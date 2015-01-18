@@ -67,7 +67,6 @@ class ParseURL(object):
     Supported URI schemes are "file", "s3", "s3n" and "hdfs".
 
     """
-
     def __init__(self, url, default_scheme="file"):
         """
         Parse given `url`.
@@ -109,7 +108,8 @@ class ParseURL(object):
             return
 
         if self.scheme == 'file':
-            # TODO: relative path doesn't work
+            # FIXME: relative path doesn't work
+            # we want to use relative paths
             self.uri_path = uri.path
             return
 
@@ -146,6 +146,8 @@ class SmartOpenRead(object):
             s3_connection = boto.connect_s3(aws_access_key_id = self.parsed_url.access_id, aws_secret_access_key = self.parsed_url.access_secret)
             return s3_iter_lines(s3_connection.lookup(self.parsed_url.bucket_id).lookup(self.parsed_url.key_id))
 
+        # TODO
+        # presunut kod z gensimu sem
         if self.parsed_url.scheme == "file":
             return gensim.utils.smart_open(self.parsed_url.uri_path)
 
@@ -238,7 +240,7 @@ def smart_open(url, mode="rb"):
     if (mode in ("w", "wb")):
         parsed_url = ParseURL(url)
 
-        # TODO: what about schemes file and hdfs???
+        # FIXME: what about schemes file and hdfs???
         if not parsed_url.scheme in ("s3", "s3n"):
             raise NotImplementedError("write mode available only for s3, s3n schemes")
 
@@ -354,10 +356,8 @@ def s3_store_lines(input_data, url="", outbucket=None, outkey=None, delimiter="\
         raise RuntimeError("`url` or `outbucket` must be defined")
 
     if url:
-        logger.info("URL")
         parsed_url = ParseURL(url)
 
-        # TODO: given URL must have s3 scheme
         if parsed_url.scheme not in ("s3", "s3n"):
             raise NotImplementedError("s3_store_lines supports only for s3, s3n schemes")
 
@@ -366,7 +366,6 @@ def s3_store_lines(input_data, url="", outbucket=None, outkey=None, delimiter="\
         outkey = boto.s3.key.Key(outbucket)
         outkey.key = parsed_url.key_id
     else:
-        logger.info("bucket")
         outkey_id = outkey
         outkey = boto.s3.key.Key(outbucket)
         outkey.key = outkey_id
