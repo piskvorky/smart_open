@@ -114,6 +114,7 @@ class SmartOpenReadTest(unittest.TestCase):
         mock_subprocess.Popen.assert_called_with(["hadoop", "fs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
 
 
+    @mock_s3
     @mock.patch('smart_open.boto')
     @mock.patch('smart_open.s3_iter_lines')
     def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
