@@ -35,16 +35,17 @@ File path can be either:
 
 """
 
-import boto
 import itertools
 import logging
+import multiprocessing.pool
 import os
 import subprocess
 import urlparse
-
 from cStringIO import StringIO
-import multiprocessing.pool
 from sys import version_info
+
+import boto.s3
+import boto.s3.key
 
 # Minimum version required version 2.6;
 # python 2.5 has a syntax which is already incompatible
@@ -183,7 +184,10 @@ def s3_iter_lines(key):
 
     """
     # check valid object on input
-    # FIXME: why this doesn't work?
+
+    print "***" #FIXME    
+    print isinstance(key, boto.s3.key.Key)  #FIXME
+
     if not isinstance(key, boto.s3.key.Key):
         raise TypeError("input must be a boto Key object")
 
@@ -252,7 +256,7 @@ def smart_open(url, mode="rb"):
     if (mode in ("w", "wb")):
         parsed_url = ParseURL(url)
 
-        # FIXME: what about schemes file and hdfs???
+        # TODO: what about schemes file and hdfs???
         if not parsed_url.scheme in ("s3", "s3n"):
             raise NotImplementedError("write mode available only for s3, s3n schemes")
 
@@ -279,7 +283,6 @@ class SmartOpenWrite(object):
         warning is logged.
 
         """
-        print "__init__"
         self.outbucket = outbucket
         self.outkey = outkey
         self.min_chunk_size = min_chunk_size
@@ -292,7 +295,6 @@ class SmartOpenWrite(object):
         Initialize multipart upload, reset internal stats.
 
         """
-        print "__enter__"
         # initialize mulitpart upload
         self.mp = self.outbucket.initiate_multipart_upload(self.outkey)
 
@@ -332,7 +334,6 @@ class SmartOpenWrite(object):
         Check if upload was correct. Complete, or cancel multipart upload.
 
         """
-        print "exit"
         buff = "".join(self.lines)
         if buff:
             logger.info("uploading last part #%i, %i bytes (total %.1fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
@@ -388,7 +389,6 @@ def s3_store_lines(input_data, url="", outbucket=None, outkey=None, delimiter="\
 
     with SmartOpenWrite(outbucket, outkey, min_chunk_size) as fout:
         for lineno, line in enumerate(input_data):
-            print "writing line %d: %s" % (lineno, line)
             if lineno % 100000 == 0:
                 logger.debug("at line %d" % lineno)
             fout.write(line + delimiter)
@@ -418,9 +418,7 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
     keys = (key for key in bucket.list(prefix=prefix) if accept_key(key.name))
 
     pool = multiprocessing.pool.Pool(processes=workers)
-    print pool
     for key_no, (key, content) in enumerate(pool.imap_unordered(s3_iter_bucket_process_key, keys)):
-        print key_no
         if key_no % 1000 == 0:
             logger.info("yielding key #%i: %s, size %i (total %.1fMB)" %
                 (key_no, key, len(content), total_size / 1024.0 ** 2))
