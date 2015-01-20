@@ -220,8 +220,9 @@ class IterLinesTest(unittest.TestCase):
     Method iter_lines just calls SmartOpenRead class.
 
     """
+    @mock.patch('smart_open.boto')
     @mock.patch('smart_open.SmartOpenRead')
-    def test_iter_lines_mock(self, mock):
+    def test_iter_lines_mock(self, mock_read, mock_boto):
         """
         Test iter_lines using mock.
         Check if SmartOpenRead gets correct argument.
@@ -416,23 +417,7 @@ class S3StoreLinesTest(unittest.TestCase):
 
 
     @mock_s3
-    @mock.patch('smart_open.boto')
-    @mock.patch('smart_open.SmartOpenWrite')
-    def test_s3_store_lines_02(self, mock_write, mock_boto):
-        """
-        Test s3_store_lines with given URL.
-
-        """
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        smart_open.s3_store_lines(["sentence1", "sentence2"], url="s3://mybucket/mykey")
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
-        mock_boto.connect_s3().lookup.assert_called_with("mybucket")
-        self.assertTrue(mock_write.called)
-
-
-    @mock_s3
-    def test_s3_store_lines_02_moto(self):
+    def test_s3_store_lines_02(self):
         """
         Test s3_store_lines with given URL using moto.
 
