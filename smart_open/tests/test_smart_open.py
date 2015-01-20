@@ -229,7 +229,7 @@ class IterLinesTest(unittest.TestCase):
 
         """
         smart_open.iter_lines("blah")
-        mock.assert_called_with("blah")
+        mock_read.assert_called_with("blah")
 
 
 class SmartOpenTest(unittest.TestCase):
