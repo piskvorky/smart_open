@@ -423,6 +423,8 @@ class S3StoreLinesTest(unittest.TestCase):
         Test s3_store_lines with given URL.
 
         """
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
         smart_open.s3_store_lines(["sentence1", "sentence2"], url="s3://mybucket/mykey")
         mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
         mock_boto.connect_s3().lookup.assert_called_with("mybucket")
