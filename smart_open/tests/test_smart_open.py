@@ -4,14 +4,14 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 
-import boto
 import mock
 import os
 import random
 import unittest
 import string
-
 from moto import mock_s3
+
+import boto.s3
 
 import smart_open
 
@@ -94,6 +94,7 @@ class SmartOpenReadTest(unittest.TestCase):
         Check if file_smart_open obtain correct filepath.
     
         """
+        mock_smart_open.return_value = ["test"]
         smart_open_object = smart_open.SmartOpenRead("file:///tmp/test.txt")
         smart_open_object.__iter__()
         mock_smart_open.assert_called_with("/tmp/test.txt")
@@ -221,9 +222,8 @@ class IterLinesTest(unittest.TestCase):
     Method iter_lines just calls SmartOpenRead class.
 
     """
-    @mock.patch('smart_open.boto')
     @mock.patch('smart_open.SmartOpenRead')
-    def test_iter_lines_mock(self, mock_read, mock_boto):
+    def test_iter_lines_mock(self, mock_read):
         """
         Test iter_lines using mock.
         Check if SmartOpenRead gets correct argument.
