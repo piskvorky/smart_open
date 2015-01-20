@@ -36,9 +36,9 @@ File path can be either:
 """
 
 import boto
-import gensim
 import itertools
 import logging
+import os
 import subprocess
 import urlparse
 
@@ -67,7 +67,6 @@ class ParseURL(object):
     Supported URI schemes are "file", "s3", "s3n" and "hdfs".
 
     """
-
     def __init__(self, url, default_scheme="file"):
         """
         Parse given `url`.
@@ -80,8 +79,10 @@ class ParseURL(object):
         self.scheme = uri.scheme if uri.scheme else default_scheme
 
         if self.scheme == "hdfs":
-            # TODO: uri.path could be empty
-            self.uri_path = uri.path
+            self.uri_path = uri.netloc + uri.path
+
+            if not self.uri_path:
+                raise RuntimeError("invalid HDFS URI: %s" % url)
             return
 
         if self.scheme in ("s3", "s3n"):
@@ -102,15 +103,21 @@ class ParseURL(object):
                 self.bucket_id, self.key_id = self.bucket_id.split('/', 1)
 
             else:
-                # more than 1 '@' in uri
-                # TODO: '@' in bucket or key?
+                # more than 1 '@' means invalid uri
+                # Bucket names must be at least 3 and no more than 63 characters long.
+                # Bucket names must be a series of one or more labels.
+                # Adjacent labels are separated by a single period (.).
+                # Bucket names can contain lowercase letters, numbers, and hyphens.
+                # Each label must start and end with a lowercase letter or a number.
                 raise RuntimeError("invalid S3 URI: %s" % url)
 
             return
 
         if self.scheme == 'file':
-            # TODO: relative path doesn't work
-            self.uri_path = uri.path
+            self.uri_path = uri.netloc + uri.path
+
+            if not self.uri_path:
+                raise RuntimeError("invalid FILE URI: %s" % url)
             return
 
         raise NotImplementedError("unknown URI scheme in %r" % url)
@@ -129,10 +136,6 @@ class SmartOpenRead(object):
         """
         self.parsed_url = ParseURL(url, default_scheme)
 
-        # TODO: the same check is provided in ParseURL, so we can remove this one:
-        if not self.parsed_url.scheme in ("hdfs", "s3", "s3n", "file"):
-            raise NotImplementedError("unknown URI scheme in %r" % parsed_url.scheme)
-
     def __iter__(self):
         """
         Return generator for each type of supported files.
@@ -147,7 +150,7 @@ class SmartOpenRead(object):
             return s3_iter_lines(s3_connection.lookup(self.parsed_url.bucket_id).lookup(self.parsed_url.key_id))
 
         if self.parsed_url.scheme == "file":
-            return gensim.utils.smart_open(self.parsed_url.uri_path)
+            return file_smart_open(self.parsed_url.uri_path)
 
         raise NotImplementedError("unknown URI scheme in %r" % self.parsed_url.scheme)
 
@@ -157,14 +160,20 @@ class SmartOpenRead(object):
     def __exit__(self, type, value, traceback):
         return None
 
-    #def read(self, size=-1):
-    #    # return whole content as string
-    #    if size < 0:
-    #        size = None
-    #
-    #    # skip first self.start bytes
-    #    chunk = itertools.islice(self.key, size)
-    #    return "".join(chunk)
+
+def file_smart_open(fname, mode='rb'):
+    _, ext = os.path.splitext(fname)
+
+    if ext == '.bz2':
+        from bz2 import BZ2File
+        return make_closing(BZ2File)(fname, mode)
+
+    if ext == '.gz':
+        from gzip import GzipFile
+        return make_closing(GzipFile)(fname, mode)
+
+    return open(fname, mode)
+
 
 def s3_iter_lines(key):
     """
@@ -173,6 +182,10 @@ def s3_iter_lines(key):
     `key` is a boto Key object.
 
     """
+    # check valid object on input
+    # FIXME: why this doesn't work?
+    if not isinstance(key, boto.s3.key.Key):
+        raise TypeError("input must be a boto Key object")
 
     buf = ''
     # keep reading chunks of bytes into the buffer
@@ -190,6 +203,7 @@ def s3_iter_lines(key):
                 # no more newlines => break out to read more data from s3 into the buffer
                 buf = buf[start : ]
                 break
+
     # process the last line, too
     if buf:
         yield buf
@@ -211,6 +225,7 @@ def iter_lines(url, default_scheme="file"):
     """
     return SmartOpenRead(url)
 
+
 def smart_open(url, mode="rb"):
     """
     Basically, this is the standard "file interface" of Python:
@@ -231,14 +246,13 @@ def smart_open(url, mode="rb"):
        "s3://my_aws_key_id:key_secret@my_bucket/lines.txt"
 
     """
-
     if (mode in ("r", "rb")):
         return SmartOpenRead(url)
 
     if (mode in ("w", "wb")):
         parsed_url = ParseURL(url)
 
-        # TODO: what about schemes file and hdfs???
+        # FIXME: what about schemes file and hdfs???
         if not parsed_url.scheme in ("s3", "s3n"):
             raise NotImplementedError("write mode available only for s3, s3n schemes")
 
@@ -252,6 +266,7 @@ def smart_open(url, mode="rb"):
         return SmartOpenWrite(outbucket, outkey)
 
     raise NotImplementedError("unknown file mode %s" % mode)
+
 
 class SmartOpenWrite(object):
     """
@@ -333,6 +348,7 @@ class SmartOpenWrite(object):
 
         return None
 
+
 def s3_store_lines(input_data, url="", outbucket=None, outkey=None, delimiter="\n", min_chunk_size=50 * 1024 ** 2):
     """
     Stream lines (strings, or unicode which will be converted to utf8 strings) from
@@ -354,10 +370,7 @@ def s3_store_lines(input_data, url="", outbucket=None, outkey=None, delimiter="\
         raise RuntimeError("`url` or `outbucket` must be defined")
 
     if url:
-        logger.info("URL")
         parsed_url = ParseURL(url)
-
-        # TODO: given URL must have s3 scheme
         if parsed_url.scheme not in ("s3", "s3n"):
             raise NotImplementedError("s3_store_lines supports only for s3, s3n schemes")
 
@@ -366,7 +379,6 @@ def s3_store_lines(input_data, url="", outbucket=None, outkey=None, delimiter="\
         outkey = boto.s3.key.Key(outbucket)
         outkey.key = parsed_url.key_id
     else:
-        logger.info("bucket")
         outkey_id = outkey
         outkey = boto.s3.key.Key(outbucket)
         outkey.key = outkey_id
@@ -376,6 +388,7 @@ def s3_store_lines(input_data, url="", outbucket=None, outkey=None, delimiter="\
 
     with SmartOpenWrite(outbucket, outkey, min_chunk_size) as fout:
         for lineno, line in enumerate(input_data):
+            print "writing line %d: %s" % (lineno, line)
             if lineno % 100000 == 0:
                 logger.debug("at line %d" % lineno)
             fout.write(line + delimiter)
