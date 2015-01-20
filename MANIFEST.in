@@ -1,3 +1,0 @@
-include README.rst
-include setup.py
-include sqlitedict.py

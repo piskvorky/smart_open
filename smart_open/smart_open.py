@@ -36,7 +36,7 @@ File path can be either:
 """
 
 import boto
-import gensim
+#import gensim
 import itertools
 import logging
 import subprocess

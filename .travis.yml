@@ -1,7 +1,8 @@
 language: python
 python:
-- "3.4"
 - "2.7"
 - "2.6"
-install: python setup.py install
-script: make test-all
+install:
+- pip install mock moto
+- python setup.py install
+script: python setup.py test
