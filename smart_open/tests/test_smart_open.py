@@ -415,6 +415,7 @@ class S3StoreLinesTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, smart_open.s3_store_lines, None, url="a")
 
 
+    @mock_s3
     @mock.patch('smart_open.boto')
     @mock.patch('smart_open.SmartOpenWrite')
     def test_s3_store_lines_02(self, mock_write, mock_boto):
