@@ -16,7 +16,7 @@ smart_open -- S3 file streaming in Python
 What?
 =====
 
-`smart_open` is a Python library for **efficient streaming of (very large) files from/to S3**. It is well tested (using `moto <https://github.com/spulec/moto>`_), well documented and has a dead simple API:
+``smart_open`` is a Python library for **efficient streaming of (very large) files from/to S3**. It is well tested (using `moto <https://github.com/spulec/moto>`_), well documented and has a dead simple API:
 
 FIXME EXAMPES
 
@@ -25,13 +25,13 @@ Why?
 
 Amazon's standard Python library, `boto <http://docs.pythonboto.org/en/latest/>`_ contains all the necessary building blocks for streaming, but has a really clumsy interface. There are nasty hidden gotchas when you want to stream large files from/to S3 (as opposed to simple in-memory read/write with `key.set_contents_from_string()` and `key.get_contents_as_string()`).
 
-`smart_open` shields you from that, offering a cleaner API. The result is less code for you to write and fewer bugs to make.
+``smart_open`` shields you from that, offering a cleaner API. The result is less code for you to write and fewer bugs to make.
 
 
 Installation
 ------------
 
-The module has no dependencies beyond 2.6 <= Python < 3.0 and `boto`:
+The module has no dependencies beyond 2.6 <= Python < 3.0 and ``boto``:
 
     pip install smart_open
 
@@ -45,19 +45,19 @@ To run the unit tests (optional), you'll also need to install `mock <https://pyp
 Todo
 ----
 
-* improve `smart_open` support for HDFS (streaming from/to Hadoop File System)
-* migrate `smart_open` streaming of gzip/bz2 files from gensim
+* improve ``smart_open`` support for HDFS (streaming from/to Hadoop File System)
+* migrate ``smart_open`` streaming of gzip/bz2 files from gensim
 * document the default `file://` support in `smart_open` better
 * add py3k support
 
 Documentation
 -------------
 
-FIXME TODO `help()`
+FIXME TODO ``help()``
 
 
 Comments, bug reports
 ---------------------
 
-`smart_open` lives on `github <https://github.com/piskvorky/smart_open>`_. You can file
+``smart_open`` lives on `github <https://github.com/piskvorky/smart_open>`_. You can file
 issues or pull requests there.
