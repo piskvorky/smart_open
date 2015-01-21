@@ -87,17 +87,18 @@ class SmartOpenReadTest(unittest.TestCase):
 
     """
     # TODO: add more complex test
-    @mock.patch('smart_open.file_smart_open')
-    def test_file(self, mock_smart_open):
+    #@mock.patch('smart_open.file_smart_open')
+    def test_file(self):
         """
         Test FILE files.
         Check if file_smart_open obtain correct filepath.
     
         """
-        smart_open_object = smart_open.SmartOpenRead("file:///tmp/test.txt")
-        smart_open_object.__iter__()
-        mock_smart_open.assert_called_with("/tmp/test.txt")
-        self.assertFalse(True)
+        with mock.patch("smart_open.file_smart_open") as mock_smart_open:
+            smart_open_object = smart_open.SmartOpenRead("file:///tmp/test.txt")
+            smart_open_object.__iter__()
+            mock_smart_open.assert_called_with("/tmp/test.txt")
+        #self.assertFalse(True)
 
 
     # TODO: couldn't find any project for testing HDFS
