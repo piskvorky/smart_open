@@ -94,10 +94,10 @@ class SmartOpenReadTest(unittest.TestCase):
         Check if file_smart_open obtain correct filepath.
     
         """
-        mock_smart_open.return_value = ["test"]
         smart_open_object = smart_open.SmartOpenRead("file:///tmp/test.txt")
         smart_open_object.__iter__()
         mock_smart_open.assert_called_with("/tmp/test.txt")
+        self.assertFalse(True)
 
 
     # TODO: couldn't find any project for testing HDFS
