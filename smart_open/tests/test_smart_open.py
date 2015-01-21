@@ -10,7 +10,6 @@ import random
 import unittest
 import string
 from moto import mock_s3
-
 import boto.s3
 
 import smart_open
@@ -87,17 +86,19 @@ class SmartOpenReadTest(unittest.TestCase):
 
     """
     # TODO: add more complex test
-    #@mock.patch('smart_open.file_smart_open')
-    def test_file(self):
+    @mock.patch('smart_open.file_smart_open')
+    def test_file(self, mock):
         """
         Test FILE files.
         Check if file_smart_open obtain correct filepath.
-    
+
         """
-        with mock.patch("smart_open.file_smart_open") as mock_smart_open:
-            smart_open_object = smart_open.SmartOpenRead("file:///tmp/test.txt")
-            smart_open_object.__iter__()
-            mock_smart_open.assert_called_with("/tmp/test.txt")
+        mock.return_value = (str(i) for i in range(10))
+        smart_open_object = smart_open.SmartOpenRead("file:///tmp/test.txt")
+        print smart_open_object # FIXME
+        for line in smart_open_object:
+            break
+        mock.assert_called_with("/tmp/test.txt")
         #self.assertFalse(True)
 
 

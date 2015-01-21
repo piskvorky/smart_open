@@ -142,6 +142,7 @@ class SmartOpenRead(object):
         Return generator for each type of supported files.
 
         """
+        print "I am __iter__" # FIXME
         if self.parsed_url.scheme == "hdfs":
             hdfs = subprocess.Popen(["hadoop", "fs", "-cat", self.parsed_url.uri_path], stdout = subprocess.PIPE)
             return hdfs.stdout
