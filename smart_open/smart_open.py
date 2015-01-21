@@ -142,6 +142,7 @@ class SmartOpenRead(object):
         Return generator for each type of supported files.
 
         """
+        print "I am __iter__" # FIXME
         if self.parsed_url.scheme == "hdfs":
             hdfs = subprocess.Popen(["hadoop", "fs", "-cat", self.parsed_url.uri_path], stdout = subprocess.PIPE)
             return hdfs.stdout
@@ -151,6 +152,7 @@ class SmartOpenRead(object):
             return s3_iter_lines(s3_connection.lookup(self.parsed_url.bucket_id).lookup(self.parsed_url.key_id))
 
         if self.parsed_url.scheme == "file":
+            print "Call file_smart_open" # FIXME
             return file_smart_open(self.parsed_url.uri_path)
 
         raise NotImplementedError("unknown URI scheme in %r" % self.parsed_url.scheme)
@@ -163,6 +165,7 @@ class SmartOpenRead(object):
 
 
 def file_smart_open(fname, mode='rb'):
+    print "I am file_smart_open" # FIXME
     _, ext = os.path.splitext(fname)
 
     if ext == '.bz2':

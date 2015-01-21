@@ -4,14 +4,13 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 
-import boto
 import mock
 import os
 import random
 import unittest
 import string
-
 from moto import mock_s3
+import boto.s3
 
 import smart_open
 
@@ -88,15 +87,19 @@ class SmartOpenReadTest(unittest.TestCase):
     """
     # TODO: add more complex test
     @mock.patch('smart_open.file_smart_open')
-    def test_file(self, mock_smart_open):
+    def test_file(self, mock):
         """
         Test FILE files.
         Check if file_smart_open obtain correct filepath.
-    
+
         """
+        mock.return_value = (str(i) for i in range(10))
         smart_open_object = smart_open.SmartOpenRead("file:///tmp/test.txt")
-        smart_open_object.__iter__()
-        mock_smart_open.assert_called_with("/tmp/test.txt")
+        print smart_open_object # FIXME
+        for line in smart_open_object:
+            break
+        mock.assert_called_with("/tmp/test.txt")
+        #self.assertFalse(True)
 
 
     # TODO: couldn't find any project for testing HDFS
@@ -114,6 +117,7 @@ class SmartOpenReadTest(unittest.TestCase):
         mock_subprocess.Popen.assert_called_with(["hadoop", "fs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
 
 
+    @mock_s3
     @mock.patch('smart_open.boto')
     @mock.patch('smart_open.s3_iter_lines')
     def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
@@ -221,14 +225,14 @@ class IterLinesTest(unittest.TestCase):
 
     """
     @mock.patch('smart_open.SmartOpenRead')
-    def test_iter_lines_mock(self, mock):
+    def test_iter_lines_mock(self, mock_read):
         """
         Test iter_lines using mock.
         Check if SmartOpenRead gets correct argument.
 
         """
         smart_open.iter_lines("blah")
-        mock.assert_called_with("blah")
+        mock_read.assert_called_with("blah")
 
 
 class SmartOpenTest(unittest.TestCase):
@@ -415,21 +419,8 @@ class S3StoreLinesTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, smart_open.s3_store_lines, None, url="a")
 
 
-    @mock.patch('smart_open.boto')
-    @mock.patch('smart_open.SmartOpenWrite')
-    def test_s3_store_lines_02(self, mock_write, mock_boto):
-        """
-        Test s3_store_lines with given URL.
-
-        """
-        smart_open.s3_store_lines(["sentence1", "sentence2"], url="s3://mybucket/mykey")
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
-        mock_boto.connect_s3().lookup.assert_called_with("mybucket")
-        self.assertTrue(mock_write.called)
-
-
     @mock_s3
-    def test_s3_store_lines_02_moto(self):
+    def test_s3_store_lines_02(self):
         """
         Test s3_store_lines with given URL using moto.
 
