@@ -1,10 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2015 Radim Rehurek <me@radimrehurek.com>
+# This code is distributed under the terms and conditions
+# from the MIT License (MIT).
 
 
 import os
+import sys
+
+# minimum required version is 2.6; py3k not supported yet
+if not ((2, 6) <= sys.version_info < (3, 0)):
+    raise ImportError("smart_open requires 2.6 <= python < 3")
+
 
 # TODO add ez_setup?
 from setuptools import setup, find_packages
@@ -35,7 +42,7 @@ setup(
     platforms = 'any',
 
     install_requires=[
-        'boto >= 2.35',
+        'boto >= 2.0',
     ],
 
     test_suite="smart_open.tests",
