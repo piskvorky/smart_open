@@ -87,7 +87,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     """
     # TODO: add more complex test
-    @mock.patch('smart_open.file_smart_open')
+    @mock.patch('smart_open.smart_open_lib.file_smart_open')
     def test_file(self, mock_smart_open):
         """
         Test FILE files.
@@ -101,7 +101,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     # TODO: couldn't find any project for testing HDFS
     # TODO: we want to test also a content of the files, not just calling
-    @mock.patch('smart_open.subprocess')
+    @mock.patch('smart_open.smart_open_lib.subprocess')
     def test_hdfs(self, mock_subprocess):
         """
         Test iterator for HDFS files.
@@ -114,8 +114,8 @@ class SmartOpenReadTest(unittest.TestCase):
         mock_subprocess.Popen.assert_called_with(["hadoop", "fs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
 
 
-    @mock.patch('smart_open.boto')
-    @mock.patch('smart_open.s3_iter_lines')
+    @mock.patch('smart_open.smart_open_lib.boto')
+    @mock.patch('smart_open.smart_open_lib.s3_iter_lines')
     def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
         """
         Test iterator for S3 files.
@@ -220,7 +220,7 @@ class IterLinesTest(unittest.TestCase):
     Method iter_lines just calls SmartOpenRead class.
 
     """
-    @mock.patch('smart_open.SmartOpenRead')
+    @mock.patch('smart_open.smart_open_lib.SmartOpenRead')
     def test_iter_lines_mock(self, mock):
         """
         Test iter_lines using mock.
@@ -236,9 +236,9 @@ class SmartOpenTest(unittest.TestCase):
     Test reading and writing from/into files.
 
     """
-    @mock.patch('smart_open.boto')
-    @mock.patch('smart_open.SmartOpenRead')
-    @mock.patch('smart_open.SmartOpenWrite')
+    @mock.patch('smart_open.smart_open_lib.boto')
+    @mock.patch('smart_open.smart_open_lib.SmartOpenRead')
+    @mock.patch('smart_open.smart_open_lib.SmartOpenWrite')
     def test_file_mode_mock(self, mock_write, mock_read, mock_boto):
         """
         Test supported file modes using mock.
@@ -415,8 +415,8 @@ class S3StoreLinesTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, smart_open.s3_store_lines, None, url="a")
 
 
-    @mock.patch('smart_open.boto')
-    @mock.patch('smart_open.SmartOpenWrite')
+    @mock.patch('smart_open.smart_open_lib.boto')
+    @mock.patch('smart_open.smart_open_lib.SmartOpenWrite')
     def test_s3_store_lines_02(self, mock_write, mock_boto):
         """
         Test s3_store_lines with given URL.
