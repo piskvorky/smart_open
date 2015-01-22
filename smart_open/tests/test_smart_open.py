@@ -4,13 +4,11 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 
+import os
+import unittest
+
 import boto
 import mock
-import os
-import random
-import unittest
-import string
-
 from moto import mock_s3
 
 import smart_open
@@ -61,7 +59,6 @@ class ParseURLTest(unittest.TestCase):
         self.assertEqual(parsed_url.access_secret, None)
 
         # correct uri with credentials
-        # pouzit skutocne hodnoty pre credentials
         parsed_url = smart_open.ParseURL("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")
         self.assertEqual(parsed_url.scheme, "s3")
         self.assertEqual(parsed_url.bucket_id, "mybucket")
@@ -69,7 +66,7 @@ class ParseURLTest(unittest.TestCase):
         self.assertEqual(parsed_url.access_id, "ACCESSID456")
         self.assertEqual(parsed_url.access_secret, "acces/sse_cr-et")
 
-        # correct uri, credentials contains 
+        # correct uri, contains credentials
         parsed_url = smart_open.ParseURL("s3://accessid:access/secret@mybucket/mykey")
         self.assertEqual(parsed_url.scheme, "s3")
         self.assertEqual(parsed_url.bucket_id, "mybucket")
@@ -91,8 +88,8 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_file(self, mock_smart_open):
         """
         Test FILE files.
-        Check if file_smart_open obtain correct filepath.
-    
+        Check if file_smart_open obtained the correct filepath.
+
         """
         smart_open_object = smart_open.SmartOpenRead("file:///tmp/test.txt")
         smart_open_object.__iter__()
@@ -106,7 +103,7 @@ class SmartOpenReadTest(unittest.TestCase):
         """
         Test iterator for HDFS files.
         Check if subprocess.Popen obtain correct filepath.
-    
+
         """
         mock_subprocess.PIPE.return_value = "test"
         smart_open_object = smart_open.SmartOpenRead("hdfs:///tmp/test.txt")
@@ -120,18 +117,18 @@ class SmartOpenReadTest(unittest.TestCase):
         """
         Test iterator for S3 files.
         Check if boto.connect_s3 obtain correct credentials.
-    
+
         """
         # no credentials
         smart_open_object = smart_open.SmartOpenRead("s3://mybucket/mykey")
         smart_open_object.__iter__()
         mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
-    
+
         # with credential
         smart_open_object = smart_open.SmartOpenRead("s3://access_id:access_secret@mybucket/mykey")
         smart_open_object.__iter__()
         mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret")
-    
+
         # lookup bucket, key; call s3_iter_lines
         smart_open_object = smart_open.SmartOpenRead("s3://access_id:access_secret@mybucket/mykey")
         smart_open_object.__iter__()
@@ -144,7 +141,7 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_s3_moto(self):
         """
         Test iterator for S3 files using moto.
-        
+
         """
         # create fake bucket and fake key
         conn = boto.connect_s3()
@@ -195,7 +192,7 @@ class S3IterLinesTest(unittest.TestCase):
     def test_s3_iter_lines_without_key(self):
         """
         Call s3_iter_lines with invalid boto key object.
-    
+
         """
         try:
             for i in smart_open.s3_iter_lines(None):
@@ -269,10 +266,10 @@ class SmartOpenTest(unittest.TestCase):
 
 
     @mock_s3
-    def test_file_mode_mock(self):
+    def test_file_mode_moto(self):
         """
         Test supported file modes using moto.
-        
+
         """
         # fake bucket and key
         conn = boto.connect_s3()
@@ -498,7 +495,7 @@ class S3IterBucketTest(unittest.TestCase):
         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
         mykey.configure_mock(**attrs)
 
-        (key, content) = smart_open.s3_iter_bucket_process_key(mykey)
+        key, content = smart_open.s3_iter_bucket_process_key(mykey)
         self.assertEqual(key, mykey)
         self.assertEqual(content, "contentA")
 
@@ -517,7 +514,7 @@ class S3IterBucketTest(unittest.TestCase):
         mykey.key = "mykey"
         mykey.set_contents_from_string("contentA")
 
-        (key, content) = smart_open.s3_iter_bucket_process_key(mykey)
+        key, content = smart_open.s3_iter_bucket_process_key(mykey)
         self.assertEqual(key, mykey)
         self.assertEqual(content, "contentA")
 
@@ -536,7 +533,7 @@ class S3IterBucketTest(unittest.TestCase):
         mybucket = mock.Mock(spec=["list"])
         mybucket.configure_mock(**attrs)
 
-        for (key, content) in smart_open.s3_iter_bucket(mybucket):
+        for key, content in smart_open.s3_iter_bucket(mybucket):
             mock_pool.Pool.assert_called_with(processes=16)
             mock_pool.Pool().imap_unordered.assert_called_with()
 
@@ -561,7 +558,7 @@ class S3IterBucketTest(unittest.TestCase):
         smart_open.s3_store_lines(["sentence41", "sentence42"], url="s3://mybucket/mykey04")
         smart_open.s3_store_lines(["sentence51", "sentence52"], url="s3://mybucket/mykey05")
 
-        for (key, content) in smart_open.s3_iter_bucket(mybucket):
+        for key, content in smart_open.s3_iter_bucket(mybucket):
             if key == "mykey01":
                 self.assertEqual(content, "sentence11\nsentence12\n")
 

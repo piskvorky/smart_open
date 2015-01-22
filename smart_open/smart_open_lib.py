@@ -55,12 +55,8 @@ if _major_version < 3:      # py <= 2.x
     if version_info[1] < 6: # py <= 2.5
         raise ImportError("smart_open requires python 2.6 or higher")
 
-try:
-    from cPickle import dumps, loads, HIGHEST_PROTOCOL as PICKLE_PROTOCOL
-except ImportError:
-    from pickle import dumps, loads, HIGHEST_PROTOCOL as PICKLE_PROTOCOL
-
 logger = logging.getLogger(__name__)
+
 
 class ParseURL(object):
     """
@@ -143,11 +139,11 @@ class SmartOpenRead(object):
 
         """
         if self.parsed_url.scheme == "hdfs":
-            hdfs = subprocess.Popen(["hadoop", "fs", "-cat", self.parsed_url.uri_path], stdout = subprocess.PIPE)
+            hdfs = subprocess.Popen(["hadoop", "fs", "-cat", self.parsed_url.uri_path], stdout=subprocess.PIPE)
             return hdfs.stdout
 
         if self.parsed_url.scheme in ("s3", "s3n"):
-            s3_connection = boto.connect_s3(aws_access_key_id = self.parsed_url.access_id, aws_secret_access_key = self.parsed_url.access_secret)
+            s3_connection = boto.connect_s3(aws_access_key_id=self.parsed_url.access_id, aws_secret_access_key=self.parsed_url.access_secret)
             return s3_iter_lines(s3_connection.lookup(self.parsed_url.bucket_id).lookup(self.parsed_url.key_id))
 
         if self.parsed_url.scheme == "file":
@@ -160,6 +156,22 @@ class SmartOpenRead(object):
 
     def __exit__(self, type, value, traceback):
         return None
+
+
+def make_closing(base, **attrs):
+    """
+    Add support for `with Base(attrs) as fout:` to the base class if it's missing.
+    The base class' `close()` method will be called on context exit, to always close the file properly.
+
+    This is needed for gzip.GzipFile, bz2.BZ2File etc in older Pythons (<=2.6), which otherwise
+    raise "AttributeError: GzipFile instance has no attribute '__exit__'".
+
+    """
+    if not hasattr(base, '__enter__'):
+        attrs['__enter__'] = lambda self: self
+    if not hasattr(base, '__exit__'):
+        attrs['__exit__'] = lambda self, type, value, traceback: self.close()
+    return type('Closing' + base.__name__, (base, object), attrs)
 
 
 def file_smart_open(fname, mode='rb'):

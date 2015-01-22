@@ -31,7 +31,7 @@ Amazon's standard Python library, `boto <http://docs.pythonboto.org/en/latest/>`
 Installation
 ------------
 
-The module has no dependencies beyond 2.6 <= Python < 3.0 and ``boto``:
+The module has no dependencies beyond 2.6 <= Python < 3.0 and ``boto``::
 
     pip install smart_open
 
