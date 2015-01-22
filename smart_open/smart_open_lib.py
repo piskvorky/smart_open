@@ -3,7 +3,7 @@
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
-#
+
 
 """
 This is the standard "file interface" of Python:
@@ -42,18 +42,9 @@ import os
 import subprocess
 import urlparse
 from cStringIO import StringIO
-from sys import version_info
 
 import boto.s3
 import boto.s3.key
-
-# Minimum version required version 2.6;
-# python 2.5 has a syntax which is already incompatible
-# but newer pythons in 2 series are easily forward compatible
-_major_version = version_info[0]
-if _major_version < 3:      # py <= 2.x
-    if version_info[1] < 6: # py <= 2.5
-        raise ImportError("smart_open requires python 2.6 or higher")
 
 logger = logging.getLogger(__name__)
 
@@ -238,7 +229,7 @@ def iter_lines(url, default_scheme="file"):
     return SmartOpenRead(url)
 
 
-def smart_open(url, mode="rb"):
+def smart_open(url, mode="rb", min_part_size=50 * 1024**2):
     """
     Basically, this is the standard "file interface" of Python:
     https://docs.python.org/2/library/stdtypes.html#bltin-file-objects
@@ -275,7 +266,7 @@ def smart_open(url, mode="rb"):
         outkey.key = parsed_url.key_id
 
         # return SmartOpenWrite object
-        return SmartOpenWrite(outbucket, outkey)
+        return SmartOpenWrite(outbucket, outkey, min_part_size=min_part_size)
 
     raise NotImplementedError("unknown file mode %s" % mode)
 
@@ -285,18 +276,18 @@ class SmartOpenWrite(object):
     Implementation of context manager for writing into files from s3.
 
     """
-    def __init__(self, outbucket, outkey, min_chunk_size=5 * 1024 ** 2):
+    def __init__(self, outbucket, outkey, min_part_size=50 * 1024**2):
         """
-        Read given arguments and keywords. If `min_chunk_size` is less then 5MB,
+        Read given arguments and keywords. If `min_part_size` is less then 5MB,
         warning is logged.
 
         """
         self.outbucket = outbucket
         self.outkey = outkey
-        self.min_chunk_size = min_chunk_size
+        self.min_part_size = min_part_size
 
-        if min_chunk_size < 5 * 1024 ** 2:
-            logger.warning("s3 requires minimum part size >= 5MB; multipart upload may fail")
+        if min_part_size < 5 * 1024 ** 2:
+            logger.warning("S3 requires minimum part size >= 5MB; multipart upload may fail")
 
     def __enter__(self):
         """
@@ -316,8 +307,10 @@ class SmartOpenWrite(object):
 
     def write(self, b):
         """
-        Store given lines into buffer, until buffer contains more than
-        `self.min_chunk_size` bytes. Then starts upload.
+        Write given bytes into S3.
+
+        Note that the bytes are buffered first to overcome limitations on S3 minimum part
+        size (see the `min_part_size` constructor parameter).
 
         """
         if isinstance(b, unicode):
@@ -330,7 +323,7 @@ class SmartOpenWrite(object):
         self.chunk_bytes += len(b)
         self.total_size += len(b)
 
-        if self.chunk_bytes >= self.min_chunk_size:
+        if self.chunk_bytes >= self.min_part_size:
             buff = "".join(self.lines)
             logger.info("uploading part #%i, %i bytes (total %.1fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
             self.mp.upload_part_from_file(StringIO(buff), part_num=self.parts + 1)
@@ -358,7 +351,7 @@ class SmartOpenWrite(object):
         return None
 
 
-def s3_store_lines(input_data, url="", outbucket=None, outkey=None, delimiter="\n", min_chunk_size=50 * 1024 ** 2):
+def s3_store_lines(input_data, url="", outbucket=None, outkey=None, delimiter="\n", min_part_size=50 * 1024 ** 2):
     """
     Stream lines (strings, or unicode which will be converted to utf8 strings) from
     the `input_data` iterator into a single s3 object `outkey` (string) under `outbucket`
@@ -393,9 +386,9 @@ def s3_store_lines(input_data, url="", outbucket=None, outkey=None, delimiter="\
         outkey.key = outkey_id
 
     logger.info("streaming input into %s/%s, using %.1fMB chunks and %r delimiter" %
-        (outbucket, outkey, min_chunk_size / 1024.0 ** 2, delimiter))
+        (outbucket, outkey, min_part_size / 1024.0 ** 2, delimiter))
 
-    with SmartOpenWrite(outbucket, outkey, min_chunk_size) as fout:
+    with SmartOpenWrite(outbucket, outkey, min_part_size) as fout:
         for lineno, line in enumerate(input_data):
             if lineno % 100000 == 0:
                 logger.debug("at line %d" % lineno)

@@ -4,10 +4,12 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 
-import os
+
 import unittest
+import logging
 
 import boto
+from boto.exception import S3ResponseError
 import mock
 from moto import mock_s3
 
@@ -143,20 +145,32 @@ class SmartOpenReadTest(unittest.TestCase):
         Test iterator for S3 files using moto.
 
         """
+        # a list of strings to test with
+        expected = ["*" * 5 * 1024**2] + ['0123456789'] * 1024 + ["test"]
+
         # create fake bucket and fake key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
-        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fin:
-            fin.write("test")
+        with smart_open.smart_open("s3://mybucket/mykey", "wb", min_part_size=5 * 1024**2) as fout:
+            # write a single huge line (=full multipart upload)
+            fout.write("%s\n" % expected[0])
+
+            # write lots of small lines
+            for lineno, line in enumerate(expected[1:-1]):
+                fout.write('%s\n' % line)
+
+            # a plain line at the end, no newline at the end
+            fout.write("%s" % expected[-1])
 
         # connect to fake s3 and read from fake key
         smart_open_object = smart_open.SmartOpenRead("s3://mybucket/mykey")
-        output = []
-        for line in smart_open_object:
-            output.append(line)
-            break
+        output = [line.rstrip('\n') for line in smart_open_object]
+        self.assertEqual(output, expected)
 
-        self.assertEqual("".join(output), "test")
+        # same thing but using a context manager
+        with smart_open.SmartOpenRead("s3://mybucket/mykey") as smart_open_object:
+            output = [line.rstrip('\n') for line in smart_open_object]
+            self.assertEqual(output, expected)
 
 
 class S3IterLinesTest(unittest.TestCase):
@@ -173,19 +187,17 @@ class S3IterLinesTest(unittest.TestCase):
         # create fake bucket and fake key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
+        test_string = "hello world!\nhow are you?"
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fin:
-            fin.write("test")
+            fin.write(test_string)
 
         # obtain boto key object
         mykey = conn.get_bucket("mybucket").get_key("mykey")
 
         # call s3_iter_lines and check output
-        output = []
-        for line in smart_open.s3_iter_lines(mykey):
-            output.append(line)
-            break
+        output = list(smart_open.s3_iter_lines(mykey))
 
-        self.assertEqual("".join(output), "test")
+        self.assertEqual(''.join(output), test_string)
 
 
     @mock_s3
@@ -274,17 +286,15 @@ class SmartOpenTest(unittest.TestCase):
         # fake bucket and key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
+        test_string = "second test"
 
         # correct write mode, correct s3 url
         with smart_open.smart_open("s3://mybucket/newkey", "wb") as fin:
-            fin.write("second test")
+            fin.write(test_string)
 
-        output = []
-        for line in smart_open.smart_open("s3://mybucket/newkey", "rb"):
-            output.append(line)
-            break
+        output = list(smart_open.smart_open("s3://mybucket/newkey", "rb"))
 
-        self.assertEqual("".join(output), "second test")
+        self.assertEqual(output, [test_string])
 
 
 class SmartOpenWriteTest(unittest.TestCase):
@@ -304,18 +314,16 @@ class SmartOpenWriteTest(unittest.TestCase):
         mybucket = conn.get_bucket("mybucket")
         mykey = boto.s3.key.Key()
         mykey.name = "testkey"
+        test_string = "žluťoučký koníček"
 
         # write into key
         with smart_open.SmartOpenWrite(mybucket, mykey) as fin:
-            fin.write("test")
+            fin.write(test_string)
 
         # read key and test content
-        output = []
-        for line in smart_open.smart_open("s3://mybucket/testkey", "rb"):
-            output.append(line)
-            break
+        output = list(smart_open.smart_open("s3://mybucket/testkey", "rb"))
 
-        self.assertEqual("".join(output), "test")
+        self.assertEqual(output, [test_string])
 
 
     @mock_s3
@@ -373,26 +381,23 @@ class SmartOpenWriteTest(unittest.TestCase):
         mykey.name = "testkey"
 
         # write
-        smart_open_write = smart_open.SmartOpenWrite(mybucket, mykey, min_chunk_size=10)
+        smart_open_write = smart_open.SmartOpenWrite(mybucket, mykey, min_part_size=10)
         with smart_open_write as fin:
             fin.write(u"test")
             self.assertEqual(fin.chunk_bytes, 4)
 
-            fin.write(u"test")
-            self.assertEqual(fin.chunk_bytes, 8)
+            fin.write(u"test\n")
+            self.assertEqual(fin.chunk_bytes, 9)
             self.assertEqual(fin.parts, 0)
 
             fin.write(u"test")
             self.assertEqual(fin.chunk_bytes, 0)
             self.assertEqual(fin.parts, 1)
 
-        # read key and test content
-        output = []
-        for line in smart_open.smart_open("s3://mybucket/testkey", "rb"):
-            output.append(line)
-            break
+        # read back the same key and check its content
+        output = list(smart_open.smart_open("s3://mybucket/testkey"))
 
-        self.assertEqual("".join(output), "testtesttest")
+        self.assertEqual(output, ["testtest\n", "test"])
 
 
 class S3StoreLinesTest(unittest.TestCase):
@@ -434,16 +439,15 @@ class S3StoreLinesTest(unittest.TestCase):
         # fake connection and bucket
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
+        expected = ["sentence1\n", "sentence2\n"]
 
-        # store lines
-        smart_open.s3_store_lines(list(["sentence1", "sentence2"]), url="s3://mybucket/mykey")
+        # store lines from a generator; adds the default \n delimiter automatically by default
+        smart_open.s3_store_lines((line.rstrip('\n') for line in expected), url="s3://mybucket/mykey")
 
         # read and check data
-        output = []
-        for line in smart_open.smart_open("s3://mybucket/mykey", "rb"):
-            output.append(line)
+        output = list(smart_open.smart_open("s3://mybucket/mykey", "rb"))
 
-        self.assertEqual("".join(output), "sentence1\nsentence2\n")
+        self.assertEqual(output, expected)
 
 
     @mock.patch('smart_open.boto')
@@ -573,3 +577,8 @@ class S3IterBucketTest(unittest.TestCase):
 
             if key == "mykey05":
                 self.assertEqual(content, "sentence51\nsentence52\n")
+
+
+if __name__ == '__main__':
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
+    unittest.main()
