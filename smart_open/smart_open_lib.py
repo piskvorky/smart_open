@@ -1,41 +1,43 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
+# Copyright (C) 2015 Radim Rehurek <me@radimrehurek.com>
+#
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 
 
 """
-This is the standard "file interface" of Python:
-https://docs.python.org/2/library/stdtypes.html#bltin-file-objects from which
-we only want to implement line iteration, read, write and close for now.
-The operations are memory efficient (streaming) and suitable for large files.
+Utilities for streaming from several file-like data storages: S3 / HDFS / standard
+filesystem / compressed files..., using a single, Pythonic API.
 
-File path can be either:
-   1. local filesystem;
-   2. HDFS;
-   3. Amazon's S3;
+The streaming makes heavy use of generators and pipes, to avoid loading
+full file contents into memory, allowing work with arbitrarily large files.
 
->>> for line in smart_open.iter_lines('s3://mybucket/mykey.txt'):
->>>    print line
+Examples::
 
->>> with smart_open('s3://mybucket/mykey.txt', 'rb') as fin:
->>>     for line in fin:
->>>        print line
+>>> # stream lines from an HDFS file
+>>> for line in smart_open.smart_open.iter_lines('hdfs://user/hadoop/my_file.txt'):
+...    print line
 
->>> smart_open.s3_store_lines(['sentence 1'], 's3://mybucket/mykey.txt')
+>>> # stream lines from S3; you can use context managers too:
+>>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'rb') as fin:
+...     for line in fin:
+...         print line
 
+>>> # stream content *into* S3:
 >>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'wb') as fout:
->>>     for line in ['sentence 1', 'sentence 2', 'sentence 3']:
->>>         fout.write(line + '\n')
+...     for line in ['first line', 'second line', 'third line']:
+...          fout.write(line + '\n')
 
->>> for file_name, file_content in s3_iter_bucket(mybucket,
-    accept_key=lambda fname: fname.endswith('.json')):
->>>     print file_name, len(file_content)
+>>> # efficient, parallelized iteration over select keys in an S3 bucket
+>>> for fname, content in smart_open.s3_iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('.json')):
+...     print fname, len(content)
+
+(see the function API docs for extra options).
 
 """
 
-import itertools
 import logging
 import multiprocessing.pool
 import os
@@ -43,45 +45,99 @@ import subprocess
 import urlparse
 from cStringIO import StringIO
 
-import boto.s3
 import boto.s3.key
 
 logger = logging.getLogger(__name__)
 
+S3_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
 
-class ParseURL(object):
+
+def smart_open(uri, mode="rb"):
     """
-    Parse given URL.
+    Open the given s3/hdfs/file/gzip... file pointed to by `uri` for reading or writing.
+
+    The only supported modes are 'r' = 'rb' (read, default) and 'w' = 'wb' (replace write).
+
+    The reads/writes are memory efficient (streamed by lines) and suitable for large files.
+
+    The `uri` can be either::
+
+    1. local filesystem; examples: "/home/joe/lines.txt", "/home/joe/lines.txt.gz",
+       "file:///home/joe/lines.txt.bz2"
+    2. HDFS; example "hdfs:///some/path/lines.txt"
+    3. Amazon's S3; example "s3://my_bucket/lines.txt",
+       "s3://my_aws_key_id:key_secret@my_bucket/lines.txt"
+
+    """
+    # this method just routes the request to classes handling the specific storage
+    # schemes, depending on the URI protocol in `uri`
+    parsed_uri = ParseUri(uri)
+
+    if parsed_uri.scheme in ("file", ):
+        # local files -- both read & write supported
+        # compression, if any, is determined by the filename extension (.gz, .bz2)
+        return file_smart_open(parsed_uri.uri_path, mode)
+
+    if mode in ('r', 'rb'):
+        if parsed_uri.scheme in ("s3", "s3n"):
+            return S3OpenRead(parsed_uri)
+        elif parsed_uri.scheme in ("hdfs", ):
+            return HdfsOpenRead(parsed_uri)
+        else:
+            raise NotImplementedError("read mode not supported for %r scheme", parsed_uri.scheme)
+    elif mode in ('w', 'wb'):
+        if parsed_uri.scheme in ("s3", "s3n"):
+            s3_connection = boto.connect_s3(aws_access_key_id=parsed_uri.access_id, aws_secret_access_key=parsed_uri.access_secret)
+            outbucket = s3_connection.lookup(parsed_uri.bucket_id)
+            outkey = boto.s3.key.Key(outbucket)
+            outkey.key = parsed_uri.key_id
+            return S3OpenWrite(outbucket, outkey)
+        else:
+            raise NotImplementedError("write mode not supported for %r scheme", parsed_uri.scheme)
+
+    else:
+        raise NotImplementedError("unknown file mode %s" % mode)
+
+
+class ParseUri(object):
+    """
+    Parse the given URI.
+
     Supported URI schemes are "file", "s3", "s3n" and "hdfs".
 
+    Valid URI examples::
+
+      * s3://my_bucket/my_key
+      * s3://my_key:my_secret@my_bucket/my_key
+      * hdfs:///path/file
+      * ./local/path/file
+      * ./local/path/file.gz
+      * file:///home/user/file
+      * file:///home/user/file.bz2
+
     """
-    def __init__(self, url, default_scheme="file"):
+    def __init__(self, uri, default_scheme="file"):
         """
-        Parse given `url`.
-        If uri scheme is "s3" or "s3n", extract all params for
-        connection to S3.
-        Use `default_scheme` if no scheme is parsed.
+        Assume `default_scheme` if no scheme given in `uri`.
 
         """
-        uri = urlparse.urlsplit(url)
-        self.scheme = uri.scheme if uri.scheme else default_scheme
+        parsed_uri = urlparse.urlsplit(uri)
+        self.scheme = parsed_uri.scheme if parsed_uri.scheme else default_scheme
 
         if self.scheme == "hdfs":
-            self.uri_path = uri.netloc + uri.path
+            self.uri_path = parsed_uri.netloc + parsed_uri.path
 
             if not self.uri_path:
-                raise RuntimeError("invalid HDFS URI: %s" % url)
-            return
-
-        if self.scheme in ("s3", "s3n"):
-            self.bucket_id = (uri.netloc + uri.path).split('@')
-            self.key_id = ""
+                raise RuntimeError("invalid HDFS URI: %s" % uri)
+        elif self.scheme in ("s3", "s3n"):
+            self.bucket_id = (parsed_uri.netloc + parsed_uri.path).split('@')
+            self.key_id = None
 
             if len(self.bucket_id) == 1:
                 # URI without credentials: s3://bucket/object
                 self.bucket_id, self.key_id = self.bucket_id[0].split('/', 1)
+                # "None" credentials are interpreted as "look for credentials in other locations" by boto
                 self.access_id, self.access_secret = None, None
-
             elif len(self.bucket_id) == 2 and len(self.bucket_id[0].split(':')) == 2:
                 # URI in full format: s3://key:secret@bucket/object
                 # access key id: [A-Z0-9]{20}
@@ -89,7 +145,6 @@ class ParseURL(object):
                 acc, self.bucket_id = self.bucket_id
                 self.access_id, self.access_secret = acc.split(':')
                 self.bucket_id, self.key_id = self.bucket_id.split('/', 1)
-
             else:
                 # more than 1 '@' means invalid uri
                 # Bucket names must be at least 3 and no more than 63 characters long.
@@ -97,56 +152,76 @@ class ParseURL(object):
                 # Adjacent labels are separated by a single period (.).
                 # Bucket names can contain lowercase letters, numbers, and hyphens.
                 # Each label must start and end with a lowercase letter or a number.
-                raise RuntimeError("invalid S3 URI: %s" % url)
-
-            return
-
-        if self.scheme == 'file':
-            self.uri_path = uri.netloc + uri.path
+                raise RuntimeError("invalid S3 URI: %s" % uri)
+        elif self.scheme == 'file':
+            self.uri_path = parsed_uri.netloc + parsed_uri.path
 
             if not self.uri_path:
-                raise RuntimeError("invalid FILE URI: %s" % url)
-            return
+                raise RuntimeError("invalid file URI: %s" % uri)
+        else:
+            raise NotImplementedError("unknown URI scheme in %r" % uri)
 
-        raise NotImplementedError("unknown URI scheme in %r" % url)
 
-
-class SmartOpenRead(object):
+class S3OpenRead(object):
     """
-    Implementation of context manager for reading files.
+    Implement streamed reader from S3, as an iterable & context manager.
 
     """
-    def __init__(self, url, default_scheme="file"):
-        """
-        Parse given `url`. If url contains unsupported uri scheme,
-        exception is raised.
-
-        """
-        self.parsed_url = ParseURL(url, default_scheme)
+    def __init__(self, parsed_uri):
+        if parsed_uri.scheme not in ("s3", "s3n"):
+            raise TypeError("can only process S3 files")
+        self.parsed_uri = parsed_uri
+        s3_connection = boto.connect_s3(
+            aws_access_key_id=parsed_uri.access_id,
+            aws_secret_access_key=parsed_uri.access_secret)
+        self.outbucket = s3_connection.lookup(parsed_uri.bucket_id)
+        self.outkey = boto.s3.key.Key(self.outbucket)
+        self.outkey.key = parsed_uri.key_id
 
     def __iter__(self):
-        """
-        Return generator for each type of supported files.
+        s3_connection = boto.connect_s3(
+            aws_access_key_id=self.parsed_uri.access_id,
+            aws_secret_access_key=self.parsed_uri.access_secret)
+        return s3_iter_lines(s3_connection.lookup(self.parsed_uri.bucket_id).lookup(self.parsed_uri.key_id))
 
-        """
-        if self.parsed_url.scheme == "hdfs":
-            hdfs = subprocess.Popen(["hadoop", "fs", "-cat", self.parsed_url.uri_path], stdout=subprocess.PIPE)
-            return hdfs.stdout
+    def read(self, size=None):
+        raise NotImplementedError("read() not implemented yet")
 
-        if self.parsed_url.scheme in ("s3", "s3n"):
-            s3_connection = boto.connect_s3(aws_access_key_id=self.parsed_url.access_id, aws_secret_access_key=self.parsed_url.access_secret)
-            return s3_iter_lines(s3_connection.lookup(self.parsed_url.bucket_id).lookup(self.parsed_url.key_id))
-
-        if self.parsed_url.scheme == "file":
-            return file_smart_open(self.parsed_url.uri_path)
-
-        raise NotImplementedError("unknown URI scheme in %r" % self.parsed_url.scheme)
+    def seek(self, offset, whence=None):
+        raise NotImplementedError("seek() not implemented yet")
 
     def __enter__(self):
         return self
 
     def __exit__(self, type, value, traceback):
-        return None
+        pass
+
+
+class HdfsOpenRead(object):
+    """
+    Implement streamed reader from HDFS, as an iterable & context manager.
+
+    """
+    def __init__(self, parsed_uri):
+        if parsed_uri.scheme not in ("hdfs"):
+            raise TypeError("can only process HDFS files")
+        self.parsed_uri = parsed_uri
+
+    def __iter__(self):
+        hdfs = subprocess.Popen(["hadoop", "fs", "-cat", self.parsed_uri.uri_path], stdout=subprocess.PIPE)
+        return hdfs.stdout
+
+    def read(self, size=None):
+        raise NotImplementedError("read() not implemented yet")
+
+    def seek(self, offset, whence=None):
+        raise NotImplementedError("seek() not implemented yet")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        pass
 
 
 def make_closing(base, **attrs):
@@ -166,6 +241,11 @@ def make_closing(base, **attrs):
 
 
 def file_smart_open(fname, mode='rb'):
+    """
+    Stream from/to local filesystem, transparently (de)compressing gzip and bz2
+    files if necessary.
+
+    """
     _, ext = os.path.splitext(fname)
 
     if ext == '.bz2':
@@ -179,107 +259,16 @@ def file_smart_open(fname, mode='rb'):
     return open(fname, mode)
 
 
-def s3_iter_lines(key):
+class S3OpenWrite(object):
     """
-    Stream an object from s3 line by line (generator).
-
-    `key` is a boto Key object.
+    Context manager for writing into S3 files.
 
     """
-    # check valid object on input
-    if not isinstance(key, boto.s3.key.Key):
-        raise TypeError("input must be a boto Key object")
-
-    buf = ''
-    # keep reading chunks of bytes into the buffer
-    for chunk in key:
-        buf += chunk
-
-        start = 0
-        # process all lines within the current buffer
-        while True:
-            end = buf.find('\n', start) + 1
-            if end:
-                yield buf[start : end]
-                start = end
-            else:
-                # no more newlines => break out to read more data from s3 into the buffer
-                buf = buf[start : ]
-                break
-
-    # process the last line, too
-    if buf:
-        yield buf
-
-
-def iter_lines(url, default_scheme="file"):
-    """
-    Iterate over lines from a single file, pointed to by `url` path. The iteration
-    is memory efficient (streaming) and suitable for large files.
-
-    The `url` path can be either:
-
-    1. local filesystem; examples: "/home/joe/lines.txt", "/home/joe/lines.txt.gz",
-       "file:///home/joe/lines.txt.bz2"
-    2. HDFS; example "hdfs:///some/path/lines.txt"
-    3. Amazon's S3; example "s3://my_bucket/lines.txt",
-       "s3://my_aws_key_id:key_secret@my_bucket/lines.txt"
-
-    """
-    return SmartOpenRead(url)
-
-
-def smart_open(url, mode="rb", min_part_size=50 * 1024**2):
-    """
-    Basically, this is the standard "file interface" of Python:
-    https://docs.python.org/2/library/stdtypes.html#bltin-file-objects
-
-    The only supported modes for open are 'r' = 'rb' (read, default)
-    and 'w' = 'wb' (replace write).
-
-    Iterate over lines from a single file, pointed to by `url` path. The iteration
-    is memory efficient (streaming) and suitable for large files.
-
-    The `url` path can be either:
-
-    1. local filesystem; examples: "/home/joe/lines.txt", "/home/joe/lines.txt.gz",
-       "file:///home/joe/lines.txt.bz2"
-    2. HDFS; example "hdfs:///some/path/lines.txt"
-    3. Amazon's S3; example "s3://my_bucket/lines.txt",
-       "s3://my_aws_key_id:key_secret@my_bucket/lines.txt"
-
-    """
-    if (mode in ("r", "rb")):
-        return SmartOpenRead(url)
-
-    if (mode in ("w", "wb")):
-        parsed_url = ParseURL(url)
-
-        # TODO: what about schemes file and hdfs???
-        if not parsed_url.scheme in ("s3", "s3n"):
-            raise NotImplementedError("write mode available only for s3, s3n schemes")
-
-        # prepare boto bucket and boto key objects
-        s3_connection = boto.connect_s3(aws_access_key_id=parsed_url.access_id, aws_secret_access_key=parsed_url.access_secret)
-        outbucket = s3_connection.lookup(parsed_url.bucket_id)
-        outkey = boto.s3.key.Key(outbucket)
-        outkey.key = parsed_url.key_id
-
-        # return SmartOpenWrite object
-        return SmartOpenWrite(outbucket, outkey, min_part_size=min_part_size)
-
-    raise NotImplementedError("unknown file mode %s" % mode)
-
-
-class SmartOpenWrite(object):
-    """
-    Implementation of context manager for writing into files from s3.
-
-    """
-    def __init__(self, outbucket, outkey, min_part_size=50 * 1024**2):
+    def __init__(self, outbucket, outkey, min_part_size=S3_MIN_PART_SIZE):
         """
-        Read given arguments and keywords. If `min_part_size` is less then 5MB,
-        warning is logged.
+        Streamed input is uploaded in chunks, as soon as `min_part_size` bytes are
+        accumulated (50MB by default). The minimum chunk size allowed by AWS S3
+        is 5MB.
 
         """
         self.outbucket = outbucket
@@ -289,11 +278,6 @@ class SmartOpenWrite(object):
         if min_part_size < 5 * 1024 ** 2:
             logger.warning("S3 requires minimum part size >= 5MB; multipart upload may fail")
 
-    def __enter__(self):
-        """
-        Initialize multipart upload, reset internal stats.
-
-        """
         # initialize mulitpart upload
         self.mp = self.outbucket.initiate_multipart_upload(self.outkey)
 
@@ -303,17 +287,16 @@ class SmartOpenWrite(object):
         self.chunk_bytes = 0
         self.parts = 0
 
-        return self
-
     def write(self, b):
         """
-        Write given bytes into S3.
+        Write the given bytes (binary string) into the S3 file from constructor.
 
-        Note that the bytes are buffered first to overcome limitations on S3 minimum part
-        size (see the `min_part_size` constructor parameter).
+        Note there's buffering happening under the covers, so this may not actually
+        do any HTTP transfer right away.
 
         """
         if isinstance(b, unicode):
+            # not part of API: also accept unicode => encode it as utf8
             b = b.encode('utf8')
 
         if not isinstance(b, str):
@@ -330,69 +313,29 @@ class SmartOpenWrite(object):
             self.parts += 1
             self.lines, self.chunk_bytes = [], 0
 
+    def seek(self, offset, whence=None):
+        raise NotImplementedError("seek() not implemented yet")
+
+    def __enter__(self):
+        return self
+
     def __exit__(self, type, value, traceback):
-        """
-        Check if upload was correct. Complete, or cancel multipart upload.
+        try:
+            buff = "".join(self.lines)
+            if buff:
+                logger.info("uploading last part #%i, %i bytes (total %.1fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+                self.mp.upload_part_from_file(StringIO(buff), part_num=self.parts + 1)
 
-        """
-        buff = "".join(self.lines)
-        if buff:
-            logger.info("uploading last part #%i, %i bytes (total %.1fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
-            self.mp.upload_part_from_file(StringIO(buff), part_num=self.parts + 1)
-
-        if self.total_size:
-            self.mp.complete_upload()
-        else:
-            # AWS complains with "The XML you provided was not well-formed or did not validate against our published schema"
-            # when the input is completely empty => abort the upload
-            logger.warning("empty input, ignoring multipart upload")
+            if self.total_size:
+                self.mp.complete_upload()
+            else:
+                # AWS complains with "The XML you provided was not well-formed or did not validate against our published schema"
+                # when the input is completely empty => abort the upload
+                logger.info("empty input, ignoring multipart upload")
+                self.outbucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
+        except Exception:
+            logger.exception("encountered error while terminating multipart upload; attempting cancel")
             self.outbucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
-
-        return None
-
-
-def s3_store_lines(input_data, url="", outbucket=None, outkey=None, delimiter="\n", min_part_size=50 * 1024 ** 2):
-    """
-    Stream lines (strings, or unicode which will be converted to utf8 strings) from
-    the `input_data` iterator into a single s3 object `outkey` (string) under `outbucket`
-    (boto Bucket object).
-
-    Optionally put `delimiter` after each line (set this to empty string to disable;
-    default is the newline character).
-
-    This works around a number of s3 annoyances, such as its inability to store too
-    large files (=uses multipart upload), inability to store too small multiparts
-    (=merges parts into blocks of sufficient size), empty files etc.
-
-    Suitable for processing very large inputs/outputs, in limited RAM.
-
-    """
-
-    if not url and not outbucket:
-        raise RuntimeError("`url` or `outbucket` must be defined")
-
-    if url:
-        parsed_url = ParseURL(url)
-        if parsed_url.scheme not in ("s3", "s3n"):
-            raise NotImplementedError("s3_store_lines supports only for s3, s3n schemes")
-
-        s3_connection = boto.connect_s3(aws_access_key_id=parsed_url.access_id, aws_secret_access_key=parsed_url.access_secret)
-        outbucket = s3_connection.lookup(parsed_url.bucket_id)
-        outkey = boto.s3.key.Key(outbucket)
-        outkey.key = parsed_url.key_id
-    else:
-        outkey_id = outkey
-        outkey = boto.s3.key.Key(outbucket)
-        outkey.key = outkey_id
-
-    logger.info("streaming input into %s/%s, using %.1fMB chunks and %r delimiter" %
-        (outbucket, outkey, min_part_size / 1024.0 ** 2, delimiter))
-
-    with SmartOpenWrite(outbucket, outkey, min_part_size) as fout:
-        for lineno, line in enumerate(input_data):
-            if lineno % 100000 == 0:
-                logger.debug("at line %d" % lineno)
-            fout.write(line + delimiter)
 
 
 def s3_iter_bucket_process_key(key):
@@ -407,10 +350,16 @@ def s3_iter_bucket_process_key(key):
 
 def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16):
     """
-    Iterate over all objects in the given input `bucket` in parallel, yielding out
-    (key name, key content) 2-tuples (generator).
+    Iterate over all files in the given input `bucket`, yielding out
+    `(key name, key content)` 2-tuples.
 
-    `accept_key` must be a function of one parameter = unicode string = key name.
+    `accept_key` is a function accepting a key name (unicode string) and return True/False,
+    signalling whether the given key should be yielded out or not (default: process all).
+
+    If `key_limit` is given, stop after yielding out that many results.
+
+    The keys are processed in parallel, using `workers` processes (default: 16),
+    to speed up downloads greatly.
 
     """
     logger.info("iterating over keys from %s with %i workers" % (bucket, workers))
@@ -434,3 +383,36 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
     pool.terminate()
 
     logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
+
+
+def s3_iter_lines(key):
+    """
+    Stream an object from S3 line by line (generator).
+
+    `key` must be a `boto.key.Key` object.
+
+    """
+    # check valid object on input
+    if not isinstance(key, boto.s3.key.Key):
+        raise TypeError("expected boto.key.Key object on input")
+
+    buf = ''
+    # keep reading chunks of bytes into the buffer
+    for chunk in key:
+        buf += chunk
+
+        start = 0
+        # process all lines within the current buffer
+        while True:
+            end = buf.find('\n', start) + 1
+            if end:
+                yield buf[start : end]
+                start = end
+            else:
+                # no more newlines => break out to read more data from s3 into the buffer
+                buf = buf[start : ]
+                break
+
+    # process the last line, too
+    if buf:
+        yield buf
