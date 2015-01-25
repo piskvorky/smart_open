@@ -119,8 +119,8 @@ class SmartOpenReadTest(unittest.TestCase):
         # lookup bucket, key; call s3_iter_lines
         smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://access_id:access_secret@mybucket/mykey"))
         smart_open_object.__iter__()
-        mock_boto.connect_s3().lookup.assert_called_with("mybucket")
-        mock_boto.connect_s3().lookup().lookup.assert_called_with("mykey")
+        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
+        mock_boto.connect_s3().get_bucket().lookup.assert_called_with("mykey")
         self.assertTrue(mock_s3_iter_lines.called)
 
 
@@ -232,7 +232,7 @@ class S3IterLinesTest(unittest.TestCase):
         except TypeError:
             pass
         else:
-            self.fail("s3_iter_lines extected to fail on non-Key inputs")
+            self.fail("s3_iter_lines expected to fail on non-`boto.key.Key` inputs")
 
         try:
             for i in smart_open.s3_iter_lines("test"):
@@ -240,7 +240,7 @@ class S3IterLinesTest(unittest.TestCase):
         except TypeError:
             pass
         else:
-            self.fail("s3_iter_lines extected to fail on non-Key inputs")
+            self.fail("s3_iter_lines extected to fail on non-`boto.key.Key` inputs")
 
 
 class SmartOpenTest(unittest.TestCase):

@@ -185,12 +185,19 @@ class S3OpenRead(object):
             aws_access_key_id=parsed_uri.access_id,
             aws_secret_access_key=parsed_uri.access_secret)
         self.read_key = s3_connection.get_bucket(parsed_uri.bucket_id).lookup(parsed_uri.key_id)
+        if self.read_key is None:
+            raise KeyError(parsed_uri.key_id)
+
 
     def __iter__(self):
         s3_connection = boto.connect_s3(
             aws_access_key_id=self.parsed_uri.access_id,
             aws_secret_access_key=self.parsed_uri.access_secret)
-        return s3_iter_lines(s3_connection.lookup(self.parsed_uri.bucket_id).lookup(self.parsed_uri.key_id))
+        key = s3_connection.get_bucket(self.parsed_uri.bucket_id).lookup(self.parsed_uri.key_id)
+        if key is None:
+            raise KeyError(self.parsed_uri.key_id)
+
+        return s3_iter_lines(key)
 
     def read(self, size=None):
         """
@@ -222,7 +229,7 @@ class S3OpenRead(object):
         return self
 
     def __exit__(self, type, value, traceback):
-        pass
+        self.read_key.close()
 
 
 class HdfsOpenRead(object):
@@ -336,8 +343,9 @@ class S3OpenWrite(object):
 
         if self.chunk_bytes >= self.min_part_size:
             buff = "".join(self.lines)
-            logger.info("uploading part #%i, %i bytes (total %.1fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
             self.mp.upload_part_from_file(StringIO(buff), part_num=self.parts + 1)
+            logger.debug("upload of part #%i finished" % self.parts)
             self.parts += 1
             self.lines, self.chunk_bytes = [], 0
 
@@ -351,17 +359,19 @@ class S3OpenWrite(object):
         try:
             buff = "".join(self.lines)
             if buff:
-                logger.info("uploading last part #%i, %i bytes (total %.1fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+                logger.info("uploading last part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
                 self.mp.upload_part_from_file(StringIO(buff), part_num=self.parts + 1)
+                logger.debug("upload of last part #%i finished" % self.parts)
 
             if self.total_size:
                 self.mp.complete_upload()
             else:
                 # AWS complains with "The XML you provided was not well-formed or did not validate against our published schema"
-                # when the input is completely empty => abort the upload
+                # when the input is completely empty => abort the upload, no file created
+                # TODO: or create the empty file some other way?
                 logger.info("empty input, ignoring multipart upload")
                 self.outbucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
-        except Exception:
+        except:  # including KeyboardInterrupt
             logger.exception("encountered error while terminating multipart upload; attempting cancel")
             self.outbucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
 
@@ -395,7 +405,7 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
       >>> mybucket = boto.connect_s3().get_bucket('mybucket')
 
       >>> # get all JSON files under "mybucket/foo/"
-      >>> for key, content in s3_iter_bucket(mybucket, prefix='/foo/', accept_key=lambda key: key.endswith('.json')):
+      >>> for key, content in s3_iter_bucket(mybucket, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
       ...     print key, len(content)
 
       >>> # limit to 10k files, using 32 parallel workers (default is 16)

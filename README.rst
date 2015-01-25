@@ -27,6 +27,8 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
   >>> with smart_open.smart_open('s3://mybucket/mykey.txt') as fin:
   ...     for line in fin:
   ...         print line
+  ...     fin.seek(0)  # seek to file beginning
+  ...     fin.read(1000)  # read 1000 bytes
 
   >>> # stream from HDFS
   >>> for line in smart_open.smart_open('hdfs://user/hadoop/my_file.txt'):
@@ -48,13 +50,12 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
 there's also an extra method ``smart_open.s3_iter_bucket()`` that does this efficiently,
 **processing the bucket keys in parallel** (using multiprocessing)::
 
-  >>> bucket = boto.connect_s3().get_bucket('mybucket')
-
   >>> # get all JSON files under "mybucket/foo/"
-  >>> for key, content in s3_iter_bucket(bucket, prefix='/foo/', accept_key=lambda key: key.endswith('.json')):
+  >>> bucket = boto.connect_s3().get_bucket('mybucket')
+  >>> for key, content in s3_iter_bucket(bucket, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
   ...     print key, len(content)
 
-For more info & full method signatures, check out the API docs::
+For more info (S3 credentials in URI, minimum S3 part size...) and full method signatures, check out the API docs::
 
   >>> import smart_open
   >>> help(smart_open.smart_open)
