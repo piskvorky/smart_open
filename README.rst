@@ -17,7 +17,9 @@ What?
 =====
 
 ``smart_open`` is a Python library for **efficient streaming of very large files** from/to S3, HDFS or local (compressed) files.
-It is well tested (using `moto <https://github.com/spulec/moto>`_), well documented and sports a simple, Pythonic API::
+It is well tested (using `moto <https://github.com/spulec/moto>`_), well documented and sports a simple, Pythonic API:
+
+.. code-block:: python
 
   >>> # stream lines from an S3 object
   >>> for line in smart_open.smart_open('s3://mybucket/mykey.txt'):
@@ -48,14 +50,18 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
 
 Since going over all (or select) keys in an S3 bucket is a very common operation,
 there's also an extra method ``smart_open.s3_iter_bucket()`` that does this efficiently,
-**processing the bucket keys in parallel** (using multiprocessing)::
+**processing the bucket keys in parallel** (using multiprocessing):
+
+.. code-block:: python
 
   >>> # get all JSON files under "mybucket/foo/"
   >>> bucket = boto.connect_s3().get_bucket('mybucket')
   >>> for key, content in s3_iter_bucket(bucket, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
   ...     print key, len(content)
 
-For more info (S3 credentials in URI, minimum S3 part size...) and full method signatures, check out the API docs::
+For more info (S3 credentials in URI, minimum S3 part size...) and full method signatures, check out the API docs:
+
+.. code-block:: python
 
   >>> import smart_open
   >>> help(smart_open.smart_open_lib)
