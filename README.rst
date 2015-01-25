@@ -91,7 +91,7 @@ To run the unit tests (optional), you'll also need to install `mock <https://pyp
 Todo
 ----
 
-Suggestions, pull request and improvements welcome!
+``smart_open`` is an ongoing effort. Suggestions, pull request and improvements welcome!
 
 On the roadmap:
 
