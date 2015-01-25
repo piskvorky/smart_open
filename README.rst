@@ -16,7 +16,7 @@ smart_open -- Utils for streaming large files (S3, HDFS, gzip, bz2...)
 What?
 =====
 
-``smart_open`` is a Python library for **efficient streaming of (very large) files** from S3, HDFS or local (compressed) files.
+``smart_open`` is a Python library for **efficient streaming of very large files** from/to S3, HDFS or local (compressed) files.
 It is well tested (using `moto <https://github.com/spulec/moto>`_), well documented and sports a simple, Pythonic API::
 
   >>> # stream lines from an S3 object
@@ -27,8 +27,8 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
   >>> with smart_open.smart_open('s3://mybucket/mykey.txt') as fin:
   ...     for line in fin:
   ...         print line
-  ...     fin.seek(0)  # seek to file beginning
-  ...     fin.read(1000)  # read 1000 bytes
+  ...     fin.seek(0)  # seek to the beginning
+  ...     print fin.read(1000)  # read 1000 bytes
 
   >>> # stream from HDFS
   >>> for line in smart_open.smart_open('hdfs://user/hadoop/my_file.txt'):
@@ -58,14 +58,13 @@ there's also an extra method ``smart_open.s3_iter_bucket()`` that does this effi
 For more info (S3 credentials in URI, minimum S3 part size...) and full method signatures, check out the API docs::
 
   >>> import smart_open
-  >>> help(smart_open.smart_open)
-  >>> help(smart_open.s3_iter_bucket)
+  >>> help(smart_open.smart_open_lib)
 
 Why?
 ----
 
 Working with large S3 files using Amazon's default Python library, `boto <http://docs.pythonboto.org/en/latest/>`_, is a pain. Its ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` only work for small files (loaded in RAM, no streaming).
-There are nasty hidden gotchas when using `boto``'s multipart upload functionality, and lots of boilerplate.
+There are nasty hidden gotchas when using ``boto``'s multipart upload functionality, and a lot of boilerplate.
 
 ``smart_open`` shields you from that. It builds on boto but offers a cleaner API. The result is less code for you to write and fewer bugs to make.
 
@@ -76,7 +75,7 @@ The module has no dependencies beyond 2.6 <= Python < 3.0 and ``boto``::
 
     pip install smart_open
 
-Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pypi/smart_open>`_ ::
+Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pypi/smart_open>`_::
 
     python setup.py test  # run unit tests
     python setup.py install
@@ -99,3 +98,8 @@ Comments, bug reports
 
 ``smart_open`` lives on `github <https://github.com/piskvorky/smart_open>`_. You can file
 issues or pull requests there.
+
+----------------
+
+``smart_open`` is open source software released under the `MIT license <https://github.com/piskvorky/smart_open/blob/master/LICENSE>`_.
+Copyright (c) 2015-now `Radim Řehůřek <http://radimrehurek.com>`_.
