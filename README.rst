@@ -41,7 +41,7 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
   ...     for line in ['first line', 'second line', 'third line']:
   ...          fout.write(line + '\n')
 
-  >> stream from/to local compressed files:
+  >>> # stream from/to local compressed files:
   >>> for line in smart_open.smart_open('./foo.txt.gz'):
   ...    print line
 
