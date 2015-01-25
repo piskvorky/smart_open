@@ -24,7 +24,7 @@ def read(fname):
 
 setup(
     name = 'smart_open',
-    version = '0.1.1',
+    version = '1.0.0',
     description = 'Utils for streaming large files (S3, HDFS, gzip, bz2...)',
     long_description = read('README.rst'),
 
@@ -50,7 +50,7 @@ setup(
     test_suite="smart_open.tests",
 
     classifiers = [ # from http://pypi.python.org/pypi?%3Aaction=list_classifiers
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Environment :: Console',
         'Intended Audience :: Developers',
         'License :: Public Domain',
