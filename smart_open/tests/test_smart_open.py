@@ -23,10 +23,7 @@ class ParseUriTest(unittest.TestCase):
 
     """
     def test_scheme(self):
-        """
-        Test correct parsing of URI schemes.
-
-        """
+        """Do URIs schemes parse correctly?"""
         # supported schemes
         for scheme in ("s3", "s3n", "hdfs", "file"):
             parsed_uri = smart_open.ParseUri(scheme + "://mybucket/mykey")
@@ -41,10 +38,7 @@ class ParseUriTest(unittest.TestCase):
 
 
     def test_s3_uri(self):
-        """
-        Test parsing of S3 URIs.
-
-        """
+        """Do S3 URIs parse correctly?"""
         # correct uri without credentials
         parsed_uri = smart_open.ParseUri("s3://mybucket/mykey")
         self.assertEqual(parsed_uri.scheme, "s3")
@@ -89,7 +83,7 @@ class SmartOpenReadTest(unittest.TestCase):
     # TODO: add more complex test for file://
     @mock.patch('smart_open.smart_open_lib.file_smart_open')
     def test_file(self, mock_smart_open):
-        """Test file:// scheme."""
+        """Is file:// line iterator called correctly?"""
         smart_open_object = smart_open.smart_open("file:///tmp/test.txt", "rb")
         smart_open_object.__iter__()
         # called with the correct path?
@@ -100,7 +94,7 @@ class SmartOpenReadTest(unittest.TestCase):
     # TODO: we want to test also a content of the files, not just fnc call params
     @mock.patch('smart_open.smart_open_lib.subprocess')
     def test_hdfs(self, mock_subprocess):
-        """Test read iterator for HDFS files."""
+        """Is HDFS line iterator called correctly?"""
         mock_subprocess.PIPE.return_value = "test"
         smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs:///tmp/test.txt"))
         smart_open_object.__iter__()
@@ -111,7 +105,7 @@ class SmartOpenReadTest(unittest.TestCase):
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.s3_iter_lines')
     def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
-        """Test read iterator for S3 files."""
+        """Is S3 line iterator called correctly?"""
         # no credentials
         smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
         smart_open_object.__iter__()
@@ -131,8 +125,8 @@ class SmartOpenReadTest(unittest.TestCase):
 
 
     @mock_s3
-    def test_s3_moto(self):
-        """Test read iterator for S3 files, checking content using moto."""
+    def test_s3_iter_moto(self):
+        """Are S3 files iterated over correctly?"""
         # a list of strings to test with
         expected = ["*" * 5 * 1024**2] + ['0123456789'] * 1024 + ["test"]
 
@@ -170,7 +164,7 @@ class S3IterLinesTest(unittest.TestCase):
     """
     @mock_s3
     def test_s3_iter_lines_with_key(self):
-        """Test content of s3_iter_lines using moto."""
+        """Does s3_iter_lines give correct content?"""
         # create fake bucket and fake key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
@@ -189,7 +183,7 @@ class S3IterLinesTest(unittest.TestCase):
 
     @mock_s3
     def test_s3_iter_lines_without_key(self):
-        """Call s3_iter_lines with invalid input."""
+        """Does s3_iter_lines fail on invalid input?"""
         # cannot use context manager for assertRaise in py2.6
         try:
             for i in smart_open.s3_iter_lines(None):
@@ -216,7 +210,7 @@ class SmartOpenTest(unittest.TestCase):
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.file_smart_open')
     def test_file_mode_mock(self, mock_file, mock_boto):
-        """Test supported file modes using mock."""
+        """Are file:// open modes passed correctly?"""
         # incorrect file mode
         self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "x")
 
@@ -241,16 +235,17 @@ class SmartOpenTest(unittest.TestCase):
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
     def test_s3_mode_mock(self, mock_write, mock_boto):
+        """Are s3:// open modes passed correctly?"""
         # correct write mode, correct s3 URI
         smart_open.smart_open("s3://mybucket/mykey", "w")
         mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
         mock_boto.connect_s3().lookup.return_value = True
-        mock_boto.connect_s3().lookup.assert_called_with("mybucket")
+        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
         self.assertTrue(mock_write.called)
 
     @mock_s3
     def test_s3_modes_moto(self):
-        """Test supported s3 modes using moto."""
+        """Do s3:// open modes work correctly?"""
         # fake bucket and key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
@@ -272,7 +267,7 @@ class S3OpenWriteTest(unittest.TestCase):
     """
     @mock_s3
     def test_write_01(self):
-        """Test writing into s3 files using moto."""
+        """Does writing into s3 work correctly?"""
         # fake connection, bucket and key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
@@ -292,7 +287,7 @@ class S3OpenWriteTest(unittest.TestCase):
 
     @mock_s3
     def test_write_01a(self):
-        """Test write with incorrect input."""
+        """Does s3 write fail on incorrect input?"""
         # fake connection, bucket and key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
@@ -311,7 +306,7 @@ class S3OpenWriteTest(unittest.TestCase):
 
     @mock_s3
     def test_write_02(self):
-        """Test writing of unicode input into s3 files."""
+        """Does s3 write unicode conversion work?"""
         # fake connection, bucket and key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
@@ -327,7 +322,7 @@ class S3OpenWriteTest(unittest.TestCase):
 
     @mock_s3
     def test_write_03(self):
-        """Test writing into s3 files."""
+        """Does s3 multipart chunking work correctly?"""
         # fake connection, bucket and key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
@@ -361,7 +356,7 @@ class S3IterBucketTest(unittest.TestCase):
 
     """
     def test_s3_iter_bucket_process_key_mock(self):
-        """Test s3_iter_bucket_process_key using mock."""
+        """Is s3_iter_bucket_process_key called correctly?"""
         attrs = {"name" : "fileA", "get_contents_as_string.return_value" : "contentA"}
         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
         mykey.configure_mock(**attrs)
@@ -373,7 +368,7 @@ class S3IterBucketTest(unittest.TestCase):
 
     @mock_s3
     def test_s3_iter_bucket_process_key_moto(self):
-        """Test s3_iter_bucket_process_key using moto."""
+        """Does s3_iter_bucket_process_key work correctly?"""
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
         mybucket = conn.get_bucket("mybucket")
@@ -389,7 +384,7 @@ class S3IterBucketTest(unittest.TestCase):
 
     @mock.patch('smart_open.multiprocessing.pool')
     def test_s3_iter_bucket_mock(self, mock_pool):
-        """Test parallel bucket iteration using mock."""
+        """Is s3_iter_bucket called correctly?"""
         attrs = {"name" : "fileA", "get_contents_as_string.return_value" : "contentA"}
         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
         mykey.configure_mock(**attrs)
@@ -408,7 +403,7 @@ class S3IterBucketTest(unittest.TestCase):
 
     @mock_s3
     def test_s3_iter_bucket_moto(self):
-        """Test parallel bucket iteration using moto."""
+        """Does s3_iter_bucket work correctly?"""
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
         mybucket = conn.get_bucket("mybucket")

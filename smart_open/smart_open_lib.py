@@ -14,27 +14,10 @@ filesystem / compressed files..., using a single, Pythonic API.
 The streaming makes heavy use of generators and pipes, to avoid loading
 full file contents into memory, allowing work with arbitrarily large files.
 
-Examples::
+The main methods are:
 
->>> # stream lines from an HDFS file
->>> for line in smart_open.smart_open.iter_lines('hdfs://user/hadoop/my_file.txt'):
-...    print line
-
->>> # stream lines from S3; you can use context managers too:
->>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'rb') as fin:
-...     for line in fin:
-...         print line
-
->>> # stream content *into* S3:
->>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'wb') as fout:
-...     for line in ['first line', 'second line', 'third line']:
-...          fout.write(line + '\n')
-
->>> # efficient, parallelized iteration over select keys in an S3 bucket
->>> for fname, content in smart_open.s3_iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('.json')):
-...     print fname, len(content)
-
-(see the function API docs for extra options).
+* `smart_open()`, which opens the given file for reading/writing
+* `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
 
 """
 
@@ -54,19 +37,46 @@ S3_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
 
 def smart_open(uri, mode="rb"):
     """
-    Open the given s3/hdfs/file/gzip... file pointed to by `uri` for reading or writing.
+    Open the given S3 / HDFS / filesystem file pointed to by `uri` for reading or writing.
 
-    The only supported modes are 'r' = 'rb' (read, default) and 'w' = 'wb' (replace write).
+    The only supported modes for now are 'rb' (read, default) and 'wb' (replace & write).
 
-    The reads/writes are memory efficient (streamed by lines) and suitable for large files.
+    The reads/writes are memory efficient (streamed) and therefore suitable for
+    arbitrarily large files.
 
-    The `uri` can be either::
+    The `uri` can be either:
 
-    1. local filesystem; examples: "/home/joe/lines.txt", "/home/joe/lines.txt.gz",
-       "file:///home/joe/lines.txt.bz2"
-    2. HDFS; example "hdfs:///some/path/lines.txt"
-    3. Amazon's S3; example "s3://my_bucket/lines.txt",
-       "s3://my_aws_key_id:key_secret@my_bucket/lines.txt"
+    1. local filesystem (compressed ``.gz`` or ``.bz2`` files handled automatically):
+       `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
+    2. Amazon's S3 (can also supply credentials inside the URI):
+       `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
+    3. HDFS: `hdfs:///some/path/lines.txt`
+
+    Examples::
+
+      >>> # stream lines from S3; you can use context managers too:
+      >>> with smart_open.smart_open('s3://mybucket/mykey.txt') as fin:
+      ...     for line in fin:
+      ...         print line
+
+      >>> # stream line-by-line from an HDFS file
+      >>> for line in smart_open.smart_open('hdfs:///user/hadoop/my_file.txt'):
+      ...    print line
+
+      >>> # stream content *into* S3:
+      >>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'wb') as fout:
+      ...     for line in ['first line', 'second line', 'third line']:
+      ...          fout.write(line + '\n')
+
+      >>> # stream from/to (compressed) local files:
+      >>> for line in smart_open.smart_open('/home/radim/my_file.txt'):
+      ...    print line
+      >>> for line in smart_open.smart_open('/home/radim/my_file.txt.gz'):
+      ...    print line
+      >>> with smart_open.smart_open('/home/radim/my_file.txt.gz', 'wb') as fout:
+      ...    fout.write("hello world!\n")
+      >>> with smart_open.smart_open('/home/radim/another.txt.bz2', 'wb') as fout:
+      ...    fout.write("good bye!\n")
 
     """
     # this method just routes the request to classes handling the specific storage
@@ -88,7 +98,7 @@ def smart_open(uri, mode="rb"):
     elif mode in ('w', 'wb'):
         if parsed_uri.scheme in ("s3", "s3n"):
             s3_connection = boto.connect_s3(aws_access_key_id=parsed_uri.access_id, aws_secret_access_key=parsed_uri.access_secret)
-            outbucket = s3_connection.lookup(parsed_uri.bucket_id)
+            outbucket = s3_connection.get_bucket(parsed_uri.bucket_id)
             outkey = boto.s3.key.Key(outbucket)
             outkey.key = parsed_uri.key_id
             return S3OpenWrite(outbucket, outkey)
@@ -350,16 +360,29 @@ def s3_iter_bucket_process_key(key):
 
 def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16):
     """
-    Iterate over all files in the given input `bucket`, yielding out
-    `(key name, key content)` 2-tuples.
+    Iterate and download all S3 files under `bucket/prefix`, yielding out
+    `(key name, key content)` 2-tuples (generator).
 
-    `accept_key` is a function accepting a key name (unicode string) and return True/False,
-    signalling whether the given key should be yielded out or not (default: process all).
+    `accept_key` is a function that accepts a key name (unicode string) and
+    returns True/False, signalling whether the given key should be downloaded out or
+    not (default: accept all keys).
 
     If `key_limit` is given, stop after yielding out that many results.
 
     The keys are processed in parallel, using `workers` processes (default: 16),
     to speed up downloads greatly.
+
+    Example::
+
+      >>> mybucket = boto.connect_s3().get_bucket('mybucket')
+
+      >>> # get all JSON files under "mybucket/foo/"
+      >>> for key, content in s3_iter_bucket(mybucket, prefix='/foo/', accept_key=lambda key: key.endswith('.json')):
+      ...     print key, len(content)
+
+      >>> # limit to 10k files, using 32 parallel workers (default is 16)
+      >>> for key, content in s3_iter_bucket(mybucket, key_limit=10000, workers=32):
+      ...     print key, len(content)
 
     """
     logger.info("iterating over keys from %s with %i workers" % (bucket, workers))
