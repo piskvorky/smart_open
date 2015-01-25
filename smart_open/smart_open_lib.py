@@ -184,9 +184,7 @@ class S3OpenRead(object):
         s3_connection = boto.connect_s3(
             aws_access_key_id=parsed_uri.access_id,
             aws_secret_access_key=parsed_uri.access_secret)
-        self.outbucket = s3_connection.lookup(parsed_uri.bucket_id)
-        self.outkey = boto.s3.key.Key(self.outbucket)
-        self.outkey.key = parsed_uri.key_id
+        self.read_key = s3_connection.get_bucket(parsed_uri.bucket_id).lookup(parsed_uri.key_id)
 
     def __iter__(self):
         s3_connection = boto.connect_s3(
@@ -195,10 +193,30 @@ class S3OpenRead(object):
         return s3_iter_lines(s3_connection.lookup(self.parsed_uri.bucket_id).lookup(self.parsed_uri.key_id))
 
     def read(self, size=None):
-        raise NotImplementedError("read() not implemented yet")
+        """
+        Read a specified number of bytes from the key.
 
-    def seek(self, offset, whence=None):
-        raise NotImplementedError("seek() not implemented yet")
+        Note read() and line iteration (`for line in self: ...`) each have their
+        own file position, so they are independent. Doing a `read` will not affect
+        the line iteration, and vice versa.
+
+        """
+        if size < 0 or not size:
+            # for compatibility with standard Python `read(negative)` = read the rest of the file
+            # XXX boto would read *from the start* if given size=-1
+            size = 0
+        return self.read_key.read(size)
+
+    def seek(self, offset, whence=0):
+        """
+        Seek to the specified position.
+
+        Only seeking to the beginning (offset=0) supported for now.
+
+        """
+        if whence != 0 or offset != 0:
+            raise NotImplementedError("seek other than offset=0 not implemented yet")
+        self.read_key.close(fast=True)
 
     def __enter__(self):
         return self
