@@ -104,7 +104,6 @@ def smart_open(uri, mode="rb"):
             return S3OpenWrite(outbucket, outkey)
         else:
             raise NotImplementedError("write mode not supported for %r scheme", parsed_uri.scheme)
-
     else:
         raise NotImplementedError("unknown file mode %s" % mode)
 
@@ -188,7 +187,6 @@ class S3OpenRead(object):
         if self.read_key is None:
             raise KeyError(parsed_uri.key_id)
 
-
     def __iter__(self):
         s3_connection = boto.connect_s3(
             aws_access_key_id=self.parsed_uri.access_id,
@@ -209,8 +207,8 @@ class S3OpenRead(object):
 
         """
         if size < 0 or not size:
-            # for compatibility with standard Python `read(negative)` = read the rest of the file
-            # XXX boto would read *from the start* if given size=-1
+            # For compatibility with standard Python, `read(negative)` = read the rest of the file.
+            # Otherwise, boto would read *from the start* if given size=-1.
             size = 0
         return self.read_key.read(size)
 

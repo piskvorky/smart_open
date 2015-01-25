@@ -1,6 +1,6 @@
-======================================================================
-smart_open -- Utils for streaming large files (S3, HDFS, gzip, bz2...)
-======================================================================
+=============================================
+smart_open -- utils for streaming large files
+=============================================
 
 |Travis|_
 |Downloads|_
@@ -69,7 +69,7 @@ For more info (S3 credentials in URI, minimum S3 part size...) and full method s
 Why?
 ----
 
-Working with large S3 files using Amazon's default Python library, `boto <http://docs.pythonboto.org/en/latest/>`_, is a pain. Its ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` only work for small files (loaded in RAM, no streaming).
+Working with large S3 files using Amazon's default Python library, `boto <http://docs.pythonboto.org/en/latest/>`_, is a pain. Its ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` methods only work for small files (loaded in RAM, no streaming).
 There are nasty hidden gotchas when using ``boto``'s multipart upload functionality, and a lot of boilerplate.
 
 ``smart_open`` shields you from that. It builds on boto but offers a cleaner API. The result is less code for you to write and fewer bugs to make.
