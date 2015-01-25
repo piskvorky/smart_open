@@ -352,28 +352,33 @@ class S3OpenWrite(object):
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
 
+    def close(self):
+        buff = "".join(self.lines)
+        if buff:
+            logger.info("uploading last part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+            self.mp.upload_part_from_file(StringIO(buff), part_num=self.parts + 1)
+            logger.debug("upload of last part #%i finished" % self.parts)
+
+        if self.total_size:
+            self.mp.complete_upload()
+        else:
+            # AWS complains with "The XML you provided was not well-formed or did not validate against our published schema"
+            # when the input is completely empty => abort the upload, no file created
+            # TODO: or create the empty file some other way?
+            logger.info("empty input, ignoring multipart upload")
+            self.outbucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
+
     def __enter__(self):
         return self
 
     def __exit__(self, type, value, traceback):
         try:
-            buff = "".join(self.lines)
-            if buff:
-                logger.info("uploading last part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
-                self.mp.upload_part_from_file(StringIO(buff), part_num=self.parts + 1)
-                logger.debug("upload of last part #%i finished" % self.parts)
-
-            if self.total_size:
-                self.mp.complete_upload()
-            else:
-                # AWS complains with "The XML you provided was not well-formed or did not validate against our published schema"
-                # when the input is completely empty => abort the upload, no file created
-                # TODO: or create the empty file some other way?
-                logger.info("empty input, ignoring multipart upload")
-                self.outbucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
-        except:  # including KeyboardInterrupt
+            self.close()
+        except:
             logger.exception("encountered error while terminating multipart upload; attempting cancel")
             self.outbucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
+            logger.info("cancel completed")
+            raise
 
 
 def s3_iter_bucket_process_key(key):
