@@ -46,9 +46,10 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
 
 Since going over all (or select) keys in an S3 bucket is a very common operation,
 there's also an extra method ``smart_open.s3_iter_bucket()`` that does this efficiently,
-processing the bucket keys in parallel (using multiprocessing)::
+**processing the bucket keys in parallel** (using multiprocessing)::
 
   >>> bucket = boto.connect_s3().get_bucket('mybucket')
+
   >>> # get all JSON files under "mybucket/foo/"
   >>> for key, content in s3_iter_bucket(bucket, prefix='/foo/', accept_key=lambda key: key.endswith('.json')):
   ...     print key, len(content)
@@ -62,11 +63,10 @@ For more info & full method signatures, check out the API docs::
 Why?
 ----
 
-Working with large S3 files using Amazon's default Python library, `boto <http://docs.pythonboto.org/en/latest/>`_ is a pain. Its ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` only work for small files (loads in RAM, no streaming).
-There are nasty hidden gotchas ().
-contains all the necessary building blocks for streaming, but has a really clumsy interface.
+Working with large S3 files using Amazon's default Python library, `boto <http://docs.pythonboto.org/en/latest/>`_, is a pain. Its ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` only work for small files (loaded in RAM, no streaming).
+There are nasty hidden gotchas when using `boto``'s multipart upload functionality, and lots of boilerplate.
 
-``smart_open`` shields you from that, offering a cleaner API. The result is less code for you to write and fewer bugs to make.
+``smart_open`` shields you from that. It builds on boto but offers a cleaner API. The result is less code for you to write and fewer bugs to make.
 
 Installation
 ------------
@@ -87,7 +87,7 @@ Todo
 
 Suggestions, pull request and improvements welcome!
 
-On the roadmap::
+On the roadmap:
 
 * improve ``smart_open`` support for HDFS (streaming from/to Hadoop File System)
 * better documentation for the default ``file://`` scheme
