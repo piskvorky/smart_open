@@ -545,8 +545,9 @@ class MultistreamsBZ2Test(unittest.TestCase):
         import bz2
 
         test_file = self.create_temp_bz2(streams=5)
-        with bz2.BZ2File(test_file) as bz2f:
-            self.assertNotEqual(bz2f.read(), self.TEXT * 5)
+        bz2f = bz2.BZ2File(test_file)
+        self.assertNotEqual(bz2f.read(), self.TEXT * 5)
+        bz2f.close()
         self.cleanup_temp_bz2(test_file)
 
     def test_file_smart_open_can_read_multistream_bz2(self):
