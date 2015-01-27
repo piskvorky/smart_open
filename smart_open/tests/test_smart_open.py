@@ -538,8 +538,10 @@ class MultistreamsBZ2Test(unittest.TestCase):
             self.assertEqual(bz2f.read(), self.TEXT * 5)
         self.cleanup_temp_bz2(test_file)
 
-    @unittest.skipIf(not PY2, 'Multistream bzip is included in Python 3')
     def test_python2_stdlib_bz2_cannot_read_multistream(self):
+        # Multistream bzip is included in Python 3
+        if not PY2:
+            return
         import bz2
 
         test_file = self.create_temp_bz2(streams=5)
@@ -556,4 +558,4 @@ class MultistreamsBZ2Test(unittest.TestCase):
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
-    unittest.main()
+    unittest2.main()
