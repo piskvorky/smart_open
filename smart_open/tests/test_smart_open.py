@@ -484,8 +484,8 @@ class MultistreamsBZ2Test(unittest.TestCase):
     Test that multistream bzip2 compressed files can be read.
 
     """
-    # notes these tests are derived from the Python 3.x tip bz2 tests.
 
+    # note: these tests are derived from the Python 3.x tip bz2 tests.
 
     TEXT_LINES = [
         'root:x:0:0:root:/root:/bin/bash\n',
