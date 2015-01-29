@@ -27,6 +27,7 @@ import os
 import subprocess
 import urlparse
 from cStringIO import StringIO
+import sys
 
 import boto.s3.key
 
@@ -282,7 +283,11 @@ def file_smart_open(fname, mode='rb'):
     _, ext = os.path.splitext(fname)
 
     if ext == '.bz2':
-        from bz2 import BZ2File
+        PY2 = sys.version_info[0] == 2
+        if PY2:
+            from bz2file import BZ2File
+        else:
+            from bz2 import BZ2File
         return make_closing(BZ2File)(fname, mode)
 
     if ext == '.gz':
