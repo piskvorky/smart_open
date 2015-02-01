@@ -390,7 +390,6 @@ def s3_iter_bucket_process_key(key):
     of pickling visibility.
 
     """
-    logger.info("s3_iter_bucket_process_key")
     return key, key.get_contents_as_string()
 
 
