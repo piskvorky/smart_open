@@ -86,7 +86,7 @@ Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pyp
     python setup.py test  # run unit tests
     python setup.py install
 
-To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ and `moto <https://github.com/spulec/moto>`_. The tests are also run automatically with `Travis CI <https://travis-ci.org/piskvorky/smart_open>`_ on every commit push & pull request.
+To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ and `moto <https://github.com/spulec/moto>`_ (``pip install mock moto``). The tests are also run automatically with `Travis CI <https://travis-ci.org/piskvorky/smart_open>`_ on every commit push & pull request.
 
 Todo
 ----
