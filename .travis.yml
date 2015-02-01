@@ -1,10 +1,18 @@
+sudo: false
 language: python
 notifications:
   email: false
 python:
 - "2.7"
 - "2.6"
+cache:
+  directories:
+    - $PWD/wheelhouse  # cache the dependencies
+env:
+  global:
+    - export PIP_FIND_LINKS=$PWD/wheelhouse
 install:
-- pip install mock moto
-- python setup.py install
+  - pip wheel mock moto
+  - pip install mock moto
+  - python setup.py install
 script: python setup.py test
