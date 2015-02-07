@@ -6,9 +6,9 @@ smart_open -- utils for streaming large files
 |Downloads|_
 |License|_
 
-.. |Travis| image:: https://api.travis-ci.org/piskvorky/smart_open.png?branch=master
-.. |Downloads| image:: https://pypip.in/d/smart_open/badge.png?style=flat
-.. |License| image:: https://pypip.in/license/smart_open/badge.png?style=flat
+.. |Travis| image:: https://img.shields.io/travis/piskvorky/smart_open.svg
+.. |Downloads| image:: https://img.shields.io/pypi/dm/smart_open.svg
+.. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
 .. _Travis: https://travis-ci.org/piskvorky/smart_open
 .. _Downloads: https://pypi.python.org/pypi/smart_open
 .. _License: https://github.com/piskvorky/smart_open/blob/master/LICENSE
