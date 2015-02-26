@@ -294,6 +294,15 @@ def file_smart_open(fname, mode='rb'):
         from gzip import GzipFile
         return make_closing(GzipFile)(fname, mode)
 
+    """
+    Auto create folder , if the file's folder is not exit.
+
+    """
+    if mode in ('w', 'wb') :
+        fullpath = os.path.realpath(fname)
+        path = os.path.split(fullpath)[0]
+        if not os.path.exists(path) :
+            os.makedirs(path)    
     return open(fname, mode)
 
 
