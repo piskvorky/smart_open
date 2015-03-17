@@ -147,7 +147,16 @@ class ParseUri(object):
                 # URI without credentials: s3://bucket/object
                 self.bucket_id, self.key_id = self.bucket_id[0].split('/', 1)
                 # "None" credentials are interpreted as "look for credentials in other locations" by boto
-                self.access_id, self.access_secret = None, None
+                
+                #AWSACCESSKEYID
+                #AWSSECRETACCESSKEY
+                import os
+                try :
+                    self.access_id = os.environ["AWSACCESSKEYID"]
+                    self.access_secret = os.environ['AWSSECRETACCESSKEY']
+                except KeyError:
+                    # dont thing
+                    pass
             elif len(self.bucket_id) == 2 and len(self.bucket_id[0].split(':')) == 2:
                 # URI in full format: s3://key:secret@bucket/object
                 # access key id: [A-Z0-9]{20}
