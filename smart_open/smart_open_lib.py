@@ -147,7 +147,16 @@ class ParseUri(object):
                 # URI without credentials: s3://bucket/object
                 self.bucket_id, self.key_id = self.bucket_id[0].split('/', 1)
                 # "None" credentials are interpreted as "look for credentials in other locations" by boto
-                self.access_id, self.access_secret = None, None
+                
+                #AWSACCESSKEYID
+                #AWSSECRETACCESSKEY
+                import os
+                try :
+                    self.access_id = os.environ["AWSACCESSKEYID"].strip()
+                    self.access_secret = os.environ['AWSSECRETACCESSKEY'].strip()
+                except KeyError:
+                    # dont thing
+                    pass
             elif len(self.bucket_id) == 2 and len(self.bucket_id[0].split(':')) == 2:
                 # URI in full format: s3://key:secret@bucket/object
                 # access key id: [A-Z0-9]{20}
@@ -294,6 +303,15 @@ def file_smart_open(fname, mode='rb'):
         from gzip import GzipFile
         return make_closing(GzipFile)(fname, mode)
 
+    """
+    Auto create folder , if the file's folder is not exit.
+
+    """
+    if mode in ('w', 'wb') :
+        fullpath = os.path.realpath(fname)
+        path = os.path.split(fullpath)[0]
+        if not os.path.exists(path) :
+            os.makedirs(path)    
     return open(fname, mode)
 
 
