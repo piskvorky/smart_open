@@ -152,8 +152,8 @@ class ParseUri(object):
                 #AWSSECRETACCESSKEY
                 import os
                 try :
-                    self.access_id = os.environ["AWSACCESSKEYID"]
-                    self.access_secret = os.environ['AWSSECRETACCESSKEY']
+                    self.access_id = os.environ["AWSACCESSKEYID"].strip()
+                    self.access_secret = os.environ['AWSSECRETACCESSKEY'].strip()
                 except KeyError:
                     # dont thing
                     pass
