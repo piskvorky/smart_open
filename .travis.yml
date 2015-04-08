@@ -9,4 +9,4 @@ python:
 install:
 - pip install mock moto
 - python setup.py install
-script: python setup.py test
+script: python -W ignore setup.py test

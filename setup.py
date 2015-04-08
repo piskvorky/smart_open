@@ -10,9 +10,9 @@
 import os
 import sys
 
-# minimum required version is 2.6; py3k not supported yet
-#if not ((2, 6) <= sys.version_info < (3, 0)):
-#    raise ImportError("smart_open requires 2.6 <= python < 3")
+# minimum required version is 2.6
+if not ((2, 6) <= sys.version_info):
+    raise ImportError("smart_open requires python >= 2.6")
 
 
 # TODO add ez_setup?
