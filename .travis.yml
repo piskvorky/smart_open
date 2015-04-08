@@ -4,6 +4,8 @@ notifications:
 python:
 - "2.7"
 - "2.6"
+- "3.3"
+- "3.4"
 install:
 - pip install mock moto
 - python setup.py install

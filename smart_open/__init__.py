@@ -1,1 +1,1 @@
-from smart_open_lib import *
+from .smart_open_lib import *

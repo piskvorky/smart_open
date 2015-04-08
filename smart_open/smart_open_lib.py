@@ -25,10 +25,9 @@ import logging
 import multiprocessing.pool
 import os
 import subprocess
-import urlparse
-from cStringIO import StringIO
 import sys
 
+from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
 
 logger = logging.getLogger(__name__)
@@ -131,7 +130,7 @@ class ParseUri(object):
         Assume `default_scheme` if no scheme given in `uri`.
 
         """
-        parsed_uri = urlparse.urlsplit(uri)
+        parsed_uri = urlsplit(uri)
         self.scheme = parsed_uri.scheme if parsed_uri.scheme else default_scheme
 
         if self.scheme == "hdfs":
@@ -207,7 +206,7 @@ class S3OpenRead(object):
         the line iteration, and vice versa.
 
         """
-        if size < 0 or not size:
+        if not size or size < 0:
             # For compatibility with standard Python, `read(negative)` = read the rest of the file.
             # Otherwise, boto would read *from the start* if given size=-1.
             size = 0
@@ -333,11 +332,11 @@ class S3OpenWrite(object):
         do any HTTP transfer right away.
 
         """
-        if isinstance(b, unicode):
+        if isinstance(b, six.text_type):
             # not part of API: also accept unicode => encode it as utf8
             b = b.encode('utf8')
 
-        if not isinstance(b, str):
+        if not isinstance(b, six.binary_type):
             raise TypeError("input must be a binary string")
 
         self.lines.append(b)
@@ -345,9 +344,9 @@ class S3OpenWrite(object):
         self.total_size += len(b)
 
         if self.chunk_bytes >= self.min_part_size:
-            buff = "".join(self.lines)
+            buff = b"".join(self.lines)
             logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
-            self.mp.upload_part_from_file(StringIO(buff), part_num=self.parts + 1)
+            self.mp.upload_part_from_file(BytesIO(buff), part_num=self.parts + 1)
             logger.debug("upload of part #%i finished" % self.parts)
             self.parts += 1
             self.lines, self.chunk_bytes = [], 0
@@ -356,10 +355,10 @@ class S3OpenWrite(object):
         raise NotImplementedError("seek() not implemented yet")
 
     def close(self):
-        buff = "".join(self.lines)
+        buff = b"".join(self.lines)
         if buff:
             logger.info("uploading last part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
-            self.mp.upload_part_from_file(StringIO(buff), part_num=self.parts + 1)
+            self.mp.upload_part_from_file(BytesIO(buff), part_num=self.parts + 1)
             logger.debug("upload of last part #%i finished" % self.parts)
 
         if self.total_size:
@@ -454,7 +453,7 @@ def s3_iter_lines(key):
     if not isinstance(key, boto.s3.key.Key):
         raise TypeError("expected boto.key.Key object on input")
 
-    buf = ''
+    buf = b''
     # keep reading chunks of bytes into the buffer
     for chunk in key:
         buf += chunk
@@ -462,7 +461,7 @@ def s3_iter_lines(key):
         start = 0
         # process all lines within the current buffer
         while True:
-            end = buf.find('\n', start) + 1
+            end = buf.find(b'\n', start) + 1
             if end:
                 yield buf[start : end]
                 start = end

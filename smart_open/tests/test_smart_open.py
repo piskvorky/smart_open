@@ -131,32 +131,32 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_s3_iter_moto(self):
         """Are S3 files iterated over correctly?"""
         # a list of strings to test with
-        expected = ["*" * 5 * 1024**2] + ['0123456789'] * 1024 + ["test"]
+        expected = [b"*" * 5 * 1024**2] + [b'0123456789'] * 1024 + [b"test"]
 
         # create fake bucket and fake key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
-        # lower the multipart upload size, to speed up the tests
+        # lower the multipart upload size, to speed up these tests
         smart_open_lib.S3_MIN_PART_SIZE = 5 * 1024**2
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
             # write a single huge line (=full multipart upload)
-            fout.write("%s\n" % expected[0])
+            fout.write(expected[0] + b'\n')
 
             # write lots of small lines
             for lineno, line in enumerate(expected[1:-1]):
-                fout.write('%s\n' % line)
+                fout.write(line + b'\n')
 
-            # a plain line at the end, no newline at the end
-            fout.write("%s" % expected[-1])
+            # ...and write the last line too, no newline at the end
+            fout.write(expected[-1])
 
         # connect to fake s3 and read from the fake key we filled above
         smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
-        output = [line.rstrip('\n') for line in smart_open_object]
+        output = [line.rstrip(b'\n') for line in smart_open_object]
         self.assertEqual(output, expected)
 
         # same thing but using a context manager
         with smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey")) as smart_open_object:
-            output = [line.rstrip('\n') for line in smart_open_object]
+            output = [line.rstrip(b'\n') for line in smart_open_object]
             self.assertEqual(output, expected)
 
     @mock_s3
@@ -166,7 +166,7 @@ class SmartOpenReadTest(unittest.TestCase):
         conn.create_bucket("mybucket")
 
         # write some bogus key so we can check it below
-        content = "hello wořld\nhow are you?"
+        content = u"hello wořld\nhow are you?".encode('utf8')
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
             fout.write(content)
 
@@ -186,7 +186,7 @@ class SmartOpenReadTest(unittest.TestCase):
         conn.create_bucket("mybucket")
 
         # write some bogus key so we can check it below
-        content = "hello wořld\nhow are you?"
+        content = u"hello wořld\nhow are you?".encode('utf8')
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
             fout.write(content)
 
@@ -212,7 +212,7 @@ class S3IterLinesTest(unittest.TestCase):
         # create fake bucket and fake key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
-        test_string = "hello žluťoučký world!\nhow are you?"
+        test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fin:
             fin.write(test_string)
 
@@ -222,7 +222,7 @@ class S3IterLinesTest(unittest.TestCase):
         # call s3_iter_lines and check output
         output = list(smart_open.s3_iter_lines(mykey))
 
-        self.assertEqual(''.join(output), test_string)
+        self.assertEqual(b''.join(output), test_string)
 
 
     @mock_s3
@@ -293,7 +293,7 @@ class SmartOpenTest(unittest.TestCase):
         # fake bucket and key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
-        test_string = "second test"
+        test_string = b"second test"
 
         # correct write mode, correct s3 URI
         with smart_open.smart_open("s3://mybucket/newkey", "wb") as fin:
@@ -318,7 +318,7 @@ class S3OpenWriteTest(unittest.TestCase):
         mybucket = conn.get_bucket("mybucket")
         mykey = boto.s3.key.Key()
         mykey.name = "testkey"
-        test_string = "žluťoučký koníček"
+        test_string = u"žluťoučký koníček".encode('utf8')
 
         # write into key
         with smart_open.S3OpenWrite(mybucket, mykey) as fin:
@@ -350,7 +350,7 @@ class S3OpenWriteTest(unittest.TestCase):
 
     @mock_s3
     def test_write_02(self):
-        """Does s3 write unicode conversion work?"""
+        """Does s3 write unicode-utf8 conversion work?"""
         # fake connection, bucket and key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
@@ -377,7 +377,7 @@ class S3OpenWriteTest(unittest.TestCase):
         # write
         smart_open_write = smart_open.S3OpenWrite(mybucket, mykey, min_part_size=10)
         with smart_open_write as fin:
-            fin.write(u"test")
+            fin.write(u"test")  # implicit unicode=>utf8 conversion
             self.assertEqual(fin.chunk_bytes, 4)
 
             fin.write(u"test\n")
@@ -391,7 +391,7 @@ class S3OpenWriteTest(unittest.TestCase):
         # read back the same key and check its content
         output = list(smart_open.smart_open("s3://mybucket/testkey"))
 
-        self.assertEqual(output, ["testtest\n", "test"])
+        self.assertEqual(output, [b"testtest\n", b"test"])
 
 
 class S3IterBucketTest(unittest.TestCase):
@@ -401,13 +401,13 @@ class S3IterBucketTest(unittest.TestCase):
     """
     def test_s3_iter_bucket_process_key_mock(self):
         """Is s3_iter_bucket_process_key called correctly?"""
-        attrs = {"name" : "fileA", "get_contents_as_string.return_value" : "contentA"}
+        attrs = {"name" : "fileA", "get_contents_as_string.return_value" : b"contentA"}
         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
         mykey.configure_mock(**attrs)
 
         key, content = smart_open.s3_iter_bucket_process_key(mykey)
         self.assertEqual(key, mykey)
-        self.assertEqual(content, "contentA")
+        self.assertEqual(content, b"contentA")
 
 
     @mock_s3
@@ -423,7 +423,7 @@ class S3IterBucketTest(unittest.TestCase):
 
         key, content = smart_open.s3_iter_bucket_process_key(mykey)
         self.assertEqual(key, mykey)
-        self.assertEqual(content, "contentA")
+        self.assertEqual(content, b"contentA")
 
 
     @mock.patch('smart_open.multiprocessing.pool')
@@ -457,7 +457,7 @@ class S3IterBucketTest(unittest.TestCase):
         for key_no in range(200):
             key_name = "mykey%s" % key_no
             with smart_open.smart_open("s3://mybucket/%s" % key_name, 'wb') as fout:
-                content = '\n'.join("line%i%i" % (key_no, line_no) for line_no in range(10))
+                content = '\n'.join("line%i%i" % (key_no, line_no) for line_no in range(10)).encode('utf8')
                 fout.write(content)
                 expected[key_name] = content
 
@@ -488,36 +488,35 @@ class MultistreamsBZ2Test(unittest.TestCase):
     # note: these tests are derived from the Python 3.x tip bz2 tests.
 
     TEXT_LINES = [
-        'root:x:0:0:root:/root:/bin/bash\n',
-        'bin:x:1:1:bin:/bin:\n',
-        'daemon:x:2:2:daemon:/sbin:\n',
-        'adm:x:3:4:adm:/var/adm:\n',
-        'lp:x:4:7:lp:/var/spool/lpd:\n',
-        'sync:x:5:0:sync:/sbin:/bin/sync\n',
-        'shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown\n',
-        'halt:x:7:0:halt:/sbin:/sbin/halt\n',
-        'mail:x:8:12:mail:/var/spool/mail:\n',
-        'news:x:9:13:news:/var/spool/news:\n',
-        'uucp:x:10:14:uucp:/var/spool/uucp:\n',
-        'operator:x:11:0:operator:/root:\n',
-        'games:x:12:100:games:/usr/games:\n',
-        'gopher:x:13:30:gopher:/usr/lib/gopher-data:\n',
-        'ftp:x:14:50:FTP User:/var/ftp:/bin/bash\n',
-        'nobody:x:65534:65534:Nobody:/home:\n',
-        'postfix:x:100:101:postfix:/var/spool/postfix:\n',
-        'niemeyer:x:500:500::/home/niemeyer:/bin/bash\n',
-        'postgres:x:101:102:PostgreSQL Server:/var/lib/pgsql:/bin/bash\n',
-        'mysql:x:102:103:MySQL server:/var/lib/mysql:/bin/bash\n',
-        'www:x:103:104::/var/www:/bin/false\n',
+        b'root:x:0:0:root:/root:/bin/bash\n',
+        b'bin:x:1:1:bin:/bin:\n',
+        b'daemon:x:2:2:daemon:/sbin:\n',
+        b'adm:x:3:4:adm:/var/adm:\n',
+        b'lp:x:4:7:lp:/var/spool/lpd:\n',
+        b'sync:x:5:0:sync:/sbin:/bin/sync\n',
+        b'shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown\n',
+        b'halt:x:7:0:halt:/sbin:/sbin/halt\n',
+        b'mail:x:8:12:mail:/var/spool/mail:\n',
+        b'news:x:9:13:news:/var/spool/news:\n',
+        b'uucp:x:10:14:uucp:/var/spool/uucp:\n',
+        b'operator:x:11:0:operator:/root:\n',
+        b'games:x:12:100:games:/usr/games:\n',
+        b'gopher:x:13:30:gopher:/usr/lib/gopher-data:\n',
+        b'ftp:x:14:50:FTP User:/var/ftp:/bin/bash\n',
+        b'nobody:x:65534:65534:Nobody:/home:\n',
+        b'postfix:x:100:101:postfix:/var/spool/postfix:\n',
+        b'niemeyer:x:500:500::/home/niemeyer:/bin/bash\n',
+        b'postgres:x:101:102:PostgreSQL Server:/var/lib/pgsql:/bin/bash\n',
+        b'mysql:x:102:103:MySQL server:/var/lib/mysql:/bin/bash\n',
+        b'www:x:103:104::/var/www:/bin/false\n',
         ]
 
-    TEXT = ''.join(TEXT_LINES)
+    TEXT = b''.join(TEXT_LINES)
 
-    DATA = 'BZh91AY&SY.\xc8N\x18\x00\x01>_\x80\x00\x10@\x02\xff\xf0\x01\x07n\x00?\xe7\xff\xe00\x01\x99\xaa\x00\xc0\x03F\x86\x8c#&\x83F\x9a\x03\x06\xa6\xd0\xa6\x93M\x0fQ\xa7\xa8\x06\x804hh\x12$\x11\xa4i4\xf14S\xd2<Q\xb5\x0fH\xd3\xd4\xdd\xd5\x87\xbb\xf8\x94\r\x8f\xafI\x12\xe1\xc9\xf8/E\x00pu\x89\x12]\xc9\xbbDL\nQ\x0e\t1\x12\xdf\xa0\xc0\x97\xac2O9\x89\x13\x94\x0e\x1c7\x0ed\x95I\x0c\xaaJ\xa4\x18L\x10\x05#\x9c\xaf\xba\xbc/\x97\x8a#C\xc8\xe1\x8cW\xf9\xe2\xd0\xd6M\xa7\x8bXa<e\x84t\xcbL\xb3\xa7\xd9\xcd\xd1\xcb\x84.\xaf\xb3\xab\xab\xad`n}\xa0lh\tE,\x8eZ\x15\x17VH>\x88\xe5\xcd9gd6\x0b\n\xe9\x9b\xd5\x8a\x99\xf7\x08.K\x8ev\xfb\xf7xw\xbb\xdf\xa1\x92\xf1\xdd|/";\xa2\xba\x9f\xd5\xb1#A\xb6\xf6\xb3o\xc9\xc5y\\\xebO\xe7\x85\x9a\xbc\xb6f8\x952\xd5\xd7"%\x89>V,\xf7\xa6z\xe2\x9f\xa3\xdf\x11\x11"\xd6E)I\xa9\x13^\xca\xf3r\xd0\x03U\x922\xf26\xec\xb6\xed\x8b\xc3U\x13\x9d\xc5\x170\xa4\xfa^\x92\xacDF\x8a\x97\xd6\x19\xfe\xdd\xb8\xbd\x1a\x9a\x19\xa3\x80ankR\x8b\xe5\xd83]\xa9\xc6\x08\x82f\xf6\xb9"6l$\xb8j@\xc0\x8a\xb0l1..\xbak\x83ls\x15\xbc\xf4\xc1\x13\xbe\xf8E\xb8\x9d\r\xa8\x9dk\x84\xd3n\xfa\xacQ\x07\xb1%y\xaav\xb4\x08\xe0z\x1b\x16\xf5\x04\xe9\xcc\xb9\x08z\x1en7.G\xfc]\xc9\x14\xe1B@\xbb!8`'
+    DATA = b'BZh91AY&SY.\xc8N\x18\x00\x01>_\x80\x00\x10@\x02\xff\xf0\x01\x07n\x00?\xe7\xff\xe00\x01\x99\xaa\x00\xc0\x03F\x86\x8c#&\x83F\x9a\x03\x06\xa6\xd0\xa6\x93M\x0fQ\xa7\xa8\x06\x804hh\x12$\x11\xa4i4\xf14S\xd2<Q\xb5\x0fH\xd3\xd4\xdd\xd5\x87\xbb\xf8\x94\r\x8f\xafI\x12\xe1\xc9\xf8/E\x00pu\x89\x12]\xc9\xbbDL\nQ\x0e\t1\x12\xdf\xa0\xc0\x97\xac2O9\x89\x13\x94\x0e\x1c7\x0ed\x95I\x0c\xaaJ\xa4\x18L\x10\x05#\x9c\xaf\xba\xbc/\x97\x8a#C\xc8\xe1\x8cW\xf9\xe2\xd0\xd6M\xa7\x8bXa<e\x84t\xcbL\xb3\xa7\xd9\xcd\xd1\xcb\x84.\xaf\xb3\xab\xab\xad`n}\xa0lh\tE,\x8eZ\x15\x17VH>\x88\xe5\xcd9gd6\x0b\n\xe9\x9b\xd5\x8a\x99\xf7\x08.K\x8ev\xfb\xf7xw\xbb\xdf\xa1\x92\xf1\xdd|/";\xa2\xba\x9f\xd5\xb1#A\xb6\xf6\xb3o\xc9\xc5y\\\xebO\xe7\x85\x9a\xbc\xb6f8\x952\xd5\xd7"%\x89>V,\xf7\xa6z\xe2\x9f\xa3\xdf\x11\x11"\xd6E)I\xa9\x13^\xca\xf3r\xd0\x03U\x922\xf26\xec\xb6\xed\x8b\xc3U\x13\x9d\xc5\x170\xa4\xfa^\x92\xacDF\x8a\x97\xd6\x19\xfe\xdd\xb8\xbd\x1a\x9a\x19\xa3\x80ankR\x8b\xe5\xd83]\xa9\xc6\x08\x82f\xf6\xb9"6l$\xb8j@\xc0\x8a\xb0l1..\xbak\x83ls\x15\xbc\xf4\xc1\x13\xbe\xf8E\xb8\x9d\r\xa8\x9dk\x84\xd3n\xfa\xacQ\x07\xb1%y\xaav\xb4\x08\xe0z\x1b\x16\xf5\x04\xe9\xcc\xb9\x08z\x1en7.G\xfc]\xc9\x14\xe1B@\xbb!8`'
 
     def create_temp_bz2(self, streams=1):
         f = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False)
-        name = f.name
         f.write(self.DATA * streams)
         f.close()
         return f.name
