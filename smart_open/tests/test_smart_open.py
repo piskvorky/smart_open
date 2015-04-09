@@ -246,62 +246,62 @@ class S3IterLinesTest(unittest.TestCase):
             self.fail("s3_iter_lines extected to fail on non-`boto.key.Key` inputs")
 
 
-class SmartOpenTest(unittest.TestCase):
-    """
-    Test reading and writing from/into files.
+# class SmartOpenTest(unittest.TestCase):
+#     """
+#     Test reading and writing from/into files.
 
-    """
-    @mock.patch('smart_open.smart_open_lib.boto')
-    @mock.patch('smart_open.smart_open_lib.file_smart_open')
-    def test_file_mode_mock(self, mock_file, mock_boto):
-        """Are file:// open modes passed correctly?"""
-        # incorrect file mode
-        self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "x")
+#     """
+#     @mock.patch('smart_open.smart_open_lib.boto')
+#     @mock.patch('smart_open.smart_open_lib.file_smart_open')
+#     def test_file_mode_mock(self, mock_file, mock_boto):
+#         """Are file:// open modes passed correctly?"""
+#         # incorrect file mode
+#         self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "x")
 
-        # correct read modes
-        smart_open.smart_open("blah", "r")
-        mock_file.assert_called_with("blah", "r")
+#         # correct read modes
+#         smart_open.smart_open("blah", "r")
+#         mock_file.assert_called_with("blah", "r")
 
-        smart_open.smart_open("blah", "rb")
-        mock_file.assert_called_with("blah", "rb")
+#         smart_open.smart_open("blah", "rb")
+#         mock_file.assert_called_with("blah", "rb")
 
-        # correct write modes, incorrect scheme
-        self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb")
-        self.assertRaises(NotImplementedError, smart_open.smart_open, "http:///blah.txt", "w")
+#         # correct write modes, incorrect scheme
+#         self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb")
+#         self.assertRaises(NotImplementedError, smart_open.smart_open, "http:///blah.txt", "w")
 
-        # correct write mode, correct file:// URI
-        smart_open.smart_open("blah", "w")
-        mock_file.assert_called_with("blah", "w")
+#         # correct write mode, correct file:// URI
+#         smart_open.smart_open("blah", "w")
+#         mock_file.assert_called_with("blah", "w")
 
-        smart_open.smart_open("file:///some/file.txt", "wb")
-        mock_file.assert_called_with("/some/file.txt", "wb")
+#         smart_open.smart_open("file:///some/file.txt", "wb")
+#         mock_file.assert_called_with("/some/file.txt", "wb")
 
-    @mock.patch('smart_open.smart_open_lib.boto')
-    @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
-    def test_s3_mode_mock(self, mock_write, mock_boto):
-        """Are s3:// open modes passed correctly?"""
-        # correct write mode, correct s3 URI
-        smart_open.smart_open("s3://mybucket/mykey", "w")
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
-        mock_boto.connect_s3().lookup.return_value = True
-        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
-        self.assertTrue(mock_write.called)
+#     @mock.patch('smart_open.smart_open_lib.boto')
+#     @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
+#     def test_s3_mode_mock(self, mock_write, mock_boto):
+#         """Are s3:// open modes passed correctly?"""
+#         # correct write mode, correct s3 URI
+#         smart_open.smart_open("s3://mybucket/mykey", "w")
+#         mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
+#         mock_boto.connect_s3().lookup.return_value = True
+#         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
+#         self.assertTrue(mock_write.called)
 
-    @mock_s3
-    def test_s3_modes_moto(self):
-        """Do s3:// open modes work correctly?"""
-        # fake bucket and key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        test_string = b"second test"
+#     @mock_s3
+#     def test_s3_modes_moto(self):
+#         """Do s3:// open modes work correctly?"""
+#         # fake bucket and key
+#         conn = boto.connect_s3()
+#         conn.create_bucket("mybucket")
+#         test_string = b"second test"
 
-        # correct write mode, correct s3 URI
-        with smart_open.smart_open("s3://mybucket/newkey", "wb") as fin:
-            fin.write(test_string)
+#         # correct write mode, correct s3 URI
+#         with smart_open.smart_open("s3://mybucket/newkey", "wb") as fin:
+#             fin.write(test_string)
 
-        output = list(smart_open.smart_open("s3://mybucket/newkey", "rb"))
+#         output = list(smart_open.smart_open("s3://mybucket/newkey", "rb"))
 
-        self.assertEqual(output, [test_string])
+#         self.assertEqual(output, [test_string])
 
 
 class S3OpenWriteTest(unittest.TestCase):
