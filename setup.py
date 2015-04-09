@@ -10,8 +10,7 @@
 import os
 import sys
 
-# minimum required version is 2.6
-if not ((2, 6) <= sys.version_info):
+if sys.version_info < (2, 6):
     raise ImportError("smart_open requires python >= 2.6")
 
 
@@ -24,7 +23,7 @@ def read(fname):
 
 setup(
     name = 'smart_open',
-    version = '1.1.0',
+    version = '1.2.0',
     description = 'Utils for streaming large files (S3, HDFS, gzip, bz2...)',
     long_description = read('README.rst'),
 
@@ -58,6 +57,8 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
         'Topic :: System :: Distributed Computing',
         'Topic :: Database :: Front-Ends',
     ],

@@ -16,7 +16,7 @@ smart_open -- utils for streaming large files
 What?
 =====
 
-``smart_open`` is a Python library for **efficient streaming of very large files** from/to S3, HDFS or local (compressed) files.
+``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS or local (compressed) files.
 It is well tested (using `moto <https://github.com/spulec/moto>`_), well documented and sports a simple, Pythonic API:
 
 .. code-block:: python
@@ -77,7 +77,7 @@ There are nasty hidden gotchas when using ``boto``'s multipart upload functional
 Installation
 ------------
 
-The module has no dependencies beyond 2.6 <= Python < 3.0 and ``boto``::
+The module has no dependencies beyond Python >= 2.6 and ``boto``::
 
     pip install smart_open
 
