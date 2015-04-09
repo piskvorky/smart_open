@@ -304,94 +304,94 @@ class S3IterLinesTest(unittest.TestCase):
 #         self.assertEqual(output, [test_string])
 
 
-class S3OpenWriteTest(unittest.TestCase):
-    """
-    Test writing into s3 files.
+# class S3OpenWriteTest(unittest.TestCase):
+#     """
+#     Test writing into s3 files.
 
-    """
-    @mock_s3
-    def test_write_01(self):
-        """Does writing into s3 work correctly?"""
-        # fake connection, bucket and key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-        mykey = boto.s3.key.Key()
-        mykey.name = "testkey"
-        test_string = u"žluťoučký koníček".encode('utf8')
+#     """
+#     @mock_s3
+#     def test_write_01(self):
+#         """Does writing into s3 work correctly?"""
+#         # fake connection, bucket and key
+#         conn = boto.connect_s3()
+#         conn.create_bucket("mybucket")
+#         mybucket = conn.get_bucket("mybucket")
+#         mykey = boto.s3.key.Key()
+#         mykey.name = "testkey"
+#         test_string = u"žluťoučký koníček".encode('utf8')
 
-        # write into key
-        with smart_open.S3OpenWrite(mybucket, mykey) as fin:
-            fin.write(test_string)
+#         # write into key
+#         with smart_open.S3OpenWrite(mybucket, mykey) as fin:
+#             fin.write(test_string)
 
-        # read key and test content
-        output = list(smart_open.smart_open("s3://mybucket/testkey", "rb"))
+#         # read key and test content
+#         output = list(smart_open.smart_open("s3://mybucket/testkey", "rb"))
 
-        self.assertEqual(output, [test_string])
+#         self.assertEqual(output, [test_string])
 
-    @mock_s3
-    def test_write_01a(self):
-        """Does s3 write fail on incorrect input?"""
-        # fake connection, bucket and key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-        mykey = boto.s3.key.Key()
-        mykey.name = "testkey"
+#     @mock_s3
+#     def test_write_01a(self):
+#         """Does s3 write fail on incorrect input?"""
+#         # fake connection, bucket and key
+#         conn = boto.connect_s3()
+#         conn.create_bucket("mybucket")
+#         mybucket = conn.get_bucket("mybucket")
+#         mykey = boto.s3.key.Key()
+#         mykey.name = "testkey"
 
-        try:
-            with smart_open.S3OpenWrite(mybucket, mykey) as fin:
-                fin.write(None)
-        except TypeError:
-            pass
-        else:
-            self.fail()
-
-
-    @mock_s3
-    def test_write_02(self):
-        """Does s3 write unicode-utf8 conversion work?"""
-        # fake connection, bucket and key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-        mykey = boto.s3.key.Key()
-        mykey.name = "testkey"
-
-        smart_open_write = smart_open.S3OpenWrite(mybucket, mykey)
-        with smart_open_write as fin:
-            fin.write(u"testžížáč")
-            self.assertEqual(fin.total_size, 14)
+#         try:
+#             with smart_open.S3OpenWrite(mybucket, mykey) as fin:
+#                 fin.write(None)
+#         except TypeError:
+#             pass
+#         else:
+#             self.fail()
 
 
-    @mock_s3
-    def test_write_03(self):
-        """Does s3 multipart chunking work correctly?"""
-        # fake connection, bucket and key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-        mykey = boto.s3.key.Key()
-        mykey.name = "testkey"
+#     @mock_s3
+#     def test_write_02(self):
+#         """Does s3 write unicode-utf8 conversion work?"""
+#         # fake connection, bucket and key
+#         conn = boto.connect_s3()
+#         conn.create_bucket("mybucket")
+#         mybucket = conn.get_bucket("mybucket")
+#         mykey = boto.s3.key.Key()
+#         mykey.name = "testkey"
 
-        # write
-        smart_open_write = smart_open.S3OpenWrite(mybucket, mykey, min_part_size=10)
-        with smart_open_write as fin:
-            fin.write(u"test")  # implicit unicode=>utf8 conversion
-            self.assertEqual(fin.chunk_bytes, 4)
+#         smart_open_write = smart_open.S3OpenWrite(mybucket, mykey)
+#         with smart_open_write as fin:
+#             fin.write(u"testžížáč")
+#             self.assertEqual(fin.total_size, 14)
 
-            fin.write(u"test\n")
-            self.assertEqual(fin.chunk_bytes, 9)
-            self.assertEqual(fin.parts, 0)
 
-            fin.write(u"test")
-            self.assertEqual(fin.chunk_bytes, 0)
-            self.assertEqual(fin.parts, 1)
+#     @mock_s3
+#     def test_write_03(self):
+#         """Does s3 multipart chunking work correctly?"""
+#         # fake connection, bucket and key
+#         conn = boto.connect_s3()
+#         conn.create_bucket("mybucket")
+#         mybucket = conn.get_bucket("mybucket")
+#         mykey = boto.s3.key.Key()
+#         mykey.name = "testkey"
 
-        # read back the same key and check its content
-        output = list(smart_open.smart_open("s3://mybucket/testkey"))
+#         # write
+#         smart_open_write = smart_open.S3OpenWrite(mybucket, mykey, min_part_size=10)
+#         with smart_open_write as fin:
+#             fin.write(u"test")  # implicit unicode=>utf8 conversion
+#             self.assertEqual(fin.chunk_bytes, 4)
 
-        self.assertEqual(output, [b"testtest\n", b"test"])
+#             fin.write(u"test\n")
+#             self.assertEqual(fin.chunk_bytes, 9)
+#             self.assertEqual(fin.parts, 0)
+
+#             fin.write(u"test")
+#             self.assertEqual(fin.chunk_bytes, 0)
+#             self.assertEqual(fin.parts, 1)
+
+#         # read back the same key and check its content
+#         output = list(smart_open.smart_open("s3://mybucket/testkey"))
+
+#         self.assertEqual(output, [b"testtest\n", b"test"])
 
 
 # class S3IterBucketTest(unittest.TestCase):
