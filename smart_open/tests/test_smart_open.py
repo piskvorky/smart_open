@@ -93,16 +93,16 @@ class SmartOpenReadTest(unittest.TestCase):
         mock_smart_open.assert_called_with("/tmp/test.txt", "rb")
 
 
-    # couldn't find any project for mocking up HDFS data
-    # TODO: we want to test also a content of the files, not just fnc call params
-    @mock.patch('smart_open.smart_open_lib.subprocess')
-    def test_hdfs(self, mock_subprocess):
-        """Is HDFS line iterator called correctly?"""
-        mock_subprocess.PIPE.return_value = "test"
-        smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs:///tmp/test.txt"))
-        smart_open_object.__iter__()
-        # called with the correct params?
-        mock_subprocess.Popen.assert_called_with(["hadoop", "fs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+    # # couldn't find any project for mocking up HDFS data
+    # # TODO: we want to test also a content of the files, not just fnc call params
+    # @mock.patch('smart_open.smart_open_lib.subprocess')
+    # def test_hdfs(self, mock_subprocess):
+    #     """Is HDFS line iterator called correctly?"""
+    #     mock_subprocess.PIPE.return_value = "test"
+    #     smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs:///tmp/test.txt"))
+    #     smart_open_object.__iter__()
+    #     # called with the correct params?
+    #     mock_subprocess.Popen.assert_called_with(["hadoop", "fs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
 
 
     @mock.patch('smart_open.smart_open_lib.boto')
