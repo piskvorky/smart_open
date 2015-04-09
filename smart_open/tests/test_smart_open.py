@@ -20,62 +20,62 @@ from moto import mock_s3
 import smart_open
 from smart_open import smart_open_lib
 
-class ParseUriTest(unittest.TestCase):
-    """
-    Test ParseUri class.
+# class ParseUriTest(unittest.TestCase):
+#     """
+#     Test ParseUri class.
 
-    """
-    def test_scheme(self):
-        """Do URIs schemes parse correctly?"""
-        # supported schemes
-        for scheme in ("s3", "s3n", "hdfs", "file"):
-            parsed_uri = smart_open.ParseUri(scheme + "://mybucket/mykey")
-            self.assertEqual(parsed_uri.scheme, scheme)
+#     """
+#     def test_scheme(self):
+#         """Do URIs schemes parse correctly?"""
+#         # supported schemes
+#         for scheme in ("s3", "s3n", "hdfs", "file"):
+#             parsed_uri = smart_open.ParseUri(scheme + "://mybucket/mykey")
+#             self.assertEqual(parsed_uri.scheme, scheme)
 
-        # unsupported scheme => NotImplementedError
-        self.assertRaises(NotImplementedError, smart_open.ParseUri, "http://mybucket/mykey")
+#         # unsupported scheme => NotImplementedError
+#         self.assertRaises(NotImplementedError, smart_open.ParseUri, "http://mybucket/mykey")
 
-        # unknown scheme => default_scheme
-        parsed_uri = smart_open.ParseUri("blah blah")
-        self.assertEqual(parsed_uri.scheme, "file")
+#         # unknown scheme => default_scheme
+#         parsed_uri = smart_open.ParseUri("blah blah")
+#         self.assertEqual(parsed_uri.scheme, "file")
 
 
-    def test_s3_uri(self):
-        """Do S3 URIs parse correctly?"""
-        # correct uri without credentials
-        parsed_uri = smart_open.ParseUri("s3://mybucket/mykey")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "mykey")
-        self.assertEqual(parsed_uri.access_id, None)
-        self.assertEqual(parsed_uri.access_secret, None)
+#     def test_s3_uri(self):
+#         """Do S3 URIs parse correctly?"""
+#         # correct uri without credentials
+#         parsed_uri = smart_open.ParseUri("s3://mybucket/mykey")
+#         self.assertEqual(parsed_uri.scheme, "s3")
+#         self.assertEqual(parsed_uri.bucket_id, "mybucket")
+#         self.assertEqual(parsed_uri.key_id, "mykey")
+#         self.assertEqual(parsed_uri.access_id, None)
+#         self.assertEqual(parsed_uri.access_secret, None)
 
-        # correct uri, key contains slash
-        parsed_uri = smart_open.ParseUri("s3://mybucket/mydir/mykey")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "mydir/mykey")
-        self.assertEqual(parsed_uri.access_id, None)
-        self.assertEqual(parsed_uri.access_secret, None)
+#         # correct uri, key contains slash
+#         parsed_uri = smart_open.ParseUri("s3://mybucket/mydir/mykey")
+#         self.assertEqual(parsed_uri.scheme, "s3")
+#         self.assertEqual(parsed_uri.bucket_id, "mybucket")
+#         self.assertEqual(parsed_uri.key_id, "mydir/mykey")
+#         self.assertEqual(parsed_uri.access_id, None)
+#         self.assertEqual(parsed_uri.access_secret, None)
 
-        # correct uri with credentials
-        parsed_uri = smart_open.ParseUri("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "mykey")
-        self.assertEqual(parsed_uri.access_id, "ACCESSID456")
-        self.assertEqual(parsed_uri.access_secret, "acces/sse_cr-et")
+#         # correct uri with credentials
+#         parsed_uri = smart_open.ParseUri("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")
+#         self.assertEqual(parsed_uri.scheme, "s3")
+#         self.assertEqual(parsed_uri.bucket_id, "mybucket")
+#         self.assertEqual(parsed_uri.key_id, "mykey")
+#         self.assertEqual(parsed_uri.access_id, "ACCESSID456")
+#         self.assertEqual(parsed_uri.access_secret, "acces/sse_cr-et")
 
-        # correct uri, contains credentials
-        parsed_uri = smart_open.ParseUri("s3://accessid:access/secret@mybucket/mykey")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "mykey")
-        self.assertEqual(parsed_uri.access_id, "accessid")
-        self.assertEqual(parsed_uri.access_secret, "access/secret")
+#         # correct uri, contains credentials
+#         parsed_uri = smart_open.ParseUri("s3://accessid:access/secret@mybucket/mykey")
+#         self.assertEqual(parsed_uri.scheme, "s3")
+#         self.assertEqual(parsed_uri.bucket_id, "mybucket")
+#         self.assertEqual(parsed_uri.key_id, "mykey")
+#         self.assertEqual(parsed_uri.access_id, "accessid")
+#         self.assertEqual(parsed_uri.access_secret, "access/secret")
 
-        # incorrect uri - only one '@' in uri is allowed
-        self.assertRaises(RuntimeError, smart_open.ParseUri, "s3://access_id@access_secret@mybucket/mykey")
+#         # incorrect uri - only one '@' in uri is allowed
+#         self.assertRaises(RuntimeError, smart_open.ParseUri, "s3://access_id@access_secret@mybucket/mykey")
 
 
 # class SmartOpenReadTest(unittest.TestCase):
