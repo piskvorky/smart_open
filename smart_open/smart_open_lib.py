@@ -131,6 +131,7 @@ class ParseUri(object):
 
         """
         parsed_uri = urlsplit(uri)
+        logger.info("FIXME %s", uri)
         self.scheme = parsed_uri.scheme if parsed_uri.scheme else default_scheme
 
         if self.scheme == "hdfs":
