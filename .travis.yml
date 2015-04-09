@@ -7,4 +7,5 @@ install:
 - if [[ $TRAVIS_PYTHON_VERSION == 2.6 ]]; then pip install ordereddict; fi
 - pip install mock moto
 - python setup.py install
-script: nosetests #python -W ignore setup.py test
+script:
+- python -W ignore smart_open/tests/test_smart_open.py
