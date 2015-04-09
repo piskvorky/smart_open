@@ -394,87 +394,87 @@ class S3OpenWriteTest(unittest.TestCase):
         self.assertEqual(output, [b"testtest\n", b"test"])
 
 
-class S3IterBucketTest(unittest.TestCase):
-    """
-    Test parallel iteration of given bucket.
+# class S3IterBucketTest(unittest.TestCase):
+#     """
+#     Test parallel iteration of given bucket.
 
-    """
-    def test_s3_iter_bucket_process_key_mock(self):
-        """Is s3_iter_bucket_process_key called correctly?"""
-        attrs = {"name" : "fileA", "get_contents_as_string.return_value" : b"contentA"}
-        mykey = mock.Mock(spec=["name", "get_contents_as_string"])
-        mykey.configure_mock(**attrs)
+#     """
+#     def test_s3_iter_bucket_process_key_mock(self):
+#         """Is s3_iter_bucket_process_key called correctly?"""
+#         attrs = {"name" : "fileA", "get_contents_as_string.return_value" : b"contentA"}
+#         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
+#         mykey.configure_mock(**attrs)
 
-        key, content = smart_open.s3_iter_bucket_process_key(mykey)
-        self.assertEqual(key, mykey)
-        self.assertEqual(content, b"contentA")
-
-
-    @mock_s3
-    def test_s3_iter_bucket_process_key_moto(self):
-        """Does s3_iter_bucket_process_key work correctly?"""
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-
-        mykey = boto.s3.key.Key(mybucket)
-        mykey.key = "mykey"
-        mykey.set_contents_from_string("contentA")
-
-        key, content = smart_open.s3_iter_bucket_process_key(mykey)
-        self.assertEqual(key, mykey)
-        self.assertEqual(content, b"contentA")
+#         key, content = smart_open.s3_iter_bucket_process_key(mykey)
+#         self.assertEqual(key, mykey)
+#         self.assertEqual(content, b"contentA")
 
 
-    @mock.patch('smart_open.multiprocessing.pool')
-    def test_s3_iter_bucket_mock(self, mock_pool):
-        """Is s3_iter_bucket called correctly?"""
-        attrs = {"name" : "fileA", "get_contents_as_string.return_value" : "contentA"}
-        mykey = mock.Mock(spec=["name", "get_contents_as_string"])
-        mykey.configure_mock(**attrs)
+#     @mock_s3
+#     def test_s3_iter_bucket_process_key_moto(self):
+#         """Does s3_iter_bucket_process_key work correctly?"""
+#         conn = boto.connect_s3()
+#         conn.create_bucket("mybucket")
+#         mybucket = conn.get_bucket("mybucket")
 
-        attrs = {"list.return_value" : [mykey]}
-        mybucket = mock.Mock(spec=["list"])
-        mybucket.configure_mock(**attrs)
+#         mykey = boto.s3.key.Key(mybucket)
+#         mykey.key = "mykey"
+#         mykey.set_contents_from_string("contentA")
 
-        for key, content in smart_open.s3_iter_bucket(mybucket):
-            mock_pool.Pool.assert_called_with(processes=16)
-            mock_pool.Pool().imap_unordered.assert_called_with()
-
-        mock_pool.Pool.assert_called_with(processes=16)
-        self.assertTrue(mock_pool.Pool().imap_unordered.called)
+#         key, content = smart_open.s3_iter_bucket_process_key(mykey)
+#         self.assertEqual(key, mykey)
+#         self.assertEqual(content, b"contentA")
 
 
-    @mock_s3
-    def test_s3_iter_bucket_moto(self):
-        """Does s3_iter_bucket work correctly?"""
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
+#     @mock.patch('smart_open.multiprocessing.pool')
+#     def test_s3_iter_bucket_mock(self, mock_pool):
+#         """Is s3_iter_bucket called correctly?"""
+#         attrs = {"name" : "fileA", "get_contents_as_string.return_value" : "contentA"}
+#         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
+#         mykey.configure_mock(**attrs)
 
-        # first, create some keys in the bucket
-        expected = {}
-        for key_no in range(200):
-            key_name = "mykey%s" % key_no
-            with smart_open.smart_open("s3://mybucket/%s" % key_name, 'wb') as fout:
-                content = '\n'.join("line%i%i" % (key_no, line_no) for line_no in range(10)).encode('utf8')
-                fout.write(content)
-                expected[key_name] = content
+#         attrs = {"list.return_value" : [mykey]}
+#         mybucket = mock.Mock(spec=["list"])
+#         mybucket.configure_mock(**attrs)
 
-        # read all keys + their content back, in parallel, using s3_iter_bucket
-        result = dict(smart_open.s3_iter_bucket(mybucket))
-        self.assertEqual(expected, result)
+#         for key, content in smart_open.s3_iter_bucket(mybucket):
+#             mock_pool.Pool.assert_called_with(processes=16)
+#             mock_pool.Pool().imap_unordered.assert_called_with()
 
-        # read some of the keys back, in parallel, using s3_iter_bucket
-        result = dict(smart_open.s3_iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('4')))
-        self.assertEqual(result, dict((k, c) for k, c in expected.items() if k.endswith('4')))
+#         mock_pool.Pool.assert_called_with(processes=16)
+#         self.assertTrue(mock_pool.Pool().imap_unordered.called)
 
-        # read some of the keys back, in parallel, using s3_iter_bucket
-        result = dict(smart_open.s3_iter_bucket(mybucket, key_limit=10))
-        self.assertEqual(len(result), min(len(expected), 10))
 
-        for workers in [1, 4, 8, 16, 64]:
-            self.assertEqual(dict(smart_open.s3_iter_bucket(mybucket, workers=workers)), expected)
+#     @mock_s3
+#     def test_s3_iter_bucket_moto(self):
+#         """Does s3_iter_bucket work correctly?"""
+#         conn = boto.connect_s3()
+#         conn.create_bucket("mybucket")
+#         mybucket = conn.get_bucket("mybucket")
+
+#         # first, create some keys in the bucket
+#         expected = {}
+#         for key_no in range(200):
+#             key_name = "mykey%s" % key_no
+#             with smart_open.smart_open("s3://mybucket/%s" % key_name, 'wb') as fout:
+#                 content = '\n'.join("line%i%i" % (key_no, line_no) for line_no in range(10)).encode('utf8')
+#                 fout.write(content)
+#                 expected[key_name] = content
+
+#         # read all keys + their content back, in parallel, using s3_iter_bucket
+#         result = dict(smart_open.s3_iter_bucket(mybucket))
+#         self.assertEqual(expected, result)
+
+#         # read some of the keys back, in parallel, using s3_iter_bucket
+#         result = dict(smart_open.s3_iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('4')))
+#         self.assertEqual(result, dict((k, c) for k, c in expected.items() if k.endswith('4')))
+
+#         # read some of the keys back, in parallel, using s3_iter_bucket
+#         result = dict(smart_open.s3_iter_bucket(mybucket, key_limit=10))
+#         self.assertEqual(len(result), min(len(expected), 10))
+
+#         for workers in [1, 4, 8, 16, 64]:
+#             self.assertEqual(dict(smart_open.s3_iter_bucket(mybucket, workers=workers)), expected)
 
 
 PY2 = sys.version_info[0] == 2
