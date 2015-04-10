@@ -6,7 +6,7 @@ smart_open -- utils for streaming large files
 |Downloads|_
 |License|_
 
-.. |Travis| image:: https://img.shields.io/travis/piskvorky/smart_open.svg
+.. |Travis| image:: https://img.shields.io/travis/piskvorky/smart_open/master.svg
 .. |Downloads| image:: https://img.shields.io/pypi/dm/smart_open.svg
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
 .. _Travis: https://travis-ci.org/piskvorky/smart_open
