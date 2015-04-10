@@ -130,6 +130,11 @@ class ParseUri(object):
         Assume `default_scheme` if no scheme given in `uri`.
 
         """
+        if os.name == 'nt':
+            # urlsplit doesn't work on Windows -- it parses the drive as the scheme...
+            if '://' not in uri:
+                # no protocol given => assume a local file
+                uri = 'file://' + uri
         parsed_uri = urlsplit(uri)
         self.scheme = parsed_uri.scheme if parsed_uri.scheme else default_scheme
 
@@ -168,7 +173,7 @@ class ParseUri(object):
             if not self.uri_path:
                 raise RuntimeError("invalid file URI: %s" % uri)
         else:
-            raise NotImplementedError("unknown URI scheme in %r" % uri)
+            raise NotImplementedError("unknown URI scheme %r in %r" % (self.scheme, uri))
 
 
 class S3OpenRead(object):
