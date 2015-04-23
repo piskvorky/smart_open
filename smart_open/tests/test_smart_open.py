@@ -40,124 +40,123 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "file")
 
 
-#     def test_s3_uri(self):
-#         """Do S3 URIs parse correctly?"""
-#         # correct uri without credentials
-#         parsed_uri = smart_open.ParseUri("s3://mybucket/mykey")
-#         self.assertEqual(parsed_uri.scheme, "s3")
-#         self.assertEqual(parsed_uri.bucket_id, "mybucket")
-#         self.assertEqual(parsed_uri.key_id, "mykey")
-#         self.assertEqual(parsed_uri.access_id, None)
-#         self.assertEqual(parsed_uri.access_secret, None)
+    def test_s3_uri(self):
+        """Do S3 URIs parse correctly?"""
+        # correct uri without credentials
+        parsed_uri = smart_open.ParseUri("s3://mybucket/mykey")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "mykey")
+        self.assertEqual(parsed_uri.access_id, None)
+        self.assertEqual(parsed_uri.access_secret, None)
 
-#         # correct uri, key contains slash
-#         parsed_uri = smart_open.ParseUri("s3://mybucket/mydir/mykey")
-#         self.assertEqual(parsed_uri.scheme, "s3")
-#         self.assertEqual(parsed_uri.bucket_id, "mybucket")
-#         self.assertEqual(parsed_uri.key_id, "mydir/mykey")
-#         self.assertEqual(parsed_uri.access_id, None)
-#         self.assertEqual(parsed_uri.access_secret, None)
+        # correct uri, key contains slash
+        parsed_uri = smart_open.ParseUri("s3://mybucket/mydir/mykey")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "mydir/mykey")
+        self.assertEqual(parsed_uri.access_id, None)
+        self.assertEqual(parsed_uri.access_secret, None)
 
-#         # correct uri with credentials
-#         parsed_uri = smart_open.ParseUri("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")
-#         self.assertEqual(parsed_uri.scheme, "s3")
-#         self.assertEqual(parsed_uri.bucket_id, "mybucket")
-#         self.assertEqual(parsed_uri.key_id, "mykey")
-#         self.assertEqual(parsed_uri.access_id, "ACCESSID456")
-#         self.assertEqual(parsed_uri.access_secret, "acces/sse_cr-et")
+        # correct uri with credentials
+        parsed_uri = smart_open.ParseUri("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "mykey")
+        self.assertEqual(parsed_uri.access_id, "ACCESSID456")
+        self.assertEqual(parsed_uri.access_secret, "acces/sse_cr-et")
 
-#         # correct uri, contains credentials
-#         parsed_uri = smart_open.ParseUri("s3://accessid:access/secret@mybucket/mykey")
-#         self.assertEqual(parsed_uri.scheme, "s3")
-#         self.assertEqual(parsed_uri.bucket_id, "mybucket")
-#         self.assertEqual(parsed_uri.key_id, "mykey")
-#         self.assertEqual(parsed_uri.access_id, "accessid")
-#         self.assertEqual(parsed_uri.access_secret, "access/secret")
+        # correct uri, contains credentials
+        parsed_uri = smart_open.ParseUri("s3://accessid:access/secret@mybucket/mykey")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "mykey")
+        self.assertEqual(parsed_uri.access_id, "accessid")
+        self.assertEqual(parsed_uri.access_secret, "access/secret")
 
-#         # incorrect uri - only one '@' in uri is allowed
-#         self.assertRaises(RuntimeError, smart_open.ParseUri, "s3://access_id@access_secret@mybucket/mykey")
-
-
-# class SmartOpenReadTest(unittest.TestCase):
-#     """
-#     Test reading from files under various schemes.
-
-#     """
-#     # TODO: add more complex test for file://
-#     @mock.patch('smart_open.smart_open_lib.file_smart_open')
-#     def test_file(self, mock_smart_open):
-#         """Is file:// line iterator called correctly?"""
-#         smart_open_object = smart_open.smart_open("file:///tmp/test.txt", "rb")
-#         smart_open_object.__iter__()
-#         # called with the correct path?
-#         mock_smart_open.assert_called_with("/tmp/test.txt", "rb")
+        # incorrect uri - only one '@' in uri is allowed
+        self.assertRaises(RuntimeError, smart_open.ParseUri, "s3://access_id@access_secret@mybucket/mykey")
 
 
-    # # couldn't find any project for mocking up HDFS data
-    # # TODO: we want to test also a content of the files, not just fnc call params
-    # @mock.patch('smart_open.smart_open_lib.subprocess')
-    # def test_hdfs(self, mock_subprocess):
-    #     """Is HDFS line iterator called correctly?"""
-    #     mock_subprocess.PIPE.return_value = "test"
-    #     smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs:///tmp/test.txt"))
-    #     smart_open_object.__iter__()
-    #     # called with the correct params?
-    #     mock_subprocess.Popen.assert_called_with(["hadoop", "fs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+class SmartOpenReadTest(unittest.TestCase):
+    """
+    Test reading from files under various schemes.
+
+    """
+    # TODO: add more complex test for file://
+    @mock.patch('smart_open.smart_open_lib.file_smart_open')
+    def test_file(self, mock_smart_open):
+        """Is file:// line iterator called correctly?"""
+        smart_open_object = smart_open.smart_open("file:///tmp/test.txt", "rb")
+        smart_open_object.__iter__()
+        # called with the correct path?
+        mock_smart_open.assert_called_with("/tmp/test.txt", "rb")
 
 
-    # @mock.patch('smart_open.smart_open_lib.boto')
-    # @mock.patch('smart_open.smart_open_lib.s3_iter_lines')
-    # def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
-    #     """Is S3 line iterator called correctly?"""
-    #     # no credentials
-    #     smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
-    #     smart_open_object.__iter__()
-    #     mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
-
-    #     # with credential
-    #     smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://access_id:access_secret@mybucket/mykey"))
-    #     smart_open_object.__iter__()
-    #     mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret")
-
-    #     # lookup bucket, key; call s3_iter_lines
-    #     smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://access_id:access_secret@mybucket/mykey"))
-    #     smart_open_object.__iter__()
-    #     mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
-    #     mock_boto.connect_s3().get_bucket().lookup.assert_called_with("mykey")
-    #     self.assertTrue(mock_s3_iter_lines.called)
+    # couldn't find any project for mocking up HDFS data
+    # TODO: we want to test also a content of the files, not just fnc call params
+    @mock.patch('smart_open.smart_open_lib.subprocess')
+    def test_hdfs(self, mock_subprocess):
+        """Is HDFS line iterator called correctly?"""
+        mock_subprocess.PIPE.return_value = "test"
+        smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs:///tmp/test.txt"))
+        smart_open_object.__iter__()
+        # called with the correct params?
+        mock_subprocess.Popen.assert_called_with(["hadoop", "fs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
 
 
-    # @mock_s3
-    # def test_s3_iter_moto(self):
-    #     """Are S3 files iterated over correctly?"""
-    #     # a list of strings to test with
-    #     expected = [b"*" * 5 * 1024**2] + [b'0123456789'] * 1024 + [b"test"]
+    @mock.patch('smart_open.smart_open_lib.boto')
+    @mock.patch('smart_open.smart_open_lib.s3_iter_lines')
+    def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
+        """Is S3 line iterator called correctly?"""
+        # no credentials
+        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
+        smart_open_object.__iter__()
+        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
 
-    #     # create fake bucket and fake key
-    #     conn = boto.connect_s3()
-    #     conn.create_bucket("mybucket")
-    #     # lower the multipart upload size, to speed up these tests
-    #     smart_open_lib.S3_MIN_PART_SIZE = 5 * 1024**2
-    #     with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
-    #         # write a single huge line (=full multipart upload)
-    #         fout.write(expected[0] + b'\n')
+        # with credential
+        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://access_id:access_secret@mybucket/mykey"))
+        smart_open_object.__iter__()
+        mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret")
 
-    #         # write lots of small lines
-    #         for lineno, line in enumerate(expected[1:-1]):
-    #             fout.write(line + b'\n')
+        # lookup bucket, key; call s3_iter_lines
+        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://access_id:access_secret@mybucket/mykey"))
+        smart_open_object.__iter__()
+        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
+        mock_boto.connect_s3().get_bucket().lookup.assert_called_with("mykey")
+        self.assertTrue(mock_s3_iter_lines.called)
 
-    #         # ...and write the last line too, no newline at the end
-    #         fout.write(expected[-1])
 
-    #     # connect to fake s3 and read from the fake key we filled above
-    #     smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
-    #     output = [line.rstrip(b'\n') for line in smart_open_object]
-    #     self.assertEqual(output, expected)
+    @mock_s3
+    def test_s3_iter_moto(self):
+        """Are S3 files iterated over correctly?"""
+        # a list of strings to test with
+        expected = [b"*" * 5 * 1024**2] + [b'0123456789'] * 1024 + [b"test"]
 
-    #     # same thing but using a context manager
-    #     with smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey")) as smart_open_object:
-    #         output = [line.rstrip(b'\n') for line in smart_open_object]
-    #         self.assertEqual(output, expected)
+        # create fake bucket and fake key
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
+        # lower the multipart upload size, to speed up these tests
+        smart_open_lib.S3_MIN_PART_SIZE = 5 * 1024**2
+        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+            # write a single huge line (=full multipart upload)
+            fout.write(expected[0] + b'\n')
+
+            # write lots of small lines
+            for lineno, line in enumerate(expected[1:-1]):
+                fout.write(line + b'\n')
+
+            # ...and write the last line too, no newline at the end
+            fout.write(expected[-1])
+
+        # connect to fake s3 and read from the fake key we filled above
+        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
+        output = [line.rstrip(b'\n') for line in smart_open_object]
+        self.assertEqual(output, expected)
+        # same thing but using a context manager
+        with smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey")) as smart_open_object:
+            output = [line.rstrip(b'\n') for line in smart_open_object]
+            self.assertEqual(output, expected)
 
     # @mock_s3
     # def test_s3_read_moto(self):
