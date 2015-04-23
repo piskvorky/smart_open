@@ -20,24 +20,24 @@ from moto import mock_s3
 import smart_open
 from smart_open import smart_open_lib
 
-# class ParseUriTest(unittest.TestCase):
-#     """
-#     Test ParseUri class.
+class ParseUriTest(unittest.TestCase):
+    """
+    Test ParseUri class.
 
-#     """
-#     def test_scheme(self):
-#         """Do URIs schemes parse correctly?"""
-#         # supported schemes
-#         for scheme in ("s3", "s3n", "hdfs", "file"):
-#             parsed_uri = smart_open.ParseUri(scheme + "://mybucket/mykey")
-#             self.assertEqual(parsed_uri.scheme, scheme)
+    """
+    def test_scheme(self):
+        """Do URIs schemes parse correctly?"""
+        # supported schemes
+        for scheme in ("s3", "s3n", "hdfs", "file"):
+            parsed_uri = smart_open.ParseUri(scheme + "://mybucket/mykey")
+            self.assertEqual(parsed_uri.scheme, scheme)
 
-#         # unsupported scheme => NotImplementedError
-#         self.assertRaises(NotImplementedError, smart_open.ParseUri, "http://mybucket/mykey")
+        # unsupported scheme => NotImplementedError
+        self.assertRaises(NotImplementedError, smart_open.ParseUri, "http://mybucket/mykey")
 
-#         # unknown scheme => default_scheme
-#         parsed_uri = smart_open.ParseUri("blah blah")
-#         self.assertEqual(parsed_uri.scheme, "file")
+        # unknown scheme => default_scheme
+        parsed_uri = smart_open.ParseUri("blah blah")
+        self.assertEqual(parsed_uri.scheme, "file")
 
 
 #     def test_s3_uri(self):
@@ -201,28 +201,28 @@ from smart_open import smart_open_lib
     #     self.assertEqual(content, smart_open_object.read(-1)) # same thing
 
 
-class S3IterLinesTest(unittest.TestCase):
-    """
-    Test s3_iter_lines.
+#class S3IterLinesTest(unittest.TestCase):
+#    """
+#    Test s3_iter_lines.
 
-    """
-    @mock_s3
-    def test_s3_iter_lines_with_key(self):
-        """Does s3_iter_lines give correct content?"""
+#    """
+#    @mock_s3
+#    def test_s3_iter_lines_with_key(self):
+#        """Does s3_iter_lines give correct content?"""
         # create fake bucket and fake key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
-        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fin:
-            fin.write(test_string)
+#        conn = boto.connect_s3()
+#        conn.create_bucket("mybucket")
+#        test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
+#        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fin:
+#            fin.write(test_string)
 
         # obtain boto key object
-        mykey = conn.get_bucket("mybucket").get_key("mykey")
+#        mykey = conn.get_bucket("mybucket").get_key("mykey")
 
         # call s3_iter_lines and check output
-        output = list(smart_open.s3_iter_lines(mykey))
+#        output = list(smart_open.s3_iter_lines(mykey))
 
-        self.assertEqual(b''.join(output), test_string)
+#        self.assertEqual(b''.join(output), test_string)
 
 
 #    @mock_s3
