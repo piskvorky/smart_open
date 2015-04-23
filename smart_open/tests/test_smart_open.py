@@ -201,28 +201,28 @@ from smart_open import smart_open_lib
     #     self.assertEqual(content, smart_open_object.read(-1)) # same thing
 
 
-#class S3IterLinesTest(unittest.TestCase):
-#    """
-#    Test s3_iter_lines.
+class S3IterLinesTest(unittest.TestCase):
+    """
+    Test s3_iter_lines.
 
-#    """
-#    @mock_s3
-#    def test_s3_iter_lines_with_key(self):
-#        """Does s3_iter_lines give correct content?"""
+    """
+    @mock_s3
+    def test_s3_iter_lines_with_key(self):
+        """Does s3_iter_lines give correct content?"""
         # create fake bucket and fake key
-#        conn = boto.connect_s3()
-#        conn.create_bucket("mybucket")
-#        test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
-#        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fin:
-#            fin.write(test_string)
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
+        test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
+        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fin:
+            fin.write(test_string)
 
         # obtain boto key object
-#        mykey = conn.get_bucket("mybucket").get_key("mykey")
+        mykey = conn.get_bucket("mybucket").get_key("mykey")
 
         # call s3_iter_lines and check output
-#        output = list(smart_open.s3_iter_lines(mykey))
+        output = list(smart_open.s3_iter_lines(mykey))
 
-#        self.assertEqual(b''.join(output), test_string)
+        self.assertEqual(b''.join(output), test_string)
 
 
 #    @mock_s3
