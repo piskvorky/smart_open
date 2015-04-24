@@ -413,17 +413,16 @@ class S3IterBucketTest(unittest.TestCase):
     def test_s3_iter_bucket_process_key_moto(self):
         """Does s3_iter_bucket_process_key work correctly?"""
         conn = boto.connect_s3()
-        #conn.create_bucket("mybucket")
-        self.assertEqual(1, 1)
-        #mybucket = conn.get_bucket("mybucket")
+        conn.create_bucket("mybucket")
+        mybucket = conn.get_bucket("mybucket")
 
-        #mykey = boto.s3.key.Key(mybucket)
-        #mykey.key = "mykey"
-        #mykey.set_contents_from_string("contentA")
+        mykey = boto.s3.key.Key(mybucket)
+        mykey.key = "mykey"
+        mykey.set_contents_from_string("contentA")
 
-        #key, content = smart_open.s3_iter_bucket_process_key(mykey)
-        #self.assertEqual(key, mykey)
-        #self.assertEqual(content, b"contentA")
+        key, content = smart_open.s3_iter_bucket_process_key(mykey)
+        self.assertEqual(key, mykey)
+        self.assertEqual(content, b"contentA")
 
 
     @mock.patch('smart_open.multiprocessing.pool')
