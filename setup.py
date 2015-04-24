@@ -43,7 +43,8 @@ setup(
     platforms = 'any',
 
     install_requires=[
-        'boto >= 2.38',
+        'boto >= 2.32',
+        'httpretty==0.8.6',
         'bz2file',
     ],
 
