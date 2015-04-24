@@ -393,20 +393,20 @@ class SmartOpenTest(unittest.TestCase):
 #         self.assertEqual(output, [b"testtest\n", b"test"])
 
 
-# class S3IterBucketTest(unittest.TestCase):
-#     """
-#     Test parallel iteration of given bucket.
+class S3IterBucketTest(unittest.TestCase):
+    """
+    Test parallel iteration of given bucket.
 
-#     """
-#     def test_s3_iter_bucket_process_key_mock(self):
-#         """Is s3_iter_bucket_process_key called correctly?"""
-#         attrs = {"name" : "fileA", "get_contents_as_string.return_value" : b"contentA"}
-#         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
-#         mykey.configure_mock(**attrs)
+    """
+    def test_s3_iter_bucket_process_key_mock(self):
+        """Is s3_iter_bucket_process_key called correctly?"""
+        attrs = {"name" : "fileA", "get_contents_as_string.return_value" : b"contentA"}
+        mykey = mock.Mock(spec=["name", "get_contents_as_string"])
+        mykey.configure_mock(**attrs)
 
-#         key, content = smart_open.s3_iter_bucket_process_key(mykey)
-#         self.assertEqual(key, mykey)
-#         self.assertEqual(content, b"contentA")
+        key, content = smart_open.s3_iter_bucket_process_key(mykey)
+        self.assertEqual(key, mykey)
+        self.assertEqual(content, b"contentA")
 
 
 #     @mock_s3
@@ -425,23 +425,23 @@ class SmartOpenTest(unittest.TestCase):
 #         self.assertEqual(content, b"contentA")
 
 
-#     @mock.patch('smart_open.multiprocessing.pool')
-#     def test_s3_iter_bucket_mock(self, mock_pool):
-#         """Is s3_iter_bucket called correctly?"""
-#         attrs = {"name" : "fileA", "get_contents_as_string.return_value" : "contentA"}
-#         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
-#         mykey.configure_mock(**attrs)
+    @mock.patch('smart_open.multiprocessing.pool')
+    def test_s3_iter_bucket_mock(self, mock_pool):
+        """Is s3_iter_bucket called correctly?"""
+        attrs = {"name" : "fileA", "get_contents_as_string.return_value" : "contentA"}
+        mykey = mock.Mock(spec=["name", "get_contents_as_string"])
+        mykey.configure_mock(**attrs)
 
-#         attrs = {"list.return_value" : [mykey]}
-#         mybucket = mock.Mock(spec=["list"])
-#         mybucket.configure_mock(**attrs)
+        attrs = {"list.return_value" : [mykey]}
+        mybucket = mock.Mock(spec=["list"])
+        mybucket.configure_mock(**attrs)
 
-#         for key, content in smart_open.s3_iter_bucket(mybucket):
-#             mock_pool.Pool.assert_called_with(processes=16)
-#             mock_pool.Pool().imap_unordered.assert_called_with()
+        for key, content in smart_open.s3_iter_bucket(mybucket):
+            mock_pool.Pool.assert_called_with(processes=16)
+            mock_pool.Pool().imap_unordered.assert_called_with()
 
-#         mock_pool.Pool.assert_called_with(processes=16)
-#         self.assertTrue(mock_pool.Pool().imap_unordered.called)
+        mock_pool.Pool.assert_called_with(processes=16)
+        self.assertTrue(mock_pool.Pool().imap_unordered.called)
 
 
 #     @mock_s3
