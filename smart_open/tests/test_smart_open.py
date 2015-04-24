@@ -224,25 +224,25 @@ class SmartOpenReadTest(unittest.TestCase):
 #        self.assertEqual(b''.join(output), test_string)
 
 
-#    @mock_s3
-#    def test_s3_iter_lines_without_key(self):
-#        """Does s3_iter_lines fail on invalid input?"""
+    @mock_s3
+    def test_s3_iter_lines_without_key(self):
+        """Does s3_iter_lines fail on invalid input?"""
         # cannot use context manager for assertRaise in py2.6
-#        try:
-#            for i in smart_open.s3_iter_lines(None):
-#                pass
-#        except TypeError:
-#            pass
-#        else:
-#            self.fail("s3_iter_lines expected to fail on non-`boto.key.Key` inputs")
+        try:
+            for i in smart_open.s3_iter_lines(None):
+                pass
+        except TypeError:
+            pass
+        else:
+            self.fail("s3_iter_lines expected to fail on non-`boto.key.Key` inputs")
 
-#        try:
-#            for i in smart_open.s3_iter_lines("test"):
-#                pass
-#        except TypeError:
-#            pass
-#        else:
-#            self.fail("s3_iter_lines extected to fail on non-`boto.key.Key` inputs")
+        try:
+            for i in smart_open.s3_iter_lines("test"):
+                pass
+        except TypeError:
+            pass
+        else:
+            self.fail("s3_iter_lines extected to fail on non-`boto.key.Key` inputs")
 
 
 class SmartOpenTest(unittest.TestCase):
