@@ -43,7 +43,7 @@ setup(
     platforms = 'any',
 
     install_requires=[
-        'boto >= 2.38',
+        'boto >= 2.32',
         'bz2file',
     ],
 
