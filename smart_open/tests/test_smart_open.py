@@ -275,16 +275,16 @@ class SmartOpenTest(unittest.TestCase):
         smart_open.smart_open("file:///some/file.txt", "wb")
         mock_file.assert_called_with("/some/file.txt", "wb")
 
-#     @mock.patch('smart_open.smart_open_lib.boto')
-#     @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
-#     def test_s3_mode_mock(self, mock_write, mock_boto):
-#         """Are s3:// open modes passed correctly?"""
-#         # correct write mode, correct s3 URI
-#         smart_open.smart_open("s3://mybucket/mykey", "w")
-#         mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
-#         mock_boto.connect_s3().lookup.return_value = True
-#         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
-#         self.assertTrue(mock_write.called)
+    @mock.patch('smart_open.smart_open_lib.boto')
+    @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
+    def test_s3_mode_mock(self, mock_write, mock_boto):
+        """Are s3:// open modes passed correctly?"""
+        # correct write mode, correct s3 URI
+        smart_open.smart_open("s3://mybucket/mykey", "w")
+        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
+        mock_boto.connect_s3().lookup.return_value = True
+        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
+        self.assertTrue(mock_write.called)
 
 #     @mock_s3
 #     def test_s3_modes_moto(self):
