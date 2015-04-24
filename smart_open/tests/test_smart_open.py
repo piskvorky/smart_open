@@ -286,21 +286,21 @@ class SmartOpenTest(unittest.TestCase):
         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
         self.assertTrue(mock_write.called)
 
-#     @mock_s3
-#     def test_s3_modes_moto(self):
-#         """Do s3:// open modes work correctly?"""
-#         # fake bucket and key
-#         conn = boto.connect_s3()
-#         conn.create_bucket("mybucket")
-#         test_string = b"second test"
+    @mock_s3
+    def test_s3_modes_moto(self):
+        """Do s3:// open modes work correctly?"""
+        # fake bucket and key
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
+        test_string = b"second test"
 
-#         # correct write mode, correct s3 URI
-#         with smart_open.smart_open("s3://mybucket/newkey", "wb") as fin:
-#             fin.write(test_string)
+        # correct write mode, correct s3 URI
+        with smart_open.smart_open("s3://mybucket/newkey", "wb") as fin:
+            fin.write(test_string)
 
-#         output = list(smart_open.smart_open("s3://mybucket/newkey", "rb"))
+        output = list(smart_open.smart_open("s3://mybucket/newkey", "rb"))
 
-#         self.assertEqual(output, [test_string])
+        self.assertEqual(output, [test_string])
 
 
 # class S3OpenWriteTest(unittest.TestCase):
