@@ -407,7 +407,7 @@ def s3_iter_bucket_process_key(key):
 def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16):
     """
     Iterate and download all S3 files under `bucket/prefix`, yielding out
-    `(key name, key content)` 2-tuples (generator).
+    `(key, key content)` 2-tuples (generator).
 
     `accept_key` is a function that accepts a key name (unicode string) and
     returns True/False, signalling whether the given key should be downloaded out or
@@ -442,7 +442,7 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
             logger.info("yielding key #%i: %s, size %i (total %.1fMB)" %
                 (key_no, key, len(content), total_size / 1024.0 ** 2))
 
-        yield key.name, content
+        yield key, content
         key.close()
         total_size += len(content)
 
