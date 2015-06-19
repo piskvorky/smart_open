@@ -480,7 +480,10 @@ class S3IterBucketTest(unittest.TestCase):
         self.assertEqual(len(result), min(len(expected), 10))
 
         for workers in [1, 4, 8, 16, 64]:
-            self.assertEqual(dict(smart_open.s3_iter_bucket(mybucket, workers=workers)), expected)
+            result = {}
+            for k, c in smart_open.s3_iter_bucket(mybucket):
+                result[k.name] = c
+            self.assertEqual(result, expected)
 
 
 PY2 = sys.version_info[0] == 2
