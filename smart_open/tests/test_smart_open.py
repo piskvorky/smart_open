@@ -462,11 +462,15 @@ class S3IterBucketTest(unittest.TestCase):
                 expected[key_name] = content
 
         # read all keys + their content back, in parallel, using s3_iter_bucket
-        result = dict(smart_open.s3_iter_bucket(mybucket))
+        result = {}
+        for k, c in smart_open.s3_iter_bucket(mybucket):
+            result[k.name] = c
         self.assertEqual(expected, result)
 
         # read some of the keys back, in parallel, using s3_iter_bucket
-        result = dict(smart_open.s3_iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('4')))
+        result = {}
+        for k, c in smart_open.s3_iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('4')):
+            result[k.name] = c
         self.assertEqual(result, dict((k, c) for k, c in expected.items() if k.endswith('4')))
 
         # read some of the keys back, in parallel, using s3_iter_bucket
@@ -474,7 +478,10 @@ class S3IterBucketTest(unittest.TestCase):
         self.assertEqual(len(result), min(len(expected), 10))
 
         for workers in [1, 4, 8, 16, 64]:
-            self.assertEqual(dict(smart_open.s3_iter_bucket(mybucket, workers=workers)), expected)
+            result = {}
+            for k, c in smart_open.s3_iter_bucket(mybucket):
+                result[k.name] = c
+            self.assertEqual(result, expected)
 
 
 PY2 = sys.version_info[0] == 2
