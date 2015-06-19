@@ -465,14 +465,12 @@ class S3IterBucketTest(unittest.TestCase):
         result = {}
         for k, c in smart_open.s3_iter_bucket(mybucket):
             result[k.name] = c
-        #result = dict(smart_open.s3_iter_bucket(mybucket))
         self.assertEqual(expected, result)
 
         # read some of the keys back, in parallel, using s3_iter_bucket
         result = {}
         for k, c in smart_open.s3_iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('4')):
             result[k.name] = c
-        #result = dict(smart_open.s3_iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('4')))
         self.assertEqual(result, dict((k, c) for k, c in expected.items() if k.endswith('4')))
 
         # read some of the keys back, in parallel, using s3_iter_bucket
