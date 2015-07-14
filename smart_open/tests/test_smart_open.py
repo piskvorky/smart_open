@@ -102,7 +102,7 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs:///tmp/test.txt"))
         smart_open_object.__iter__()
         # called with the correct params?
-        mock_subprocess.Popen.assert_called_with(["hadoop", "fs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
 
 
     @mock.patch('smart_open.smart_open_lib.boto')
