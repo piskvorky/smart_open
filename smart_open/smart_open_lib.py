@@ -246,7 +246,7 @@ class HdfsOpenRead(object):
         self.parsed_uri = parsed_uri
 
     def __iter__(self):
-        hdfs = subprocess.Popen(["hdfs", "dfs", "-cat", self.parsed_uri.uri_path], stdout=subprocess.PIPE)
+        hdfs = subprocess.Popen(["hdfs", "dfs", "-cat", os.path.join("/", self.parsed_uri.uri_path)], stdout=subprocess.PIPE)
         return hdfs.stdout
 
     def read(self, size=None):
