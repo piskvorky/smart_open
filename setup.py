@@ -7,6 +7,7 @@
 # from the MIT License (MIT).
 
 
+import io
 import os
 import sys
 
@@ -18,7 +19,7 @@ if sys.version_info < (2, 6):
 from setuptools import setup, find_packages
 
 def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+    return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
 
 
 setup(
