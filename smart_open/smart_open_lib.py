@@ -145,6 +145,8 @@ class ParseUri(object):
 
         if self.scheme == "hdfs":
             self.uri_path = parsed_uri.netloc + parsed_uri.path
+            if self.uri_path[0] != "/":
+                self.uri_path = "/" + self.uri_path
 
             if not self.uri_path:
                 raise RuntimeError("invalid HDFS URI: %s" % uri)
@@ -263,7 +265,7 @@ class HdfsOpenRead(object):
         self.parsed_uri = parsed_uri
 
     def __iter__(self):
-        hdfs = subprocess.Popen(["hdfs", "dfs", "-cat", "/" + self.parsed_uri.uri_path], stdout=subprocess.PIPE)
+        hdfs = subprocess.Popen(["hdfs", "dfs", "-cat", self.parsed_uri.uri_path], stdout=subprocess.PIPE)
         return hdfs.stdout
 
     def read(self, size=None):
