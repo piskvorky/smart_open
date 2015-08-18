@@ -123,7 +123,7 @@ class ParseUri(object):
       * s3://my_key:my_secret@my_bucket/my_key
       * hdfs:///path/file
       * hdfs://path/file
-      * webhdfs://host:port/path
+      * webhdfs://host:port/path/file
       * ./local/path/file
       * ./local/path/file.gz
       * file:///home/user/file
