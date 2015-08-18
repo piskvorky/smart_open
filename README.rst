@@ -36,6 +36,10 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
   >>> for line in smart_open.smart_open('hdfs://user/hadoop/my_file.txt'):
   ...    print line
 
+  >>> # stream from WebHDFS
+  >>> for line in smart_open.smart_open('webhdfs://host:port/user/hadoop/my_file.txt'):
+  ...    print line
+
   >>> # stream content *into* S3 (write mode):
   >>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'wb') as fout:
   ...     for line in ['first line', 'second line', 'third line']:
