@@ -263,7 +263,7 @@ class HdfsOpenRead(object):
         self.parsed_uri = parsed_uri
 
     def __iter__(self):
-        hdfs = subprocess.Popen(["hdfs", "dfs", "-cat", os.path.join("/", self.parsed_uri.uri_path)], stdout=subprocess.PIPE)
+        hdfs = subprocess.Popen(["hdfs", "dfs", "-cat", "/" + self.parsed_uri.uri_path], stdout=subprocess.PIPE)
         return hdfs.stdout
 
     def read(self, size=None):
@@ -292,7 +292,7 @@ class WebHdfsOpenRead(object):
 
     def __iter__(self):
         payload = {"op": "OPEN"}
-        response = requests.get(os.path.join("http://", self.parsed_uri.uri_path), params=payload, stream=True)
+        response = requests.get("http://" + self.parsed_uri.uri_path, params=payload, stream=True)
         return response.iter_lines()
 
     def read(self, size=None):
