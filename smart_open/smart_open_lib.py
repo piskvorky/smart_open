@@ -285,6 +285,7 @@ class WebHdfsOpenRead(object):
         if parsed_uri.scheme not in ("webhdfs"):
             raise TypeError("can only process WebHDFS files")
         self.parsed_uri = parsed_uri
+        self.offset = 0
 
     def __iter__(self):
         payload = {"op": "OPEN"}
@@ -292,10 +293,35 @@ class WebHdfsOpenRead(object):
         return response.iter_lines()
 
     def read(self, size=None):
-        raise NotImplementedError("read() not implemented yet")
+        """
+        Read the specific number of bytes from the file
 
-    def seek(self, offset, whence=None):
-        raise NotImplementedError("seek() not implemented yet")
+        Note read() and line iteration (`for line in self: ...`) each have their
+        own file position, so they are independent. Doing a `read` will not affect
+        the line iteration, and vice versa.
+        """
+        if not size or size < 0:
+            payload = {"op": "OPEN", "offset": self.offset}
+            self.offset = 0
+        else:
+            payload = {"op": "OPEN", "offset": self.offset, "length": size}
+            self.offset = self.offset + size
+        response = requests.get("http://" + self.parsed_uri.uri_path, params=payload, stream=True)
+        return response.content
+
+    def seek(self, offset, whence=0):
+        """
+        Seek to the specified position.
+
+        Only seeking to the beginning (offset=0) supported for now.
+
+        """
+        if whence == 0 and offset == 0:
+            self.offset = 0
+        elif whence == 0:
+            self.offset = offset
+        else:
+            raise NotImplementedError("operations with whence not implemented yet")
 
     def __enter__(self):
         return self
