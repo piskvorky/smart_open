@@ -230,12 +230,6 @@ class S3OpenRead(object):
             size = 0
         return self.read_key.read(size)
 
-    def readline(self):
-        """
-        Read line of the file from the key
-        """
-        return next(self.line_generator)
-
     def seek(self, offset, whence=0):
         """
         Seek to the specified position.
