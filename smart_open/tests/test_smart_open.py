@@ -77,6 +77,12 @@ class ParseUriTest(unittest.TestCase):
         # incorrect uri - only one '@' in uri is allowed
         self.assertRaises(RuntimeError, smart_open.ParseUri, "s3://access_id@access_secret@mybucket/mykey")
 
+    def test_webhdfs_uri(self):
+        """Do webhdfs USIs parse correctly"""
+        parsed_uri = smart_open.ParseUri("webhdfs://host:port/path/file")
+        self.assertEqual(parsed_uri.scheme, "webhdfs")
+        self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file")
+
 
 class SmartOpenReadTest(unittest.TestCase):
     """
