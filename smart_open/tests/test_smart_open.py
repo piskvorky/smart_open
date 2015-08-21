@@ -16,7 +16,6 @@ import os
 import boto
 import mock
 from moto import mock_s3
-import requests
 import responses
 
 import smart_open
@@ -116,10 +115,11 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object.__iter__()
         mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
 
-    def test_webhdfs(self, mock_get):
+    @responses.activate
+    def test_webhdfs(self):
         """Is webhdfs line iterator called correctly"""
-        responses.add(responses.GET, "http://host:port/webhdfs/v1/path/file", body='abc\n123')
-        smart_open_object = smart_open.WebHdfsOpenRead(smart_open.ParseUri("webhdfs://host:port/path/file"))
+        responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file", body='line1\nline2')
+        smart_open_object = smart_open.WebHdfsOpenRead(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
         iterator = iter(smart_open_object)
         self.assertEqual(iterator.next(), "line1")
         self.assertEqual(iterator.next(), "line2")
