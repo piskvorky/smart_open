@@ -124,6 +124,13 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(iterator.next(), "line1")
         self.assertEqual(iterator.next(), "line2")
 
+    @responses.activate
+    def test_webhdfs_read(self):
+        """Does webhdfs read method work correctly"""
+        responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file", body='line1\nline2')
+        smart_open_object = smart_open.WebHdfsOpenRead(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
+        self.assertEqual(smart_open_object.read(), "line1\nline2")
+
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.s3_iter_lines')
     def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
