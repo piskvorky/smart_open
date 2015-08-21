@@ -16,6 +16,8 @@ import os
 import boto
 import mock
 from moto import mock_s3
+import requests
+import responses
 
 import smart_open
 from smart_open import smart_open_lib
@@ -98,7 +100,6 @@ class SmartOpenReadTest(unittest.TestCase):
         # called with the correct path?
         mock_smart_open.assert_called_with("/tmp/test.txt", "rb")
 
-
     # couldn't find any project for mocking up HDFS data
     # TODO: we want to test also a content of the files, not just fnc call params
     @mock.patch('smart_open.smart_open_lib.subprocess')
@@ -114,6 +115,14 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs://tmp/test.txt"))
         smart_open_object.__iter__()
         mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+
+    def test_webhdfs(self, mock_get):
+        """Is webhdfs line iterator called correctly"""
+        responses.add(responses.GET, "http://host:port/webhdfs/v1/path/file", body='abc\n123')
+        smart_open_object = smart_open.WebHdfsOpenRead(smart_open.ParseUri("webhdfs://host:port/path/file"))
+        iterator = iter(smart_open_object)
+        self.assertEqual(iterator.next(), "line1")
+        self.assertEqual(iterator.next(), "line2")
 
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.s3_iter_lines')
