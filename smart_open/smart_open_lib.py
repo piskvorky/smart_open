@@ -145,8 +145,7 @@ class ParseUri(object):
 
         if self.scheme == "hdfs":
             self.uri_path = parsed_uri.netloc + parsed_uri.path
-            if self.uri_path[0] != "/":
-                self.uri_path = "/" + self.uri_path
+            self.uri_path = "/" + self.uri_path.lstrip("/")
 
             if not self.uri_path:
                 raise RuntimeError("invalid HDFS URI: %s" % uri)
