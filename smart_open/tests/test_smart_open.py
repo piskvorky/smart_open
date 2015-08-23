@@ -16,6 +16,7 @@ import os
 import boto
 import mock
 from moto import mock_s3
+import responses
 
 import smart_open
 from smart_open import smart_open_lib
@@ -77,6 +78,12 @@ class ParseUriTest(unittest.TestCase):
         # incorrect uri - only one '@' in uri is allowed
         self.assertRaises(RuntimeError, smart_open.ParseUri, "s3://access_id@access_secret@mybucket/mykey")
 
+    def test_webhdfs_uri(self):
+        """Do webhdfs URIs parse correctly"""
+        parsed_uri = smart_open.ParseUri("webhdfs://host:port/path/file")
+        self.assertEqual(parsed_uri.scheme, "webhdfs")
+        self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file")
+
 
 class SmartOpenReadTest(unittest.TestCase):
     """
@@ -91,7 +98,6 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object.__iter__()
         # called with the correct path?
         mock_smart_open.assert_called_with("/tmp/test.txt", "rb")
-
 
     # couldn't find any project for mocking up HDFS data
     # TODO: we want to test also a content of the files, not just fnc call params
@@ -108,6 +114,22 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs://tmp/test.txt"))
         smart_open_object.__iter__()
         mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+
+    @responses.activate
+    def test_webhdfs(self):
+        """Is webhdfs line iterator called correctly"""
+        responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file", body='line1\nline2')
+        smart_open_object = smart_open.WebHdfsOpenRead(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
+        iterator = iter(smart_open_object)
+        self.assertEqual(next(iterator).decode("utf-8"), "line1")
+        self.assertEqual(next(iterator).decode("utf-8"), "line2")
+
+    @responses.activate
+    def test_webhdfs_read(self):
+        """Does webhdfs read method work correctly"""
+        responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file", body='line1\nline2')
+        smart_open_object = smart_open.WebHdfsOpenRead(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
+        self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.s3_iter_lines')

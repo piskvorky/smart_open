@@ -26,6 +26,7 @@ import multiprocessing.pool
 import os
 import subprocess
 import sys
+import requests
 
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
@@ -93,6 +94,8 @@ def smart_open(uri, mode="rb"):
             return S3OpenRead(parsed_uri)
         elif parsed_uri.scheme in ("hdfs", ):
             return HdfsOpenRead(parsed_uri)
+        elif parsed_uri.scheme in ("webhdfs", ):
+            return WebHdfsOpenRead(parsed_uri)
         else:
             raise NotImplementedError("read mode not supported for %r scheme", parsed_uri.scheme)
     elif mode in ('w', 'wb'):
@@ -119,6 +122,8 @@ class ParseUri(object):
       * s3://my_bucket/my_key
       * s3://my_key:my_secret@my_bucket/my_key
       * hdfs:///path/file
+      * hdfs://path/file
+      * webhdfs://host:port/path/file
       * ./local/path/file
       * ./local/path/file.gz
       * file:///home/user/file
@@ -140,9 +145,15 @@ class ParseUri(object):
 
         if self.scheme == "hdfs":
             self.uri_path = parsed_uri.netloc + parsed_uri.path
+            self.uri_path = "/" + self.uri_path.lstrip("/")
 
             if not self.uri_path:
                 raise RuntimeError("invalid HDFS URI: %s" % uri)
+        elif self.scheme == "webhdfs":
+            self.uri_path = parsed_uri.netloc + "/webhdfs/v1" + parsed_uri.path
+
+            if not self.uri_path:
+                raise RuntimeError("invalid WebHDFS URI: %s" % uri)
         elif self.scheme in ("s3", "s3n"):
             self.bucket_id = (parsed_uri.netloc + parsed_uri.path).split('@')
             self.key_id = None
@@ -191,6 +202,7 @@ class S3OpenRead(object):
         self.read_key = s3_connection.get_bucket(parsed_uri.bucket_id).lookup(parsed_uri.key_id)
         if self.read_key is None:
             raise KeyError(parsed_uri.key_id)
+        self.line_generator = s3_iter_lines(self.read_key)
 
     def __iter__(self):
         s3_connection = boto.connect_s3(
@@ -246,7 +258,7 @@ class HdfsOpenRead(object):
         self.parsed_uri = parsed_uri
 
     def __iter__(self):
-        hdfs = subprocess.Popen(["hdfs", "dfs", "-cat", os.path.join("/", self.parsed_uri.uri_path)], stdout=subprocess.PIPE)
+        hdfs = subprocess.Popen(["hdfs", "dfs", "-cat", self.parsed_uri.uri_path], stdout=subprocess.PIPE)
         return hdfs.stdout
 
     def read(self, size=None):
@@ -254,6 +266,61 @@ class HdfsOpenRead(object):
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        pass
+
+
+class WebHdfsOpenRead(object):
+    """
+    Implement streamed reader from WebHDFS, as an iterable & context manager.
+    NOTE: it does not support kerberos authentication yet
+
+    """
+    def __init__(self, parsed_uri):
+        if parsed_uri.scheme not in ("webhdfs"):
+            raise TypeError("can only process WebHDFS files")
+        self.parsed_uri = parsed_uri
+        self.offset = 0
+
+    def __iter__(self):
+        payload = {"op": "OPEN"}
+        response = requests.get("http://" + self.parsed_uri.uri_path, params=payload, stream=True)
+        return response.iter_lines()
+
+    def read(self, size=None):
+        """
+        Read the specific number of bytes from the file
+
+        Note read() and line iteration (`for line in self: ...`) each have their
+        own file position, so they are independent. Doing a `read` will not affect
+        the line iteration, and vice versa.
+        """
+        if not size or size < 0:
+            payload = {"op": "OPEN", "offset": self.offset}
+            self.offset = 0
+        else:
+            payload = {"op": "OPEN", "offset": self.offset, "length": size}
+            self.offset = self.offset + size
+        response = requests.get("http://" + self.parsed_uri.uri_path, params=payload, stream=True)
+        return response.content
+
+    def seek(self, offset, whence=0):
+        """
+        Seek to the specified position.
+
+        Only seeking to the beginning (offset=0) supported for now.
+
+        """
+        if whence == 0 and offset == 0:
+            self.offset = 0
+        elif whence == 0:
+            self.offset = offset
+        else:
+            raise NotImplementedError("operations with whence not implemented yet")
 
     def __enter__(self):
         return self
