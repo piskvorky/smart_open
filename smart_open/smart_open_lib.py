@@ -90,9 +90,9 @@ def smart_open(uri, mode="rb", **kw):
 
     if mode in ('r', 'rb'):
         if parsed_uri.scheme in ("s3", "s3n"):
-            return S3OpenRead(parsed_uri,**kw)
+            return S3OpenRead(parsed_uri, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
-            return HdfsOpenRead(parsed_uri,**kw)
+            return HdfsOpenRead(parsed_uri, **kw)
         else:
             raise NotImplementedError("read mode not supported for %r scheme", parsed_uri.scheme)
     elif mode in ('w', 'wb'):
@@ -306,7 +306,7 @@ class S3OpenWrite(object):
     Context manager for writing into S3 files.
 
     """
-    def __init__(self, outbucket, outkey, min_part_size=S3_MIN_PART_SIZE,**kw):
+    def __init__(self, outbucket, outkey, min_part_size=S3_MIN_PART_SIZE, **kw):
         """
         Streamed input is uploaded in chunks, as soon as `min_part_size` bytes are
         accumulated (50MB by default). The minimum chunk size allowed by AWS S3
@@ -321,7 +321,7 @@ class S3OpenWrite(object):
             logger.warning("S3 requires minimum part size >= 5MB; multipart upload may fail")
 
         # initialize mulitpart upload
-        self.mp = self.outbucket.initiate_multipart_upload(self.outkey,**kw)
+        self.mp = self.outbucket.initiate_multipart_upload(self.outkey, **kw)
 
         # initialize stats
         self.lines = []
