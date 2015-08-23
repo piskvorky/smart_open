@@ -34,7 +34,11 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
 
   >>> # stream from HDFS
   >>> for line in smart_open.smart_open('hdfs://user/hadoop/my_file.txt'):
-  ...    print line
+  ...     print line
+
+  >>> # stream from WebHDFS
+  >>> for line in smart_open.smart_open('webhdfs://host:port/user/hadoop/my_file.txt'):
+  ...     print line
 
   >>> # stream content *into* S3 (write mode):
   >>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'wb') as fout:
@@ -86,7 +90,7 @@ Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pyp
     python setup.py test  # run unit tests
     python setup.py install
 
-To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ and `moto <https://github.com/spulec/moto>`_ (``pip install mock moto``). The tests are also run automatically with `Travis CI <https://travis-ci.org/piskvorky/smart_open>`_ on every commit push & pull request.
+To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>` (``pip install mock moto responses``). The tests are also run automatically with `Travis CI <https://travis-ci.org/piskvorky/smart_open>`_ on every commit push & pull request.
 
 Todo
 ----
