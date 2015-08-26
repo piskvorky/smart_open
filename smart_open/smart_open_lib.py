@@ -27,6 +27,7 @@ import os
 import subprocess
 import sys
 import requests
+import httplib
 
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
@@ -105,6 +106,8 @@ def smart_open(uri, mode="rb"):
             outkey = boto.s3.key.Key(outbucket)
             outkey.key = parsed_uri.key_id
             return S3OpenWrite(outbucket, outkey)
+        elif parsed_uri.scheme in ("webhdfs", ):
+            return WebHdfsOpenWrite(parsed_uri)
         else:
             raise NotImplementedError("write mode not supported for %r scheme", parsed_uri.scheme)
     else:
@@ -462,6 +465,50 @@ class S3OpenWrite(object):
             raise
 
 
+class WebHdfsOpenWrite(object):
+    """
+    Context manager for writing into webhdfs files
+
+    """
+    def __init__(self, parsed_uri):
+        if parsed_uri.scheme not in ("webhdfs"):
+            raise TypeError("can only process WebHDFS files")
+        self.parsed_uri = parsed_uri
+
+    def write(self, b):
+        """
+        Write the given bytes (binary string) into the WebHDFS file from constructor.
+
+        """
+        if isinstance(b, six.text_type):
+            # not part of API: also accept unicode => encode it as utf8
+            b = b.encode('utf8')
+
+        if not isinstance(b, six.binary_type):
+            raise TypeError("input must be a binary string")
+
+        payload = {"op": "CREATE", "overwrite": True}
+        init_response = requests.put("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
+        if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
+            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
+        uri = init_response.headers['location']
+        response = requests.put(uri, data=b, headers={'content-type': 'application/octet-stream'})
+        if not response.status_code == httplib.CREATED:
+            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
+
+    def seek(self, offset, whence=None):
+        raise NotImplementedError("seek() not implemented yet")
+
+    def close(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+
 def s3_iter_bucket_process_key(key):
     """
     Conceptually part of `s3_iter_bucket`, but must remain top-level method because
@@ -552,3 +599,9 @@ def s3_iter_lines(key):
     # process the last line, too
     if buf:
         yield buf
+
+
+class WebHdfsException(Exception):
+    def __init__(self, msg=str()):
+        self.msg = msg
+        super(WebHdfsException, self).__init__(self.msg)
