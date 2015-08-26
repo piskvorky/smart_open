@@ -106,6 +106,8 @@ def smart_open(uri, mode="rb", **kw):
             outkey = boto.s3.key.Key(outbucket)
             outkey.key = parsed_uri.key_id
             return S3OpenWrite(outbucket, outkey, **kw)
+        elif parsed_uri.scheme in ("webhdfs", ):
+            return WebHdfsOpenWrite(parsed_uri, **kw)
         else:
             raise NotImplementedError("write mode not supported for %r scheme", parsed_uri.scheme)
     else:
