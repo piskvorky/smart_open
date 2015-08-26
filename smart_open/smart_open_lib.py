@@ -27,7 +27,10 @@ import os
 import subprocess
 import sys
 import requests
-import httplib
+if sys.version_info[0] == 2:
+    import httplib
+elif sys.version_info[0] == 3:
+    import http.client as httplib
 
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
