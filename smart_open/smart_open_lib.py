@@ -478,6 +478,7 @@ class WebHdfsOpenWrite(object):
             raise TypeError("can only process WebHDFS files")
         self.parsed_uri = parsed_uri
         self.closed = False
+        # creating empty file first
         payload = {"op": "CREATE", "overwrite": True}
         init_response = requests.put("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
@@ -490,7 +491,7 @@ class WebHdfsOpenWrite(object):
     def write(self, b):
         """
         Write the given bytes (binary string) into the WebHDFS file from constructor.
-        NOTE: some kind of caching might improve the performance here a lot (writing )
+        NOTE: some kind of caching might improve the performance here a lot (writing one line takes one request now)
 
         """
         if self.closed:
