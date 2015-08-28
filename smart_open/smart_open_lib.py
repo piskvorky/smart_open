@@ -477,12 +477,24 @@ class WebHdfsOpenWrite(object):
         if parsed_uri.scheme not in ("webhdfs"):
             raise TypeError("can only process WebHDFS files")
         self.parsed_uri = parsed_uri
+        self.closed = False
+        payload = {"op": "CREATE", "overwrite": True}
+        init_response = requests.put("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
+        if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
+            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
+        uri = init_response.headers['location']
+        response = requests.put(uri, data="", headers={'content-type': 'application/octet-stream'})
+        if not response.status_code == httplib.CREATED:
+            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
 
     def write(self, b):
         """
         Write the given bytes (binary string) into the WebHDFS file from constructor.
+        NOTE: some kind of caching might improve the performance here a lot (writing )
 
         """
+        if self.closed:
+            raise ValueError("I/O operation on closed file")
         if isinstance(b, six.text_type):
             # not part of API: also accept unicode => encode it as utf8
             b = b.encode('utf8')
@@ -490,20 +502,20 @@ class WebHdfsOpenWrite(object):
         if not isinstance(b, six.binary_type):
             raise TypeError("input must be a binary string")
 
-        payload = {"op": "CREATE", "overwrite": True}
-        init_response = requests.put("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
+        payload = {"op": "APPEND"}
+        init_response = requests.post("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
             raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
         uri = init_response.headers['location']
-        response = requests.put(uri, data=b, headers={'content-type': 'application/octet-stream'})
-        if not response.status_code == httplib.CREATED:
+        response = requests.post(uri, data=b, headers={'content-type': 'application/octet-stream'})
+        if not response.status_code == httplib.OK:
             raise WebHdfsException(str(response.status_code) + "\n" + response.content)
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
 
     def close(self):
-        pass
+        self.closed = True
 
     def __enter__(self):
         return self
