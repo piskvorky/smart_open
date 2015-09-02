@@ -38,6 +38,7 @@ import boto.s3.key
 logger = logging.getLogger(__name__)
 
 S3_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
+WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 
 def smart_open(uri, mode="rb", **kw):
@@ -473,11 +474,12 @@ class WebHdfsOpenWrite(object):
     Context manager for writing into webhdfs files
 
     """
-    def __init__(self, parsed_uri):
+    def __init__(self, parsed_uri, min_part_size=WEBHDFS_MIN_PART_SIZE):
         if parsed_uri.scheme not in ("webhdfs"):
             raise TypeError("can only process WebHDFS files")
         self.parsed_uri = parsed_uri
         self.closed = False
+        self.min_part_size = min_part_size
         # creating empty file first
         payload = {"op": "CREATE", "overwrite": True}
         init_response = requests.put("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
@@ -487,11 +489,24 @@ class WebHdfsOpenWrite(object):
         response = requests.put(uri, data="", headers={'content-type': 'application/octet-stream'})
         if not response.status_code == httplib.CREATED:
             raise WebHdfsException(str(response.status_code) + "\n" + response.content)
+        self.lines = []
+        self.parts = 0
+        self.chunk_bytes = 0
+        self.total_size = 0
+
+    def upload(self, data):
+        payload = {"op": "APPEND"}
+        init_response = requests.post("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
+        if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
+            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
+        uri = init_response.headers['location']
+        response = requests.post(uri, data=data, headers={'content-type': 'application/octet-stream'})
+        if not response.status_code == httplib.OK:
+            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
 
     def write(self, b):
         """
         Write the given bytes (binary string) into the WebHDFS file from constructor.
-        NOTE: some kind of caching might improve the performance here a lot (writing one line takes one request now)
 
         """
         if self.closed:
@@ -503,19 +518,27 @@ class WebHdfsOpenWrite(object):
         if not isinstance(b, six.binary_type):
             raise TypeError("input must be a binary string")
 
-        payload = {"op": "APPEND"}
-        init_response = requests.post("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
-        if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
-            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
-        uri = init_response.headers['location']
-        response = requests.post(uri, data=b, headers={'content-type': 'application/octet-stream'})
-        if not response.status_code == httplib.OK:
-            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
+        self.lines.append(b)
+        self.chunk_bytes += len(b)
+        self.total_size += len(b)
+
+        if self.chunk_bytes >= self.min_part_size:
+            buff = b"".join(self.lines)
+            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+            self.upload(buff)
+            logger.debug("upload of part #%i finished" % self.parts)
+            self.parts += 1
+            self.lines, self.chunk_bytes = [], 0
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
 
     def close(self):
+        buff = b"".join(self.lines)
+        if buff:
+            logger.info("uploading last part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+            self.upload(buff)
+            logger.debug("upload of last part #%i finished" % self.parts)
         self.closed = True
 
     def __enter__(self):
