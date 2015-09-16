@@ -27,6 +27,10 @@ import os
 import subprocess
 import sys
 import requests
+if sys.version_info[0] == 2:
+    import httplib
+elif sys.version_info[0] == 3:
+    import http.client as httplib
 
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
@@ -34,6 +38,7 @@ import boto.s3.key
 logger = logging.getLogger(__name__)
 
 S3_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
+WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 
 def smart_open(uri, mode="rb", **kw):
@@ -109,6 +114,8 @@ def smart_open(uri, mode="rb", **kw):
             outkey = boto.s3.key.Key(outbucket)
             outkey.key = parsed_uri.key_id
             return S3OpenWrite(outbucket, outkey, **kw)
+        elif parsed_uri.scheme in ("webhdfs", ):
+            return WebHdfsOpenWrite(parsed_uri, **kw)
         else:
             raise NotImplementedError("write mode not supported for %r scheme", parsed_uri.scheme)
     else:
@@ -466,6 +473,85 @@ class S3OpenWrite(object):
             raise
 
 
+class WebHdfsOpenWrite(object):
+    """
+    Context manager for writing into webhdfs files
+
+    """
+    def __init__(self, parsed_uri, min_part_size=WEBHDFS_MIN_PART_SIZE):
+        if parsed_uri.scheme not in ("webhdfs"):
+            raise TypeError("can only process WebHDFS files")
+        self.parsed_uri = parsed_uri
+        self.closed = False
+        self.min_part_size = min_part_size
+        # creating empty file first
+        payload = {"op": "CREATE", "overwrite": True}
+        init_response = requests.put("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
+        if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
+            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
+        uri = init_response.headers['location']
+        response = requests.put(uri, data="", headers={'content-type': 'application/octet-stream'})
+        if not response.status_code == httplib.CREATED:
+            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
+        self.lines = []
+        self.parts = 0
+        self.chunk_bytes = 0
+        self.total_size = 0
+
+    def upload(self, data):
+        payload = {"op": "APPEND"}
+        init_response = requests.post("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
+        if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
+            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
+        uri = init_response.headers['location']
+        response = requests.post(uri, data=data, headers={'content-type': 'application/octet-stream'})
+        if not response.status_code == httplib.OK:
+            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
+
+    def write(self, b):
+        """
+        Write the given bytes (binary string) into the WebHDFS file from constructor.
+
+        """
+        if self.closed:
+            raise ValueError("I/O operation on closed file")
+        if isinstance(b, six.text_type):
+            # not part of API: also accept unicode => encode it as utf8
+            b = b.encode('utf8')
+
+        if not isinstance(b, six.binary_type):
+            raise TypeError("input must be a binary string")
+
+        self.lines.append(b)
+        self.chunk_bytes += len(b)
+        self.total_size += len(b)
+
+        if self.chunk_bytes >= self.min_part_size:
+            buff = b"".join(self.lines)
+            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+            self.upload(buff)
+            logger.debug("upload of part #%i finished" % self.parts)
+            self.parts += 1
+            self.lines, self.chunk_bytes = [], 0
+
+    def seek(self, offset, whence=None):
+        raise NotImplementedError("seek() not implemented yet")
+
+    def close(self):
+        buff = b"".join(self.lines)
+        if buff:
+            logger.info("uploading last part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+            self.upload(buff)
+            logger.debug("upload of last part #%i finished" % self.parts)
+        self.closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+
 def s3_iter_bucket_process_key(key):
     """
     Conceptually part of `s3_iter_bucket`, but must remain top-level method because
@@ -556,3 +642,9 @@ def s3_iter_lines(key):
     # process the last line, too
     if buf:
         yield buf
+
+
+class WebHdfsException(Exception):
+    def __init__(self, msg=str()):
+        self.msg = msg
+        super(WebHdfsException, self).__init__(self.msg)
