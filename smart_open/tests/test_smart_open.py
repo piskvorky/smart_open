@@ -436,7 +436,9 @@ class WebHdfsWriteTest(unittest.TestCase):
         responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
         smart_open_object = smart_open.WebHdfsOpenWrite(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
         assert len(responses.calls) == 2
-        assert responses.calls[0].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?overwrite=True&op=CREATE"
+        path, params = responses.calls[0].request.url.split("?")
+        assert path == "http://127.0.0.1:8440/webhdfs/v1/path/file"
+        assert params == "overwrite=True&op=CREATE" or params == "op=CREATE&overwrite=True"
         assert responses.calls[1].request.url == "http://127.0.0.1:8440/file"
 
     @responses.activate
@@ -451,9 +453,9 @@ class WebHdfsWriteTest(unittest.TestCase):
         smart_open_object = smart_open.WebHdfsOpenWrite(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
 
         def write_callback(request):
-            resp_body = request.body
+            assert request.body == u"žluťoučký koníček".encode('utf8')
             headers = {}
-            return (200, headers, resp_body)
+            return (200, headers, "")
         test_string = u"žluťoučký koníček".encode('utf8')
         responses.add_callback(responses.POST, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
         responses.add_callback(responses.POST, "http://127.0.0.1:8440/file", callback=write_callback)
@@ -462,10 +464,6 @@ class WebHdfsWriteTest(unittest.TestCase):
         assert len(responses.calls) == 4
         assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"
         assert responses.calls[3].request.url == "http://127.0.0.1:8440/file"
-        # FIXME here is probably some bug related to the responses library, which probably encode text to some weird format
-        # Uploading file directly to the webhdfs works as expected. I am trying to solve this problem at:
-        #
-        #assert responses.calls[3].response.text == u"žluťoučký koníček".encode('utf8')
 
 
 class S3IterBucketTest(unittest.TestCase):
