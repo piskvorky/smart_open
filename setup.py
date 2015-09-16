@@ -47,6 +47,7 @@ setup(
         'boto >= 2.32',
         'httpretty==0.8.6',
         'bz2file',
+        'requests',
     ],
 
     test_suite="smart_open.tests",
