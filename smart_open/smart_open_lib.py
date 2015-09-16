@@ -80,6 +80,10 @@ def smart_open(uri, mode="rb", **kw):
       ...    fout.write("good bye!\n")
 
     """
+    # simply pass-through if already a file-like
+    if not isinstance(uri, six.string_types) and hasattr(uri, 'read'):
+        return uri
+
     # this method just routes the request to classes handling the specific storage
     # schemes, depending on the URI protocol in `uri`
     parsed_uri = ParseUri(uri)
