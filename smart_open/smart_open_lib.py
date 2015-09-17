@@ -407,6 +407,11 @@ class S3OpenWrite(object):
         self.chunk_bytes = 0
         self.parts = 0
 
+    def __str__(self):
+        return "%s<bucket: %s, key: %s, min_part_size: %s>" % (
+            self.__class__.__name__, self.outbucket, self.outkey, self.min_part_size,
+            )
+
     def write(self, b):
         """
         Write the given bytes (binary string) into the S3 file from constructor.
