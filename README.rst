@@ -104,7 +104,6 @@ Todo
 
 On the roadmap:
 
-* improve ``smart_open`` support for HDFS (streaming from/to Hadoop File System)
 * better documentation for the default ``file://`` scheme
 
 Comments, bug reports
