@@ -124,6 +124,8 @@ def smart_open(uri, mode="rb", **kw):
                 return WebHdfsOpenRead(parsed_uri, **kw)
             else:
                 return WebHdfsOpenWrite(parsed_uri, **kw)
+        else:
+            raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif isinstance(uri, boto.s3.key.Key):
         # handle case where we are given an S3 key directly
         if mode in ('r', 'rb'):
