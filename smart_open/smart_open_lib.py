@@ -629,10 +629,8 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
             # we were asked to output only a limited number of keys => we're done
             break
 
-    try:
+    if not NO_MULTIPROCESSING:
         pool.terminate()
-    except UnboundLocalError:
-        pass # pool not defined when in NO_MULTIPROCESSING mode
 
     logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
 
