@@ -84,6 +84,13 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "webhdfs")
         self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file")
 
+    def test_ssh_uri(self):
+        """Do SSH uris parse correctly"""
+        parsed_uri = smart_open.ParseUri("ssh://ubuntu@ip_address:/some/path/lines.txt")
+        self.assertEqual(parsed_uri.scheme, "ssh")
+        self.assertEqual(parsed_uri.uri_path, "/some/path/lines.txt")
+        self.assertEqual(parsed_uri.netloc, "ubuntu@ip_address")
+
 
 class SmartOpenReadTest(unittest.TestCase):
     """
@@ -114,6 +121,15 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs://tmp/test.txt"))
         smart_open_object.__iter__()
         mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+
+    @mock.patch('smart_open.smart_open_lib.subprocess')
+    def test_ssh(self, mock_subprocess):
+        """Is SSH line iterator called correctly?"""
+        mock_subprocess.PIPE.return_value = "test"
+        smart_open_object = smart_open.SSHOpenRead(smart_open.ParseUri("ssh://ubuntu@ip_address:/some/path/lines.txt"))
+        smart_open_object.__iter__()
+        # called with the correct params?
+        mock_subprocess.Popen.assert_called_with("ssh ubuntu@ip_address 'cat /some/path/lines.txt'", stdout=mock_subprocess.PIPE, shell=True)
 
     @responses.activate
     def test_webhdfs(self):
