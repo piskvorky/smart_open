@@ -67,7 +67,9 @@ def smart_open(uri, mode="rb", **kw):
        `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
     2. Amazon's S3 (can also supply credentials inside the URI):
        `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
-    3. HDFS: `hdfs:///some/path/lines.txt`
+    3. SSH: `ssh://ubuntu@ip_address:/some/path/lines.txt`
+    4. HDFS: `hdfs:///some/path/lines.txt`
+    5. WEBHDFS: `webhdfs://some/path/lines.txt`
 
     Examples::
 
@@ -116,6 +118,8 @@ def smart_open(uri, mode="rb", **kw):
             return HdfsOpenRead(parsed_uri, **kw)
         elif parsed_uri.scheme in ("webhdfs", ):
             return WebHdfsOpenRead(parsed_uri, **kw)
+        elif parsed_uri.scheme in ("ssh", ):
+            return SSHOpenRead(parsed_uri, **kw)
         else:
             raise NotImplementedError("read mode not supported for %r scheme", parsed_uri.scheme)
     elif mode in ('w', 'wb'):
@@ -205,6 +209,9 @@ class ParseUri(object):
 
             if not self.uri_path:
                 raise RuntimeError("invalid file URI: %s" % uri)
+        elif self.scheme == "ssh":
+            self.uri_path = parsed_uri.path
+            self.netloc = parsed_uri.netloc.rstrip(":")
         else:
             raise NotImplementedError("unknown URI scheme %r in %r" % (self.scheme, uri))
 
@@ -267,6 +274,34 @@ class S3OpenRead(object):
 
     def __exit__(self, type, value, traceback):
         self.read_key.close()
+
+
+class SSHOpenRead(object):
+    """
+    Implement streamed reader from remote server using SSH
+
+    """
+    def __init__(self, parsed_uri):
+        if parsed_uri.scheme not in ("ssh"):
+            raise TypeError("can only process remote files via ssh")
+        self.parsed_uri = parsed_uri
+
+    def __iter__(self):
+        ssh = subprocess.Popen("ssh " + self.parsed_uri.netloc + " 'cat " + self.parsed_uri.uri_path + "'",
+            stdout=subprocess.PIPE, shell=True)
+        return ssh.stdout
+
+    def read(self, size=None):
+        raise NotImplementedError("read() not implemented yet")
+
+    def seek(self, offset, whence=None):
+        raise NotImplementedError("seek() not implemented yet")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        pass
 
 
 class HdfsOpenRead(object):
