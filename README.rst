@@ -16,7 +16,7 @@ smart_open -- utils for streaming large files
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS, WebHDFS or local (compressed) files.
+``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS, WebHDFS, SSH/SCP or local (compressed) files.
 It is well tested (using `moto <https://github.com/spulec/moto>`_), well documented and sports a simple, Pythonic API:
 
 .. code-block:: python
@@ -31,6 +31,10 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
   ...         print line
   ...     fin.seek(0)  # seek to the beginning
   ...     print fin.read(1000)  # read 1000 bytes
+
+  >>> # stream from SSH/SCP (NOTE: you haev to have set your public ssh key on the remote machine)
+  >>> for line in smart_open.smart_open('ssh://ubuntu@ip_address:/some/path/lines.txt'):
+  ...     print line
 
   >>> # stream from HDFS
   >>> for line in smart_open.smart_open('hdfs://user/hadoop/my_file.txt'):
