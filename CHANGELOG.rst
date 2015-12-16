@@ -1,3 +1,7 @@
+* 1.4.0, 16th of December 2015
+
+  - Updated smart_open to accept an instance of boto.s3.key.Key (PR #38, @asieira)
+
 * 1.3.0, 19th September 2015
 
   - WebHDFS read/write (PR #29, @ziky90)

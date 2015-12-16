@@ -52,16 +52,23 @@ def smart_open(uri, mode="rb", **kw):
 
     The `uri` can be either:
 
-    1. local filesystem (compressed ``.gz`` or ``.bz2`` files handled automatically):
+    1. a URI for the local filesystem (compressed ``.gz`` or ``.bz2`` files handled automatically):
        `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
-    2. Amazon's S3 (can also supply credentials inside the URI):
+    2. a URI for HDFS: `hdfs:///some/path/lines.txt`
+    3. a URI for Amazon's S3 (can also supply credentials inside the URI):
        `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
-    3. HDFS: `hdfs:///some/path/lines.txt`
+    4. an instance of the boto.s3.key.Key class.
 
     Examples::
 
       >>> # stream lines from S3; you can use context managers too:
       >>> with smart_open.smart_open('s3://mybucket/mykey.txt') as fin:
+      ...     for line in fin:
+      ...         print line
+
+      >>> # you can also use a boto.s3.key.Key instance directly:
+      >>> key = boto.connect_s3().get_bucket("my_bucket").get_key("my_key")
+      >>> with smart_open.smart_open(key) as fin:
       ...     for line in fin:
       ...         print line
 
@@ -221,7 +228,8 @@ class S3OpenRead(object):
 
     """
     def __init__(self, read_key):
-        if not isinstance(read_key, boto.s3.key.Key):
+        if not hasattr(read_key, "bucket") and not hasattr(read_key, "name") and not hasattr(read_key, "read") \
+                and not hasattr(read_key, "close"):
             raise TypeError("can only process S3 keys")
         self.read_key = read_key
         self.line_generator = s3_iter_lines(self.read_key)
@@ -405,6 +413,9 @@ class S3OpenWrite(object):
         is 5MB.
 
         """
+        if not hasattr(outkey, "bucket") and not hasattr(outkey, "name"):
+            raise TypeError("can only process S3 keys")
+
         self.outkey = outkey
         self.min_part_size = min_part_size
 

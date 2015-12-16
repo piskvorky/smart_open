@@ -131,26 +131,26 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.WebHdfsOpenRead(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
-    # @mock.patch('smart_open.smart_open_lib.boto')
-    # @mock.patch('smart_open.smart_open_lib.s3_iter_lines')
-    # def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
-    #     """Is S3 line iterator called correctly?"""
-    #     # no credentials
-    #     smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
-    #     smart_open_object.__iter__()
-    #     mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
-    #
-    #     # with credential
-    #     smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
-    #     smart_open_object.__iter__()
-    #     mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret")
-    #
-    #     # lookup bucket, key; call s3_iter_lines
-    #     smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
-    #     smart_open_object.__iter__()
-    #     mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
-    #     mock_boto.connect_s3().get_bucket().lookup.assert_called_with("mykey")
-    #     self.assertTrue(mock_s3_iter_lines.called)
+    @mock.patch('smart_open.smart_open_lib.boto')
+    @mock.patch('smart_open.smart_open_lib.s3_iter_lines')
+    def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
+        """Is S3 line iterator called correctly?"""
+        # no credentials
+        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
+        smart_open_object.__iter__()
+        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
+
+        # with credential
+        smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
+        smart_open_object.__iter__()
+        mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret")
+
+        # lookup bucket, key; call s3_iter_lines
+        smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
+        smart_open_object.__iter__()
+        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
+        mock_boto.connect_s3().get_bucket().get_key.assert_called_with("mykey")
+        self.assertTrue(mock_s3_iter_lines.called)
 
 
     @mock_s3
