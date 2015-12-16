@@ -287,7 +287,7 @@ class SSHOpenRead(object):
         self.parsed_uri = parsed_uri
 
     def __iter__(self):
-        ssh = subprocess.Popen("ssh " + self.parsed_uri.netloc + " 'cat " + self.parsed_uri.uri_path + "'",
+        ssh = subprocess.Popen("ssh -o StrictHostKeyChecking=no " + self.parsed_uri.netloc + " 'cat " + self.parsed_uri.uri_path + "'",
             stdout=subprocess.PIPE, shell=True)
         return ssh.stdout
 
