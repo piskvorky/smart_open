@@ -1,3 +1,9 @@
+* 1.3.1, 16th December 2015
+
+- Disable multiprocessing if unavailable. Allows to run on Google Compute Engine. (PR #41, @nikicc)
+- Httpretty updated to allow LC_ALL=C locale config. (PR #39, @jsphpl)
+
+
 * 1.3.0, 19th September 2015
 
   - WebHDFS read/write (PR #29, @ziky90)
