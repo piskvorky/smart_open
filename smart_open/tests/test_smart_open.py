@@ -149,7 +149,7 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
         smart_open_object.__iter__()
         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
-        mock_boto.connect_s3().get_bucket().lookup.assert_called_with("mykey")
+        mock_boto.connect_s3().get_bucket().get_key.assert_called_with("mykey")
         self.assertTrue(mock_s3_iter_lines.called)
 
 

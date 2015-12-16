@@ -221,8 +221,6 @@ class S3OpenRead(object):
 
     """
     def __init__(self, read_key):
-        if not isinstance(read_key, boto.s3.key.Key):
-            raise TypeError("can only process S3 keys")
         self.read_key = read_key
         self.line_generator = s3_iter_lines(self.read_key)
 
