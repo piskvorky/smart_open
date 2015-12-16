@@ -129,7 +129,7 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.SSHOpenRead(smart_open.ParseUri("ssh://ubuntu@ip_address:/some/path/lines.txt"))
         smart_open_object.__iter__()
         # called with the correct params?
-        mock_subprocess.Popen.assert_called_with("ssh ubuntu@ip_address 'cat /some/path/lines.txt'", stdout=mock_subprocess.PIPE, shell=True)
+        mock_subprocess.Popen.assert_called_with("ssh -o StrictHostKeyChecking=no ubuntu@ip_address 'cat /some/path/lines.txt'", stdout=mock_subprocess.PIPE, shell=True)
 
     @responses.activate
     def test_webhdfs(self):
