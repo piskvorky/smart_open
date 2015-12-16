@@ -136,17 +136,17 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
         """Is S3 line iterator called correctly?"""
         # no credentials
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
         smart_open_object.__iter__()
         mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
 
         # with credential
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://access_id:access_secret@mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
         smart_open_object.__iter__()
         mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret")
 
         # lookup bucket, key; call s3_iter_lines
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://access_id:access_secret@mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
         smart_open_object.__iter__()
         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
         mock_boto.connect_s3().get_bucket().lookup.assert_called_with("mykey")
@@ -176,12 +176,12 @@ class SmartOpenReadTest(unittest.TestCase):
             fout.write(expected[-1])
 
         # connect to fake s3 and read from the fake key we filled above
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
         output = [line.rstrip(b'\n') for line in smart_open_object]
         self.assertEqual(output, expected)
 
         # same thing but using a context manager
-        with smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey")) as smart_open_object:
+        with smart_open.smart_open("s3://mybucket/mykey") as smart_open_object:
             output = [line.rstrip(b'\n') for line in smart_open_object]
             self.assertEqual(output, expected)
 
@@ -196,7 +196,7 @@ class SmartOpenReadTest(unittest.TestCase):
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
             fout.write(content)
 
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
         self.assertEqual(content[:6], smart_open_object.read(6))
         self.assertEqual(content[6:14], smart_open_object.read(8))  # ř is 2 bytes
 
@@ -216,7 +216,7 @@ class SmartOpenReadTest(unittest.TestCase):
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
             fout.write(content)
 
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
         self.assertEqual(content[:6], smart_open_object.read(6))
         self.assertEqual(content[6:14], smart_open_object.read(8))  # ř is 2 bytes
 
@@ -344,10 +344,11 @@ class S3OpenWriteTest(unittest.TestCase):
         mybucket = conn.get_bucket("mybucket")
         mykey = boto.s3.key.Key()
         mykey.name = "testkey"
+        mykey.bucket = mybucket
         test_string = u"žluťoučký koníček".encode('utf8')
 
         # write into key
-        with smart_open.S3OpenWrite(mybucket, mykey) as fin:
+        with smart_open.S3OpenWrite(mykey) as fin:
             fin.write(test_string)
 
         # read key and test content
@@ -363,10 +364,11 @@ class S3OpenWriteTest(unittest.TestCase):
         conn.create_bucket("mybucket")
         mybucket = conn.get_bucket("mybucket")
         mykey = boto.s3.key.Key()
+        mykey.bucket = mybucket
         mykey.name = "testkey"
 
         try:
-            with smart_open.S3OpenWrite(mybucket, mykey) as fin:
+            with smart_open.S3OpenWrite(mykey) as fin:
                 fin.write(None)
         except TypeError:
             pass
@@ -383,8 +385,9 @@ class S3OpenWriteTest(unittest.TestCase):
         mybucket = conn.get_bucket("mybucket")
         mykey = boto.s3.key.Key()
         mykey.name = "testkey"
+        mykey.bucket = mybucket
 
-        smart_open_write = smart_open.S3OpenWrite(mybucket, mykey)
+        smart_open_write = smart_open.S3OpenWrite(mykey)
         with smart_open_write as fin:
             fin.write(u"testžížáč")
             self.assertEqual(fin.total_size, 14)
@@ -399,9 +402,10 @@ class S3OpenWriteTest(unittest.TestCase):
         mybucket = conn.get_bucket("mybucket")
         mykey = boto.s3.key.Key()
         mykey.name = "testkey"
+        mykey.bucket = mybucket
 
         # write
-        smart_open_write = smart_open.S3OpenWrite(mybucket, mykey, min_part_size=10)
+        smart_open_write = smart_open.S3OpenWrite(mykey, min_part_size=10)
         with smart_open_write as fin:
             fin.write(u"test")  # implicit unicode=>utf8 conversion
             self.assertEqual(fin.chunk_bytes, 4)

@@ -22,6 +22,7 @@ The main methods are:
 """
 
 import logging
+import multiprocessing.pool
 import os
 import subprocess
 import sys
@@ -35,18 +36,6 @@ from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
 
 logger = logging.getLogger(__name__)
-
-# Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
-# The only method currently relying on it is s3_iter_bucket, which is instructed
-# not to use it by the NO_MULTIPROCESSING flag.
-try:
-    import multiprocessing.pool
-except ImportError:
-    logger.warning("multiprocessing could not be imported and won't be used")
-    NO_MULTIPROCESSING = True
-    from itertools import imap
-else:
-    NO_MULTIPROCESSING = False
 
 S3_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
@@ -96,41 +85,58 @@ def smart_open(uri, mode="rb", **kw):
       ...    fout.write("good bye!\n")
 
     """
-    # simply pass-through if already a file-like
-    if not isinstance(uri, six.string_types) and hasattr(uri, 'read'):
-        return uri
 
-    # this method just routes the request to classes handling the specific storage
-    # schemes, depending on the URI protocol in `uri`
-    parsed_uri = ParseUri(uri)
+    # validate mode parameter
+    if not isinstance(mode, six.string_types):
+        raise TypeError('mode should be a string')
+    if not mode in ('r', 'rb', 'w', 'wb'):
+        raise NotImplementedError('unknown file mode %s' % mode)
 
-    if parsed_uri.scheme in ("file", ):
-        # local files -- both read & write supported
-        # compression, if any, is determined by the filename extension (.gz, .bz2)
-        return file_smart_open(parsed_uri.uri_path, mode)
+    if isinstance(uri, six.string_types):
+        # this method just routes the request to classes handling the specific storage
+        # schemes, depending on the URI protocol in `uri`
+        parsed_uri = ParseUri(uri)
 
-    if mode in ('r', 'rb'):
-        if parsed_uri.scheme in ("s3", "s3n"):
-            return S3OpenRead(parsed_uri, **kw)
-        elif parsed_uri.scheme in ("hdfs", ):
-            return HdfsOpenRead(parsed_uri, **kw)
-        elif parsed_uri.scheme in ("webhdfs", ):
-            return WebHdfsOpenRead(parsed_uri, **kw)
-        else:
-            raise NotImplementedError("read mode not supported for %r scheme", parsed_uri.scheme)
-    elif mode in ('w', 'wb'):
-        if parsed_uri.scheme in ("s3", "s3n"):
+        if parsed_uri.scheme in ("file", ):
+            # local files -- both read & write supported
+            # compression, if any, is determined by the filename extension (.gz, .bz2)
+            return file_smart_open(parsed_uri.uri_path, mode)
+        elif parsed_uri.scheme in ("s3", "s3n"):
             s3_connection = boto.connect_s3(aws_access_key_id=parsed_uri.access_id, aws_secret_access_key=parsed_uri.access_secret)
-            outbucket = s3_connection.get_bucket(parsed_uri.bucket_id)
-            outkey = boto.s3.key.Key(outbucket)
-            outkey.key = parsed_uri.key_id
-            return S3OpenWrite(outbucket, outkey, **kw)
+            bucket = s3_connection.get_bucket(parsed_uri.bucket_id)
+            if mode in ('r', 'rb'):
+                key = bucket.get_key(parsed_uri.key_id)
+                if key is None:
+                    raise KeyError(parsed_uri.key_id)
+                return S3OpenRead(key, **kw)
+            else:
+                key = bucket.get_key(parsed_uri.key_id, validate=False)
+                if key is None:
+                    raise KeyError(parsed_uri.key_id)
+                return S3OpenWrite(key, **kw)
+        elif parsed_uri.scheme in ("hdfs", ):
+            if mode in ('r', 'rb'):
+                return HdfsOpenRead(parsed_uri, **kw)
+            else:
+                raise NotImplementedError("write mode not supported for %r scheme", parsed_uri.scheme)
         elif parsed_uri.scheme in ("webhdfs", ):
-            return WebHdfsOpenWrite(parsed_uri, **kw)
+            if mode in ('r', 'rb'):
+                return WebHdfsOpenRead(parsed_uri, **kw)
+            else:
+                return WebHdfsOpenWrite(parsed_uri, **kw)
         else:
-            raise NotImplementedError("write mode not supported for %r scheme", parsed_uri.scheme)
+            raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
+    elif isinstance(uri, boto.s3.key.Key):
+        # handle case where we are given an S3 key directly
+        if mode in ('r', 'rb'):
+            return S3OpenRead(uri)
+        elif mode in ('w', 'wb'):
+            return S3OpenWrite(uri)
+    elif hasattr(uri, 'read'):
+        # simply pass-through if already a file-like
+        return uri
     else:
-        raise NotImplementedError("unknown file mode %s" % mode)
+        raise TypeError('don\'t know how to handle uri %s' % repr(uri))
 
 
 class ParseUri(object):
@@ -214,25 +220,16 @@ class S3OpenRead(object):
     Implement streamed reader from S3, as an iterable & context manager.
 
     """
-    def __init__(self, parsed_uri):
-        if parsed_uri.scheme not in ("s3", "s3n"):
-            raise TypeError("can only process S3 files")
-        self.parsed_uri = parsed_uri
-        s3_connection = boto.connect_s3(
-            aws_access_key_id=parsed_uri.access_id,
-            aws_secret_access_key=parsed_uri.access_secret)
-        self.read_key = s3_connection.get_bucket(parsed_uri.bucket_id).lookup(parsed_uri.key_id)
-        if self.read_key is None:
-            raise KeyError(parsed_uri.key_id)
+    def __init__(self, read_key):
+        if not isinstance(read_key, boto.s3.key.Key):
+            raise TypeError("can only process S3 keys")
+        self.read_key = read_key
         self.line_generator = s3_iter_lines(self.read_key)
 
     def __iter__(self):
-        s3_connection = boto.connect_s3(
-            aws_access_key_id=self.parsed_uri.access_id,
-            aws_secret_access_key=self.parsed_uri.access_secret)
-        key = s3_connection.get_bucket(self.parsed_uri.bucket_id).lookup(self.parsed_uri.key_id)
+        key = self.read_key.bucket.get_key(self.read_key.name)
         if key is None:
-            raise KeyError(self.parsed_uri.key_id)
+            raise KeyError(self.read_key.name)
 
         return s3_iter_lines(key)
 
@@ -267,6 +264,12 @@ class S3OpenRead(object):
 
     def __exit__(self, type, value, traceback):
         self.read_key.close()
+
+    def __str__(self):
+        return "%s<key: %s>" % (
+            self.__class__.__name__, self.read_key
+        )
+
 
 
 class HdfsOpenRead(object):
@@ -395,14 +398,13 @@ class S3OpenWrite(object):
     Context manager for writing into S3 files.
 
     """
-    def __init__(self, outbucket, outkey, min_part_size=S3_MIN_PART_SIZE, **kw):
+    def __init__(self, outkey, min_part_size=S3_MIN_PART_SIZE, **kw):
         """
         Streamed input is uploaded in chunks, as soon as `min_part_size` bytes are
         accumulated (50MB by default). The minimum chunk size allowed by AWS S3
         is 5MB.
 
         """
-        self.outbucket = outbucket
         self.outkey = outkey
         self.min_part_size = min_part_size
 
@@ -410,7 +412,7 @@ class S3OpenWrite(object):
             logger.warning("S3 requires minimum part size >= 5MB; multipart upload may fail")
 
         # initialize mulitpart upload
-        self.mp = self.outbucket.initiate_multipart_upload(self.outkey, **kw)
+        self.mp = self.outkey.bucket.initiate_multipart_upload(self.outkey, **kw)
 
         # initialize stats
         self.lines = []
@@ -419,8 +421,8 @@ class S3OpenWrite(object):
         self.parts = 0
 
     def __str__(self):
-        return "%s<bucket: %s, key: %s, min_part_size: %s>" % (
-            self.__class__.__name__, self.outbucket, self.outkey, self.min_part_size,
+        return "%s<key: %s, min_part_size: %s>" % (
+            self.__class__.__name__, self.outkey, self.min_part_size,
             )
 
     def write(self, b):
@@ -467,14 +469,14 @@ class S3OpenWrite(object):
             # when the input is completely empty => abort the upload, no file created
             # TODO: or create the empty file some other way?
             logger.info("empty input, ignoring multipart upload")
-            self.outbucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
+            self.outkey.bucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
 
     def __enter__(self):
         return self
 
     def _termination_error(self):
         logger.exception("encountered error while terminating multipart upload; attempting cancel")
-        self.outbucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
+        self.outkey.bucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
         logger.info("cancel completed")
 
     def __exit__(self, type, value, traceback):
@@ -589,8 +591,7 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
     If `key_limit` is given, stop after yielding out that many results.
 
     The keys are processed in parallel, using `workers` processes (default: 16),
-    to speed up downloads greatly. If multiprocessing is not available, thus
-    NO_MULTIPROCESSING is True, this parameter will be ignored.
+    to speed up downloads greatly.
 
     Example::
 
@@ -605,18 +606,13 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
       ...     print key, len(content)
 
     """
+    logger.info("iterating over keys from %s with %i workers" % (bucket, workers))
+
     total_size, key_no = 0, -1
     keys = (key for key in bucket.list(prefix=prefix) if accept_key(key.name))
 
-    if NO_MULTIPROCESSING:
-        logger.info("iterating over keys from %s without multiprocessing" % bucket)
-        iterator = imap(s3_iter_bucket_process_key, keys)
-    else:
-        logger.info("iterating over keys from %s with %i workers" % (bucket, workers))
-        pool = multiprocessing.pool.Pool(processes=workers)
-        iterator = pool.imap_unordered(s3_iter_bucket_process_key, keys)
-
-    for key_no, (key, content) in enumerate(iterator):
+    pool = multiprocessing.pool.Pool(processes=workers)
+    for key_no, (key, content) in enumerate(pool.imap_unordered(s3_iter_bucket_process_key, keys)):
         if key_no % 1000 == 0:
             logger.info("yielding key #%i: %s, size %i (total %.1fMB)" %
                 (key_no, key, len(content), total_size / 1024.0 ** 2))
@@ -628,9 +624,7 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
         if key_limit is not None and key_no + 1 >= key_limit:
             # we were asked to output only a limited number of keys => we're done
             break
-
-    if not NO_MULTIPROCESSING:
-        pool.terminate()
+    pool.terminate()
 
     logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
 
