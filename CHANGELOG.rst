@@ -1,8 +1,11 @@
+* 1.4.0, 16th December 2015
+
+  - Updated smart_open to accept an instance of boto.s3.key.Key (PR #38, @asieira)
+
 * 1.3.1, 16th December 2015
 
-- Disable multiprocessing if unavailable. Allows to run on Google Compute Engine. (PR #41, @nikicc)
-- Httpretty updated to allow LC_ALL=C locale config. (PR #39, @jsphpl)
-
+  - Disable multiprocessing if unavailable. Allows to run on Google Compute Engine. (PR #41, @nikicc)
+  - Httpretty updated to allow LC_ALL=C locale config. (PR #39, @jsphpl)
 
 * 1.3.0, 19th September 2015
 
