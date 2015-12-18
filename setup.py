@@ -24,7 +24,7 @@ def read(fname):
 
 setup(
     name = 'smart_open',
-    version = '1.3.0',
+    version = '1.3.1',
     description = 'Utils for streaming large files (S3, HDFS, gzip, bz2...)',
     long_description = read('README.rst'),
 
@@ -45,9 +45,9 @@ setup(
 
     install_requires=[
         'boto >= 2.32',
-        'httpretty>=0.8.8',
+        'httpretty==0.8.10',
         'bz2file',
-        'requests',
+        'requests==2.8.1',
     ],
 
     test_suite="smart_open.tests",
