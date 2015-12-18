@@ -8,6 +8,6 @@ python:
 - "3.4"
 install:
 - if [[ $TRAVIS_PYTHON_VERSION == 2.6 ]]; then pip install ordereddict; fi
-- pip install httpretty==0.8.10 mock moto responses
+- pip install httpretty==0.8.10 requests==2.8.1 mock moto responses
 - python setup.py install
 script: python -W ignore setup.py test
