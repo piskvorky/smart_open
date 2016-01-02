@@ -107,8 +107,6 @@ def smart_open(uri, mode="rb", **kw):
     # validate mode parameter
     if not isinstance(mode, six.string_types):
         raise TypeError('mode should be a string')
-    if not mode in ('r', 'rb', 'w', 'wb'):
-        raise NotImplementedError('unknown file mode %s' % mode)
 
     if isinstance(uri, six.string_types):
         # this method just routes the request to classes handling the specific storage
@@ -127,21 +125,26 @@ def smart_open(uri, mode="rb", **kw):
                 if key is None:
                     raise KeyError(parsed_uri.key_id)
                 return S3OpenRead(key, **kw)
-            else:
+            elif mode in ('w', 'wb'):
                 key = bucket.get_key(parsed_uri.key_id, validate=False)
                 if key is None:
                     raise KeyError(parsed_uri.key_id)
                 return S3OpenWrite(key, **kw)
+            else:
+                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+
         elif parsed_uri.scheme in ("hdfs", ):
             if mode in ('r', 'rb'):
                 return HdfsOpenRead(parsed_uri, **kw)
             else:
-                raise NotImplementedError("write mode not supported for %r scheme", parsed_uri.scheme)
+                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         elif parsed_uri.scheme in ("webhdfs", ):
             if mode in ('r', 'rb'):
                 return WebHdfsOpenRead(parsed_uri, **kw)
-            else:
+            elif mode in ('w', 'wb'):
                 return WebHdfsOpenWrite(parsed_uri, **kw)
+            else:
+                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif isinstance(uri, boto.s3.key.Key):

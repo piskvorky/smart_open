@@ -293,7 +293,10 @@ class SmartOpenTest(unittest.TestCase):
 
         # correct write modes, incorrect scheme
         self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb")
+        self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb+")
         self.assertRaises(NotImplementedError, smart_open.smart_open, "http:///blah.txt", "w")
+        self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "wb+")
+
 
         # correct write mode, correct file:// URI
         smart_open.smart_open("blah", "w")
@@ -301,6 +304,14 @@ class SmartOpenTest(unittest.TestCase):
 
         smart_open.smart_open("file:///some/file.txt", "wb")
         mock_file.assert_called_with("/some/file.txt", "wb")
+
+        smart_open.smart_open("file:///some/file.txt", "wb+")
+        mock_file.assert_called_with("/some/file.txt", "wb+")
+
+        smart_open.smart_open("file:///some/file.txt", "w+")
+        mock_file.assert_called_with("/some/file.txt", "w+")
+
+
 
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
