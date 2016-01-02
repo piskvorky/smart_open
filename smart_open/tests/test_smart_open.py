@@ -297,7 +297,6 @@ class SmartOpenTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, smart_open.smart_open, "http:///blah.txt", "w")
         self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "wb+")
 
-
         # correct write mode, correct file:// URI
         smart_open.smart_open("blah", "w")
         mock_file.assert_called_with("blah", "w")
@@ -310,7 +309,6 @@ class SmartOpenTest(unittest.TestCase):
 
         smart_open.smart_open("file:///some/file.txt", "w+")
         mock_file.assert_called_with("/some/file.txt", "w+")
-
 
 
     @mock.patch('smart_open.smart_open_lib.boto')

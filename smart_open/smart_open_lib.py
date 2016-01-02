@@ -137,14 +137,14 @@ def smart_open(uri, mode="rb", **kw):
             if mode in ('r', 'rb'):
                 return HdfsOpenRead(parsed_uri, **kw)
             else:
-                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         elif parsed_uri.scheme in ("webhdfs", ):
             if mode in ('r', 'rb'):
                 return WebHdfsOpenRead(parsed_uri, **kw)
             elif mode in ('w', 'wb'):
                 return WebHdfsOpenWrite(parsed_uri, **kw)
             else:
-                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif isinstance(uri, boto.s3.key.Key):
