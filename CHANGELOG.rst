@@ -1,3 +1,7 @@
+* 1.3.2, 3 January 2016
+
+  - Bug fix release to enable 'wb+' file mode (PR #50)
+
 * 1.3.1, 18th December 2015
 
   - Disable multiprocessing if unavailable. Allows to run on Google Compute Engine. (PR #41, @nikicc)
