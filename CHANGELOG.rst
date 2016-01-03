@@ -1,4 +1,4 @@
-* 1.3.2, 3 January 2016
+* 1.3.2, 3rd January 2016
 
   - Bug fix release to enable 'wb+' file mode (PR #50)
 
