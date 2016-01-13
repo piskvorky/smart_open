@@ -122,6 +122,7 @@ def smart_open(uri, mode="rb", **kw):
             s3_connection = boto.connect_s3(aws_access_key_id=parsed_uri.access_id,
                                             aws_secret_access_key=parsed_uri.access_secret,
                                             calling_format=OrdinaryCallingFormat())
+
             bucket = s3_connection.get_bucket(parsed_uri.bucket_id)
             if mode in ('r', 'rb'):
                 key = bucket.get_key(parsed_uri.key_id)

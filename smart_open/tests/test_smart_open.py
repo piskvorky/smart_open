@@ -15,11 +15,23 @@ import os
 
 import boto
 import mock
+
+from boto.s3.connection import OrdinaryCallingFormat
 from moto import mock_s3
+
 import responses
 
 import smart_open
 from smart_open import smart_open_lib
+
+
+def _check_connect_arguments(mock_boto, **kwargs):
+    creds = {'aws_access_key_id': None, 'aws_secret_access_key': None}
+    creds.update(kwargs)
+    call_args = mock_boto.connect_s3.call_args[1]
+    assert isinstance(call_args.pop('calling_format'), OrdinaryCallingFormat)
+    assert call_args == creds
+
 
 class ParseUriTest(unittest.TestCase):
     """
@@ -138,12 +150,12 @@ class SmartOpenReadTest(unittest.TestCase):
         # no credentials
         smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
         smart_open_object.__iter__()
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
+        _check_connect_arguments(mock_boto)
 
         # with credential
         smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
         smart_open_object.__iter__()
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret")
+        _check_connect_arguments(mock_boto, aws_access_key_id="access_id", aws_secret_access_key="access_secret")
 
         # lookup bucket, key; call s3_iter_lines
         smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
@@ -310,14 +322,14 @@ class SmartOpenTest(unittest.TestCase):
         smart_open.smart_open("file:///some/file.txt", "w+")
         mock_file.assert_called_with("/some/file.txt", "w+")
 
-
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
     def test_s3_mode_mock(self, mock_write, mock_boto):
         """Are s3:// open modes passed correctly?"""
         # correct write mode, correct s3 URI
         smart_open.smart_open("s3://mybucket/mykey", "w")
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
+        _check_connect_arguments(mock_boto)
+
         mock_boto.connect_s3().lookup.return_value = True
         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
         self.assertTrue(mock_write.called)
