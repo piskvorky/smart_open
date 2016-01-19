@@ -136,20 +136,20 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
         """Is S3 line iterator called correctly?"""
         # no credentials
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
         smart_open_object.__iter__()
         mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None)
 
         # with credential
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://access_id:access_secret@mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
         smart_open_object.__iter__()
         mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret")
 
         # lookup bucket, key; call s3_iter_lines
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://access_id:access_secret@mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
         smart_open_object.__iter__()
         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
-        mock_boto.connect_s3().get_bucket().lookup.assert_called_with("mykey")
+        mock_boto.connect_s3().get_bucket().get_key.assert_called_with("mykey")
         self.assertTrue(mock_s3_iter_lines.called)
 
 
@@ -176,12 +176,12 @@ class SmartOpenReadTest(unittest.TestCase):
             fout.write(expected[-1])
 
         # connect to fake s3 and read from the fake key we filled above
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
         output = [line.rstrip(b'\n') for line in smart_open_object]
         self.assertEqual(output, expected)
 
         # same thing but using a context manager
-        with smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey")) as smart_open_object:
+        with smart_open.smart_open("s3://mybucket/mykey") as smart_open_object:
             output = [line.rstrip(b'\n') for line in smart_open_object]
             self.assertEqual(output, expected)
 
@@ -196,7 +196,7 @@ class SmartOpenReadTest(unittest.TestCase):
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
             fout.write(content)
 
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
         self.assertEqual(content[:6], smart_open_object.read(6))
         self.assertEqual(content[6:14], smart_open_object.read(8))  # ř is 2 bytes
 
@@ -216,7 +216,7 @@ class SmartOpenReadTest(unittest.TestCase):
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
             fout.write(content)
 
-        smart_open_object = smart_open.S3OpenRead(smart_open.ParseUri("s3://mybucket/mykey"))
+        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
         self.assertEqual(content[:6], smart_open_object.read(6))
         self.assertEqual(content[6:14], smart_open_object.read(8))  # ř is 2 bytes
 
@@ -293,7 +293,9 @@ class SmartOpenTest(unittest.TestCase):
 
         # correct write modes, incorrect scheme
         self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb")
+        self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb+")
         self.assertRaises(NotImplementedError, smart_open.smart_open, "http:///blah.txt", "w")
+        self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "wb+")
 
         # correct write mode, correct file:// URI
         smart_open.smart_open("blah", "w")
@@ -301,6 +303,13 @@ class SmartOpenTest(unittest.TestCase):
 
         smart_open.smart_open("file:///some/file.txt", "wb")
         mock_file.assert_called_with("/some/file.txt", "wb")
+
+        smart_open.smart_open("file:///some/file.txt", "wb+")
+        mock_file.assert_called_with("/some/file.txt", "wb+")
+
+        smart_open.smart_open("file:///some/file.txt", "w+")
+        mock_file.assert_called_with("/some/file.txt", "w+")
+
 
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
@@ -344,10 +353,11 @@ class S3OpenWriteTest(unittest.TestCase):
         mybucket = conn.get_bucket("mybucket")
         mykey = boto.s3.key.Key()
         mykey.name = "testkey"
+        mykey.bucket = mybucket
         test_string = u"žluťoučký koníček".encode('utf8')
 
         # write into key
-        with smart_open.S3OpenWrite(mybucket, mykey) as fin:
+        with smart_open.S3OpenWrite(mykey) as fin:
             fin.write(test_string)
 
         # read key and test content
@@ -363,10 +373,11 @@ class S3OpenWriteTest(unittest.TestCase):
         conn.create_bucket("mybucket")
         mybucket = conn.get_bucket("mybucket")
         mykey = boto.s3.key.Key()
+        mykey.bucket = mybucket
         mykey.name = "testkey"
 
         try:
-            with smart_open.S3OpenWrite(mybucket, mykey) as fin:
+            with smart_open.S3OpenWrite(mykey) as fin:
                 fin.write(None)
         except TypeError:
             pass
@@ -383,8 +394,9 @@ class S3OpenWriteTest(unittest.TestCase):
         mybucket = conn.get_bucket("mybucket")
         mykey = boto.s3.key.Key()
         mykey.name = "testkey"
+        mykey.bucket = mybucket
 
-        smart_open_write = smart_open.S3OpenWrite(mybucket, mykey)
+        smart_open_write = smart_open.S3OpenWrite(mykey)
         with smart_open_write as fin:
             fin.write(u"testžížáč")
             self.assertEqual(fin.total_size, 14)
@@ -399,9 +411,10 @@ class S3OpenWriteTest(unittest.TestCase):
         mybucket = conn.get_bucket("mybucket")
         mykey = boto.s3.key.Key()
         mykey.name = "testkey"
+        mykey.bucket = mybucket
 
         # write
-        smart_open_write = smart_open.S3OpenWrite(mybucket, mykey, min_part_size=10)
+        smart_open_write = smart_open.S3OpenWrite(mykey, min_part_size=10)
         with smart_open_write as fin:
             fin.write(u"test")  # implicit unicode=>utf8 conversion
             self.assertEqual(fin.chunk_bytes, 4)
@@ -418,6 +431,52 @@ class S3OpenWriteTest(unittest.TestCase):
         output = list(smart_open.smart_open("s3://mybucket/testkey"))
 
         self.assertEqual(output, [b"testtest\n", b"test"])
+
+
+class WebHdfsWriteTest(unittest.TestCase):
+    """
+    Test writing into webhdfs files.
+
+    """
+
+    @responses.activate
+    def test_initialize_write(self):
+        def request_callback(request):
+            resp_body = ""
+            headers = {'location': 'http://127.0.0.1:8440/file'}
+            return (307, headers, resp_body)
+        responses.add_callback(responses.PUT, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
+        responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
+        smart_open_object = smart_open.WebHdfsOpenWrite(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
+        assert len(responses.calls) == 2
+        path, params = responses.calls[0].request.url.split("?")
+        assert path == "http://127.0.0.1:8440/webhdfs/v1/path/file"
+        assert params == "overwrite=True&op=CREATE" or params == "op=CREATE&overwrite=True"
+        assert responses.calls[1].request.url == "http://127.0.0.1:8440/file"
+
+    @responses.activate
+    def test_write(self):
+        def request_callback(request):
+            resp_body = ""
+            headers = {'location': 'http://127.0.0.1:8440/file'}
+            return (307, headers, resp_body)
+
+        responses.add_callback(responses.PUT, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
+        responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
+        smart_open_object = smart_open.WebHdfsOpenWrite(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
+
+        def write_callback(request):
+            assert request.body == u"žluťoučký koníček".encode('utf8')
+            headers = {}
+            return (200, headers, "")
+        test_string = u"žluťoučký koníček".encode('utf8')
+        responses.add_callback(responses.POST, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
+        responses.add_callback(responses.POST, "http://127.0.0.1:8440/file", callback=write_callback)
+        smart_open_object.write(test_string)
+        smart_open_object.close()
+        assert len(responses.calls) == 4
+        assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"
+        assert responses.calls[3].request.url == "http://127.0.0.1:8440/file"
 
 
 class S3IterBucketTest(unittest.TestCase):

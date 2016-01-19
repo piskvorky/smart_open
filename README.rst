@@ -16,7 +16,7 @@ smart_open -- utils for streaming large files
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS or local (compressed) files.
+``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS, WebHDFS or local (compressed) files.
 It is well tested (using `moto <https://github.com/spulec/moto>`_), well documented and sports a simple, Pythonic API:
 
 .. code-block:: python
@@ -24,6 +24,12 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
   >>> # stream lines from an S3 object
   >>> for line in smart_open.smart_open('s3://mybucket/mykey.txt'):
   ...    print line
+
+  >>> # you can also use a boto.s3.key.Key instance directly:
+  >>> key = boto.connect_s3().get_bucket("my_bucket").get_key("my_key")
+  >>> with smart_open.smart_open(key) as fin:
+  ...     for line in fin:
+  ...         print line
 
   >>> # can use context managers too:
   >>> with smart_open.smart_open('s3://mybucket/mykey.txt') as fin:
@@ -42,6 +48,11 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
 
   >>> # stream content *into* S3 (write mode):
   >>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'wb') as fout:
+  ...     for line in ['first line', 'second line', 'third line']:
+  ...          fout.write(line + '\n')
+
+  >>> # stream content *into* WebHDFS (write mode):
+  >>> with smart_open.smart_open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
   ...     for line in ['first line', 'second line', 'third line']:
   ...          fout.write(line + '\n')
 
@@ -99,7 +110,6 @@ Todo
 
 On the roadmap:
 
-* improve ``smart_open`` support for HDFS (streaming from/to Hadoop File System)
 * better documentation for the default ``file://`` scheme
 
 Comments, bug reports

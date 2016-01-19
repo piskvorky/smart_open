@@ -24,16 +24,16 @@ def read(fname):
 
 setup(
     name = 'smart_open',
-    version = '1.2.1',
+    version = '1.3.2',
     description = 'Utils for streaming large files (S3, HDFS, gzip, bz2...)',
     long_description = read('README.rst'),
 
     packages=find_packages(),
 
     author = u'Radim Řehůřek',
-    author_email = 'radimrehurek@seznam.cz',
-    maintainer = u'Vincent Kríž',
-    maintainer_email = 'vincent.kriz@kamadu.eu',
+    author_email = 'me@radimrehurek.com',
+    maintainer = u'Radim Řehůřek',
+    maintainer_email = 'me@radimrehurek.com',
 
     url = 'https://github.com/piskvorky/smart_open',
     download_url = 'http://pypi.python.org/pypi/smart_open',
@@ -45,8 +45,9 @@ setup(
 
     install_requires=[
         'boto >= 2.32',
-        'httpretty==0.8.6',
+        'httpretty==0.8.10',
         'bz2file',
+        'requests<=2.8.1',
     ],
 
     test_suite="smart_open.tests",
