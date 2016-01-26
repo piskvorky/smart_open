@@ -433,6 +433,27 @@ class S3OpenWriteTest(unittest.TestCase):
         self.assertEqual(output, [b"testtest\n", b"test"])
 
 
+    @mock_s3
+    def test_write_04(self):
+        """Does writing no data cause key with an empty value to be created?"""
+        # fake connection, bucket and key
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
+        mybucket = conn.get_bucket("mybucket")
+        mykey = boto.s3.key.Key()
+        mykey.name = "testkey"
+        mykey.bucket = mybucket
+
+        smart_open_write = smart_open.S3OpenWrite(mykey)
+        with smart_open_write as fin:
+            pass
+
+        # read back the same key and check its content
+        output = list(smart_open.smart_open("s3://mybucket/testkey"))
+
+        self.assertEqual(output, [])
+
+
 class WebHdfsWriteTest(unittest.TestCase):
     """
     Test writing into webhdfs files.

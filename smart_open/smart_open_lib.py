@@ -492,9 +492,11 @@ class S3OpenWrite(object):
         else:
             # AWS complains with "The XML you provided was not well-formed or did not validate against our published schema"
             # when the input is completely empty => abort the upload, no file created
-            # TODO: or create the empty file some other way?
             logger.info("empty input, ignoring multipart upload")
             self.outkey.bucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
+            # So, instead, create an empty file like this
+            logger.info("setting an empty value for the key")
+            self.outkey.set_contents_from_string('')
 
     def __enter__(self):
         return self
