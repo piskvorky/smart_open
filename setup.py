@@ -45,7 +45,8 @@ setup(
 
     install_requires=[
         'boto >= 2.32',
-        'bz2file'
+        'bz2file',
+	'requests == 2.3.0'
     ],
 
     test_suite="smart_open.tests",
