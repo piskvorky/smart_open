@@ -11,4 +11,5 @@ install:
 - if [[ $TRAVIS_PYTHON_VERSION == 2.6 ]]; then pip install ordereddict; fi
 - pip install httpretty requests mock moto responses
 - python setup.py install
+- pip freeze
 script: python -W ignore setup.py test
