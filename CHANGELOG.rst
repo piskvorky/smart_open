@@ -1,6 +1,12 @@
+* 1.4.0, 29th March 2016
+
+  - Allow passing boto `profile_name` to smart_open (PR #68, @robcowie)
+
+
 * 1.3.2, 3rd January 2016
 
   - Bug fix release to enable 'wb+' file mode (PR #50)
+
 
 * 1.3.1, 18th December 2015
 

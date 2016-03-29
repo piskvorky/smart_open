@@ -118,7 +118,13 @@ def smart_open(uri, mode="rb", **kw):
             # compression, if any, is determined by the filename extension (.gz, .bz2)
             return file_smart_open(parsed_uri.uri_path, mode)
         elif parsed_uri.scheme in ("s3", "s3n"):
-            s3_connection = boto.connect_s3(aws_access_key_id=parsed_uri.access_id, aws_secret_access_key=parsed_uri.access_secret)
+            # For credential order of precedence see
+            # http://boto.cloudhackers.com/en/latest/boto_config_tut.html#credentials
+            s3_connection = boto.connect_s3(
+                aws_access_key_id=parsed_uri.access_id,
+                aws_secret_access_key=parsed_uri.access_secret,
+                profile_name=kw.pop('profile_name', None))
+
             bucket = s3_connection.get_bucket(parsed_uri.bucket_id)
             if mode in ('r', 'rb'):
                 key = bucket.get_key(parsed_uri.key_id)
