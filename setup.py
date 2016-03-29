@@ -45,9 +45,9 @@ setup(
 
     install_requires=[
         'boto >= 2.32',
-        'httpretty==0.8.10',
         'bz2file',
-        'requests<=2.8.1',
+        'requests',
+        'httpretty == 0.8.10',
     ],
 
     test_suite="smart_open.tests",
@@ -62,6 +62,7 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
         'Topic :: System :: Distributed Computing',
         'Topic :: Database :: Front-Ends',
     ],
