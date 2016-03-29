@@ -45,7 +45,9 @@ setup(
 
     install_requires=[
         'boto >= 2.32',
-        'bz2file'
+        'bz2file',
+	'requests',
+	'httpretty == 0.8.10'
 
     ],
 
