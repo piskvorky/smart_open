@@ -1,7 +1,7 @@
-* 1.4.0, 29th March 2016
+* 1.3.3,  
 
   - Allow passing boto `profile_name` to smart_open (PR #68, @robcowie)
-
+  - Write an empty key to S3 even if nothing is written to S3OpenWrite (PR #61, @petedmarsh)
 
 * 1.3.2, 3rd January 2016
 
