@@ -1,6 +1,4 @@
 language: python
-notifications:
-  email: false
 python:
 - "2.7"
 - "2.6"
