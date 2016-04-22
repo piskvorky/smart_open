@@ -122,6 +122,7 @@ def smart_open(uri, mode="rb", **kw):
             # http://boto.cloudhackers.com/en/latest/boto_config_tut.html#credentials
             s3_connection = boto.connect_s3(
                 aws_access_key_id=parsed_uri.access_id,
+                host='s3.amazonaws.com',
                 aws_secret_access_key=parsed_uri.access_secret,
                 profile_name=kw.pop('profile_name', None))
 
