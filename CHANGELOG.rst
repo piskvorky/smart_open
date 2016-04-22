@@ -1,3 +1,7 @@
+* 1.3.4,
+
+  - Allow passing boto `host` to smart_open (PR #71, @robcowie)
+
 * 1.3.3,  
 
   - Allow passing boto `profile_name` to smart_open (PR #68, @robcowie)

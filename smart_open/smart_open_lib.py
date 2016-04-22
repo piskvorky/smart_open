@@ -118,10 +118,16 @@ def smart_open(uri, mode="rb", **kw):
             # compression, if any, is determined by the filename extension (.gz, .bz2)
             return file_smart_open(parsed_uri.uri_path, mode)
         elif parsed_uri.scheme in ("s3", "s3n"):
+            # Get an S3 host. It is required for sigv4 operations.
+            host = kw.pop('host', None)
+            if not host:
+                host = boto.config.get('s3', 'host', 's3.amazonaws.com')
+
             # For credential order of precedence see
             # http://boto.cloudhackers.com/en/latest/boto_config_tut.html#credentials
             s3_connection = boto.connect_s3(
                 aws_access_key_id=parsed_uri.access_id,
+                host=host,
                 aws_secret_access_key=parsed_uri.access_secret,
                 profile_name=kw.pop('profile_name', None))
 
