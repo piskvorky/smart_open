@@ -81,6 +81,19 @@ For more info (S3 credentials in URI, minimum S3 part size...) and full method s
   >>> import smart_open
   >>> help(smart_open.smart_open_lib)
 
+S3-Specific Options
+-------------------
+
+There are a few optional keyword arguments that are useful only for S3 access.
+
+.. code-block:: python
+
+  >>> smart_open.smart_open('s3://', host='s3.amazonaws.com')
+  >>> smart_open.smart_open('s3://', profile_name='my-profile')
+
+
+These are both passed to `boto.s3_connect()` as keyword arguments.
+
 Why?
 ----
 
