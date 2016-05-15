@@ -136,7 +136,7 @@ def smart_open(uri, mode="rb", **kw):
                 key = bucket.get_key(parsed_uri.key_id)
                 if key is None:
                     raise KeyError(parsed_uri.key_id)
-                return S3OpenRead(key, **kw)
+                return S3OpenRead(key)
             elif mode in ('w', 'wb'):
                 key = bucket.get_key(parsed_uri.key_id, validate=False)
                 if key is None:
@@ -164,7 +164,7 @@ def smart_open(uri, mode="rb", **kw):
         if mode in ('r', 'rb'):
             return S3OpenRead(uri)
         elif mode in ('w', 'wb'):
-            return S3OpenWrite(uri)
+            return S3OpenWrite(uri, **kw)
     elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
         return uri
