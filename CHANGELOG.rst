@@ -1,11 +1,11 @@
-* 1.3.4,
+* 1.3.3, 16th May 2016
 
-  - Allow passing boto `host` to smart_open (PR #71, @robcowie)
-
-* 1.3.3,  
-
-  - Allow passing boto `profile_name` to smart_open (PR #68, @robcowie)
+  - Accept an instance of boto.s3.key.Key to smart_open (PR #38, @asieira)
+  - Allow passing `encrypt_key` and other parameters to `initiate_multipart_upload` (PR #63, @asieira)
+  - Allow passing boto `host` and `profile_name` to smart_open (PR #71 #68, @robcowie)
   - Write an empty key to S3 even if nothing is written to S3OpenWrite (PR #61, @petedmarsh)
+  - Support `LC_ALL=C` environment variable setup (PR #40, @nikicc)
+  - Python 3.5 support
 
 * 1.3.2, 3rd January 2016
 
