@@ -262,7 +262,7 @@ def expand_full_path(path):
       '~/tmp' may be expanded to '/Users/username/tmp'
       'abc/def' may be expanded to '/pwd/abc/def'
     '''
-    return os.path.abspath(os.path.expanduser(path))
+    return os.path.expanduser(path)
 
 
 class S3OpenRead(object):
