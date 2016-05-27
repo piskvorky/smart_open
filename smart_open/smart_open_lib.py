@@ -248,21 +248,14 @@ class ParseUri(object):
                 raise RuntimeError("invalid S3 URI: %s" % uri)
         elif self.scheme == 'file':
             self.uri_path = parsed_uri.netloc + parsed_uri.path
-            self.uri_path = expand_full_path(self.uri_path)
+
+            # '~/tmp' may be expanded to '/Users/username/tmp'
+            self.uri_path = os.path.expanduser(self.uri_path)
 
             if not self.uri_path:
                 raise RuntimeError("invalid file URI: %s" % uri)
         else:
             raise NotImplementedError("unknown URI scheme %r in %r" % (self.scheme, uri))
-
-
-def expand_full_path(path):
-    '''Expand a relative path to a full path
-
-    For example,
-      '~/tmp' may be expanded to '/Users/username/tmp'
-    '''
-    return os.path.expanduser(path)
 
 
 class S3OpenRead(object):
