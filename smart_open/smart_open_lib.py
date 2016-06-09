@@ -48,6 +48,13 @@ except ImportError:
 else:
     NO_MULTIPROCESSING = False
 
+try:
+    import gzipstream
+    HAS_GZIPSTREAM = True
+except ImportError:
+    HAS_GZIPSTREAM = False
+
+
 S3_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
@@ -248,6 +255,12 @@ class ParseUri(object):
             raise NotImplementedError("unknown URI scheme %r in %r" % (self.scheme, uri))
 
 
+def is_gzip(name):
+    """Return True if the name indicates that the file is compressed with
+    gzip."""
+    return name.endswith(".gz")
+
+
 class S3OpenRead(object):
     """
     Implement streamed reader from S3, as an iterable & context manager.
@@ -258,6 +271,9 @@ class S3OpenRead(object):
                 and not hasattr(read_key, "close"):
             raise TypeError("can only process S3 keys")
         self.read_key = read_key
+        #
+        # TODO: is this being used anywhere?
+        #
         self.line_generator = s3_iter_lines(self.read_key)
 
     def __iter__(self):
@@ -265,7 +281,12 @@ class S3OpenRead(object):
         if key is None:
             raise KeyError(self.read_key.name)
 
-        return s3_iter_lines(key)
+        if HAS_GZIPSTREAM and is_gzip(key.name):
+            generator = gzipstream.GzipStreamFile(key)
+        else:
+            generator = s3_iter_lines(key)
+        for line in generator:
+            yield line
 
     def read(self, size=None):
         """
@@ -273,7 +294,8 @@ class S3OpenRead(object):
 
         Note read() and line iteration (`for line in self: ...`) each have their
         own file position, so they are independent. Doing a `read` will not affect
-        the line iteration, and vice versa.
+        the line iteration, and vice versa.  Furthermore, this operation returns
+        the raw bytes -- it does not perform any decompression.
 
         """
         if not size or size < 0:
@@ -441,6 +463,9 @@ class S3OpenWrite(object):
         """
         if not hasattr(outkey, "bucket") and not hasattr(outkey, "name"):
             raise TypeError("can only process S3 keys")
+
+        if is_gzip(outkey.name):
+            raise NotImplementedError("streaming write to S3 gzip not supported")
 
         self.outkey = outkey
         self.min_part_size = min_part_size

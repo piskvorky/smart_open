@@ -94,6 +94,14 @@ There are a few optional keyword arguments that are useful only for S3 access.
 
 These are both passed to `boto.s3_connect()` as keyword arguments.
 
+In order to enable streaming of decompressed S3 content, you must install ``gzipstream`` using the following command::
+
+    pip install -e git+https://github.com/commoncrawl/gzipstream.git#egg=gzipstream
+
+or by following the instructions `here <https://github.com/commoncrawl/gzipstream>`_.
+Files with names ending with `.gz` will be automatically decompressed.
+
+
 Why?
 ----
 

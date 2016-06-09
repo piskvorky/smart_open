@@ -47,6 +47,7 @@ setup(
         'boto >= 2.32',
         'bz2file',
         'requests',
+        'gzipstream',
     ],
 
     test_suite="smart_open.tests",
