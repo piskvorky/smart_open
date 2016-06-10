@@ -26,6 +26,7 @@ import os
 import subprocess
 import sys
 import requests
+import io
 if sys.version_info[0] == 2:
     import httplib
 elif sys.version_info[0] == 3:
@@ -257,9 +258,94 @@ def is_gzip(name):
     return name.endswith(".gz")
 
 
+class _S3ReadStream(object):
+
+    def __init__(self, stream):
+        self.stream = stream
+        self.unused_buffer = ''
+        self.closed = False
+        self.finished = False
+
+    def read_until_eof(self):
+        #
+        # This method is here because boto.s3.Key.read() reads the entire
+        # file, which isn't expected behavior.
+        #
+        # https://github.com/boto/boto/issues/3311
+        #
+        buf = ""
+        while not self.finished:
+            raw = self.stream.read(io.DEFAULT_BUFFER_SIZE)
+            if len(raw) > 0:
+                buf += raw
+            else:
+                self.finished = True
+        return buf
+
+    def read(self, size=None):
+        if not size or size < 0:
+            return self.read_until_eof()
+
+        # Use unused data first
+        if len(self.unused_buffer) > size:
+            part = self.unused_buffer[:size]
+            self.unused_buffer = self.unused_buffer[size:]
+            return part
+        # If the stream is finished and no unused raw data, return what we have
+        if self.stream.closed or self.finished:
+            self.finished = True
+            buf, self.unused_buffer = self.unused_buffer, ''
+            return buf
+        # Otherwise consume new data
+        raw = self.stream.read(io.DEFAULT_BUFFER_SIZE)
+        if len(raw) > 0:
+            self.unused_buffer += raw
+        else:
+            self.finished = True
+        return self.read(size)
+
+    def readinto(self, b):
+        # Read up to len(b) bytes into bytearray b
+        # Sadly not as efficient as lower level
+        data = self.read(len(b))
+        if not data:
+            return None
+        b[:len(data)] = data
+        return len(data)
+
+    def readable(self):
+        # io.BufferedReader needs us to appear readable
+        return True
+
+
+class S3ReadStream(io.BufferedReader):
+
+    def __init__(self, key):
+        self.stream = _S3ReadStream(key)
+        super(S3ReadStream, self).__init__(self.stream)
+
+    def read(self, *args, **kwargs):
+        # Patch read to return '' instead of raise Value Error
+        try:
+            return super(S3ReadStream, self).read(*args, **kwargs)
+        except ValueError:
+            return ''
+
+    def readline(self, *args, **kwargs):
+        # Patch readline to return '' instead of raise Value Error
+        try:
+            result = super(S3ReadStream, self).readline(*args, **kwargs)
+            return result
+        except ValueError:
+            return ''
+
+
 class S3OpenRead(object):
     """
     Implement streamed reader from S3, as an iterable & context manager.
+
+    Supports reading from gzip-compressed files.  Identifies such files by
+    their extension.
 
     """
     def __init__(self, read_key):
@@ -267,38 +353,30 @@ class S3OpenRead(object):
                 and not hasattr(read_key, "close"):
             raise TypeError("can only process S3 keys")
         self.read_key = read_key
-        #
-        # TODO: is this being used anywhere?
-        #
-        self.line_generator = s3_iter_lines(self.read_key)
+        self._open_reader()
+
+    def _open_reader(self):
+        if is_gzip(self.read_key.name):
+            self.reader = gzipstream.GzipStreamFile(self.read_key)
+        else:
+            self.reader = S3ReadStream(self.read_key)
 
     def __iter__(self):
-        key = self.read_key.bucket.get_key(self.read_key.name)
-        if key is None:
-            raise KeyError(self.read_key.name)
-
-        if is_gzip(key.name):
-            generator = gzipstream.GzipStreamFile(key)
-        else:
-            generator = s3_iter_lines(key)
-        for line in generator:
+        for line in self.reader:
             yield line
+
+    def readline(self):
+        try:
+            return self.reader.next()
+        except StopIteration:
+            return None
 
     def read(self, size=None):
         """
         Read a specified number of bytes from the key.
 
-        Note read() and line iteration (`for line in self: ...`) each have their
-        own file position, so they are independent. Doing a `read` will not affect
-        the line iteration, and vice versa.  Furthermore, this operation returns
-        the raw bytes -- it does not perform any decompression.
-
         """
-        if not size or size < 0:
-            # For compatibility with standard Python, `read(negative)` = read the rest of the file.
-            # Otherwise, boto would read *from the start* if given size=-1.
-            size = 0
-        return self.read_key.read(size)
+        return self.reader.read(size)
 
     def seek(self, offset, whence=0):
         """
@@ -310,12 +388,13 @@ class S3OpenRead(object):
         if whence != 0 or offset != 0:
             raise NotImplementedError("seek other than offset=0 not implemented yet")
         self.read_key.close(fast=True)
+        self._open_reader()
 
     def __enter__(self):
         return self
 
     def __exit__(self, type, value, traceback):
-        self.read_key.close()
+        self.read_key.close(fast=True)
 
     def __str__(self):
         return "%s<key: %s>" % (
@@ -695,39 +774,6 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
         pool.terminate()
 
     logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
-
-
-def s3_iter_lines(key):
-    """
-    Stream an object from S3 line by line (generator).
-
-    `key` must be a `boto.key.Key` object.
-
-    """
-    # check valid object on input
-    if not isinstance(key, boto.s3.key.Key):
-        raise TypeError("expected boto.key.Key object on input")
-
-    buf = b''
-    # keep reading chunks of bytes into the buffer
-    for chunk in key:
-        buf += chunk
-
-        start = 0
-        # process all lines within the current buffer
-        while True:
-            end = buf.find(b'\n', start) + 1
-            if end:
-                yield buf[start : end]
-                start = end
-            else:
-                # no more newlines => break out to read more data from s3 into the buffer
-                buf = buf[start : ]
-                break
-
-    # process the last line, too
-    if buf:
-        yield buf
 
 
 class WebHdfsException(Exception):

@@ -132,8 +132,8 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
     @mock.patch('smart_open.smart_open_lib.boto')
-    @mock.patch('smart_open.smart_open_lib.s3_iter_lines')
-    def test_s3_boto(self, mock_s3_iter_lines, mock_boto):
+    @mock.patch('smart_open.smart_open_lib.S3OpenRead')
+    def test_s3_boto(self, mock_s3_open_read, mock_boto):
         """Is S3 line iterator called correctly?"""
         # Configure the mock boto.config.get to return default host
         smart_open.smart_open_lib.boto.config.get.return_value = 's3.amazonaws.com'
@@ -158,7 +158,10 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object.__iter__()
         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
         mock_boto.connect_s3().get_bucket().get_key.assert_called_with("mykey")
-        self.assertTrue(mock_s3_iter_lines.called)
+        #
+        # TODO: this is kind of a useless assertion...
+        #
+        self.assertTrue(smart_open_object.__iter__.called)
 
         # with user-specified host
         smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey", host='aa.domain.com')
@@ -212,9 +215,6 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(content[:6], smart_open_object.read(6))
         self.assertEqual(content[6:14], smart_open_object.read(8))  # ř is 2 bytes
 
-        # make sure iteration does not affect read()
-        for line in smart_open_object:
-            pass
         self.assertEqual(content[14:], smart_open_object.read())  # read the rest
 
     @mock_s3
@@ -258,7 +258,7 @@ class S3IterLinesTest(unittest.TestCase):
         mykey = conn.get_bucket("mybucket").get_key("mykey")
 
         # call s3_iter_lines and check output
-        output = list(smart_open.s3_iter_lines(mykey))
+        output = list(smart_open.S3OpenRead(mykey))
 
         self.assertEqual(b''.join(output), test_string)
 
@@ -268,7 +268,7 @@ class S3IterLinesTest(unittest.TestCase):
         """Does s3_iter_lines fail on invalid input?"""
         # cannot use context manager for assertRaise in py2.6
         try:
-            for i in smart_open.s3_iter_lines(None):
+            for i in smart_open.S3OpenRead(None):
                 pass
         except TypeError:
             pass
@@ -276,7 +276,7 @@ class S3IterLinesTest(unittest.TestCase):
             self.fail("s3_iter_lines expected to fail on non-`boto.key.Key` inputs")
 
         try:
-            for i in smart_open.s3_iter_lines("test"):
+            for i in smart_open.S3OpenRead("test"):
                 pass
         except TypeError:
             pass
