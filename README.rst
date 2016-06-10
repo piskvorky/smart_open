@@ -113,7 +113,8 @@ There are nasty hidden gotchas when using ``boto``'s multipart upload functional
 Installation
 ------------
 
-The module has no dependencies beyond Python >= 2.6 (or Python >= 3.3) and ``boto``::
+The module has no dependencies beyond Python >= 2.6 (or Python >= 3.3),
+``boto`` and ``requests``::
 
     pip install smart_open
 

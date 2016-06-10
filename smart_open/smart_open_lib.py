@@ -48,11 +48,7 @@ except ImportError:
 else:
     NO_MULTIPROCESSING = False
 
-try:
-    import gzipstream
-    HAS_GZIPSTREAM = True
-except ImportError:
-    HAS_GZIPSTREAM = False
+import gzipstream
 
 
 S3_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
@@ -281,7 +277,7 @@ class S3OpenRead(object):
         if key is None:
             raise KeyError(self.read_key.name)
 
-        if HAS_GZIPSTREAM and is_gzip(key.name):
+        if is_gzip(key.name):
             generator = gzipstream.GzipStreamFile(key)
         else:
             generator = s3_iter_lines(key)
