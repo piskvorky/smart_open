@@ -317,6 +317,12 @@ class _S3ReadStream(object):
         # io.BufferedReader needs us to appear readable
         return True
 
+    def _checkReadable(self, msg=None):
+        # This is required to satisfy io.BufferedReader on Python 2.6.
+        # Another way to achieve this is to inherit from io.IOBase, but that
+        # leads to other problems.
+        return True
+
 
 class S3ReadStream(io.BufferedReader):
 
