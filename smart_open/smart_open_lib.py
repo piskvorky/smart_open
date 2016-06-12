@@ -284,7 +284,7 @@ class _S3ReadStream(object):
 
     def read(self, size=None):
         if not size or size < 0:
-            return self.read_until_eof()
+            return self.unused_buffer + self.read_until_eof()
 
         # Use unused data first
         if len(self.unused_buffer) > size:
