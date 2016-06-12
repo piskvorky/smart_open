@@ -262,7 +262,7 @@ class _S3ReadStream(object):
 
     def __init__(self, stream):
         self.stream = stream
-        self.unused_buffer = ''
+        self.unused_buffer = b''
         self.closed = False
         self.finished = False
 
@@ -273,7 +273,7 @@ class _S3ReadStream(object):
         #
         # https://github.com/boto/boto/issues/3311
         #
-        buf = ""
+        buf = b""
         while not self.finished:
             raw = self.stream.read(io.DEFAULT_BUFFER_SIZE)
             if len(raw) > 0:
@@ -294,7 +294,7 @@ class _S3ReadStream(object):
         # If the stream is finished and no unused raw data, return what we have
         if self.stream.closed or self.finished:
             self.finished = True
-            buf, self.unused_buffer = self.unused_buffer, ''
+            buf, self.unused_buffer = self.unused_buffer, b''
             return buf
         #
         # Otherwise consume new data
