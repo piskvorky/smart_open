@@ -91,16 +91,8 @@ There are a few optional keyword arguments that are useful only for S3 access.
   >>> smart_open.smart_open('s3://', host='s3.amazonaws.com')
   >>> smart_open.smart_open('s3://', profile_name='my-profile')
 
-
 These are both passed to `boto.s3_connect()` as keyword arguments.
-
-In order to enable streaming of decompressed S3 content, you must install ``gzipstream`` using the following command::
-
-    pip install -e git+https://github.com/commoncrawl/gzipstream.git#egg=gzipstream
-
-or by following the instructions `here <https://github.com/commoncrawl/gzipstream>`_.
-Files with names ending with `.gz` will be automatically decompressed.
-
+The S3 reader supports gzipped content, as long as the key is obviously a gzipped file (e.g. ends with ".gz").
 
 Why?
 ----
