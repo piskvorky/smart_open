@@ -296,8 +296,13 @@ class _S3ReadStream(object):
             self.finished = True
             buf, self.unused_buffer = self.unused_buffer, ''
             return buf
+        #
         # Otherwise consume new data
-        raw = self.stream.read(io.DEFAULT_BUFFER_SIZE)
+        # Since we are reading uncompressed data, we can directly specify
+        # the number of bytes to read from the stream, instead of reading in
+        # blocks of io.DEFAULT_BUFFER_SIZE bytes like GzipStreamFile does.
+        #
+        raw = self.stream.read(size - len(self.unused_buffer))
         if len(raw) > 0:
             self.unused_buffer += raw
         else:

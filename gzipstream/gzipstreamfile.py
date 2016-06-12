@@ -35,6 +35,10 @@ class _GzipStreamFile(object):
       buf, self.unused_buffer = self.unused_buffer, ''
       return buf
     # Otherwise consume new data
+    #
+    # TODO:
+    # If size is much larger than the buffer size, this block-based approach
+    # can lead to a very deep recursion.
     raw = self.stream.read(io.DEFAULT_BUFFER_SIZE)
     if len(raw) > 0:
       self.unused_buffer += self.decoder.decompress(raw)
