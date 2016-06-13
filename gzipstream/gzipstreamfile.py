@@ -1,3 +1,10 @@
+#
+# Adapted from Stephen Merity's gzipstream
+# (https://github.com/Smerity/gzipstream)
+#
+# Used under the MIT license
+# (https://github.com/Smerity/gzipstream/blob/master/LICENSE)
+#
 import io
 import zlib
 
