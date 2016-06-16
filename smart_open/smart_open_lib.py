@@ -212,6 +212,8 @@ class ParseUri(object):
                 raise RuntimeError("invalid HDFS URI: %s" % uri)
         elif self.scheme == "webhdfs":
             self.uri_path = parsed_uri.netloc + "/webhdfs/v1" + parsed_uri.path
+            if parsed_uri.query:
+                self.uri_path += "?" + parsed_uri.query
 
             if not self.uri_path:
                 raise RuntimeError("invalid WebHDFS URI: %s" % uri)
