@@ -282,32 +282,35 @@ class _S3ReadStream(object):
                 self.finished = True
         return buf
 
+    def read_from_buffer(self, size):
+        part = self.unused_buffer[:size]
+        self.unused_buffer = self.unused_buffer[size:]
+        return part
+
     def read(self, size=None):
         if not size or size < 0:
             return self.unused_buffer + self.read_until_eof()
 
         # Use unused data first
         if len(self.unused_buffer) > size:
-            part = self.unused_buffer[:size]
-            self.unused_buffer = self.unused_buffer[size:]
-            return part
+            return self.read_from_buffer(size)
+
         # If the stream is finished and no unused raw data, return what we have
         if self.stream.closed or self.finished:
             self.finished = True
             buf, self.unused_buffer = self.unused_buffer, b''
             return buf
-        #
-        # Otherwise consume new data
-        # Since we are reading uncompressed data, we can directly specify
-        # the number of bytes to read from the stream, instead of reading in
-        # blocks of io.DEFAULT_BUFFER_SIZE bytes like GzipStreamFile does.
-        #
-        raw = self.stream.read(size - len(self.unused_buffer))
-        if len(raw) > 0:
-            self.unused_buffer += raw
-        else:
-            self.finished = True
-        return self.read(size)
+
+        # Consume new data in chunks and return it.
+        while len(self.unused_buffer) < size:
+            raw = self.stream.read(io.DEFAULT_BUFFER_SIZE)
+            if len(raw):
+                self.unused_buffer += raw
+            else:
+                self.finished = True
+                break
+
+        return self.read_from_buffer(size)
 
     def readinto(self, b):
         # Read up to len(b) bytes into bytearray b
