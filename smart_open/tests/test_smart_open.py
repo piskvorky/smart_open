@@ -80,10 +80,15 @@ class ParseUriTest(unittest.TestCase):
 
     def test_webhdfs_uri(self):
         """Do webhdfs URIs parse correctly"""
+        # valid uri, no query
         parsed_uri = smart_open.ParseUri("webhdfs://host:port/path/file")
         self.assertEqual(parsed_uri.scheme, "webhdfs")
         self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file")
 
+        # valid uri, with query
+        parsed_uri = smart_open.ParseUri("webhdfs://host:port/path/file?query_part_1&query_part2")
+        self.assertEqual(parsed_uri.scheme, "webhdfs")
+        self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file?query_part_1&query_part2")
 
 class SmartOpenReadTest(unittest.TestCase):
     """
