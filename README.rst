@@ -5,10 +5,10 @@ smart_open -- utils for streaming large files
 |Travis|_
 |License|_
 
-.. |Travis| image:: https://img.shields.io/travis/piskvorky/smart_open/master.svg
+.. |Travis| image:: https://img.shields.io/travis/RaRe-Technologies/smart_open/master.svg
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
-.. _Travis: https://travis-ci.org/piskvorky/smart_open
-.. _License: https://github.com/piskvorky/smart_open/blob/master/LICENSE
+.. _Travis: https://travis-ci.org/RaRe-Technologies/smart_open
+.. _License: https://github.com/RaRe-Technologies/smart_open/blob/master/LICENSE
 
 What?
 =====
@@ -111,7 +111,7 @@ Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pyp
     python setup.py test  # run unit tests
     python setup.py install
 
-To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>` (``pip install mock moto responses``). The tests are also run automatically with `Travis CI <https://travis-ci.org/piskvorky/smart_open>`_ on every commit push & pull request.
+To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>` (``pip install mock moto responses``). The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
 
 Todo
 ----
@@ -125,7 +125,7 @@ On the roadmap:
 Comments, bug reports
 ---------------------
 
-``smart_open`` lives on `github <https://github.com/piskvorky/smart_open>`_. You can file
+``smart_open`` lives on `github <https://github.com/RaRe-Technologies/smart_open>`_. You can file
 issues or pull requests there.
 
 ----------------
