@@ -650,13 +650,13 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
     total_size, key_no = 0, -1
     keys = (key for key in bucket.list(prefix=prefix) if accept_key(key.name))
 
-    if not MULTIPROCESSING:
-        logger.info("iterating over keys from %s without multiprocessing" % bucket)
-        iterator = imap(s3_iter_bucket_process_key, keys)
-    else:
+    if MULTIPROCESSING:
         logger.info("iterating over keys from %s with %i workers" % (bucket, workers))
         pool = multiprocessing.pool.Pool(processes=workers)
         iterator = pool.imap_unordered(s3_iter_bucket_process_key, keys)
+    else:
+        logger.info("iterating over keys from %s without multiprocessing" % bucket)
+        iterator = imap(s3_iter_bucket_process_key, keys)
 
     for key_no, (key, content) in enumerate(iterator):
         if key_no % 1000 == 0:
