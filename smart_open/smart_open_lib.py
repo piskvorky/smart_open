@@ -46,6 +46,8 @@ try:
 except ImportError:
     logger.warning("multiprocessing could not be imported and won't be used")
     from itertools import imap
+# for backwards compatibility (remove at next major version):
+NO_MULTIPROCESSING = not MULTIPROCESSING
 
 S3_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
