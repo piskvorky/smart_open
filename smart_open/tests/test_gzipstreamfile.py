@@ -1,13 +1,16 @@
-from .. import gzipstreamfile
+from gzipstream import gzipstreamfile
 import unittest
+import os.path as P
 
 GzipStreamFile = gzipstreamfile.GzipStreamFile
+CURR_DIR = P.abspath(P.dirname(__file__))
 
 
 class TestSequenceFunctions(unittest.TestCase):
   def test_warc_md5sum(self):
+    """Does the WARC md5 checksum match the expected value?"""
     for read_size in [1, 2, 10, 28, 42, 100, 256, 512, 800]:
-      f = open('gzipstream/tests/test_data/crlf_at_1k_boundary.warc.gz')
+      f = open(P.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz'))
       gz = GzipStreamFile(f)
       data = []
       tmp = gz.read(read_size)
