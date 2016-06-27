@@ -1,3 +1,10 @@
+* 1.3.4, 25th June 2016
+
+  - Bundle gzipstream to enable streaming of gzipped content from S3
+  - Update gzipstream to avoid deep recursion
+  - Implemented readline for S3
+  - Added pip requirements.txt
+
 * 1.3.3, 16th May 2016
 
   - Accept an instance of boto.s3.key.Key to smart_open (PR #38, @asieira)

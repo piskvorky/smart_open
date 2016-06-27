@@ -88,8 +88,8 @@ There are a few optional keyword arguments that are useful only for S3 access.
   >>> smart_open.smart_open('s3://', host='s3.amazonaws.com')
   >>> smart_open.smart_open('s3://', profile_name='my-profile')
 
-
 These are both passed to `boto.s3_connect()` as keyword arguments.
+The S3 reader supports gzipped content, as long as the key is obviously a gzipped file (e.g. ends with ".gz").
 
 Why?
 ----
@@ -102,7 +102,8 @@ There are nasty hidden gotchas when using ``boto``'s multipart upload functional
 Installation
 ------------
 
-The module has no dependencies beyond Python >= 2.6 (or Python >= 3.3) and ``boto``::
+The module has no dependencies beyond Python >= 2.6 (or Python >= 3.3),
+``boto`` and ``requests``::
 
     pip install smart_open
 
