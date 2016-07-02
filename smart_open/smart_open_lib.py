@@ -339,15 +339,6 @@ class S3ReadStream(io.BufferedReader):
         self.stream = _S3ReadStream(key)
         super(S3ReadStream, self).__init__(self.stream)
 
-        #
-        # Generator behavior changed in Python 3.
-        # Instead of g.next(), Python 3.x expects next(g) or g.__next__().
-        # http://stackoverflow.com/questions/1073396/is-generator-next-visible-in-python-3-0
-        # This is a patch to keep things working in Python 3.x.
-        #
-        if sys.version_info[0] == 3:
-            self.next = self.__next__
-
     def read(self, *args, **kwargs):
         # Patch read to return '' instead of raise Value Error
         try:
@@ -390,10 +381,7 @@ class S3OpenRead(object):
             yield line
 
     def readline(self):
-        try:
-            return self.reader.next()
-        except StopIteration:
-            return b""
+        return self.reader.readline()
 
     def read(self, size=None):
         """
