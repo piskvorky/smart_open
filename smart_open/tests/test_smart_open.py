@@ -260,7 +260,7 @@ class S3OpenReadTest(unittest.TestCase):
         self.assertEquals(
             reader.readline(), u"hello žluťoučký world!\n".encode("utf-8")
         )
-        self.assertEquals(reader.readline(), "how are you?")
+        self.assertEquals(reader.readline(), b"how are you?")
 
     @mock_s3
     def test_readline_iter(self):
@@ -290,9 +290,9 @@ class S3OpenReadTest(unittest.TestCase):
         mykey = conn.get_bucket("mybucket").get_key("mykey")
         reader = smart_open.S3OpenRead(mykey)
 
-        self.assertEquals(reader.readline(), "")
-        self.assertEquals(reader.readline(), "")
-        self.assertEquals(reader.readline(), "")
+        self.assertEquals(reader.readline(), b"")
+        self.assertEquals(reader.readline(), b"")
+        self.assertEquals(reader.readline(), b"")
 
 
 class S3IterLinesTest(unittest.TestCase):
