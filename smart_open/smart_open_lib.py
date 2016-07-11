@@ -381,10 +381,7 @@ class S3OpenRead(object):
             yield line
 
     def readline(self):
-        try:
-            return self.reader.next()
-        except StopIteration:
-            return None
+        return self.reader.readline()
 
     def read(self, size=None):
         """
