@@ -562,8 +562,8 @@ class S3OpenWrite(object):
         if not hasattr(outkey, "bucket") and not hasattr(outkey, "name"):
             raise TypeError("can only process S3 keys")
 
-        if is_gzip(outkey.name):
-            raise NotImplementedError("streaming write to S3 gzip not supported")
+        # if is_gzip(outkey.name):
+        #     raise NotImplementedError("streaming write to S3 gzip not supported")
 
         self.outkey = outkey
         self.min_part_size = min_part_size
