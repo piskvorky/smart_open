@@ -33,6 +33,7 @@ elif sys.version_info[0] == 3:
     import http.client as httplib
 
 from boto.compat import BytesIO, urlsplit, six
+from boto.s3.connection import OrdinaryCallingFormat
 import boto.s3.key
 
 logger = logging.getLogger(__name__)
@@ -126,13 +127,23 @@ def smart_open(uri, mode="rb", **kw):
             if not host:
                 host = boto.config.get('s3', 'host', 's3.amazonaws.com')
 
+            calling_format = kw.pop('calling_format', None)
+
             # For credential order of precedence see
             # http://boto.cloudhackers.com/en/latest/boto_config_tut.html#credentials
-            s3_connection = boto.connect_s3(
-                aws_access_key_id=parsed_uri.access_id,
-                host=host,
-                aws_secret_access_key=parsed_uri.access_secret,
-                profile_name=kw.pop('profile_name', None))
+            if calling_format:
+                s3_connection = boto.connect_s3(
+                    aws_access_key_id=parsed_uri.access_id,
+                    host=host,
+                    aws_secret_access_key=parsed_uri.access_secret,
+                    profile_name=kw.pop('profile_name', None),
+                    calling_format=calling_format)
+            else:
+                s3_connection = boto.connect_s3(
+                    aws_access_key_id=parsed_uri.access_id,
+                    host=host,
+                    aws_secret_access_key=parsed_uri.access_secret,
+                    profile_name=kw.pop('profile_name', None))
 
             bucket = s3_connection.get_bucket(parsed_uri.bucket_id)
             if mode in ('r', 'rb'):
