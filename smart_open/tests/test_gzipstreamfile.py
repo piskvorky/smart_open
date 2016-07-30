@@ -1,4 +1,4 @@
-import gzipstream.gzipstreamfile
+import smart_open.gzipstreamfile
 import unittest
 import os.path as P
 import hashlib
@@ -13,7 +13,7 @@ class TestSequenceFunctions(unittest.TestCase):
         fpath = P.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
         for read_size in [1, 2, 10, 28, 42, 100, 256, 512, 800]:
             f = open(fpath, "rb")
-            gz = gzipstream.gzipstreamfile.GzipStreamFile(f)
+            gz = smart_open.gzipstreamfile.GzipStreamFile(f)
             data = []
             tmp = gz.read(read_size)
             while tmp:
