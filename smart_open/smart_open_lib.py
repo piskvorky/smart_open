@@ -351,13 +351,24 @@ class S3ReadStream(io.BufferedReader):
 
     def read(self, *args, **kwargs):
         # Patch read to return '' instead of raise Value Error
+        # TODO: what actually raises ValueError in the following code?
         try:
-            return super(S3ReadStream, self).read(*args, **kwargs)
+            #
+            # io.BufferedReader behaves differently to a built-in file object.
+            # If the object is in non-blocking mode and no bytes are available,
+            # the former will return None. The latter returns an empty string.
+            # We want to behave like a built-in file object here.
+            #
+            result = super(S3ReadStream, self).read(*args, **kwargs)
+            if result is None:
+                return ""
+            return result
         except ValueError:
             return ''
 
     def readline(self, *args, **kwargs):
         # Patch readline to return '' instead of raise Value Error
+        # TODO: what actually raises ValueError in the following code?
         try:
             result = super(S3ReadStream, self).readline(*args, **kwargs)
             return result

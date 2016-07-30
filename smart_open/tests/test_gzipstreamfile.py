@@ -19,6 +19,7 @@ class TestSequenceFunctions(unittest.TestCase):
             while tmp:
                 data.append(tmp)
                 tmp = gz.read(read_size)
+                self.assertTrue(tmp is not None)
             data = b''.join(data)
             m = hashlib.md5(data)
             assert m.hexdigest() == '18473e60f8c7c98d29d65bf805736a0d', \
