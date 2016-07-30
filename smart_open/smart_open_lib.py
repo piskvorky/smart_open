@@ -48,7 +48,7 @@ except ImportError:
     logger.warning("multiprocessing could not be imported and won't be used")
     from itertools import imap
 
-import gzipstream
+from . import gzipstreamfile
 
 
 S3_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
@@ -383,7 +383,7 @@ class S3OpenRead(object):
 
     def _open_reader(self):
         if is_gzip(self.read_key.name):
-            self.reader = gzipstream.GzipStreamFile(self.read_key)
+            self.reader = gzipstreamfile.GzipStreamFile(self.read_key)
         else:
             self.reader = S3ReadStream(self.read_key)
 
