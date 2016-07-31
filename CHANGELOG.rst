@@ -1,3 +1,12 @@
+* 1.3.5, 6th August 2015
+
+  - Move gzipstream module to smart_open package
+  - Ensure reader objects never return None
+  - Ensure read functions never return more bytes than asked for
+  - Add support for reading gzipped objects until EOF, e.g. read()
+  - Add missing parameter to read_from_buffer call (https://github.com/RaRe-Technologies/smart_open/issues/84)
+  - Add unit tests for gzipstream
+
 * 1.3.4, 25th June 2016
 
   - Bundle gzipstream to enable streaming of gzipped content from S3

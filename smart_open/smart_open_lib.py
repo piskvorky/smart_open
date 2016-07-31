@@ -269,7 +269,7 @@ def is_gzip(name):
     return name.endswith(".gz")
 
 
-class _S3ReadStream(object):
+class S3ReadStreamInner(object):
 
     def __init__(self, stream):
         self.stream = stream
@@ -294,23 +294,24 @@ class _S3ReadStream(object):
         return buf
 
     def read_from_buffer(self, size):
+        """Remove at most size bytes from our buffer and return them."""
         part = self.unused_buffer[:size]
         self.unused_buffer = self.unused_buffer[size:]
         return part
 
     def read(self, size=None):
         if not size or size < 0:
-            return self.unused_buffer + self.read_until_eof()
+            return self.read_from_buffer(
+                len(self.unused_buffer)) + self.read_until_eof()
 
         # Use unused data first
-        if len(self.unused_buffer) > size:
+        if len(self.unused_buffer) >= size:
             return self.read_from_buffer(size)
 
         # If the stream is finished and no unused raw data, return what we have
         if self.stream.closed or self.finished:
             self.finished = True
-            buf, self.unused_buffer = self.unused_buffer, b''
-            return buf
+            return self.read_from_buffer(size)
 
         # Consume new data in chunks and return it.
         while len(self.unused_buffer) < size:
@@ -346,7 +347,7 @@ class _S3ReadStream(object):
 class S3ReadStream(io.BufferedReader):
 
     def __init__(self, key):
-        self.stream = _S3ReadStream(key)
+        self.stream = S3ReadStreamInner(key)
         super(S3ReadStream, self).__init__(self.stream)
 
     def read(self, *args, **kwargs):
