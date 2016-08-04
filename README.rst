@@ -57,6 +57,9 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
   >>> for line in smart_open.smart_open('./foo.txt.gz'):
   ...    print line
 
+  >>> for line in smart_open.smart_open('~/foo.txt.gz'):
+  ...    print line
+
   >>> with smart_open.smart_open('/home/radim/foo.txt.bz2', 'wb') as fout:
   ...    fout.write("some content\n")
 

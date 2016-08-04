@@ -99,10 +99,21 @@ class SmartOpenReadTest(unittest.TestCase):
     @mock.patch('smart_open.smart_open_lib.file_smart_open')
     def test_file(self, mock_smart_open):
         """Is file:// line iterator called correctly?"""
-        smart_open_object = smart_open.smart_open("file:///tmp/test.txt", "rb")
+        prefix = "file://"
+        full_path = '/tmp/test.txt'
+        read_mode = "rb"
+        smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with("/tmp/test.txt", "rb")
+        mock_smart_open.assert_called_with(full_path, read_mode)
+
+        short_path = "~/tmp/test.txt"
+        full_path = os.path.expanduser(short_path)
+
+        smart_open_object = smart_open.smart_open(prefix+short_path, read_mode)
+        smart_open_object.__iter__()
+        # called with the correct expanded path?
+        mock_smart_open.assert_called_with(full_path, read_mode)
 
     # couldn't find any project for mocking up HDFS data
     # TODO: we want to test also a content of the files, not just fnc call params
@@ -358,6 +369,11 @@ class SmartOpenTest(unittest.TestCase):
 
         smart_open.smart_open("blah", "rb")
         mock_file.assert_called_with("blah", "rb")
+
+        short_path = "~/blah"
+        full_path = os.path.expanduser(short_path)
+        smart_open.smart_open(short_path, "rb")
+        mock_file.assert_called_with(full_path, "rb")
 
         # correct write modes, incorrect scheme
         self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb")

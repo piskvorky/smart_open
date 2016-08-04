@@ -104,6 +104,11 @@ def smart_open(uri, mode="rb", **kw):
       ...    fout.write("hello world!\n")
       >>> with smart_open.smart_open('/home/radim/another.txt.bz2', 'wb') as fout:
       ...    fout.write("good bye!\n")
+      >>> # stream from/to (compressed) local files with Expand ~ and ~user constructions:
+      >>> for line in smart_open.smart_open('~/my_file.txt'):
+      ...    print line
+      >>> for line in smart_open.smart_open('my_file.txt'):
+      ...    print line
 
     """
 
@@ -189,6 +194,8 @@ class ParseUri(object):
       * hdfs://path/file
       * webhdfs://host:port/path/file
       * ./local/path/file
+      * ~/local/path/file
+      * local/path/file
       * ./local/path/file.gz
       * file:///home/user/file
       * file:///home/user/file.bz2
@@ -246,6 +253,9 @@ class ParseUri(object):
                 raise RuntimeError("invalid S3 URI: %s" % uri)
         elif self.scheme == 'file':
             self.uri_path = parsed_uri.netloc + parsed_uri.path
+
+            # '~/tmp' may be expanded to '/Users/username/tmp'
+            self.uri_path = os.path.expanduser(self.uri_path)
 
             if not self.uri_path:
                 raise RuntimeError("invalid file URI: %s" % uri)
