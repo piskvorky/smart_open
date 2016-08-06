@@ -4,7 +4,7 @@
   - Ensure reader objects never return None
   - Ensure read functions never return more bytes than asked for
   - Add support for reading gzipped objects until EOF, e.g. read()
-  - Fix issue #84
+  - Add missing parameter to read_from_buffer call (https://github.com/RaRe-Technologies/smart_open/issues/84)
   - Add unit tests for gzipstream
 
 * 1.3.4, 25th June 2016
