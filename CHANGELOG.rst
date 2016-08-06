@@ -1,8 +1,10 @@
 * 1.3.5, 6th August 2015
 
   - Move gzipstream module to smart_open package
-  - Make sure reader objects never return None
-  - Fix issue #85
+  - Ensure reader objects never return None
+  - Ensure read functions never return more bytes than asked for
+  - Add support for reading gzipped objects until EOF, e.g. read()
+  - Fix issue #84
   - Add unit tests for gzipstream
 
 * 1.3.4, 25th June 2016
