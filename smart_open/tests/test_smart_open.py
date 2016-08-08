@@ -17,9 +17,13 @@ import boto
 import mock
 from moto import mock_s3
 import responses
+import io
 
 import smart_open
 from smart_open import smart_open_lib
+
+logger = logging.getLogger(__name__)
+
 
 class ParseUriTest(unittest.TestCase):
     """
@@ -255,7 +259,61 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(content, smart_open_object.read(-1)) # same thing
 
 
+class S3ReadStreamInnerTest(unittest.TestCase):
+
+    def test_never_return_more_than_asked_for(self):
+        """read should never return more bytes than it is asked for."""
+        stream = io.BytesIO(b"0" * io.DEFAULT_BUFFER_SIZE * 2)
+        reader = smart_open.S3ReadStreamInner(stream)
+
+        logger.debug("reader: %r", reader)
+
+        logger.debug("performing partial read")
+        ret = reader.read(io.DEFAULT_BUFFER_SIZE // 2)
+        self.assertEquals(len(ret), io.DEFAULT_BUFFER_SIZE // 2)
+
+        #
+        # Currently, the reader's buffer is half-full wrt DEFAULT_BUFFER_SIZE.
+        # Force it to read more bytes from the stream, causing it to contain
+        # 1.5 * DEFAULT_BUFFER_SIZE bytes, and reaching EOF.  The bug is that
+        # once it reaches EOF, it always returns the buffer contents, ignoring
+        # how many bytes it was originally asked for.
+        #
+        ret = reader.read(io.DEFAULT_BUFFER_SIZE)
+        self.assertEquals(len(ret), io.DEFAULT_BUFFER_SIZE)
+
+        #
+        # Consume the rest of the file.
+        #
+        self.assertEquals(len(reader.read()), io.DEFAULT_BUFFER_SIZE // 2)
+
+    def test_buffer_flushed_after_eof(self):
+        """The buffer should be empty after we've requested to read until
+        EOF."""
+        stream = io.BytesIO(b"0" * io.DEFAULT_BUFFER_SIZE * 2)
+        reader = smart_open.S3ReadStreamInner(stream)
+        self.assertEquals(len(reader.read(io.DEFAULT_BUFFER_SIZE)),
+                          io.DEFAULT_BUFFER_SIZE)
+        self.assertEquals(len(reader.read()), io.DEFAULT_BUFFER_SIZE)
+        self.assertEquals(len(reader.unused_buffer), 0)
+        self.assertEquals(len(reader.read()), 0)
+
+
 class S3OpenReadTest(unittest.TestCase):
+
+    @mock_s3
+    def test_read_never_returns_none(self):
+        """read should never return None."""
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
+        test_string = u"ветер по морю гуляет..."
+        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_string.encode('utf8'))
+
+        r = smart_open.S3OpenRead(conn.get_bucket("mybucket").get_key("mykey"))
+        self.assertEquals(r.read(), test_string.encode("utf-8"))
+        self.assertEquals(r.read(), b"")
+        self.assertEquals(r.read(), b"")
 
     @mock_s3
     def test_readline(self):

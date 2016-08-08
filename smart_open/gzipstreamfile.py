@@ -9,7 +9,7 @@ import io
 import zlib
 
 
-class _GzipStreamFile(object):
+class GzipStreamFileInner(object):
     def __init__(self, stream):
         self.stream = stream
         self.decoder = None
@@ -26,20 +26,42 @@ class _GzipStreamFile(object):
             self.unused_buffer += self.decoder.decompress(unused_raw)
 
     def read_from_buffer(self, size):
+        """Read at most size bytes from buffer."""
         part = self.unused_buffer[:size]
         self.unused_buffer = self.unused_buffer[size:]
         return part
 
-    def read(self, size):
+    def read_until_eof(self):
+        #
+        # This method is here because boto.s3.Key.read() reads the entire
+        # file, which isn't expected behavior.
+        #
+        # https://github.com/boto/boto/issues/3311
+        #
+        while not self.finished:
+            while self.decoder and self.decoder.unused_data:
+                self.restart_decoder()
+
+            raw = self.stream.read(io.DEFAULT_BUFFER_SIZE)
+            if len(raw) > 0:
+                self.unused_buffer += self.decoder.decompress(raw)
+            else:
+                self.finished = True
+        return self.unused_buffer
+
+    def read(self, size=None):
+        if not size or size < 0:
+            return self.read_from_buffer(
+                len(self.unused_buffer)) + self.read_until_eof()
+
         # Use unused data first
-        if len(self.unused_buffer) > size:
-            return self.read_from_buffer()
+        if len(self.unused_buffer) >= size:
+            return self.read_from_buffer(size)
 
         # If the stream is finished and no unused raw data, return what we have
         if self.stream.closed or self.finished:
             self.finished = True
-            buf, self.unused_buffer = self.unused_buffer, b''
-            return buf
+            return self.read_from_buffer(size)
 
         # Otherwise consume new data
         while len(self.unused_buffer) < size:
@@ -80,19 +102,29 @@ class _GzipStreamFile(object):
 
 class GzipStreamFile(io.BufferedReader):
     def __init__(self, stream):
-        self._gzipstream = _GzipStreamFile(stream)
+        self._gzipstream = GzipStreamFileInner(stream)
         super(GzipStreamFile, self).__init__(self._gzipstream)
 
     def read(self, *args, **kwargs):
         # Patch read to return '' instead of raise Value Error
+        # TODO: what actually raises ValueError in the following code?
         try:
             result = super(GzipStreamFile, self).read(*args, **kwargs)
+            #
+            # io.BufferedReader behaves differently to a built-in file object.
+            # If the object is in non-blocking mode and no bytes are available,
+            # the former will return None. The latter returns an empty string.
+            # We want to behave like a built-in file object here.
+            #
+            if result is None:
+                result = ""
             return result
         except ValueError:
             return ''
 
     def readline(self, *args, **kwargs):
         # Patch readline to return '' instead of raise Value Error
+        # TODO: what actually raises ValueError in the following code?
         try:
             result = super(GzipStreamFile, self).readline(*args, **kwargs)
             return result
