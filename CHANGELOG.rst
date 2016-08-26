@@ -1,11 +1,12 @@
-* 1.3.5, 6th August 2015
+* 1.3.5, 26th August 2015
 
-  - Move gzipstream module to smart_open package
-  - Ensure reader objects never return None
-  - Ensure read functions never return more bytes than asked for
-  - Add support for reading gzipped objects until EOF, e.g. read()
-  - Add missing parameter to read_from_buffer call (https://github.com/RaRe-Technologies/smart_open/issues/84)
-  - Add unit tests for gzipstream
+  - Relative path support (PR #73, @yupbank)
+  - Move gzipstream module to smart_open package (PR #81, @mpenkov)
+  - Ensure reader objects never return None (PR #81, @mpenkov)
+  - Ensure read functions never return more bytes than asked for (PR #84, @mpenkov)
+  - Add support for reading gzipped objects until EOF, e.g. read() (PR #81, @mpenkov)
+  - Add missing parameter to read_from_buffer call (PR #84, @mpenkov)
+  - Add unit tests for gzipstream (PR #84, @mpenkov)
 
 * 1.3.4, 25th June 2016
 
