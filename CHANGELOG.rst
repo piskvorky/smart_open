@@ -1,4 +1,4 @@
-* 1.3.5, 26th August 2015
+* 1.3.4, 26th August 2015
 
   - Relative path support (PR #73, @yupbank)
   - Move gzipstream module to smart_open package (PR #81, @mpenkov)
@@ -7,13 +7,12 @@
   - Add support for reading gzipped objects until EOF, e.g. read() (PR #81, @mpenkov)
   - Add missing parameter to read_from_buffer call (PR #84, @mpenkov)
   - Add unit tests for gzipstream (PR #84, @mpenkov)
-
-* 1.3.4, 25th June 2016
-
-  - Bundle gzipstream to enable streaming of gzipped content from S3
-  - Update gzipstream to avoid deep recursion
-  - Implemented readline for S3
-  - Added pip requirements.txt
+  - Bundle gzipstream to enable streaming of gzipped content from S3 (PR #73, @mpenkov)
+  - Update gzipstream to avoid deep recursion (PR #73, @mpenkov)
+  - Implemented readline for S3 (PR #73, @mpenkov)
+  - Added pip requirements.txt (PR #73, @mpenkov)
+  - Invert NO_MULTIPROCESSING flag (PR #79, @Janrain-Colin)
+  - Add ability to add query to webhdfs uri. (PR #78, @ellimilial)
 
 * 1.3.3, 16th May 2016
 
