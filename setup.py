@@ -49,6 +49,13 @@ setup(
         'requests',
     ],
 
+    tests_require=[
+        'mock',
+        'moto',
+        'responses',
+    ],
+
+
     test_suite="smart_open.tests",
 
     classifiers = [ # from http://pypi.python.org/pypi?%3Aaction=list_classifiers
