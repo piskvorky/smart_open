@@ -1,4 +1,5 @@
 * 1.3.5, 5th October 2016
+
   - Add MANIFEST.in required for conda-forge recip (PR #90, @tmylk)
   - Fix #92. Allow hash in filename (PR #93, @tmylk)
  
