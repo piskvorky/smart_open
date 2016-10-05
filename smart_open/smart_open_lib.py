@@ -211,7 +211,7 @@ class ParseUri(object):
             if '://' not in uri:
                 # no protocol given => assume a local file
                 uri = 'file://' + uri
-        parsed_uri = urlsplit(uri)
+        parsed_uri = urlsplit(uri, allow_fragments=False)
         self.scheme = parsed_uri.scheme if parsed_uri.scheme else default_scheme
 
         if self.scheme == "hdfs":
