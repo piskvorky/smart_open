@@ -111,6 +111,22 @@ class SmartOpenReadTest(unittest.TestCase):
         # called with the correct path?
         mock_smart_open.assert_called_with(full_path, read_mode)
 
+        full_path = '/tmp/test#hash##more.txt'
+        read_mode = "rb"
+        smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
+        smart_open_object.__iter__()
+        # called with the correct path?
+        mock_smart_open.assert_called_with(full_path, read_mode)
+
+
+        full_path = 'aa#aa'
+        read_mode = "rb"
+        smart_open_object = smart_open.smart_open(full_path, read_mode)
+        smart_open_object.__iter__()
+        # called with the correct path?
+        mock_smart_open.assert_called_with(full_path, read_mode)
+
+
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)
 
