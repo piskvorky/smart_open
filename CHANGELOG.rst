@@ -1,4 +1,8 @@
-* 1.3.4, 26th August 2015
+* 1.3.5, 5th October 2016
+  - Add MANIFEST.in required for conda-forge recip (PR #90, @tmylk)
+  - Fix #92. Allow hash in filename (PR #93, @tmylk)
+ 
+* 1.3.4, 26th August 2016
 
   - Relative path support (PR #73, @yupbank)
   - Move gzipstream module to smart_open package (PR #81, @mpenkov)
