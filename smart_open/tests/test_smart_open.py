@@ -363,8 +363,9 @@ class SmartOpenTest(unittest.TestCase):
     def test_file_mode_mock(self, mock_file, mock_boto):
         """Are file:// open modes passed correctly?"""
         # incorrect file mode
-        with self.assertRaises(NotImplementedError):
-            smart_open.smart_open("s3://bucket/key", "x")
+        self.assertRaises(
+            NotImplementedError, smart_open.smart_open, "s3://bucket/key", "x"
+        )
 
         # correct read modes
         smart_open.smart_open("blah", "r")
@@ -940,17 +941,13 @@ class S3BufferedInputBaseTest(unittest.TestCase):
 
         array = [b"0"] * 4
         self.assertEquals(4, base.readinto(array))
-        self.assertEquals(bytes(array), b"6789")
+        self.assertEquals(b"".join([bytes(a) for a in array]), b"6789")
         self.assertEquals(base.tell(), 9)
 
-        with self.assertRaises(IOError):
-            base.seek(1)
-        with self.assertRaises(IOError):
-            base.truncate()
-        with self.assertRaises(io.UnsupportedOperation):
-            base.detach()
-        with self.assertRaises(io.UnsupportedOperation):
-            base.read1()
+        self.assertRaises(IOError, base.seek, 1)
+        self.assertRaises(IOError, base.truncate)
+        self.assertRaises(io.UnsupportedOperation, base.detach)
+        self.assertRaises(io.UnsupportedOperation, base.read1)
 
 
 class S3BufferedOutputBaseTest(unittest.TestCase):
@@ -967,8 +964,8 @@ class S3BufferedOutputBaseTest(unittest.TestCase):
         with smart_open.S3BufferedOutputBase(mykey) as fout:
             self.assertTrue(fout.writable())
             fout.write(b"this is a test")
-            with self.assertRaises(io.UnsupportedOperation):
-                fout.detach()
+
+            self.assertRaises(io.UnsupportedOperation, fout.detach)
 
         with smart_open.S3BufferedInputBase(mykey) as fin:
             self.assertEquals(fin.read(), b"this is a test")
@@ -985,21 +982,22 @@ class S3OpenTest(unittest.TestCase):
         key = boto.s3.key.Key(bucket)
         key.key = "key"
 
-        text = "физкульт-привет!"
+        text = u"физкульт-привет!"
         key.set_contents_from_string(text.encode("utf-8"))
 
         with smart_open.s3_open_key(key, "r") as fin:
-            self.assertEquals(fin.read(), "физкульт-привет!")
+            self.assertEquals(fin.read(), u"физкульт-привет!")
 
         parsed_uri = smart_open.ParseUri("s3://bucket/key")
         with smart_open.s3_open_uri(parsed_uri, "r") as fin:
-            self.assertEquals(fin.read(), "физкульт-привет!")
+            self.assertEquals(fin.read(), u"физкульт-привет!")
 
     def test_bad_mode(self):
         """Bad mode should raise and exception."""
         uri = smart_open.ParseUri("s3://bucket/key")
-        with self.assertRaises(NotImplementedError):
-            smart_open.s3_open_uri(uri, "x")
+        self.assertRaises(
+            NotImplementedError, smart_open.s3_open_uri, uri, "x"
+        )
 
     @mock_s3
     def test_rw_encoding(self):
@@ -1019,9 +1017,8 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.s3_open_uri(uri, "rb") as fin:
             self.assertEquals(text.encode("koi8-r"), fin.read())
 
-        with self.assertRaises(UnicodeDecodeError):
-            with smart_open.s3_open_uri(uri, "r", encoding="euc-jp") as fin:
-                fin.read()
+        with smart_open.s3_open_uri(uri, "r", encoding="euc-jp") as fin:
+            self.assertRaises(UnicodeDecodeError, fin.read)
 
         with smart_open.s3_open_uri(uri, "r", encoding="euc-jp",
                                     errors="replace") as fin:
