@@ -744,7 +744,7 @@ class WebHdfsOpenWrite(object):
         self.close()
 
 
-def s3_iter_bucket_process_key(key, retries = 3):
+def s3_iter_bucket_process_key(key, retries=3):
     """
     Conceptually part of `s3_iter_bucket`, but must remain top-level method because
     of pickling visibility.

@@ -1,8 +1,12 @@
+* UNRELEASED
+
+  - Add retry around `s3_iter_bucket_process_key` to address S3 Read Timeout errors.
+
 * 1.3.5, 5th October 2016
 
   - Add MANIFEST.in required for conda-forge recip (PR #90, @tmylk)
   - Fix #92. Allow hash in filename (PR #93, @tmylk)
- 
+
 * 1.3.4, 26th August 2016
 
   - Relative path support (PR #73, @yupbank)
