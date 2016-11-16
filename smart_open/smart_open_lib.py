@@ -752,7 +752,7 @@ def s3_iter_bucket_process_key(key, retries=3):
     """
     # Sometimes, https://github.com/boto/boto/issues/2409 can happen because of network issues on either side.
     # Retry up to 3 times to ensure its not a transient issue.
-    for x in xrange(0, retries + 1):
+    for x in range(0, retries + 1):
         try:
             return key, key.get_contents_as_string()
         except SSLError:
