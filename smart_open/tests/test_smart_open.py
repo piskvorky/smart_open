@@ -683,8 +683,7 @@ class S3IterBucketTest(unittest.TestCase):
 
         # when get_contents_as_string always returns SSLError
         mykey.get_contents_as_string.side_effect = SSLError
-        with self.assertRaises(SSLError):
-            key, content = smart_open.s3_iter_bucket_process_key(mykey)
+        self.assertRaises(SSLError, smart_open.s3_iter_bucket_process_key, mykey)
 
         # when get_contents_as_string only returns SSLError once, can still recover
         mykey.get_contents_as_string.side_effect = [SSLError, b"contentA"]
@@ -700,13 +699,11 @@ class S3IterBucketTest(unittest.TestCase):
 
         # but not more than three times ....
         mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, SSLError, b"contentA"]
-        with self.assertRaises(SSLError):
-            key, content = smart_open.s3_iter_bucket_process_key(mykey)
+        self.assertRaises(SSLError, smart_open.s3_iter_bucket_process_key, mykey)
 
         # some other exception always fails, and never retries
         mykey.get_contents_as_string.side_effect = [Exception, b"contentA"]
-        with self.assertRaises(Exception):
-            key, content = smart_open.s3_iter_bucket_process_key(mykey)
+        self.assertRaises(Exception, smart_open.s3_iter_bucket_process_key, mykey)
 
     @mock_s3
     def test_s3_iter_bucket_process_key_moto(self):
