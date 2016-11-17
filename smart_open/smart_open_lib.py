@@ -34,6 +34,7 @@ elif sys.version_info[0] == 3:
 
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
+from ssl import SSLError
 
 logger = logging.getLogger(__name__)
 
@@ -743,13 +744,23 @@ class WebHdfsOpenWrite(object):
         self.close()
 
 
-def s3_iter_bucket_process_key(key):
+def s3_iter_bucket_process_key(key, retries=3):
     """
     Conceptually part of `s3_iter_bucket`, but must remain top-level method because
     of pickling visibility.
 
     """
-    return key, key.get_contents_as_string()
+    # Sometimes, https://github.com/boto/boto/issues/2409 can happen because of network issues on either side.
+    # Retry up to 3 times to ensure its not a transient issue.
+    for x in range(0, retries + 1):
+        try:
+            return key, key.get_contents_as_string()
+        except SSLError:
+            # Actually fail on last pass through the loop
+            if x == retries:
+                raise
+            # Otherwise, try again, as this might be a transient timeout
+            pass
 
 
 def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16):
