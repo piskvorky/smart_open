@@ -125,7 +125,7 @@ def smart_open(uri, mode="rb", **kw):
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
-            return file_smart_open(parsed_uri.uri_path, mode)
+            return file_smart_open(parsed_uri.uri_path, mode, **kw)
         elif parsed_uri.scheme in ("s3", "s3n"):
             # Get an S3 host. It is required for sigv4 operations.
             host = kw.pop('host', None)
@@ -536,16 +536,17 @@ def make_closing(base, **attrs):
     return type('Closing' + base.__name__, (base, object), attrs)
 
 
-def file_smart_open(fname, mode='rb'):
+def file_smart_open(fname, mode='rb', encoding='utf-8'):
     """
     Stream from/to local filesystem, transparently (de)compressing gzip and bz2
     files if necessary.
 
     """
+    PY2 = sys.version_info[0] == 2
+
     _, ext = os.path.splitext(fname)
 
     if ext == '.bz2':
-        PY2 = sys.version_info[0] == 2
         if PY2:
             from bz2file import BZ2File
         else:
@@ -556,7 +557,10 @@ def file_smart_open(fname, mode='rb'):
         from gzip import GzipFile
         return make_closing(GzipFile)(fname, mode)
 
-    return open(fname, mode)
+    if PY2 or 'b' in mode:
+        return open(fname, mode)
+    else:
+        return open(fname, mode, encoding=encoding)
 
 
 class S3OpenWrite(object):
