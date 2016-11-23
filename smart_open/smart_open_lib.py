@@ -427,12 +427,8 @@ class S3OpenRead(object):
 
     def _regenerate_key(self):
         """
-        Given boto2 key object, it generates a new
-        copy of itself and return it, useful in
-        scenarios where we want to reset the read
-        stream of the key
-        :param key: `boto.s3.key.Key` object
-        :return: `boto.s3.key.Key` object
+        Regenerates `boto.s3.key.Key` object and 
+        overrides the read_key with the new object
         """
         bucket = self.read_key.bucket
         key_name = self.read_key.name
