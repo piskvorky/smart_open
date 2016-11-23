@@ -422,8 +422,22 @@ class S3OpenRead(object):
         """
         if whence != 0 or offset != 0:
             raise NotImplementedError("seek other than offset=0 not implemented yet")
-        self.read_key.close(fast=True)
+        self._regenerate_key()
         self._open_reader()
+
+    def _regenerate_key(self):
+        """
+        Given boto2 key object, it generates a new
+        copy of itself and return it, useful in
+        scenarios where we want to reset the read
+        stream of the key
+        :param key: `boto.s3.key.Key` object
+        :return: `boto.s3.key.Key` object
+        """
+        bucket = self.read_key.bucket
+        key_name = self.read_key.name
+        del self.read_key
+        self.read_key = bucket.get_key(key_name)
 
     def __enter__(self):
         return self
