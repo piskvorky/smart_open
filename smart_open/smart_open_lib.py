@@ -128,26 +128,26 @@ def smart_open(uri, mode="rb", **kw):
             # compression, if any, is determined by the filename extension (.gz, .bz2)
             return file_smart_open(parsed_uri.uri_path, mode)
         elif parsed_uri.scheme in ("s3", "s3n", "s3u"):
-            if 'host' in kw or parsed_uri.ordinary_calling_format:
-                # If the host was overridden, honor it directly.
-                calling_format = boto.s3.connection.OrdinaryCallingFormat()
-            else:
-                calling_format = boto.s3.connection.VHostCallingFormat()
-
+            kwargs = {}
             # Get an S3 host. It is required for sigv4 operations.
             host = kw.pop('host', parsed_uri.host)
             port = kw.pop('port', parsed_uri.port)
-            is_secure = kw.pop('is_secure', parsed_uri.scheme != 's3u')
+            if port != 443:
+                kwargs['port'] = port
+
+            if not kw.pop('is_secure', parsed_uri.scheme != 's3u'):
+                kwargs['is_secure'] = False
+                # If the security model docker is overridden, honor the host directly.
+                kwargs['calling_format'] = boto.s3.connection.OrdinaryCallingFormat()
+
             # For credential order of precedence see
             # http://boto.cloudhackers.com/en/latest/boto_config_tut.html#credentials
             s3_connection = boto.connect_s3(
                 aws_access_key_id=parsed_uri.access_id,
                 host=host,
-                port=port,
                 aws_secret_access_key=parsed_uri.access_secret,
-                is_secure=is_secure,
-                calling_format=calling_format,
-                profile_name=kw.pop('profile_name', None))
+                profile_name=kw.pop('profile_name', None),
+                **kwargs)
 
             bucket = s3_connection.get_bucket(parsed_uri.bucket_id)
             if mode in ('r', 'rb'):
