@@ -193,6 +193,9 @@ class SmartOpenReadTest(unittest.TestCase):
         # lookup bucket, key; call s3_iter_lines
         smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
         smart_open_object.__iter__()
+
+        # Check that the port argument wasn't passed to the connection
+        mock_boto.connect_s3.assert_called_with(aws_access_key_id='access_id', aws_secret_access_key='access_secret', host='s3.amazonaws.com', profile_name=None)
         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
         mock_boto.connect_s3().get_bucket().get_key.assert_called_with("mykey")
         #
