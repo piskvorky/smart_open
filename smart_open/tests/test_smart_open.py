@@ -80,8 +80,8 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, "accessid")
         self.assertEqual(parsed_uri.access_secret, "access/secret")
 
-        # incorrect uri - only one '@' in uri is allowed
-        self.assertRaises(RuntimeError, smart_open.ParseUri, "s3://access_id@access_secret@mybucket/mykey")
+        # incorrect uri - only two '@' in uri are allowed
+        self.assertRaises(RuntimeError, smart_open.ParseUri, "s3://access_id@access_secret@mybucket@port/mykey")
 
     def test_webhdfs_uri(self):
         """Do webhdfs URIs parse correctly"""
@@ -482,6 +482,40 @@ class SmartOpenTest(unittest.TestCase):
         # correct write mode, correct s3 URI
         smart_open.smart_open("s3://mybucket/mykey", "w")
         mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None, profile_name=None, host='s3.amazonaws.com')
+        mock_boto.connect_s3().lookup.return_value = True
+        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
+        self.assertTrue(mock_write.called)
+
+    @mock.patch('smart_open.smart_open_lib.boto')
+    @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
+    def test_s3_unsecured_mode_mock(self, mock_write, mock_boto):
+        """Are s3u:// open modes passed correctly?"""
+        # Configure the mock boto.config.get to return default host
+        smart_open.smart_open_lib.boto.config.get.return_value = 'example.com'
+
+        # correct write mode, correct s3u URI
+        smart_open.smart_open("s3u://user:secret@example.com@mybucket/mykey", "w")
+        mock_boto.connect_s3.assert_called_with(
+            aws_access_key_id='user', aws_secret_access_key='secret',
+            profile_name=None, host='example.com', is_secure=False,
+            calling_format=mock_boto.s3.connection.OrdinaryCallingFormat())
+        mock_boto.connect_s3().lookup.return_value = True
+        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
+        self.assertTrue(mock_write.called)
+
+    @mock.patch('smart_open.smart_open_lib.boto')
+    @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
+    def test_s3_unsecured_mode_with_port_mock(self, mock_write, mock_boto):
+        """Are s3u:// open modes passed correctly?"""
+        # Configure the mock boto.config.get to return default host
+        smart_open.smart_open_lib.boto.config.get.return_value = 'example.com'
+
+        # correct write mode, correct s3u URI
+        smart_open.smart_open("s3u://user:secret@example.com:2048@mybucket/mykey", "w")
+        mock_boto.connect_s3.assert_called_with(
+            aws_access_key_id='user', aws_secret_access_key='secret',
+            profile_name=None, host='example.com', is_secure=False, port=2048,
+            calling_format=mock_boto.s3.connection.OrdinaryCallingFormat())
         mock_boto.connect_s3().lookup.return_value = True
         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
         self.assertTrue(mock_write.called)

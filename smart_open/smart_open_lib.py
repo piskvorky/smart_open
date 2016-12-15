@@ -33,6 +33,7 @@ elif sys.version_info[0] == 3:
     import http.client as httplib
 
 from boto.compat import BytesIO, urlsplit, six
+import boto.s3.connection
 import boto.s3.key
 from ssl import SSLError
 
@@ -126,11 +127,18 @@ def smart_open(uri, mode="rb", **kw):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
             return file_smart_open(parsed_uri.uri_path, mode)
-        elif parsed_uri.scheme in ("s3", "s3n"):
+        elif parsed_uri.scheme in ("s3", "s3n", "s3u"):
+            kwargs = {}
             # Get an S3 host. It is required for sigv4 operations.
-            host = kw.pop('host', None)
-            if not host:
-                host = boto.config.get('s3', 'host', 's3.amazonaws.com')
+            host = kw.pop('host', parsed_uri.host)
+            port = kw.pop('port', parsed_uri.port)
+            if port != 443:
+                kwargs['port'] = port
+
+            if not kw.pop('is_secure', parsed_uri.scheme != 's3u'):
+                kwargs['is_secure'] = False
+                # If the security model docker is overridden, honor the host directly.
+                kwargs['calling_format'] = boto.s3.connection.OrdinaryCallingFormat()
 
             # For credential order of precedence see
             # http://boto.cloudhackers.com/en/latest/boto_config_tut.html#credentials
@@ -138,7 +146,8 @@ def smart_open(uri, mode="rb", **kw):
                 aws_access_key_id=parsed_uri.access_id,
                 host=host,
                 aws_secret_access_key=parsed_uri.access_secret,
-                profile_name=kw.pop('profile_name', None))
+                profile_name=kw.pop('profile_name', None),
+                **kwargs)
 
             bucket = s3_connection.get_bucket(parsed_uri.bucket_id)
             if mode in ('r', 'rb'):
@@ -185,12 +194,16 @@ class ParseUri(object):
     """
     Parse the given URI.
 
-    Supported URI schemes are "file", "s3", "s3n" and "hdfs".
+    Supported URI schemes are "file", "s3", "s3n", "s3u" and "hdfs".
+
+      * s3 and s3n are treated the same way.
+      * s3u is s3 but without SSL.
 
     Valid URI examples::
 
       * s3://my_bucket/my_key
       * s3://my_key:my_secret@my_bucket/my_key
+      * s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
       * hdfs:///path/file
       * hdfs://path/file
       * webhdfs://host:port/path/file
@@ -228,10 +241,12 @@ class ParseUri(object):
 
             if not self.uri_path:
                 raise RuntimeError("invalid WebHDFS URI: %s" % uri)
-        elif self.scheme in ("s3", "s3n"):
+        elif self.scheme in ("s3", "s3n", "s3u"):
             self.bucket_id = (parsed_uri.netloc + parsed_uri.path).split('@')
             self.key_id = None
-
+            self.port = 443
+            self.host = boto.config.get('s3', 'host', 's3.amazonaws.com')
+            self.ordinary_calling_format = False
             if len(self.bucket_id) == 1:
                 # URI without credentials: s3://bucket/object
                 self.bucket_id, self.key_id = self.bucket_id[0].split('/', 1)
@@ -244,8 +259,18 @@ class ParseUri(object):
                 acc, self.bucket_id = self.bucket_id
                 self.access_id, self.access_secret = acc.split(':')
                 self.bucket_id, self.key_id = self.bucket_id.split('/', 1)
+            elif len(self.bucket_id) == 3 and len(self.bucket_id[0].split(':')) == 2:
+                # or URI in extended format: s3://key:secret@server[:port]@bucket/object
+                acc,  server, self.bucket_id = self.bucket_id
+                self.access_id, self.access_secret = acc.split(':')
+                self.bucket_id, self.key_id = self.bucket_id.split('/', 1)
+                server = server.split(':')
+                self.ordinary_calling_format = True
+                self.host = server[0]
+                if len(server) == 2:
+                    self.port = int(server[1])
             else:
-                # more than 1 '@' means invalid uri
+                # more than 2 '@' means invalid uri
                 # Bucket names must be at least 3 and no more than 63 characters long.
                 # Bucket names must be a series of one or more labels.
                 # Adjacent labels are separated by a single period (.).

@@ -22,6 +22,10 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
   >>> for line in smart_open.smart_open('s3://mybucket/mykey.txt'):
   ...    print line
 
+  >>> # using a completely custom s3 server, like s3proxy:
+  >>> for line in smart_open.smart_open('s3u://user:secret@host:port@mybucket/mykey.txt'):
+  ...    print line
+
   >>> # you can also use a boto.s3.key.Key instance directly:
   >>> key = boto.connect_s3().get_bucket("my_bucket").get_key("my_key")
   >>> with smart_open.smart_open(key) as fin:
