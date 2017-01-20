@@ -29,6 +29,7 @@ setup(
     long_description = read('README.rst'),
 
     packages=find_packages(),
+    package_data={"smart_open.tests": ["test_data/*gz"]},
 
     author = u'Radim Řehůřek',
     author_email = 'me@radimrehurek.com',
