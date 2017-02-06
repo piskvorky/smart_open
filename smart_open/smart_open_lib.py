@@ -167,7 +167,7 @@ def smart_open(uri, mode="rb", **kw):
             if mode in ('r', 'rb'):
                 return HdfsOpenRead(parsed_uri, **kw)
             else:
-                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+                return HdfsOpenWrite(parsed_uri, **kw)
         elif parsed_uri.scheme in ("webhdfs", ):
             if mode in ('r', 'rb'):
                 return WebHdfsOpenRead(parsed_uri, **kw)
@@ -488,6 +488,33 @@ class HdfsOpenRead(object):
 
     def __exit__(self, type, value, traceback):
         pass
+
+
+class HdfsOpenWrite(object):
+    """
+    Implement streamed reader from HDFS, as an iterable & context manager.
+
+    """
+    def __init__(self, parsed_uri):
+        if parsed_uri.scheme not in ("hdfs"):
+            raise TypeError("can only process HDFS files")
+        self.parsed_uri = parsed_uri
+        self.out_pipe = subprocess.Popen(["hdfs","dfs","-put","-f","-",self.parsed_uri.uri_path], stdin=subprocess.PIPE)
+
+    def write(self, b):
+        self.out_pipe.stdin.write(b)
+
+    def seek(self, offset, whence=None):
+        raise NotImplementedError("seek() not implemented yet")
+
+    def __enter__(self):
+        return self
+
+    def close(self):
+        self.out_pipe.stdin.close()
+
+    def __exit__(self, type, value, traceback):
+        self.close()
 
 
 class WebHdfsOpenRead(object):
