@@ -494,7 +494,7 @@ class HdfsOpenRead(object):
 
 class HdfsOpenWrite(object):
     """
-    Implement streamed reader from HDFS, as an iterable & context manager.
+    Implement streamed writer from HDFS, as an iterable & context manager.
 
     """
     def __init__(self, parsed_uri):
