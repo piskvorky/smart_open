@@ -166,8 +166,10 @@ def smart_open(uri, mode="rb", **kw):
         elif parsed_uri.scheme in ("hdfs", ):
             if mode in ('r', 'rb'):
                 return HdfsOpenRead(parsed_uri, **kw)
-            else:
+            if mode in ('w', 'wb'):
                 return HdfsOpenWrite(parsed_uri, **kw)
+            else:
+                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         elif parsed_uri.scheme in ("webhdfs", ):
             if mode in ('r', 'rb'):
                 return WebHdfsOpenRead(parsed_uri, **kw)
