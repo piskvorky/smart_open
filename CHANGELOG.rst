@@ -1,6 +1,9 @@
-* UNRELEASED
+* 1.3.6, 13th Feb 2017
 
-  - Add retry around `s3_iter_bucket_process_key` to address S3 Read Timeout errors.
+  - Add retry around `s3_iter_bucket_process_key` to address S3 Read Timeout errors. (PR #96, @bbbco)
+  - Support custom S3 server host, port, ssl. (PR #101, @robottwo)
+  - Include tests data in sdist + install them. (PR #105, @cournape)
+  - HdfsOpenWrite implementation similar to read (PR #106, @skibaa)  
 
 * 1.3.5, 5th October 2016
 
