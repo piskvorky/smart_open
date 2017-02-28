@@ -634,6 +634,7 @@ class HttpReadStream(object):
             from urllib.request import urlopen
 
         if kerberos:
+            import requests_kerberos
             auth = requests_kerberos.HTTPKerberosAuth()
         elif user is not None and password is not None:
             auth = (user, password)
