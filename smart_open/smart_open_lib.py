@@ -27,6 +27,9 @@ import subprocess
 import sys
 import requests
 import io
+from contextlib import closing
+
+
 if sys.version_info[0] == 2:
     import httplib
 elif sys.version_info[0] == 3:
@@ -76,6 +79,11 @@ def smart_open(uri, mode="rb", **kw):
     4. an instance of the boto.s3.key.Key class.
 
     Examples::
+
+      >>> # stream lines from http; you can use context managers too:
+      >>> with smart_open.smart_open('http://www.google.com') as fin:
+      ...     for line in fin:
+      ...         print line
 
       >>> # stream lines from S3; you can use context managers too:
       >>> with smart_open.smart_open('s3://mybucket/mykey.txt') as fin:
@@ -177,6 +185,11 @@ def smart_open(uri, mode="rb", **kw):
                 return WebHdfsOpenWrite(parsed_uri, **kw)
             else:
                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+        elif parsed_uri.scheme.startswith('http'):
+            if mode in ('r', 'rb'):
+                return HttpOpenRead(parsed_uri, **kw)
+            else:
+                return NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif isinstance(uri, boto.s3.key.Key):
@@ -287,6 +300,8 @@ class ParseUri(object):
 
             if not self.uri_path:
                 raise RuntimeError("invalid file URI: %s" % uri)
+        elif self.scheme.startswith('http'):
+            self.uri_path = uri
         else:
             raise NotImplementedError("unknown URI scheme %r in %r" % (self.scheme, uri))
 
@@ -573,23 +588,6 @@ class WebHdfsOpenRead(object):
     def __exit__(self, type, value, traceback):
         pass
 
-
-def make_closing(base, **attrs):
-    """
-    Add support for `with Base(attrs) as fout:` to the base class if it's missing.
-    The base class' `close()` method will be called on context exit, to always close the file properly.
-
-    This is needed for gzip.GzipFile, bz2.BZ2File etc in older Pythons (<=2.6), which otherwise
-    raise "AttributeError: GzipFile instance has no attribute '__exit__'".
-
-    """
-    if not hasattr(base, '__enter__'):
-        attrs['__enter__'] = lambda self: self
-    if not hasattr(base, '__exit__'):
-        attrs['__exit__'] = lambda self, type, value, traceback: self.close()
-    return type('Closing' + base.__name__, (base, object), attrs)
-
-
 def file_smart_open(fname, mode='rb'):
     """
     Stream from/to local filesystem, transparently (de)compressing gzip and bz2
@@ -604,13 +602,127 @@ def file_smart_open(fname, mode='rb'):
             from bz2file import BZ2File
         else:
             from bz2 import BZ2File
-        return make_closing(BZ2File)(fname, mode)
+        return closing(BZ2File(fname, mode))
 
     if ext == '.gz':
         from gzip import GzipFile
-        return make_closing(GzipFile)(fname, mode)
+        return closing(GzipFile(fname, mode))
 
     return open(fname, mode)
+
+
+class HttpReadStream(object):
+    """
+    Implement streamed reader from a web site, as an iterable & context manager.
+    Supports Kerberos and Basic HTTP authentication.
+
+    As long as you don't mix different access patterns (readline vs readlines vs
+    read(n) vs read() vs iteration) this will load efficiently in memory.
+
+    """
+    def __init__(self, url, mode='r', kerberos=False, user=None, password=None):
+        """
+        If Kerberos is True, will attempt to use the local Kerberos credentials.
+        Otherwise, will try to use "basic" HTTP authentication via username/password.
+
+        If none of those are set, will connect unauthenticated.
+        """
+        PY2 = sys.version_info[0] == 2
+        if PY2:
+            from urllib2 import urlopen
+        else:
+            from urlib.request import urlopen
+
+        if kerberos:
+            from requests_kerberos import HTTPKerberosAuth
+            auth = HTTPKerberosAuth()
+        elif user is not None and password is not None:
+            auth = (user, password)
+        else:
+            auth = None
+        
+        self.response = requests.get(url, auth=auth, stream=True)
+        self._read_buffer = None
+        self._read_iter = None
+        self._readline_iter = None
+
+    def __iter__(self):
+        return response.iter_lines()
+
+    def readline(self):
+        """
+        Mimics the readline call to a filehandle object.
+        """
+        if self._readline_iter is None:
+            self._readline_iter = self.response.iter_lines()
+
+        try:
+            return self._readline_iter.next()
+        except StopIteration:
+            raise EOFError()
+
+    def readlines(self):
+        """
+        Mimics the readlines call to a filehandle object.
+        """
+        return list(self.response.iter_lines())
+
+    def read(self, size=None):
+        """
+        Mimics the read call to a filehandle object.
+        """
+        if size is None:
+            return self.response.content
+        else:
+            if self._read_iter is None:
+                self._read_iter = self.response.iter_content(size)
+                self._read_buffer = self._read_iter.next()
+            
+            while len(self._read_buffer) < size:
+                try:
+                    self._read_buffer += self._read_iter.next()
+                except StopIteration:
+                    # Oops, ran out of data early.
+                    retval = self._read_buffer
+                    self._read_buffer = ''
+                    if len(retval) == 0:
+                        raise EOFError()
+                    else:
+                        return retval
+            
+            # If we got here, it means we have enough data in the buffer
+            # to return to the caller.
+            retval = self._read_buffer[:size]
+            self._read_buffer = self._read_buffer[size:]
+            return retval
+
+    def __enter__(self, *args, **kwargs):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        self.response.close()
+
+def HttpOpenRead(parsed_uri, mode='r', **kwargs):
+    if parsed_uri.scheme not in ('http', 'https'):
+        raise TypeError("can only process http/https urls")
+    url = parsed_uri.uri_path
+
+    response = HttpReadStream(url, **kwargs)
+
+    if url.endswith('.gz'):
+        from gzip import GzipFile
+        return closing(GzipFile(fileobj=response))
+
+    elif url.endswith('.bz2'):
+        PY2 = sys.version_info[0] == 2
+        if PY2:
+            from bz2file import BZ2File
+        else:
+            from bz2 import BZ2File
+        return closing(BZ2File(fileobj=response))
+
+    else:
+        return response
 
 
 class S3OpenWrite(object):

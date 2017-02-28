@@ -34,12 +34,12 @@ class ParseUriTest(unittest.TestCase):
     def test_scheme(self):
         """Do URIs schemes parse correctly?"""
         # supported schemes
-        for scheme in ("s3", "s3n", "hdfs", "file"):
+        for scheme in ("s3", "s3n", "hdfs", "file", "http", "https"):
             parsed_uri = smart_open.ParseUri(scheme + "://mybucket/mykey")
             self.assertEqual(parsed_uri.scheme, scheme)
 
         # unsupported scheme => NotImplementedError
-        self.assertRaises(NotImplementedError, smart_open.ParseUri, "http://mybucket/mykey")
+        self.assertRaises(NotImplementedError, smart_open.ParseUri, "foobar://mybucket/mykey")
 
         # unknown scheme => default_scheme
         parsed_uri = smart_open.ParseUri("blah blah")
@@ -167,6 +167,28 @@ class SmartOpenReadTest(unittest.TestCase):
         responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file", body='line1\nline2')
         smart_open_object = smart_open.WebHdfsOpenRead(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
+
+    def test_http_readline(self):
+        """Can we stream from an HTTP site correctly"""
+        with smart_open.HttpOpenRead(smart_open.ParseUri('http://www.google.com'), 'r') as smart_open_object:
+            content = smart_open_object.readline()
+            expected_str = '<!doctype html>'
+            self.assertEqual(content[:len(expected_str)], expected_str)
+
+    def test_http_read(self):
+        """Can we perform chunked reads on an HTTP stream correctly"""
+        with smart_open.HttpOpenRead(smart_open.ParseUri('http://www.google.com'), 'r') as smart_open_object:
+            expected_str = '<!doctype html>'
+            content = (smart_open_object.read(3) + 
+                       smart_open_object.read(len(expected_str) - 3))
+            self.assertEqual(content[:len(expected_str)], expected_str)
+
+    def test_https_readline(self):
+        """Can we stream from an HTTPS site correctly"""
+        with smart_open.HttpOpenRead(smart_open.ParseUri('https://www.google.com'), 'r') as smart_open_object:
+            content = smart_open_object.readline()
+            expected_str = '<!doctype html>'
+            self.assertEqual(content[:len(expected_str)], expected_str)
 
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.S3OpenRead')
