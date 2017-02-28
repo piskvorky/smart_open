@@ -1,7 +1,10 @@
-* UNRELEASED
+* 1.4.0, 13th Feb 2017
 
-  - Add retry around `s3_iter_bucket_process_key` to address S3 Read Timeout errors.
-
+  - HdfsOpenWrite implementation similar to read (PR #106, @skibaa)  
+  - Support custom S3 server host, port, ssl. (PR #101, @robottwo)
+  - Add retry around `s3_iter_bucket_process_key` to address S3 Read Timeout errors. (PR #96, @bbbco)  
+  - Include tests data in sdist + install them. (PR #105, @cournape)
+  
 * 1.3.5, 5th October 2016
 
   - Add MANIFEST.in required for conda-forge recip (PR #90, @tmylk)

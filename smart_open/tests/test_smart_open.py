@@ -486,6 +486,19 @@ class SmartOpenTest(unittest.TestCase):
         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
         self.assertTrue(mock_write.called)
 
+    @mock.patch('smart_open.smart_open_lib.subprocess')
+    def test_hdfs(self, mock_subprocess):
+        """Is HDFS write called correctly"""
+        smart_open_object = smart_open.HdfsOpenWrite(smart_open.ParseUri("hdfs:///tmp/test.txt"))
+        smart_open_object.write("test")
+        # called with the correct params?
+        mock_subprocess.Popen.assert_called_with(["hdfs","dfs","-put","-f","-","/tmp/test.txt"], stdin=mock_subprocess.PIPE)
+
+        # second possibility of schema
+        smart_open_object = smart_open.HdfsOpenWrite(smart_open.ParseUri("hdfs://tmp/test.txt"))
+        smart_open_object.write("test")
+        mock_subprocess.Popen.assert_called_with(["hdfs","dfs","-put","-f","-","/tmp/test.txt"], stdin=mock_subprocess.PIPE)
+
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
     def test_s3_unsecured_mode_mock(self, mock_write, mock_boto):

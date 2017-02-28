@@ -24,11 +24,12 @@ def read(fname):
 
 setup(
     name = 'smart_open',
-    version = '1.3.5',
+    version = '1.4.0',
     description = 'Utils for streaming large files (S3, HDFS, gzip, bz2...)',
     long_description = read('README.rst'),
 
     packages=find_packages(),
+    package_data={"smart_open.tests": ["test_data/*gz"]},
 
     author = u'Radim Řehůřek',
     author_email = 'me@radimrehurek.com',
