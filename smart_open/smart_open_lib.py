@@ -631,17 +631,20 @@ class HttpReadStream(object):
         if PY2:
             from urllib2 import urlopen
         else:
-            from urlib.request import urlopen
+            from urllib.request import urlopen
 
         if kerberos:
-            from requests_kerberos import HTTPKerberosAuth
-            auth = HTTPKerberosAuth()
+            auth = requests_kerberos.HTTPKerberosAuth()
         elif user is not None and password is not None:
             auth = (user, password)
         else:
             auth = None
         
         self.response = requests.get(url, auth=auth, stream=True)
+
+        if not self.response.ok:
+            self.response.raise_for_status()
+
         self._read_buffer = None
         self._read_iter = None
         self._readline_iter = None
