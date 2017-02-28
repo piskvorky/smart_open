@@ -476,7 +476,6 @@ class SmartOpenTest(unittest.TestCase):
         mock_file.assert_called_with(full_path, "rb")
 
         # correct write modes, incorrect scheme
-        self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb")
         self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb+")
         self.assertRaises(NotImplementedError, smart_open.smart_open, "http:///blah.txt", "w")
         self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "wb+")
