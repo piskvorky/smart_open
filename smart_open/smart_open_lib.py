@@ -189,7 +189,7 @@ def smart_open(uri, mode="rb", **kw):
             if mode in ('r', 'rb'):
                 return HttpOpenRead(parsed_uri, **kw)
             else:
-                return NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif isinstance(uri, boto.s3.key.Key):
@@ -705,6 +705,9 @@ class HttpReadStream(object):
 def HttpOpenRead(parsed_uri, mode='r', **kwargs):
     if parsed_uri.scheme not in ('http', 'https'):
         raise TypeError("can only process http/https urls")
+    if mode not in ('r', 'rb'):
+        raise NotImplementedError('Streaming write to http not supported')
+
     url = parsed_uri.uri_path
 
     response = HttpReadStream(url, **kwargs)
