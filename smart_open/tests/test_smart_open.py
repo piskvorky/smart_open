@@ -171,7 +171,7 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_http_readline(self):
         """Can we stream from an HTTP site correctly"""
         with smart_open.HttpOpenRead(smart_open.ParseUri('http://www.google.com'), 'r') as smart_open_object:
-            content = smart_open_object.readline()
+            content = smart_open_object.readline().decode('utf-8')
             expected_str = '<!doctype html>'
             self.assertEqual(content[:len(expected_str)], expected_str)
 
@@ -179,14 +179,14 @@ class SmartOpenReadTest(unittest.TestCase):
         """Can we perform chunked reads on an HTTP stream correctly"""
         with smart_open.HttpOpenRead(smart_open.ParseUri('http://www.google.com'), 'r') as smart_open_object:
             expected_str = '<!doctype html>'
-            content = (smart_open_object.read(3) + 
-                       smart_open_object.read(len(expected_str) - 3))
+            content = (smart_open_object.read(3).decode('utf-8') + 
+                       smart_open_object.read(len(expected_str) - 3).decode('utf-8'))
             self.assertEqual(content[:len(expected_str)], expected_str)
 
     def test_https_readline(self):
         """Can we stream from an HTTPS site correctly"""
         with smart_open.HttpOpenRead(smart_open.ParseUri('https://www.google.com'), 'r') as smart_open_object:
-            content = smart_open_object.readline()
+            content = smart_open_object.readline().decode('utf-8')
             expected_str = '<!doctype html>'
             self.assertEqual(content[:len(expected_str)], expected_str)
 

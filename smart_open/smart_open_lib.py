@@ -661,7 +661,7 @@ class HttpReadStream(object):
             self._readline_iter = self.response.iter_lines()
 
         try:
-            return self._readline_iter.next()
+            return next(self._readline_iter)
         except StopIteration:
             raise EOFError()
 
@@ -680,11 +680,11 @@ class HttpReadStream(object):
         else:
             if self._read_iter is None:
                 self._read_iter = self.response.iter_content(size)
-                self._read_buffer = self._read_iter.next()
+                self._read_buffer = next(self._read_iter)
             
             while len(self._read_buffer) < size:
                 try:
-                    self._read_buffer += self._read_iter.next()
+                    self._read_buffer += next(self._read_iter)
                 except StopIteration:
                     # Oops, ran out of data early.
                     retval = self._read_buffer
