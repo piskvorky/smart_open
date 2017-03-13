@@ -606,26 +606,40 @@ def make_closing(base, **attrs):
     return type('Closing' + base.__name__, (base, object), attrs)
 
 
+def compression_wrapper(file_obj, filename, mode):
+    """
+    This function will wrap the file_obj with an appropriate
+    [de]compression mechanism based on the extension of the filename.
+
+    file_obj must either be a filehandle object, or a class which behaves
+        like one.
+
+    If the filename extension isn't recognized, will simply return the original
+    file_obj.
+    """
+    _, ext = os.path.splitext(filename)
+    if ext == '.bz2':
+        if IS_PY2:
+            from bz2file import BZ2File
+        else:
+            from bz2 import BZ2File
+        return make_closing(BZ2File)(file_obj, mode)
+
+    elif ext == '.gz':
+        from gzip import GzipFile
+        return make_closing(GzipFile)(file_obj, mode)
+
+    else:
+        return file_obj
+
+
 def file_smart_open(fname, mode='rb'):
     """
     Stream from/to local filesystem, transparently (de)compressing gzip and bz2
     files if necessary.
 
     """
-    _, ext = os.path.splitext(fname)
-
-    if ext == '.bz2':
-        if IS_PY2:
-            from bz2file import BZ2File
-        else:
-            from bz2 import BZ2File
-        return make_closing(BZ2File)(fname, mode)
-
-    if ext == '.gz':
-        from gzip import GzipFile
-        return make_closing(GzipFile)(fname, mode)
-
-    return open(fname, mode)
+    return compression_wrapper(open(fname, mode), fname, mode)
 
 
 class HttpReadStream(object):
@@ -667,7 +681,7 @@ class HttpReadStream(object):
         self._readline_iter = None
 
     def __iter__(self):
-        return response.iter_lines()
+        return self.response.iter_lines()
 
     def readline(self):
         """
@@ -722,6 +736,7 @@ class HttpReadStream(object):
     def __exit__(self, *args, **kwargs):
         self.response.close()
 
+
 def HttpOpenRead(parsed_uri, mode='r', **kwargs):
     if parsed_uri.scheme not in ('http', 'https'):
         raise TypeError("can only process http/https urls")
@@ -732,19 +747,8 @@ def HttpOpenRead(parsed_uri, mode='r', **kwargs):
 
     response = HttpReadStream(url, **kwargs)
 
-    if url.endswith('.gz'):
-        from gzip import GzipFile
-        return make_closing(GzipFile)(fileobj=response)
-
-    elif url.endswith('.bz2'):
-        if IS_PY2:
-            from bz2file import BZ2File
-        else:
-            from bz2 import BZ2File
-        return make_closing(BZ2File)(fileobj=response)
-
-    else:
-        return response
+    fname = url.split('/')[-1]
+    return compression_wrapper(response, fname, mode)
 
 
 class S3OpenWrite(object):
