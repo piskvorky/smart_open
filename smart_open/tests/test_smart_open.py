@@ -168,12 +168,31 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.WebHdfsOpenRead(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
+    @responses.activate
+    def test_http_read(self):
+        """Does webhdfs read method work correctly"""
+        responses.add(responses.GET, "http://127.0.0.1/index.html", body='line1\nline2')
+        smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"))
+        self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
+
+    @responses.activate
     def test_http_readline(self):
-        """Can we stream from an HTTP site correctly"""
-        with smart_open.HttpOpenRead(smart_open.ParseUri('http://www.google.com'), 'r') as smart_open_object:
-            content = smart_open_object.readline().decode('utf-8')
-            expected_str = '<!doctype html>'
-            self.assertEqual(content[:len(expected_str)], expected_str)
+        """Does webhdfs read method work correctly"""
+        responses.add(responses.GET, "http://127.0.0.1/index.html", body='line1\nline2')
+        smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"))
+        self.assertEqual(smart_open_object.readline().decode("utf-8"), "line1")
+
+    @responses.activate
+    def test_http_pass(self):
+        """Does http authentication work correctly"""
+        responses.add(responses.GET, "http://127.0.0.1/index.html", body='line1\nline2')
+        smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"),
+                                                    user='me', password='pass')
+        self.assertEquals(len(responses.calls), 1)
+        actual_request = responses.calls[0].request
+        self.assert_('Authorization' in actual_request.headers)
+        self.assert_(actual_request.headers['Authorization'].startswith('Basic '))
+
 
     def test_http_read(self):
         """Can we perform chunked reads on an HTTP stream correctly"""
