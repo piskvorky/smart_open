@@ -176,10 +176,10 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
     @responses.activate
-    def test_http_readline(self):
+    def test_https_readline(self):
         """Does webhdfs read method work correctly"""
-        responses.add(responses.GET, "http://127.0.0.1/index.html", body='line1\nline2')
-        smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"))
+        responses.add(responses.GET, "https://127.0.0.1/index.html", body='line1\nline2')
+        smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("https://127.0.0.1/index.html"))
         self.assertEqual(smart_open_object.readline().decode("utf-8"), "line1")
 
     @responses.activate
@@ -192,22 +192,6 @@ class SmartOpenReadTest(unittest.TestCase):
         actual_request = responses.calls[0].request
         self.assert_('Authorization' in actual_request.headers)
         self.assert_(actual_request.headers['Authorization'].startswith('Basic '))
-
-
-    def test_http_read(self):
-        """Can we perform chunked reads on an HTTP stream correctly"""
-        with smart_open.HttpOpenRead(smart_open.ParseUri('http://www.google.com'), 'r') as smart_open_object:
-            expected_str = '<!doctype html>'
-            content = (smart_open_object.read(3).decode('utf-8') + 
-                       smart_open_object.read(len(expected_str) - 3).decode('utf-8'))
-            self.assertEqual(content[:len(expected_str)], expected_str)
-
-    def test_https_readline(self):
-        """Can we stream from an HTTPS site correctly"""
-        with smart_open.HttpOpenRead(smart_open.ParseUri('https://www.google.com'), 'r') as smart_open_object:
-            content = smart_open_object.readline().decode('utf-8')
-            expected_str = '<!doctype html>'
-            self.assertEqual(content[:len(expected_str)], expected_str)
 
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.S3OpenRead')
