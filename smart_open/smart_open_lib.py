@@ -29,7 +29,9 @@ import requests
 import io
 
 
-if sys.version_info[0] == 2:
+IS_PY2 = (sys.version_info[0] == 2)
+
+if IS_PY2:
     import httplib
 elif sys.version_info[0] == 3:
     import http.client as httplib
@@ -613,8 +615,7 @@ def file_smart_open(fname, mode='rb'):
     _, ext = os.path.splitext(fname)
 
     if ext == '.bz2':
-        PY2 = sys.version_info[0] == 2
-        if PY2:
+        if IS_PY2:
             from bz2file import BZ2File
         else:
             from bz2 import BZ2File
@@ -643,8 +644,7 @@ class HttpReadStream(object):
 
         If none of those are set, will connect unauthenticated.
         """
-        PY2 = sys.version_info[0] == 2
-        if PY2:
+        if IS_PY2:
             from urllib2 import urlopen
         else:
             from urllib.request import urlopen
@@ -737,8 +737,7 @@ def HttpOpenRead(parsed_uri, mode='r', **kwargs):
         return make_closing(GzipFile)(fileobj=response)
 
     elif url.endswith('.bz2'):
-        PY2 = sys.version_info[0] == 2
-        if PY2:
+        if IS_PY2:
             from bz2file import BZ2File
         else:
             from bz2 import BZ2File
