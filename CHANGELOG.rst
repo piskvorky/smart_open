@@ -1,3 +1,5 @@
+  - HTTP/HTTPS read support w/ Kerberos (PR #107, @robottwo)
+
 * 1.4.0, 13th Feb 2017
 
   - HdfsOpenWrite implementation similar to read (PR #106, @skibaa)  

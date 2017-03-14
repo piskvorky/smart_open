@@ -170,14 +170,14 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @responses.activate
     def test_http_read(self):
-        """Does webhdfs read method work correctly"""
+        """Does http read method work correctly"""
         responses.add(responses.GET, "http://127.0.0.1/index.html", body='line1\nline2')
         smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"))
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
     @responses.activate
     def test_https_readline(self):
-        """Does webhdfs read method work correctly"""
+        """Does https readline method work correctly"""
         responses.add(responses.GET, "https://127.0.0.1/index.html", body='line1\nline2')
         smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("https://127.0.0.1/index.html"))
         self.assertEqual(smart_open_object.readline().decode("utf-8"), "line1")
@@ -186,8 +186,7 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_http_pass(self):
         """Does http authentication work correctly"""
         responses.add(responses.GET, "http://127.0.0.1/index.html", body='line1\nline2')
-        smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"),
-                                                    user='me', password='pass')
+        _ = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"), user='me', password='pass')
         self.assertEquals(len(responses.calls), 1)
         actual_request = responses.calls[0].request
         self.assert_('Authorization' in actual_request.headers)
