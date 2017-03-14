@@ -1,3 +1,5 @@
+* 1.4.0, 14th Mar 2017
+
   - HTTP/HTTPS read support w/ Kerberos (PR #107, @robottwo)
 
 * 1.4.0, 13th Feb 2017
