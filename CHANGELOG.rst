@@ -1,4 +1,4 @@
-* 1.4.0, 14th Mar 2017
+* 1.5.0, 14th Mar 2017
 
   - HTTP/HTTPS read support w/ Kerberos (PR #107, @robottwo)
 
