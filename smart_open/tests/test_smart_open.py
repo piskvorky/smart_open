@@ -12,6 +12,7 @@ import logging
 import tempfile
 import sys
 import os
+import hashlib
 
 import boto
 import mock
@@ -854,6 +855,43 @@ class S3IterBucketTest(unittest.TestCase):
 
 PY2 = sys.version_info[0] == 2
 
+
+class CompressionFormatTest(unittest.TestCase):
+    """
+    Test that compression
+    """
+    CURR_DIR = os.path.abspath(os.path.dirname(__file__))
+    TEXT = 'Hello'
+
+    def write_read_assertion(self, test_file):
+        with smart_open.smart_open(test_file, 'wb') as fout:  # 'b' for binary, needed on Windows
+            fout.write(self.TEXT)
+
+        with smart_open.smart_open(test_file, 'rb') as fin:
+            self.assertEqual(fin.read(), self.TEXT)
+
+        if os.path.isfile(test_file):
+            os.unlink(test_file)
+
+    def test_open_gz(self):
+        """Can open gzip?"""
+        fpath = os.path.join(self.CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
+        data = smart_open.smart_open(fpath).read()
+        m = hashlib.md5(data)
+        assert m.hexdigest() == '18473e60f8c7c98d29d65bf805736a0d', \
+            'Failed to read gzip'
+
+    def test_write_read_gz(self):
+        """Can write and read gzip?"""
+        test_file = tempfile.NamedTemporaryFile('wb', suffix='.gz', delete=False).name
+        self.write_read_assertion(test_file)
+
+    def test_write_read_bz2(self):
+        """Can write and read bz2?"""
+        test_file = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False).name
+        self.write_read_assertion(test_file)
+
+
 class MultistreamsBZ2Test(unittest.TestCase):
     """
     Test that multistream bzip2 compressed files can be read.
@@ -861,6 +899,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
     """
 
     # note: these tests are derived from the Python 3.x tip bz2 tests.
+
 
     TEXT_LINES = [
         b'root:x:0:0:root:/root:/bin/bash\n',
@@ -884,7 +923,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
         b'postgres:x:101:102:PostgreSQL Server:/var/lib/pgsql:/bin/bash\n',
         b'mysql:x:102:103:MySQL server:/var/lib/mysql:/bin/bash\n',
         b'www:x:103:104::/var/www:/bin/false\n',
-        ]
+    ]
 
     TEXT = b''.join(TEXT_LINES)
 
