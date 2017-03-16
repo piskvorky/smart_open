@@ -865,7 +865,7 @@ class CompressionFormatTest(unittest.TestCase):
 
     def write_read_assertion(self, test_file):
         with smart_open.smart_open(test_file, 'wb') as fout:  # 'b' for binary, needed on Windows
-            fout.write(self.TEXT)
+            fout.write(self.TEXT.encode('utf8'))
 
         with smart_open.smart_open(test_file, 'rb') as fin:
             self.assertEqual(fin.read(), self.TEXT)
