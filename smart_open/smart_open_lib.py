@@ -623,11 +623,11 @@ def compression_wrapper(file_obj, filename, mode):
             from bz2file import BZ2File
         else:
             from bz2 import BZ2File
-        return make_closing(BZ2File)(file_obj, mode)
+        return make_closing(BZ2File)(filename, mode)
 
     elif ext == '.gz':
         from gzip import GzipFile
-        return make_closing(GzipFile)(file_obj, mode)
+        return make_closing(GzipFile)(filename, mode)
 
     else:
         return file_obj
