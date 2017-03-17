@@ -176,7 +176,6 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"))
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
-
     @responses.activate
     def test_https_readline(self):
         """Does https readline method work correctly"""
@@ -862,14 +861,14 @@ class CompressionFormatTest(unittest.TestCase):
     Test that compression
     """
     CURR_DIR = os.path.abspath(os.path.dirname(__file__))
-    TEXT = b'Hello'
+    TEXT = 'Hello'
 
     def write_read_assertion(self, test_file):
         with smart_open.smart_open(test_file, 'wb') as fout:  # 'b' for binary, needed on Windows
             fout.write(self.TEXT.encode('utf8'))
 
         with smart_open.smart_open(test_file, 'rb') as fin:
-            self.assertEqual(fin.read(), self.TEXT)
+            self.assertEqual(fin.read().decode('utf8'), self.TEXT)
 
         if os.path.isfile(test_file):
             os.unlink(test_file)
