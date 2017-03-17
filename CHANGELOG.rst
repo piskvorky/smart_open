@@ -1,3 +1,7 @@
+* 1.5.1, 16th Mar 2017
+
+  - Bugfix for compressed formats (PR #110, @tmylk)
+
 * 1.5.0, 14th Mar 2017
 
   - HTTP/HTTPS read support w/ Kerberos (PR #107, @robottwo)
