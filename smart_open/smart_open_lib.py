@@ -81,11 +81,6 @@ def smart_open(uri, mode="rb", **kw):
 
     Examples::
 
-      >>> # stream lines from http; you can use context managers too:
-      >>> with smart_open.smart_open('http://www.google.com') as fin:
-      ...     for line in fin:
-      ...         print line
-
       >>> # stream lines from S3; you can use context managers too:
       >>> with smart_open.smart_open('s3://mybucket/mykey.txt') as fin:
       ...     for line in fin:
@@ -184,11 +179,6 @@ def smart_open(uri, mode="rb", **kw):
                 return WebHdfsOpenRead(parsed_uri, **kw)
             elif mode in ('w', 'wb'):
                 return WebHdfsOpenWrite(parsed_uri, **kw)
-            else:
-                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
-        elif parsed_uri.scheme.startswith('http'):
-            if mode in ('r', 'rb'):
-                return HttpOpenRead(parsed_uri, **kw)
             else:
                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         else:
@@ -301,8 +291,6 @@ class ParseUri(object):
 
             if not self.uri_path:
                 raise RuntimeError("invalid file URI: %s" % uri)
-        elif self.scheme.startswith('http'):
-            self.uri_path = uri
         else:
             raise NotImplementedError("unknown URI scheme %r in %r" % (self.scheme, uri))
 
@@ -623,11 +611,11 @@ def compression_wrapper(file_obj, filename, mode):
             from bz2file import BZ2File
         else:
             from bz2 import BZ2File
-        return make_closing(BZ2File)(file_obj, mode)
+        return make_closing(BZ2File)(filename, mode)
 
     elif ext == '.gz':
         from gzip import GzipFile
-        return make_closing(GzipFile)(file_obj, mode)
+        return make_closing(GzipFile)(filename, mode)
 
     else:
         return file_obj

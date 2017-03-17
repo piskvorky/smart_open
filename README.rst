@@ -5,7 +5,7 @@ smart_open -- utils for streaming large files
 |Travis|_
 |License|_
 
-.. |Travis| image:: https://img.shields.io/travis/RaRe-Technologies/smart_open.svg
+.. |Travis| image:: https://img.shields.io/travis/RaRe-Technologies/smart_open.svg?branch=master
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
 .. _Travis: https://travis-ci.org/RaRe-Technologies/smart_open
 .. _License: https://github.com/RaRe-Technologies/smart_open/blob/master/LICENSE
@@ -68,9 +68,6 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
 
   >>> # stream from/to local compressed files:
   >>> for line in smart_open.smart_open('./foo.txt.gz'):
-  ...    print line
-
-  >>> for line in smart_open.smart_open('~/foo.txt.gz'):
   ...    print line
 
   >>> with smart_open.smart_open('/home/radim/foo.txt.bz2', 'wb') as fout:
