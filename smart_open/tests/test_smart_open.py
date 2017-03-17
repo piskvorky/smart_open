@@ -900,7 +900,6 @@ class MultistreamsBZ2Test(unittest.TestCase):
 
     # note: these tests are derived from the Python 3.x tip bz2 tests.
 
-
     TEXT_LINES = [
         b'root:x:0:0:root:/root:/bin/bash\n',
         b'bin:x:1:1:bin:/bin:\n',
@@ -923,7 +922,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
         b'postgres:x:101:102:PostgreSQL Server:/var/lib/pgsql:/bin/bash\n',
         b'mysql:x:102:103:MySQL server:/var/lib/mysql:/bin/bash\n',
         b'www:x:103:104::/var/www:/bin/false\n',
-    ]
+        ]
 
     TEXT = b''.join(TEXT_LINES)
 
