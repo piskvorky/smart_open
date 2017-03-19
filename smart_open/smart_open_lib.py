@@ -353,8 +353,7 @@ class S3ReadStreamInner(object):
             return self.read_from_buffer(size)
 
         # If the stream is finished and no unused raw data, return what we have
-        if self.stream.closed or self.finished:
-            self.finished = True
+        if self.finished:
             return self.read_from_buffer(size)
 
         # Consume new data in chunks and return it.
@@ -465,7 +464,6 @@ class S3OpenRead(object):
         """
         if whence != 0 or offset != 0:
             raise NotImplementedError("seek other than offset=0 not implemented yet")
-        self.read_key.close(fast=True)
         self._open_reader()
 
     def __enter__(self):
