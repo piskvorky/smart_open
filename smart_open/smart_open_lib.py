@@ -617,16 +617,21 @@ def compression_wrapper(file_obj, filename, mode):
     If the filename extension isn't recognized, will simply return the original
     file_obj.
     """
-    _, ext = os.path.splitext(filename)
+    root, ext = os.path.splitext(filename)
+    
     if ext == '.bz2':
         if IS_PY2:
             from bz2file import BZ2File
         else:
             from bz2 import BZ2File
+        if 'http' in root:
+            return make_closing(HttpReadStream)(filename, mode)
         return make_closing(BZ2File)(filename, mode)
 
     elif ext == '.gz':
         from gzip import GzipFile
+        if 'http' in root:
+            return make_closing(HttpReadStream)(filename, mode)
         return make_closing(GzipFile)(filename, mode)
 
     else:
@@ -747,8 +752,7 @@ def HttpOpenRead(parsed_uri, mode='r', **kwargs):
 
     response = HttpReadStream(url, **kwargs)
 
-    fname = url.split('/')[-1]
-    return compression_wrapper(response, fname, mode)
+    return compression_wrapper(response, url, mode)
 
 
 class S3OpenWrite(object):
