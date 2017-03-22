@@ -872,6 +872,18 @@ class CompressionFormatTest(unittest.TestCase):
 
         if os.path.isfile(test_file):
             os.unlink(test_file)
+    
+    def close_assert(self, test_file):
+        with smart_open.smart_open(test_file, 'wb') as fout: # write after close
+            pass
+        self.assertRaisesRegexp(ValueError, 'I/O operation on closed file', fout.write, self.TEXT.encode('utf8'))
+        
+        with smart_open.smart_open(test_file, 'rb') as fin: # read after close
+            pass
+        self.assertRaisesRegexp(ValueError, 'I/O operation on closed file', fin.read, None)
+        
+        if os.path.isfile(test_file):
+            os.unlink(test_file)
 
     def test_open_gz(self):
         """Can open gzip?"""
@@ -890,6 +902,16 @@ class CompressionFormatTest(unittest.TestCase):
         """Can write and read bz2?"""
         test_file = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False).name
         self.write_read_assertion(test_file)
+    
+    def test_close_gz(self):
+        """Is gzip closed correctly?"""
+        test_file = tempfile.NamedTemporaryFile('wb', suffix='.gz', delete=False).name
+        self.close_assert(test_file)
+    
+    def test_close_bz2(self):
+        """Is bz2 closed correctly?"""
+        test_file = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False).name
+        self.close_assert(test_file)
 
 
 class MultistreamsBZ2Test(unittest.TestCase):
