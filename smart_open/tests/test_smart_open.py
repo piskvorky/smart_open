@@ -880,7 +880,7 @@ class CompressionFormatTest(unittest.TestCase):
         
         with smart_open.smart_open(test_file, 'rb') as fin: # read after close
             pass
-        self.assertRaises(ValueError, fin.read, None)
+        self.assertRaises(ValueError, fin.read)
         
         if os.path.isfile(test_file):
             os.unlink(test_file)
