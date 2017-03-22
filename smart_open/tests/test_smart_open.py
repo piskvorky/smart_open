@@ -876,11 +876,11 @@ class CompressionFormatTest(unittest.TestCase):
     def close_assert(self, test_file):
         with smart_open.smart_open(test_file, 'wb') as fout: # write after close
             pass
-        self.assertRaisesRegexp(ValueError, 'I/O operation on closed file', fout.write, self.TEXT.encode('utf8'))
+        self.assertRaises(ValueError, fout.write, self.TEXT.encode('utf8'))
         
         with smart_open.smart_open(test_file, 'rb') as fin: # read after close
             pass
-        self.assertRaisesRegexp(ValueError, 'I/O operation on closed file', fin.read, None)
+        self.assertRaises(ValueError, fin.read, None)
         
         if os.path.isfile(test_file):
             os.unlink(test_file)
