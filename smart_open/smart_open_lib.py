@@ -47,7 +47,7 @@ if IS_PY2:
 
         copy_reg.pickle(partial, _reduce_partial)
 elif sys.version_info[0] == 3:
-    import StringIO
+    import io as StringIO
     import http.client as httplib
 
 from boto.compat import BytesIO, urlsplit, six
