@@ -28,24 +28,12 @@ import sys
 import requests
 import io
 
-from functools import partial
-
 
 IS_PY2 = (sys.version_info[0] == 2)
 
 if IS_PY2:
     import cStringIO as StringIO
     import httplib
-    if sys.version_info[1] == 6:
-        import copy_reg
-
-        def _reconstruct_partial(f, args, kwds):
-            return partial(f, *args, **(kwds or {}))
-
-        def _reduce_partial(p):
-            return _reconstruct_partial, (p.func, p.args, p.keywords)
-
-        copy_reg.pickle(partial, _reduce_partial)
 elif sys.version_info[0] == 3:
     import io as StringIO
     import http.client as httplib
@@ -961,6 +949,10 @@ class WebHdfsOpenWrite(object):
         self.close()
 
 
+def s3_iter_bucket_process_key_with_kwargs(kwargs):
+    return s3_iter_bucket_process_key(**kwargs)
+
+
 def s3_iter_bucket_process_key(key, retries=3):
     """
     Conceptually part of `s3_iter_bucket`, but must remain top-level method because
@@ -1009,15 +1001,15 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
 
     """
     total_size, key_no = 0, -1
-    keys = (key for key in bucket.list(prefix=prefix) if accept_key(key.name))
+    keys = ({'key': key, 'retries': retries} for key in bucket.list(prefix=prefix) if accept_key(key.name))
 
     if MULTIPROCESSING:
         logger.info("iterating over keys from %s with %i workers" % (bucket, workers))
         pool = multiprocessing.pool.Pool(processes=workers)
-        iterator = pool.imap_unordered(partial(s3_iter_bucket_process_key, retries=retries), keys)
+        iterator = pool.imap_unordered(s3_iter_bucket_process_key_with_kwargs, keys)
     else:
         logger.info("iterating over keys from %s without multiprocessing" % bucket)
-        iterator = imap(partial(s3_iter_bucket_process_key, retries=retries), keys)
+        iterator = imap(s3_iter_bucket_process_key_with_kwargs, keys)
 
     for key_no, (key, content) in enumerate(iterator):
         if key_no % 1000 == 0:
