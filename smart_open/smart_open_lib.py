@@ -34,6 +34,7 @@ from functools import partial
 IS_PY2 = (sys.version_info[0] == 2)
 
 if IS_PY2:
+    import cStringIO as StringIO
     import httplib
     if sys.version_info[1] == 6:
         import copy_reg
@@ -46,6 +47,7 @@ if IS_PY2:
 
         copy_reg.pickle(partial, _reduce_partial)
 elif sys.version_info[0] == 3:
+    import StringIO
     import http.client as httplib
 
 from boto.compat import BytesIO, urlsplit, six
@@ -639,6 +641,11 @@ def compression_wrapper(file_obj, filename, mode):
 
     elif ext == '.gz':
         from gzip import GzipFile
+        if not hasattr(file_obj, 'tell'):
+            # GzipFile needs to tell/seek in the input stream.
+            # So, in the case of a streaming response, we'll buffer the data.
+            file_obj = StringIO.StringIO(file_obj.read())
+
         return make_closing(GzipFile)(fileobj=file_obj, mode=mode)
 
     else:
@@ -705,13 +712,17 @@ class HttpReadStream(object):
         try:
             return next(self._readline_iter)
         except StopIteration:
-            raise EOFError()
+            # When readline runs out of data, it just returns an empty string
+            return ''
 
     def readlines(self):
         """
         Mimics the readlines call to a filehandle object.
         """
         return list(self.response.iter_lines())
+
+    def seek(self):
+        raise NotImplementedError('seek() is not implemented')
 
     def read(self, size=None):
         """
@@ -732,7 +743,8 @@ class HttpReadStream(object):
                     retval = self._read_buffer
                     self._read_buffer = ''
                     if len(retval) == 0:
-                        raise EOFError()
+                        # When read runs out of data, it just returns empty
+                        return ''
                     else:
                         return retval
             
