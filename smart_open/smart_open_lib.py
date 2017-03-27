@@ -28,11 +28,23 @@ import sys
 import requests
 import io
 
+from functools import partial
+
 
 IS_PY2 = (sys.version_info[0] == 2)
 
 if IS_PY2:
     import httplib
+    if sys.version_info[1] == 6:
+        import copy_reg
+
+        def _reconstruct_partial(f, args, kwds):
+            return partial(f, *args, **(kwds or {}))
+
+        def _reduce_partial(p):
+            return _reconstruct_partial, (p.func, p.args, p.keywords)
+
+        copy_reg.pickle(partial, _reduce_partial)
 elif sys.version_info[0] == 3:
     import http.client as httplib
 
@@ -955,7 +967,7 @@ def s3_iter_bucket_process_key(key, retries=3):
             pass
 
 
-def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16):
+def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16, retries=3):
     """
     Iterate and download all S3 files under `bucket/prefix`, yielding out
     `(key, key content)` 2-tuples (generator).
@@ -989,10 +1001,10 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
     if MULTIPROCESSING:
         logger.info("iterating over keys from %s with %i workers" % (bucket, workers))
         pool = multiprocessing.pool.Pool(processes=workers)
-        iterator = pool.imap_unordered(s3_iter_bucket_process_key, keys)
+        iterator = pool.imap_unordered(partial(s3_iter_bucket_process_key, retries=retries), keys)
     else:
         logger.info("iterating over keys from %s without multiprocessing" % bucket)
-        iterator = imap(s3_iter_bucket_process_key, keys)
+        iterator = imap(partial(s3_iter_bucket_process_key, retries=retries), keys)
 
     for key_no, (key, content) in enumerate(iterator):
         if key_no % 1000 == 0:

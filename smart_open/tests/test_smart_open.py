@@ -775,6 +775,12 @@ class S3IterBucketTest(unittest.TestCase):
         mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, SSLError, b"contentA"]
         self.assertRaises(SSLError, smart_open.s3_iter_bucket_process_key, mykey)
 
+        # unless you specify more retries ....
+        mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, SSLError, b"contentA"]
+        key, content = smart_open.s3_iter_bucket_process_key(mykey, retries=4)
+        self.assertEqual(key, mykey)
+        self.assertEqual(content, b"contentA")
+
         # some other exception always fails, and never retries
         mykey.get_contents_as_string.side_effect = [Exception, b"contentA"]
         self.assertRaises(Exception, smart_open.s3_iter_bucket_process_key, mykey)
@@ -851,6 +857,46 @@ class S3IterBucketTest(unittest.TestCase):
             for k, c in smart_open.s3_iter_bucket(mybucket):
                 result[k.name] = c
             self.assertEqual(result, expected)
+
+    @mock.patch('smart_open.multiprocessing.pool.Pool.imap_unordered', map)
+    def test_s3_iter_bucket_with_SSLError_moto(self):
+        attrs = {"name" : "fileA", "get_contents_as_string.return_value" : b"contentA"}
+        mykey = mock.Mock(spec=["name", "get_contents_as_string"])
+        mykey.configure_mock(**attrs)
+
+        attrs = {"list.return_value" : [mykey]}
+        mybucket = mock.Mock(spec=["list"])
+        mybucket.configure_mock(**attrs)
+
+        # when get_contents_as_string always returns SSLError
+        mykey.get_contents_as_string.side_effect = SSLError
+        self.assertRaises(SSLError, lambda x: next(smart_open.s3_iter_bucket(x)), mybucket)
+
+        # when get_contents_as_string only returns SSLError once, can still recover
+        mykey.get_contents_as_string.side_effect = [SSLError, b"contentA"]
+        key, content = next(smart_open.s3_iter_bucket(mybucket))
+        self.assertEqual(key, mykey)
+        self.assertEqual(content, b"contentA")
+
+        # when get_contents_as_string fails up to three times, can still recover
+        mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, b"contentA"]
+        key, content = next(smart_open.s3_iter_bucket(mybucket))
+        self.assertEqual(key, mykey)
+        self.assertEqual(content, b"contentA")
+
+        # but not more than three times ....
+        mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, SSLError, b"contentA"]
+        self.assertRaises(SSLError, lambda x: next(smart_open.s3_iter_bucket(x)), mybucket)
+
+        # unless you specify more retries ....
+        mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, SSLError, b"contentA"]
+        key, content = next(smart_open.s3_iter_bucket(mybucket, retries=4))
+        self.assertEqual(key, mykey)
+        self.assertEqual(content, b"contentA")
+
+        # some other exception always fails, and never retries
+        mykey.get_contents_as_string.side_effect = [Exception, b"contentA"]
+        self.assertRaises(Exception, lambda x: next(smart_open.s3_iter_bucket(x)), mybucket)
 
 
 PY2 = sys.version_info[0] == 2
