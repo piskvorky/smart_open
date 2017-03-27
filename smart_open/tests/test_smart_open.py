@@ -918,6 +918,18 @@ class CompressionFormatTest(unittest.TestCase):
 
         if os.path.isfile(test_file):
             os.unlink(test_file)
+    
+    def close_assert(self, test_file):
+        with smart_open.smart_open(test_file, 'wb') as fout: # write after close
+            pass
+        self.assertRaises(ValueError, fout.write, self.TEXT.encode('utf8'))
+        
+        with smart_open.smart_open(test_file, 'rb') as fin: # read after close
+            pass
+        self.assertRaises(ValueError, fin.read)
+        
+        if os.path.isfile(test_file):
+            os.unlink(test_file)
 
     def test_open_gz(self):
         """Can open gzip?"""
@@ -936,7 +948,58 @@ class CompressionFormatTest(unittest.TestCase):
         """Can write and read bz2?"""
         test_file = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False).name
         self.write_read_assertion(test_file)
-
+    
+    '''
+    # TO-DO: fix fd-leak for local gz,bz2 on python 2.6.9
+    def test_close_gz(self):
+        """Is gzip closed correctly?"""
+        test_file = tempfile.NamedTemporaryFile('wb', suffix='.gz', delete=False).name
+        self.close_assert(test_file)
+    
+    def test_close_bz2(self):
+        """Is bz2 closed correctly?"""
+        test_file = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False).name
+        self.close_assert(test_file)
+    '''
+    
+    @responses.activate
+    def test_read_write_http_gz(self):
+        """Does modes correctly for gz over http?"""
+        text= 'line1\nline2'
+        responses.add(responses.GET, "http://127.0.0.1/index.gz", body=text)
+        # corret read
+        self.assertEqual(smart_open.smart_open('http://127.0.0.1/index.gz', 'rb').read().decode('utf8'), text)
+        # corret failed on write
+        self.assertRaises(NotImplementedError, smart_open.smart_open, "http://127.0.0.1/index.gz", "wb")
+        self.assertRaises(NotImplementedError, smart_open.smart_open, "http://127.0.0.1/index.gz", "wb+")
+    
+    @responses.activate
+    def test_read_write_http_bz2(self):
+        """Does modes correctly for bz2 over http?"""
+        text= 'line1\nline2'
+        responses.add(responses.GET, "http://127.0.0.1/index.bz2", body=text)
+        # corret read
+        self.assertEqual(smart_open.smart_open('http://127.0.0.1/index.bz2', 'rb').read().decode('utf8'), text)
+        # corret failed on write
+        self.assertRaises(NotImplementedError, smart_open.smart_open, "http://127.0.0.1/index.bz2", "wb")
+        self.assertRaises(NotImplementedError, smart_open.smart_open, "http://127.0.0.1/index.bz2", "wb+")
+    
+    '''
+    # TO-DO: fix fd-leak for gz,bz2 over http
+    @responses.activate
+    def test_close_http_gz(self):
+        """Is gzip over http closed correctly?"""
+        text= 'line1\nline2'
+        responses.add(responses.GET, "http://127.0.0.1/index.gz", body=text)
+        self.close_assert("http://127.0.0.1/index.gz")
+    
+    @responses.activate
+    def test_close_http_bz2(self):
+        """Is bz2 over http closed correctly?"""
+        text= 'line1\nline2'
+        responses.add(responses.GET, "http://127.0.0.1/index.bz2", body=text)
+        self.close_assert("http://127.0.0.1/index.bz2")
+    '''
 
 class MultistreamsBZ2Test(unittest.TestCase):
     """
