@@ -13,7 +13,6 @@ import tempfile
 import sys
 import os
 import hashlib
-import StringIO
 
 import boto
 import mock
