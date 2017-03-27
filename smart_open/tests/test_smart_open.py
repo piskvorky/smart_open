@@ -96,6 +96,76 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "webhdfs")
         self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file?query_part_1&query_part2")
 
+
+class SmartOpenHttpTest(unittest.TestCase):
+    """
+    Test reading from HTTP connections in various ways.
+
+    """
+    @responses.activate
+    def test_http_read(self):
+        """Does http read method work correctly"""
+        responses.add(responses.GET, "http://127.0.0.1/index.html", body='line1\nline2')
+        smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"))
+        self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
+
+    @responses.activate
+    def test_https_readline(self):
+        """Does https readline method work correctly"""
+        responses.add(responses.GET, "https://127.0.0.1/index.html", body='line1\nline2')
+        smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("https://127.0.0.1/index.html"))
+        self.assertEqual(smart_open_object.readline().decode("utf-8"), "line1")
+
+    @responses.activate
+    def test_http_pass(self):
+        """Does http authentication work correctly"""
+        responses.add(responses.GET, "http://127.0.0.1/index.html", body='line1\nline2')
+        _ = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"), user='me', password='pass')
+        self.assertEquals(len(responses.calls), 1)
+        actual_request = responses.calls[0].request
+        self.assert_('Authorization' in actual_request.headers)
+        self.assert_(actual_request.headers['Authorization'].startswith('Basic '))
+
+    @responses.activate
+    def test_http_gz(self):
+        """Can open gzip via http?"""
+        fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
+        data = open(fpath, 'rb').read()
+
+        responses.add(responses.GET, "http://127.0.0.1/data.gz",
+                      body=data)
+        smart_open_object = smart_open.HttpOpenRead(
+            smart_open.ParseUri("http://127.0.0.1/data.gz"))
+
+        m = hashlib.md5(smart_open_object.read())
+        # decompress the gzip and get the same md5 hash
+        self.assertEqual(m.hexdigest(),'18473e60f8c7c98d29d65bf805736a0d')
+
+    @responses.activate
+    def test_http_bz2(self):
+        """Can open bz2 via http?"""
+        test_string = b'Hello World Compressed.'
+        test_file = tempfile.NamedTemporaryFile('wb', suffix='.bz2',
+                                                delete=False).name
+
+        with smart_open.smart_open(test_file, 'wb') as outfile:
+            outfile.write(test_string)
+
+        with open(test_file, 'rb') as infile:
+            compressed_data = infile.read()
+
+        if os.path.isfile(test_file):
+            os.unlink(test_file)
+
+        responses.add(responses.GET, "http://127.0.0.1/data.bz2",
+                      body=compressed_data)
+        smart_open_object = smart_open.HttpOpenRead(
+            smart_open.ParseUri("http://127.0.0.1/data.bz2"))
+
+        # decompress the gzip and get the same md5 hash
+        self.assertEqual(smart_open_object.read(), test_string)
+
+
 class SmartOpenReadTest(unittest.TestCase):
     """
     Test reading from files under various schemes.
@@ -168,30 +238,6 @@ class SmartOpenReadTest(unittest.TestCase):
         responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file", body='line1\nline2')
         smart_open_object = smart_open.WebHdfsOpenRead(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
-
-    @responses.activate
-    def test_http_read(self):
-        """Does http read method work correctly"""
-        responses.add(responses.GET, "http://127.0.0.1/index.html", body='line1\nline2')
-        smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"))
-        self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
-
-    @responses.activate
-    def test_https_readline(self):
-        """Does https readline method work correctly"""
-        responses.add(responses.GET, "https://127.0.0.1/index.html", body='line1\nline2')
-        smart_open_object = smart_open.HttpOpenRead(smart_open.ParseUri("https://127.0.0.1/index.html"))
-        self.assertEqual(smart_open_object.readline().decode("utf-8"), "line1")
-
-    @responses.activate
-    def test_http_pass(self):
-        """Does http authentication work correctly"""
-        responses.add(responses.GET, "http://127.0.0.1/index.html", body='line1\nline2')
-        _ = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"), user='me', password='pass')
-        self.assertEquals(len(responses.calls), 1)
-        actual_request = responses.calls[0].request
-        self.assert_('Authorization' in actual_request.headers)
-        self.assert_(actual_request.headers['Authorization'].startswith('Basic '))
 
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.S3OpenRead')
@@ -900,13 +946,13 @@ class S3IterBucketTest(unittest.TestCase):
 
 
 PY2 = sys.version_info[0] == 2
-
+CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class CompressionFormatTest(unittest.TestCase):
     """
     Test that compression
     """
-    CURR_DIR = os.path.abspath(os.path.dirname(__file__))
+
     TEXT = 'Hello'
 
     def write_read_assertion(self, test_file):
@@ -921,7 +967,7 @@ class CompressionFormatTest(unittest.TestCase):
 
     def test_open_gz(self):
         """Can open gzip?"""
-        fpath = os.path.join(self.CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
+        fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
         data = smart_open.smart_open(fpath).read()
         m = hashlib.md5(data)
         assert m.hexdigest() == '18473e60f8c7c98d29d65bf805736a0d', \

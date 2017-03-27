@@ -34,6 +34,7 @@ from functools import partial
 IS_PY2 = (sys.version_info[0] == 2)
 
 if IS_PY2:
+    import cStringIO as StringIO
     import httplib
     if sys.version_info[1] == 6:
         import copy_reg
@@ -46,6 +47,7 @@ if IS_PY2:
 
         copy_reg.pickle(partial, _reduce_partial)
 elif sys.version_info[0] == 3:
+    import io as StringIO
     import http.client as httplib
 
 from boto.compat import BytesIO, urlsplit, six
@@ -635,11 +637,11 @@ def compression_wrapper(file_obj, filename, mode):
             from bz2file import BZ2File
         else:
             from bz2 import BZ2File
-        return make_closing(BZ2File)(filename, mode)
+        return make_closing(BZ2File)(file_obj, mode)
 
     elif ext == '.gz':
         from gzip import GzipFile
-        return make_closing(GzipFile)(filename, mode)
+        return make_closing(GzipFile)(fileobj=file_obj, mode=mode)
 
     else:
         return file_obj
@@ -670,11 +672,6 @@ class HttpReadStream(object):
 
         If none of those are set, will connect unauthenticated.
         """
-        if IS_PY2:
-            from urllib2 import urlopen
-        else:
-            from urllib.request import urlopen
-
         if kerberos:
             import requests_kerberos
             auth = requests_kerberos.HTTPKerberosAuth()
@@ -688,12 +685,17 @@ class HttpReadStream(object):
         if not self.response.ok:
             self.response.raise_for_status()
 
+        self.mode = mode
         self._read_buffer = None
         self._read_iter = None
         self._readline_iter = None
 
     def __iter__(self):
         return self.response.iter_lines()
+
+    def binary_content(self):
+        """Return the content of the request as bytes."""
+        return self.response.content
 
     def readline(self):
         """
@@ -705,13 +707,17 @@ class HttpReadStream(object):
         try:
             return next(self._readline_iter)
         except StopIteration:
-            raise EOFError()
+            # When readline runs out of data, it just returns an empty string
+            return ''
 
     def readlines(self):
         """
         Mimics the readlines call to a filehandle object.
         """
         return list(self.response.iter_lines())
+
+    def seek(self):
+        raise NotImplementedError('seek() is not implemented')
 
     def read(self, size=None):
         """
@@ -732,7 +738,8 @@ class HttpReadStream(object):
                     retval = self._read_buffer
                     self._read_buffer = ''
                     if len(retval) == 0:
-                        raise EOFError()
+                        # When read runs out of data, it just returns empty
+                        return ''
                     else:
                         return retval
             
@@ -760,7 +767,13 @@ def HttpOpenRead(parsed_uri, mode='r', **kwargs):
     response = HttpReadStream(url, **kwargs)
 
     fname = url.split('/')[-1]
-    return compression_wrapper(response, fname, mode)
+
+    if fname.endswith('.gz'):
+        #  Gzip needs a seek-able filehandle, so we need to buffer it.
+        buffer =  make_closing(io.BytesIO)(response.binary_content())
+        return compression_wrapper(buffer, fname, mode)
+    else:
+        return compression_wrapper(response, fname, mode)
 
 
 class S3OpenWrite(object):
