@@ -641,11 +641,6 @@ def compression_wrapper(file_obj, filename, mode):
 
     elif ext == '.gz':
         from gzip import GzipFile
-        if not hasattr(file_obj, 'tell'):
-            # GzipFile needs to tell/seek in the input stream.
-            # So, in the case of a streaming response, we'll buffer the data.
-            file_obj = StringIO.StringIO(file_obj.read())
-
         return make_closing(GzipFile)(fileobj=file_obj, mode=mode)
 
     else:
@@ -677,11 +672,6 @@ class HttpReadStream(object):
 
         If none of those are set, will connect unauthenticated.
         """
-        if IS_PY2:
-            from urllib2 import urlopen
-        else:
-            from urllib.request import urlopen
-
         if kerberos:
             import requests_kerberos
             auth = requests_kerberos.HTTPKerberosAuth()
@@ -695,12 +685,17 @@ class HttpReadStream(object):
         if not self.response.ok:
             self.response.raise_for_status()
 
+        self.mode = mode
         self._read_buffer = None
         self._read_iter = None
         self._readline_iter = None
 
     def __iter__(self):
         return self.response.iter_lines()
+
+    def binary_content(self):
+        """Return the content of the request as bytes."""
+        return self.response.content
 
     def readline(self):
         """
@@ -772,7 +767,13 @@ def HttpOpenRead(parsed_uri, mode='r', **kwargs):
     response = HttpReadStream(url, **kwargs)
 
     fname = url.split('/')[-1]
-    return compression_wrapper(response, fname, mode)
+
+    if fname.endswith('.gz'):
+        #  Gzip needs a seek-able filehandle, so we need to buffer it.
+        buffer =  make_closing(io.BytesIO)(response.binary_content())
+        return compression_wrapper(buffer, fname, mode)
+    else:
+        return compression_wrapper(response, fname, mode)
 
 
 class S3OpenWrite(object):

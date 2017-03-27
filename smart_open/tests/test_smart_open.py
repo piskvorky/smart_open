@@ -130,7 +130,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_http_gz(self):
         """Can open gzip via http?"""
         fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
-        data = open(fpath).read()
+        data = open(fpath, 'rb').read()
 
         responses.add(responses.GET, "http://127.0.0.1/data.gz",
                       body=data)
@@ -144,14 +144,14 @@ class SmartOpenHttpTest(unittest.TestCase):
     @responses.activate
     def test_http_bz2(self):
         """Can open bz2 via http?"""
-        test_string = 'Hello World Compressed.'
+        test_string = b'Hello World Compressed.'
         test_file = tempfile.NamedTemporaryFile('wb', suffix='.bz2',
                                                 delete=False).name
 
-        with smart_open.smart_open(test_file, 'w') as outfile:
+        with smart_open.smart_open(test_file, 'wb') as outfile:
             outfile.write(test_string)
 
-        with open(test_file, 'r') as infile:
+        with open(test_file, 'rb') as infile:
             compressed_data = infile.read()
 
         if os.path.isfile(test_file):
