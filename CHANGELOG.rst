@@ -1,3 +1,8 @@
+* 1.5.2, 12th Apr 2017
+
+  - Enable compressed formats over http. Avoid filehandle leak. Fix #109 and #110. (PR #112, @robottwo )
+  - Make possible to change number of retries (PR #102, @shaform)	
+
 * 1.5.1, 16th Mar 2017
 
   - Bugfix for compressed formats (PR #110, @tmylk)
