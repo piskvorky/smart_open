@@ -754,7 +754,10 @@ def HttpOpenRead(parsed_uri, mode='r', **kwargs):
 
     response = HttpReadStream(url, **kwargs)
 
-    fname = url.split('/')[-1]
+    last_sep = url.split('/')[-1]
+
+    # Remove any URL parameters
+    fname = last_sep.split('?')[0]
 
     if fname.endswith('.gz'):
         #  Gzip needs a seek-able filehandle, so we need to buffer it.
