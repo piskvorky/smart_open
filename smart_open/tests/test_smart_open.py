@@ -135,11 +135,11 @@ class SmartOpenHttpTest(unittest.TestCase):
         responses.add(responses.GET, "http://127.0.0.1/data.gz",
                       body=data)
         smart_open_object = smart_open.HttpOpenRead(
-            smart_open.ParseUri("http://127.0.0.1/data.gz"))
+            smart_open.ParseUri("http://127.0.0.1/data.gz?some_param=some_val"))
 
         m = hashlib.md5(smart_open_object.read())
         # decompress the gzip and get the same md5 hash
-        self.assertEqual(m.hexdigest(),'18473e60f8c7c98d29d65bf805736a0d')
+        self.assertEqual(m.hexdigest(), '18473e60f8c7c98d29d65bf805736a0d')
 
     @responses.activate
     def test_http_bz2(self):
