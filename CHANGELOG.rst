@@ -1,3 +1,7 @@
+* 1.5.3, 18th May 2017
+
+  - Remove GET parameters from url. Fix #120 (PR #121, @mcrowson)
+
 * 1.5.2, 12th Apr 2017
 
   - Enable compressed formats over http. Avoid filehandle leak. Fix #109 and #110. (PR #112, @robottwo )
