@@ -52,7 +52,7 @@ setup(
 
     tests_require=[
         'mock',
-        'moto',
+        'moto==0.4.31',
         'responses',
     ],
 
