@@ -422,6 +422,12 @@ class S3ReadStream(io.BufferedReader):
         except ValueError:
             return ''
 
+    def seek(self, position, whence=0):
+        try:
+            super(S3ReadStream, self).seek(position, whence)
+        except AttributeError:
+            pass
+
 
 class S3OpenRead(object):
     """
