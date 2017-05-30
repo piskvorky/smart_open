@@ -126,7 +126,7 @@ def smart_open(uri, mode="rb", **kw):
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
-            return file_smart_open(parsed_uri.uri_path, mode)
+            return file_smart_open(parsed_uri.uri_path, mode, kw.get("parents", False))
         elif parsed_uri.scheme in ("s3", "s3n", "s3u"):
             kwargs = {}
             # Get an S3 host. It is required for sigv4 operations.
@@ -590,7 +590,7 @@ def make_closing(base, **attrs):
     return type('Closing' + base.__name__, (base, object), attrs)
 
 
-def file_smart_open(fname, mode='rb'):
+def file_smart_open(fname, mode='rb', parents=False):
     """
     Stream from/to local filesystem, transparently (de)compressing gzip and bz2
     files if necessary.
@@ -598,8 +598,24 @@ def file_smart_open(fname, mode='rb'):
     """
     _, ext = os.path.splitext(fname)
 
+    PY2 = sys.version_info[0] == 2
+
+    if parents:
+        from ntpath import split
+        import errno
+        pdir, fil = split(fname)
+        if PY2:
+            try:
+                os.makedirs(pdir)
+            except OSError as oerr:
+                if oerr.errno == errno.EEXIST and os.path.isdir(pdir):
+                    pass
+                else:
+                    raise oerr
+        else:
+            os.makedirs(pdir, exist_ok=True)
+
     if ext == '.bz2':
-        PY2 = sys.version_info[0] == 2
         if PY2:
             from bz2file import BZ2File
         else:
