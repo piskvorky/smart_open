@@ -293,21 +293,23 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
+        mock_smart_open.assert_called_with(full_path, read_mode, parents=False, encoding=None, errors='strict')
 
         full_path = '/tmp/test#hash##more.txt'
         read_mode = "rb"
         smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
+
+        mock_smart_open.assert_called_with(full_path, read_mode, parents=False, encoding=None, errors='strict')
 
         full_path = 'aa#aa'
         read_mode = "rb"
         smart_open_object = smart_open.smart_open(full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
+
+        mock_smart_open.assert_called_with(full_path, read_mode, parents=False, encoding=None, errors='strict')
 
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)
@@ -315,7 +317,8 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open(prefix+short_path, read_mode, errors='strict')
         smart_open_object.__iter__()
         # called with the correct expanded path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
+
+        mock_smart_open.assert_called_with(full_path, read_mode, parents=False, encoding=None, errors='strict')
 
     # couldn't find any project for mocking up HDFS data
     # TODO: we want to test also a content of the files, not just fnc call params
@@ -486,15 +489,15 @@ class SmartOpenTest(unittest.TestCase):
 
         # correct read modes
         smart_open.smart_open("blah", "r")
-        mock_file.assert_called_with("blah", "r", encoding=None, errors='strict')
+        mock_file.assert_called_with("blah", "r", parents=False, encoding=None, errors='strict')
 
         smart_open.smart_open("blah", "rb")
-        mock_file.assert_called_with("blah", "rb", encoding=None, errors='strict')
+        mock_file.assert_called_with("blah", "rb", parents=False, encoding=None, errors='strict')
 
         short_path = "~/blah"
         full_path = os.path.expanduser(short_path)
         smart_open.smart_open(short_path, "rb")
-        mock_file.assert_called_with(full_path, "rb", encoding=None, errors='strict')
+        mock_file.assert_called_with(full_path, "rb", parents=False, encoding=None, errors='strict')
 
         # correct write modes, incorrect scheme
         self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb+")
@@ -503,16 +506,16 @@ class SmartOpenTest(unittest.TestCase):
 
         # correct write mode, correct file:// URI
         smart_open.smart_open("blah", "w")
-        mock_file.assert_called_with("blah", "w", encoding=None, errors='strict')
+        mock_file.assert_called_with("blah", "w", parents=False, encoding=None, errors='strict')
 
         smart_open.smart_open("file:///some/file.txt", "wb")
-        mock_file.assert_called_with("/some/file.txt", "wb", encoding=None, errors='strict')
+        mock_file.assert_called_with("/some/file.txt", "wb", parents=False, encoding=None, errors='strict')
 
         smart_open.smart_open("file:///some/file.txt", "wb+")
-        mock_file.assert_called_with("/some/file.txt", "wb+", encoding=None, errors='strict')
+        mock_file.assert_called_with("/some/file.txt", "wb+", parents=False, encoding=None, errors='strict')
 
         smart_open.smart_open("file:///some/file.txt", "w+")
-        mock_file.assert_called_with("/some/file.txt", "w+", encoding=None, errors='strict')
+        mock_file.assert_called_with("/some/file.txt", "w+", parents=False, encoding=None, errors='strict')
 
     @mock.patch('boto3.Session')
     def test_s3_mode_mock(self, mock_session):
