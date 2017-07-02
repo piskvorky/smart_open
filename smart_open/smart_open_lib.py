@@ -494,7 +494,12 @@ class HdfsOpenRead(object):
         self.parsed_uri = parsed_uri
 
     def __iter__(self):
-        hdfs = subprocess.Popen(["hdfs", "dfs", "-cat", self.parsed_uri.uri_path], stdout=subprocess.PIPE)
+        if is_gzip(self.parsed_uri.uri_path):
+            command = '-text'
+        else:
+            command = '-cat'
+
+        hdfs = subprocess.Popen(["hdfs", "dfs", command, self.parsed_uri.uri_path], stdout=subprocess.PIPE)
         return hdfs.stdout
 
     def read(self, size=None):
