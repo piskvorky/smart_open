@@ -492,18 +492,23 @@ class HdfsOpenRead(object):
         if parsed_uri.scheme not in ("hdfs"):
             raise TypeError("can only process HDFS files")
         self.parsed_uri = parsed_uri
+        self._readline_iter = None
 
     def __iter__(self):
-        if is_gzip(self.parsed_uri.uri_path):
-            command = '-text'
-        else:
-            command = '-cat'
-
-        hdfs = subprocess.Popen(["hdfs", "dfs", command, self.parsed_uri.uri_path], stdout=subprocess.PIPE)
+        hdfs = subprocess.Popen(["hdfs", "dfs", '-text', self.parsed_uri.uri_path], stdout=subprocess.PIPE)
         return hdfs.stdout
 
     def read(self, size=None):
         raise NotImplementedError("read() not implemented yet")
+
+    def readline(self):
+        if self._readline_iter is None:
+            self._readline_iter = self.__iter__()
+        try:
+            return next(self._readline_iter)
+        except StopIteration:
+            # When readline runs out of data, it just returns an empty string
+            return ''
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
