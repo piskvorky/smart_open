@@ -267,27 +267,23 @@ class ParseUri(object):
             self.port = 443
             self.host = boto.config.get('s3', 'host', 's3.amazonaws.com')
             self.ordinary_calling_format = False
+            # "None" credentials are interpreted as "look for credentials in other locations" by boto
+            self.access_id, self.access_secret, self.security_token = None, None, None
             if len(self.bucket_id) == 1:
                 # URI without credentials: s3://bucket/object
                 self.bucket_id, self.key_id = self.bucket_id[0].split('/', 1)
-                # "None" credentials are interpreted as "look for credentials in other locations" by boto
-                self.access_id, self.access_secret, self.security_token = None, None, None
             elif len(self.bucket_id) == 2 and len(self.bucket_id[0].split(':')) == 2 or \
                             len(self.bucket_id[0].split(':')) == 3:
                 # URI in full format: s3://key:secret[:token]@bucket/object
                 # access key id: [A-Z0-9]{20}
                 # secret access key: [A-Za-z0-9/+=]{40}
                 acc, self.bucket_id = self.bucket_id
-                splitted_creds = acc.split(':')
-                if len(splitted_creds) == 2:
-                    self.access_id, self.access_secret = splitted_creds
-                else:
-                    self.access_id, self.access_secret, self.security_token = splitted_creds
+                self.extract_credentials(acc)
                 self.bucket_id, self.key_id = self.bucket_id.split('/', 1)
             elif len(self.bucket_id) == 3 and len(self.bucket_id[0].split(':')) == 2:
-                # or URI in extended format: s3://key:secret@server[:port]@bucket/object
+                # or URI in extended format: s3://key:secret[:token]@server[:port]@bucket/object
                 acc, server, self.bucket_id = self.bucket_id
-                self.access_id, self.access_secret = acc.split(':')
+                self.extract_credentials(acc)
                 self.bucket_id, self.key_id = self.bucket_id.split('/', 1)
                 server = server.split(':')
                 self.ordinary_calling_format = True
@@ -315,6 +311,12 @@ class ParseUri(object):
         else:
             raise NotImplementedError("unknown URI scheme %r in %r" % (self.scheme, uri))
 
+    def extract_credentials(self, acc):
+        splitted_creds = acc.split(':')
+        if len(splitted_creds) == 2:
+            self.access_id, self.access_secret = splitted_creds
+        else:
+            self.access_id, self.access_secret, self.security_token = splitted_creds
 
 def is_gzip(name):
     """Return True if the name indicates that the file is compressed with
