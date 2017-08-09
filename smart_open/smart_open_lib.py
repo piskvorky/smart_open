@@ -78,7 +78,7 @@ def smart_open(uri, mode="rb", **kw):
        `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
     2. a URI for HDFS: `hdfs:///some/path/lines.txt`
     3. a URI for Amazon's S3 (can also supply credentials inside the URI):
-       `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
+       `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret[:token]@my_bucket/lines.txt`
     4. an instance of the boto.s3.key.Key class.
 
     Examples::
@@ -157,6 +157,7 @@ def smart_open(uri, mode="rb", **kw):
                 aws_access_key_id=parsed_uri.access_id,
                 host=host,
                 aws_secret_access_key=parsed_uri.access_secret,
+                security_token=parsed_uri.security_token,
                 profile_name=kw.pop('profile_name', None),
                 **kwargs)
 
@@ -220,8 +221,8 @@ class ParseUri(object):
     Valid URI examples::
 
       * s3://my_bucket/my_key
-      * s3://my_key:my_secret@my_bucket/my_key
-      * s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
+      * s3://my_key:my_secret[:my_token]@my_bucket/my_key
+      * s3://my_key:my_secret[:my_token]@my_server:my_port@my_bucket/my_key
       * hdfs:///path/file
       * hdfs://path/file
       * webhdfs://host:port/path/file
@@ -233,6 +234,7 @@ class ParseUri(object):
       * file:///home/user/file.bz2
 
     """
+
     def __init__(self, uri, default_scheme="file"):
         """
         Assume `default_scheme` if no scheme given in `uri`.
@@ -269,17 +271,22 @@ class ParseUri(object):
                 # URI without credentials: s3://bucket/object
                 self.bucket_id, self.key_id = self.bucket_id[0].split('/', 1)
                 # "None" credentials are interpreted as "look for credentials in other locations" by boto
-                self.access_id, self.access_secret = None, None
-            elif len(self.bucket_id) == 2 and len(self.bucket_id[0].split(':')) == 2:
-                # URI in full format: s3://key:secret@bucket/object
+                self.access_id, self.access_secret, self.security_token = None, None, None
+            elif len(self.bucket_id) == 2 and len(self.bucket_id[0].split(':')) == 2 or \
+                            len(self.bucket_id[0].split(':')) == 3:
+                # URI in full format: s3://key:secret[:token]@bucket/object
                 # access key id: [A-Z0-9]{20}
                 # secret access key: [A-Za-z0-9/+=]{40}
                 acc, self.bucket_id = self.bucket_id
-                self.access_id, self.access_secret = acc.split(':')
+                splitted_creds = acc.split(':')
+                if len(splitted_creds) == 2:
+                    self.access_id, self.access_secret = splitted_creds
+                else:
+                    self.access_id, self.access_secret, self.security_token = splitted_creds
                 self.bucket_id, self.key_id = self.bucket_id.split('/', 1)
             elif len(self.bucket_id) == 3 and len(self.bucket_id[0].split(':')) == 2:
                 # or URI in extended format: s3://key:secret@server[:port]@bucket/object
-                acc,  server, self.bucket_id = self.bucket_id
+                acc, server, self.bucket_id = self.bucket_id
                 self.access_id, self.access_secret = acc.split(':')
                 self.bucket_id, self.key_id = self.bucket_id.split('/', 1)
                 server = server.split(':')
