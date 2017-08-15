@@ -533,14 +533,26 @@ class SmartOpenTest(unittest.TestCase):
         smart_open.smart_open("blah", "w")
         mock_file.assert_called_with("blah", "w", False)
 
+        smart_open.smart_open("blah", "w", parents=True)
+        mock_file.assert_called_with("blah", "w", True)
+
         smart_open.smart_open("file:///some/file.txt", "wb")
         mock_file.assert_called_with("/some/file.txt", "wb", False)
+
+        smart_open.smart_open("file:///some/file.txt", "wb", parents=True)
+        mock_file.assert_called_with("/some/file.txt", "wb", True)
 
         smart_open.smart_open("file:///some/file.txt", "wb+")
         mock_file.assert_called_with("/some/file.txt", "wb+", False)
 
+        smart_open.smart_open("file:///some/file.txt", "wb+", parents=True)
+        mock_file.assert_called_with("/some/file.txt", "wb+", True)
+
         smart_open.smart_open("file:///some/file.txt", "w+")
         mock_file.assert_called_with("/some/file.txt", "w+", False)
+
+        smart_open.smart_open("file:///some/file.txt", "w+", parents=True)
+        mock_file.assert_called_with("/some/file.txt", "w+", True)
 
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
