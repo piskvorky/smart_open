@@ -17,7 +17,11 @@ WHENCE_CHOICES = (START, CURRENT, END)
 
 DEFAULT_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
 MIN_MIN_PART_SIZE = 5 * 1024 ** 2
-MODES = ("r", "rb", "w", "wb")
+READ = 'r'
+READ_BINARY = 'rb'
+WRITE = 'w'
+WRITE_BINARY = 'wb'
+MODES = (READ, READ_BINARY, WRITE, WRITE_BINARY)
 """Allowed I/O modes for working with S3."""
 
 
@@ -32,6 +36,34 @@ def _range_string(start, stop=None):
 
 def _clamp(value, minval, maxval):
     return max(min(value, maxval), minval)
+
+
+def open(bucket_id, key_id, mode, **kwargs):
+    _LOGGER.debug('%r', locals())
+    if mode not in MODES:
+        raise NotImplementedError('bad mode: %r expected one of %r' % (mode, MODES))
+
+    buffer_size = kwargs.pop("buffer_size", io.DEFAULT_BUFFER_SIZE)
+    encoding = kwargs.pop("encoding", "utf-8")
+    errors = kwargs.pop("errors", None)
+    newline = kwargs.pop("newline", None)
+    line_buffering = kwargs.pop("line_buffering", False)
+    s3_min_part_size = kwargs.pop("s3_min_part_size", DEFAULT_MIN_PART_SIZE)
+
+    if mode in (READ, READ_BINARY):
+        fileobj = BufferedInputBase(bucket_id, key_id)
+    elif mode in (WRITE, WRITE_BINARY):
+        fileobj = BufferedOutputBase(bucket_id, key_id, min_part_size=s3_min_part_size)
+    else:
+        assert False
+
+    if mode in (READ, WRITE):
+        return io.TextIOWrapper(fileobj, encoding=encoding, errors=errors,
+                                newline=newline, line_buffering=line_buffering)
+    elif mode in (READ_BINARY, WRITE_BINARY):
+        return fileobj
+    else:
+        assert False
 
 
 class RawReader(object):
@@ -168,9 +200,9 @@ class BufferedInputBase(io.BufferedIOBase):
 
         return self._read_from_buffer(size)
 
-    def read1(self, n=-1):
-        """Unsupported."""
-        raise io.UnsupportedOperation
+    def read1(self, size=-1):
+        """This is the same as read()."""
+        return self.read(size=size)
 
     def readinto(self, b):
         """Read up to len(b) bytes into b, and return the number of bytes
@@ -209,6 +241,10 @@ class BufferedOutputBase(io.BufferedIOBase):
 multipart upload may fail")
 
         s3 = boto3.resource('s3')
+        #
+        # https://stackoverflow.com/questions/26871884/how-can-i-easily-determine-if-a-boto-3-s3-bucket-resource-exists
+        #
+        s3.create_bucket(Bucket=bucket)
         self._object = s3.Object(bucket, key)
         self._min_part_size = min_part_size
         self._mp = self._object.initiate_multipart_upload()
@@ -247,8 +283,12 @@ multipart upload may fail")
             self._mp.abort()
 
             self._object.put(Body=b'')
-
+        self._mp = None
         _LOGGER.debug("successfully closed")
+
+    @property
+    def closed(self):
+        return self._mp is None
 
     def writable(self):
         """Return True if the stream supports writing."""
@@ -304,7 +344,10 @@ multipart upload may fail")
         self._total_parts += 1
         self._buf = io.BytesIO()
 
-    def __exit__(self, exc_type, value, traceback):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
             self.terminate()
         else:
