@@ -27,7 +27,8 @@ import subprocess
 import sys
 import requests
 import io
-
+import errno
+from ntpath import split
 
 IS_PY2 = (sys.version_info[0] == 2)
 
@@ -642,8 +643,6 @@ def file_smart_open(fname, mode='rb', parents=False):
 
     """
     if parents:
-        from ntpath import split
-        import errno
         pdir, fil = split(fname)
         if IS_PY2:
             try:
