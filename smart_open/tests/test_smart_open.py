@@ -508,14 +508,26 @@ class SmartOpenTest(unittest.TestCase):
         smart_open.smart_open("blah", "w")
         mock_file.assert_called_with("blah", "w", parents=False, encoding=None, errors='strict')
 
+        smart_open.smart_open("blah", "w", parents=True)
+        mock_file.assert_called_with("blah", "w", parents=True, encoding=None, errors='strict')
+
         smart_open.smart_open("file:///some/file.txt", "wb")
         mock_file.assert_called_with("/some/file.txt", "wb", parents=False, encoding=None, errors='strict')
+
+        smart_open.smart_open("file:///some/file.txt", "wb", parents=True)
+        mock_file.assert_called_with("/some/file.txt", "wb", parents=True, encoding=None, errors='strict')
 
         smart_open.smart_open("file:///some/file.txt", "wb+")
         mock_file.assert_called_with("/some/file.txt", "wb+", parents=False, encoding=None, errors='strict')
 
+        smart_open.smart_open("file:///some/file.txt", "wb+", parents=True)
+        mock_file.assert_called_with("/some/file.txt", "wb+", parents=True, encoding=None, errors='strict')
+
         smart_open.smart_open("file:///some/file.txt", "w+")
         mock_file.assert_called_with("/some/file.txt", "w+", parents=False, encoding=None, errors='strict')
+
+        smart_open.smart_open("file:///some/file.txt", "w+", parents=True)
+        mock_file.assert_called_with("/some/file.txt", "w+", parents=True, encoding=None, errors='strict')
 
     @mock.patch('boto3.Session')
     def test_s3_mode_mock(self, mock_session):
