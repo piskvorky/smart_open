@@ -291,9 +291,9 @@ class SmartOpenReadTest(unittest.TestCase):
         # create fake bucket and fake key
         conn = boto.connect_s3()
         conn.create_bucket("mybucket")
-        # lower the multipart upload size, to speed up these tests
-        smart_open_lib.S3_MIN_PART_SIZE = 5 * 1024**2
-        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+
+        with smart_open.smart_open("s3://mybucket/mykey", "wb",
+                                   s3_min_part_size=5 * 1024**2) as fout:
             # write a single huge line (=full multipart upload)
             fout.write(expected[0] + b'\n')
 
@@ -468,128 +468,14 @@ class SmartOpenTest(unittest.TestCase):
 
         # correct write mode, correct s3 URI
         with smart_open.smart_open("s3://mybucket/newkey", "wb") as fout:
+            logger.debug('fout: %r', fout)
             fout.write(test_string)
-            logger.debug("write successfully completed")
+
+        logger.debug("write successfully completed")
 
         output = list(smart_open.smart_open("s3://mybucket/newkey", "rb"))
 
         self.assertEqual(output, [test_string])
-
-
-class S3OpenWriteTest(unittest.TestCase):
-    """
-    Test writing into s3 files.
-
-    """
-    @mock_s3
-    def test_write_01(self):
-        """Does writing into s3 work correctly?"""
-        # fake connection, bucket and key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-        mykey = boto.s3.key.Key()
-        mykey.name = "testkey"
-        mykey.bucket = mybucket
-        test_string = u"žluťoučký koníček".encode('utf8')
-
-        # write into key
-        with smart_open.S3BufferedOutputBase(mykey) as fout:
-            fout.write(test_string)
-
-        # read key and test content
-        output = list(smart_open.smart_open("s3://mybucket/testkey", "rb"))
-
-        self.assertEqual(output, [test_string])
-
-    @mock_s3
-    def test_write_01a(self):
-        """Does s3 write fail on incorrect input?"""
-        # fake connection, bucket and key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-        mykey = boto.s3.key.Key()
-        mykey.bucket = mybucket
-        mykey.name = "testkey"
-
-        try:
-            with smart_open.S3BufferedOutputBase(mykey) as fin:
-                fin.write(None)
-        except TypeError:
-            pass
-        else:
-            self.fail()
-
-    @mock_s3
-    def test_write_02(self):
-        """Does s3 write unicode-utf8 conversion work?"""
-        # fake connection, bucket and key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-        mykey = boto.s3.key.Key()
-        mykey.name = "testkey"
-        mykey.bucket = mybucket
-
-        smart_open_write = smart_open.S3BufferedOutputBase(mykey)
-        smart_open_write.tell()
-        logger.info("smart_open_write: %r", smart_open_write)
-        with smart_open_write as fout:
-            fout.write(u"testžížáč".encode("utf-8"))
-            self.assertEqual(fout.tell(), 14)
-
-    @mock_s3
-    def test_write_03(self):
-        """Does s3 multipart chunking work correctly?"""
-        # fake connection, bucket and key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-        mykey = boto.s3.key.Key()
-        mykey.name = "testkey"
-        mykey.bucket = mybucket
-
-        # write
-        smart_open_write = smart_open.S3BufferedOutputBase(
-            mykey, min_part_size=10
-        )
-        with smart_open_write as fout:
-            fout.write(u"test")  # implicit unicode=>utf8 conversion
-            self.assertEqual(fout.buf.tell(), 4)
-
-            fout.write(u"test\n")
-            self.assertEqual(fout.buf.tell(), 9)
-            self.assertEqual(fout.total_parts, 0)
-
-            fout.write(u"test")
-            self.assertEqual(fout.buf.tell(), 0)
-            self.assertEqual(fout.total_parts, 1)
-
-        # read back the same key and check its content
-        output = list(smart_open.smart_open("s3://mybucket/testkey"))
-
-        self.assertEqual(output, [b"testtest\n", b"test"])
-
-    @mock_s3
-    def test_write_04(self):
-        """Does writing no data cause key with an empty value to be created?"""
-        # fake connection, bucket and key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-        mykey = boto.s3.key.Key()
-        mykey.name = "testkey"
-        mykey.bucket = mybucket
-
-        smart_open_write = smart_open.S3BufferedOutputBase(mykey)
-        with smart_open_write as fout:
-            pass
-
-        # read back the same key and check its content
-        output = list(smart_open.smart_open("s3://mybucket/testkey"))
-
-        self.assertEqual(output, [])
 
 
 class WebHdfsWriteTest(unittest.TestCase):
@@ -995,9 +881,7 @@ class S3OpenTest(unittest.TestCase):
     def test_bad_mode(self):
         """Bad mode should raise and exception."""
         uri = smart_open.ParseUri("s3://bucket/key")
-        self.assertRaises(
-            NotImplementedError, smart_open.s3_open_uri, uri, "x"
-        )
+        self.assertRaises(NotImplementedError, smart_open.s3_open_uri, uri, "x")
 
     @mock_s3
     def test_rw_encoding(self):
@@ -1032,7 +916,7 @@ class S3OpenTest(unittest.TestCase):
         uri = smart_open.ParseUri("s3://bucket/key.gz")
 
         text = u"не слышны в саду даже шорохи"
-        with smart_open.s3_open_uri(uri, "w") as fout:
+        with smart_open.s3_open_uri(uri, "wb") as fout:
             fout.write(text.encode("utf-8"))
 
         #
