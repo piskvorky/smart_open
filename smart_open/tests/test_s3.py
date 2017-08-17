@@ -3,7 +3,11 @@ import contextlib
 import logging
 import gzip
 import io
-import unittest
+import sys
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+else:
+    import unittest
 
 import boto
 import moto
