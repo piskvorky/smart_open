@@ -871,6 +871,32 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.s3_open_uri(uri, "rb") as fin:
             self.assertEquals(fin.read().decode("utf-8"), text)
 
+    @mock_s3
+    def test_gzip_write_mode(self):
+        """Should always open in binary mode when writing through a codec."""
+        conn = boto.connect_s3()
+        conn.create_bucket("bucket")
+        uri = smart_open.ParseUri("s3://bucket/key.gz")
+
+        with mock.patch('smart_open.smart_open_s3.open') as mock_open:
+            smart_open.s3_open_uri(uri, "wb")
+            mock_open.assert_called_with('bucket', 'key.gz', 'wb')
+
+    @mock_s3
+    def test_gzip_read_mode(self):
+        """Should always open in binary mode when reading through a codec."""
+        conn = boto.connect_s3()
+        conn.create_bucket("bucket")
+        uri = smart_open.ParseUri("s3://bucket/key.gz")
+
+        text = u"если-б я был султан и имел трёх жён, то тройной красотой был бы окружён"
+        with smart_open.s3_open_uri(uri, "wb") as fout:
+            fout.write(text.encode("utf-8"))
+
+        with mock.patch('smart_open.smart_open_s3.open') as mock_open:
+            smart_open.s3_open_uri(uri, "r")
+            mock_open.assert_called_with('bucket', 'key.gz', 'rb')
+
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)

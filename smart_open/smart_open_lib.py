@@ -178,12 +178,6 @@ def smart_open(uri, mode="rb", **kw):
 
 def s3_open_uri(parsed_uri, mode, **kwargs):
     logger.debug('%r', locals())
-    #
-    # TODO: this is the wrong place to handle ignore_extension/_wrap_codec.
-    # It should happen at the highest level in the smart_open function, because
-    # it influences other file systems as well, not just S3.
-    #
-    ignore_extension = kwargs.pop("ignore_extension", False)
     if parsed_uri.access_id is not None:
         kwargs['aws_access_key_id'] = parsed_uri.access_id
     if parsed_uri.access_secret is not None:
@@ -195,14 +189,35 @@ def s3_open_uri(parsed_uri, mode, **kwargs):
         kwargs['endpoint_url'] = 'http://' + host
 
     #
+    # TODO: this is the wrong place to handle ignore_extension.
+    # It should happen at the highest level in the smart_open function, because
+    # it influences other file systems as well, not just S3.
+    #
+    if kwargs.pop("ignore_extension", False):
+        codec = None
+    else:
+        codec = _detect_codec(parsed_uri.key_id)
+
+    #
+    # Codecs work on a byte-level, so the underlying S3 object should
+    # always be reading bytes.
+    #
+    if codec and mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
+        s3_mode = smart_open_s3.READ_BINARY
+    elif codec and mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
+        s3_mode = smart_open_s3.WRITE_BINARY
+    else:
+        s3_mode = mode
+
+    #
     # TODO: I'm not sure how to handle this with boto3.  Any ideas?
     #
     # https://github.com/boto/boto3/issues/334
     #
     # _setup_unsecured_mode()
 
-    fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
-    return fobj if ignore_extension else _wrap_codec(parsed_uri.key_id, mode, fobj)
+    fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, s3_mode, **kwargs)
+    return _CODECS[codec](fobj, mode)
 
 
 def _setup_unsecured_mode(parsed_uri, kwargs):
@@ -221,22 +236,52 @@ def s3_open_key(key, mode, **kwargs):
     #
     # TODO: handle boto3 keys as well
     #
-    ignore_extension = kwargs.pop("ignore_extension", False)
     host = kwargs.pop('host', None)
     if host is not None:
-        kwargs['endpoint_url'] = 'http://host'
-    fobj = smart_open_s3.open(key.bucket.name, key.name, mode, **kwargs)
-    return fobj if ignore_extension else _wrap_codec(key.name, mode, fobj)
+        kwargs['endpoint_url'] = 'http://' + host
+
+    if kwargs.pop("ignore_extension", False):
+        codec = None
+    else:
+        codec = _detect_codec(key.name)
+
+    #
+    # Codecs work on a byte-level, so the underlying S3 object should
+    # always be reading bytes.
+    #
+    if codec and mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
+        s3_mode = smart_open_s3.READ_BINARY
+    elif codec and mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
+        s3_mode = smart_open_s3.WRITE_BINARY
+    else:
+        s3_mode = mode
+
+    logging.debug('codec: %r mode: %r s3_mode: %r', codec, mode, s3_mode)
+    fobj = smart_open_s3.open(key.bucket.name, key.name, s3_mode, **kwargs)
+    return _CODECS[codec](fobj, mode)
 
 
-def _wrap_codec(filename, mode, fileobj):
+def _detect_codec(filename):
     if is_gzip(filename):
-        return contextlib.closing(gzip.GzipFile(fileobj=fileobj, mode=mode))
+        return 'gzip'
+    return None
+
+
+def _wrap_gzip(fileobj, mode):
+    return contextlib.closing(gzip.GzipFile(fileobj=fileobj, mode=mode))
+
+
+def _wrap_none(fileobj, mode):
+    return fileobj
+
+
+_CODECS = {
+    None: _wrap_none,
+    'gzip': _wrap_gzip,
     #
     # TODO: add support for other codecs here.
     #
-    else:
-        return fileobj
+}
 
 
 class ParseUri(object):
