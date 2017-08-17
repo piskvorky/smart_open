@@ -144,7 +144,7 @@ def smart_open(uri, mode="rb", **kw):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
             return file_smart_open(parsed_uri.uri_path, mode)
-        elif parsed_uri.scheme in ("s3", "s3n"):
+        elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return s3_open_uri(parsed_uri, mode, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
             if mode in ('r', 'rb'):
@@ -188,11 +188,32 @@ def s3_open_uri(parsed_uri, mode, **kwargs):
         kwargs['aws_access_key_id'] = parsed_uri.access_id
     if parsed_uri.access_secret is not None:
         kwargs['aws_secret_access_key'] = parsed_uri.access_secret
+
+    # Get an S3 host. It is required for sigv4 operations.
     host = kwargs.pop('host', None)
     if host is not None:
         kwargs['endpoint_url'] = 'http://' + host
+
+    #
+    # TODO: I'm not sure how to handle this with boto3.  Any ideas?
+    #
+    # https://github.com/boto/boto3/issues/334
+    #
+    # _setup_unsecured_mode()
+
     fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
     return fobj if ignore_extension else _wrap_codec(parsed_uri.key_id, mode, fobj)
+
+
+def _setup_unsecured_mode(parsed_uri, kwargs):
+    port = kwargs.pop('port', parsed_uri.port)
+    if port != 443:
+        kwargs['port'] = port
+
+    if not kwargs.pop('is_secure', parsed_uri.scheme != 's3u'):
+        kwargs['is_secure'] = False
+        # If the security model docker is overridden, honor the host directly.
+        kwargs['calling_format'] = boto.s3.connection.OrdinaryCallingFormat()
 
 
 def s3_open_key(key, mode, **kwargs):
