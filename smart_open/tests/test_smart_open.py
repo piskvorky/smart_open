@@ -861,15 +861,15 @@ class S3OpenTest(unittest.TestCase):
         #
         # Check that what we've created is a gzip.
         #
-        with smart_open.s3_open_uri(uri, "rb", ignore_extension=True) as fout:
-            gz = gzip.GzipFile(fileobj=fout)
+        with smart_open.s3_open_uri(uri, "rb", ignore_extension=True) as fin:
+            gz = gzip.GzipFile(fileobj=fin)
             self.assertEquals(gz.read().decode("utf-8"), text)
 
         #
         # We should be able to read it back as well.
         #
-        with smart_open.s3_open_uri(uri, "rb") as fout:
-            self.assertEquals(fout.read().decode("utf-8"), text)
+        with smart_open.s3_open_uri(uri, "rb") as fin:
+            self.assertEquals(fin.read().decode("utf-8"), text)
 
 
 if __name__ == '__main__':
