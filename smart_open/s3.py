@@ -29,8 +29,10 @@ CURRENT = 1
 END = 2
 WHENCE_CHOICES = (START, CURRENT, END)
 
-DEFAULT_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
+DEFAULT_MIN_PART_SIZE = 50 * 1024**2
+"""Default minimum part size for S3 multipart uploads"""
 MIN_MIN_PART_SIZE = 5 * 1024 ** 2
+"""The absolute minimum permitted by Amazon."""
 READ = 'r'
 READ_BINARY = 'rb'
 WRITE = 'w'
