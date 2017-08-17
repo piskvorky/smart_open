@@ -48,7 +48,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         # connect to fake s3 and read from the fake key we filled above
         fin = smart_open.s3.BufferedInputBase('mybucket', 'mykey')
         output = [line.rstrip(b'\n') for line in fin]
-        self.assertEqual(output, expected)
+        self.assertEqual(output, expected.split(b'\n'))
 
     def test_iter_context_manager(self):
         # same thing but using a context manager
@@ -56,7 +56,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         bucket, key = create_bucket_and_key(contents=expected)
         with smart_open.s3.BufferedInputBase('mybucket', 'mykey') as fin:
             output = [line.rstrip(b'\n') for line in fin]
-            self.assertEqual(output, expected)
+            self.assertEqual(output, expected.split(b'\n'))
 
     def test_read(self):
         """Are S3 files read correctly?"""
@@ -101,7 +101,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         bucket, key = create_bucket_and_key(contents=content)
 
         fin = smart_open.s3.BufferedInputBase('mybucket', 'mykey')
-        self.assertEqual(fin.read(5), 'hello')
+        self.assertEqual(fin.read(5), b'hello')
         seek = fin.seek(1, whence=smart_open.s3.CURRENT)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
@@ -114,7 +114,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         fin = smart_open.s3.BufferedInputBase('mybucket', 'mykey')
         seek = fin.seek(-4, whence=smart_open.s3.END)
         self.assertEqual(seek, len(content) - 4)
-        self.assertEqual(fin.read(), 'you?')
+        self.assertEqual(fin.read(), b'you?')
 
     def test_detect_eof(self):
         content = u"hello wořld\nhow are you?".encode('utf8')
@@ -241,24 +241,24 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
         with smart_open.s3.BufferedOutputBase('mybucket', 'writekey') as fout:
-            with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
+            with contextlib.closing(gzip.GzipFile(fileobj=fout, mode='w')) as zipfile:
                 zipfile.write(expected)
 
         with smart_open.s3.BufferedInputBase('mybucket', 'writekey') as fin:
-            with gzip.GzipFile(fileobj=fin) as zipfile:
+            with contextlib.closing(gzip.GzipFile(fileobj=fin)) as zipfile:
                 actual = zipfile.read()
 
         self.assertEqual(expected, actual)
 
     def test_text_iterator(self):
-        expected = u"выйду ночью в поле с конём".split(' ')
+        expected = u"выйду ночью в поле с конём".split(u' ')
         create_bucket_and_key(contents="\n".join(expected).encode('utf-8'))
         with smart_open.s3.open('mybucket', 'mykey', 'r') as fin:
             actual = [line.rstrip() for line in fin]
         self.assertEqual(expected, actual)
 
     def test_binary_iterator(self):
-        expected = u"выйду ночью в поле с конём".encode('utf-8').split(' ')
+        expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
         create_bucket_and_key(contents=b"\n".join(expected))
         with smart_open.s3.open('mybucket', 'mykey', 'rb') as fin:
             actual = [line.rstrip() for line in fin]
@@ -270,3 +270,8 @@ class ClampTest(unittest.TestCase):
         self.assertEqual(smart_open.s3._clamp(5, 0, 10), 5)
         self.assertEqual(smart_open.s3._clamp(11, 0, 10), 10)
         self.assertEqual(smart_open.s3._clamp(-1, 0, 10), 0)
+
+
+if __name__ == '__main__':
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
+    unittest.main()
