@@ -240,48 +240,6 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.WebHdfsOpenRead(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
-    @mock.patch('smart_open.smart_open_lib.boto')
-    @mock.patch('smart_open.smart_open_lib.s3_open_key')
-    def test_s3_boto(self, mock_s3_open_read, mock_boto):
-        """Is S3 line iterator called correctly?"""
-        # Configure the mock boto.config.get to return default host
-        smart_open.smart_open_lib.boto.config.get.return_value = 's3.amazonaws.com'
-
-        # no credentials
-        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
-        smart_open_object.__iter__()
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None, profile_name=None, host='s3.amazonaws.com')
-
-        # with credential
-        smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
-        smart_open_object.__iter__()
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret", profile_name=None, host='s3.amazonaws.com')
-
-        # with credential profile
-        smart_open_object = smart_open.smart_open("s3://mybucket/mykey", profile_name="my_credentials")
-        smart_open_object.__iter__()
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None, profile_name="my_credentials", host='s3.amazonaws.com')
-
-        # lookup bucket, key; call s3_iter_lines
-        smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
-        smart_open_object.__iter__()
-
-        # Check that the port argument wasn't passed to the connection
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id='access_id', aws_secret_access_key='access_secret', host='s3.amazonaws.com', profile_name=None)
-        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
-        mock_boto.connect_s3().get_bucket().get_key.assert_called_with(
-            "mykey", validate=True
-        )
-        #
-        # TODO: this is kind of a useless assertion...
-        #
-        self.assertTrue(smart_open_object.__iter__.called)
-
-        # with user-specified host
-        smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey", host='aa.domain.com')
-        smart_open_object.__iter__()
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret", profile_name=None, host='aa.domain.com')
-
     @mock_s3
     def test_s3_iter_moto(self):
         """Are S3 files iterated over correctly?"""
@@ -353,6 +311,33 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(content, smart_open_object.read(-1)) # same thing
 
 
+@mock.patch('boto3.Session')
+class SmartOpenS3KwargsTest(unittest.TestCase):
+    def test_no_kwargs(self, mock_session):
+        smart_open.smart_open('s3://mybucket/mykey')
+        mock_session.assert_called_with(profile_name=None)
+        mock_session.return_value.resource.assert_called_with('s3')
+
+    def test_credentials(self, mock_session):
+        smart_open.smart_open('s3://access_id:access_secret@mybucket/mykey')
+        mock_session.assert_called_with(profile_name=None)
+        mock_session.return_value.resource.assert_called_with(
+            's3', aws_access_key_id='access_id', aws_secret_access_key='access_secret'
+        )
+
+    def test_profile(self, mock_session):
+        smart_open.smart_open('s3://mybucket/mykey', profile_name='my_credentials')
+        mock_session.assert_called_with(profile_name='my_credentials')
+        mock_session.return_value.resource.assert_called_with('s3')
+
+    def test_host(self, mock_session):
+        smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey", host='aa.domain.com')
+        mock_session.return_value.resource.assert_called_with(
+            's3', aws_access_key_id='access_id', aws_secret_access_key='access_secret',
+            endpoint_url='http://aa.domain.com'
+        )
+
+
 class SmartOpenTest(unittest.TestCase):
     """
     Test reading and writing from/into files.
@@ -397,19 +382,15 @@ class SmartOpenTest(unittest.TestCase):
         smart_open.smart_open("file:///some/file.txt", "w+")
         mock_file.assert_called_with("/some/file.txt", "w+")
 
-    @mock.patch('smart_open.smart_open_lib.boto')
-    @mock.patch('smart_open.smart_open_lib.s3_open_key')
-    def test_s3_mode_mock(self, mock_write, mock_boto):
+    @mock.patch('boto3.Session')
+    def test_s3_mode_mock(self, mock_session):
         """Are s3:// open modes passed correctly?"""
-        # Configure the mock boto.config.get to return default host
-        smart_open.smart_open_lib.boto.config.get.return_value = 's3.amazonaws.com'
 
         # correct write mode, correct s3 URI
-        smart_open.smart_open("s3://mybucket/mykey", "w")
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None, profile_name=None, host='s3.amazonaws.com')
-        mock_boto.connect_s3().lookup.return_value = True
-        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
-        self.assertTrue(mock_write.called)
+        smart_open.smart_open("s3://mybucket/mykey", "w", host='s3.amazonaws.com')
+        mock_session.return_value.resource.assert_called_with(
+            's3', endpoint_url='http://s3.amazonaws.com'
+        )
 
     @mock.patch('smart_open.smart_open_lib.subprocess')
     def test_hdfs(self, mock_subprocess):
@@ -802,59 +783,6 @@ class MultistreamsBZ2Test(unittest.TestCase):
         with smart_open_lib.file_smart_open(test_file) as bz2f:
             self.assertEqual(bz2f.read(), self.TEXT * 5)
         self.cleanup_temp_bz2(test_file)
-
-
-class S3BufferedInputBaseTest(unittest.TestCase):
-
-    @mock_s3
-    def test(self):
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-
-        mykey = boto.s3.key.Key(mybucket)
-        mykey.key = "mykey"
-        mykey.set_contents_from_string("123456789")
-
-        base = smart_open.S3BufferedInputBase(mykey)
-
-        self.assertTrue(base.readable())
-        self.assertTrue(base.seekable())
-
-        self.assertEquals(base.tell(), 0)
-        self.assertEquals(base.read(5), b"12345")
-        self.assertEquals(base.tell(), 5)
-
-        array = [b"0"] * 4
-        self.assertEquals(4, base.readinto(array))
-        self.assertEquals(b"".join([bytes(a) for a in array]), b"6789")
-        self.assertEquals(base.tell(), 9)
-
-        self.assertRaises(IOError, base.seek, 1)
-        self.assertRaises(IOError, base.truncate)
-        self.assertRaises(io.UnsupportedOperation, base.detach)
-        self.assertRaises(io.UnsupportedOperation, base.read1)
-
-
-class S3BufferedOutputBaseTest(unittest.TestCase):
-
-    @mock_s3
-    def test(self):
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-
-        mykey = boto.s3.key.Key(mybucket)
-        mykey.key = "mykey"
-
-        with smart_open.S3BufferedOutputBase(mykey) as fout:
-            self.assertTrue(fout.writable())
-            fout.write(b"this is a test")
-
-            self.assertRaises(io.UnsupportedOperation, fout.detach)
-
-        with smart_open.S3BufferedInputBase(mykey) as fin:
-            self.assertEquals(fin.read(), b"this is a test")
 
 
 class S3OpenTest(unittest.TestCase):

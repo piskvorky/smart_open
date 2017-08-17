@@ -177,21 +177,33 @@ def smart_open(uri, mode="rb", **kw):
 
 
 def s3_open_uri(parsed_uri, mode, **kwargs):
+    logger.debug('%r', locals())
     #
     # TODO: this is the wrong place to handle ignore_extension/_wrap_codec.
     # It should happen at the highest level in the smart_open function, because
     # it influences other file systems as well, not just S3.
     #
     ignore_extension = kwargs.pop("ignore_extension", False)
+    if parsed_uri.access_id is not None:
+        kwargs['aws_access_key_id'] = parsed_uri.access_id
+    if parsed_uri.access_secret is not None:
+        kwargs['aws_secret_access_key'] = parsed_uri.access_secret
+    host = kwargs.pop('host', None)
+    if host is not None:
+        kwargs['endpoint_url'] = 'http://' + host
     fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
     return fobj if ignore_extension else _wrap_codec(parsed_uri.key_id, mode, fobj)
 
 
 def s3_open_key(key, mode, **kwargs):
+    logger.debug('%r', locals())
     #
     # TODO: handle boto3 keys as well
     #
     ignore_extension = kwargs.pop("ignore_extension", False)
+    host = kwargs.pop('host', None)
+    if host is not None:
+        kwargs['endpoint_url'] = 'http://host'
     fobj = smart_open_s3.open(key.bucket.name, key.name, mode, **kwargs)
     return fobj if ignore_extension else _wrap_codec(key.name, mode, fobj)
 

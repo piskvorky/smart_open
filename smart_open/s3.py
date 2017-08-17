@@ -67,9 +67,9 @@ def open(bucket_id, key_id, mode, **kwargs):
     s3_min_part_size = kwargs.pop("s3_min_part_size", DEFAULT_MIN_PART_SIZE)
 
     if mode in (READ, READ_BINARY):
-        fileobj = BufferedInputBase(bucket_id, key_id)
+        fileobj = BufferedInputBase(bucket_id, key_id, **kwargs)
     elif mode in (WRITE, WRITE_BINARY):
-        fileobj = BufferedOutputBase(bucket_id, key_id, min_part_size=s3_min_part_size)
+        fileobj = BufferedOutputBase(bucket_id, key_id, min_part_size=s3_min_part_size, **kwargs)
     else:
         assert False
 
@@ -108,8 +108,9 @@ class BufferedInputBase(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key):
-        s3 = boto3.resource('s3')
+    def __init__(self, bucket, key, **kwargs):
+        session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
+        s3 = session.resource('s3', **kwargs)
         self._object = s3.Object(bucket, key)
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
@@ -251,12 +252,14 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key, min_part_size=DEFAULT_MIN_PART_SIZE):
+    def __init__(self, bucket, key, min_part_size=DEFAULT_MIN_PART_SIZE, **kwargs):
         if min_part_size < MIN_MIN_PART_SIZE:
             _LOGGER.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
 
-        s3 = boto3.resource('s3')
+        session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
+        s3 = session.resource('s3', **kwargs)
+
         #
         # https://stackoverflow.com/questions/26871884/how-can-i-easily-determine-if-a-boto-3-s3-bucket-resource-exists
         #
