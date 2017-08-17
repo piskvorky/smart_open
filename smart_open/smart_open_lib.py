@@ -262,7 +262,7 @@ def s3_open_key(key, mode, **kwargs):
 
 
 def _detect_codec(filename):
-    if filename.name.endswith(".gz"):
+    if filename.endswith(".gz"):
         return 'gzip'
     return None
 
