@@ -7,8 +7,22 @@ import logging
 
 import six
 
+
 _LOGGER = logging.getLogger(__name__)
-_LOGGER.addHandler(logging.NullHandler())
+
+#
+# https://github.com/matthewwithanm/django-imagekit/commit/0d5bfe37517955cca2284735769fe1dffb38ed37
+#
+try:
+    _NULL_HANDLER = logging.NullHandler()
+except AttributeError:
+    class NullHandler(logging.Handler):
+        def emit(self, record):
+            pass
+    _NULL_HANDLER = NullHandler()
+finally:
+    _LOGGER.addHandler(_NULL_HANDLER)
+
 
 START = 0
 CURRENT = 1
