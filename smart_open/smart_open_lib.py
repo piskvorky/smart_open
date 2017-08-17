@@ -262,7 +262,7 @@ def s3_open_key(key, mode, **kwargs):
 
 
 def _detect_codec(filename):
-    if is_gzip(filename):
+    if filename.name.endswith(".gz"):
         return 'gzip'
     return None
 
@@ -824,12 +824,6 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
         pool.terminate()
 
     logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
-
-
-def is_gzip(name):
-    """Return True if the name indicates that the file is compressed with
-    gzip."""
-    return name.endswith(".gz")
 
 
 class WebHdfsException(Exception):
