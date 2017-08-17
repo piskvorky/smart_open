@@ -231,6 +231,41 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEquals(reader.readline(), b"")
         self.assertEquals(reader.readline(), b"")
 
+    @mock_s3
+    def test_s3_iter_lines(self):
+        """Does s3_iter_lines give correct content?"""
+        # create fake bucket and fake key
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
+        test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
+        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fin:
+            fin.write(test_string)
+
+        # call s3_iter_lines and check output
+        reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
+        output = list(reader)
+        self.assertEqual(b''.join(output), test_string)
+
+    @mock_s3
+    def test_s3_iter_lines_without_key(self):
+        """Does s3_iter_lines fail on invalid input?"""
+        # cannot use context manager for assertRaise in py2.6
+        try:
+            for i in smart_open.s3_open_key(None):
+                pass
+        except TypeError:
+            pass
+        else:
+            self.fail("s3_iter_lines expected to fail on non-`boto.key.Key` inputs")
+
+        try:
+            for i in smart_open.s3_open_key("test"):
+                pass
+        except TypeError:
+            pass
+        else:
+            self.fail("s3_iter_lines extected to fail on non-`boto.key.Key` inputs")
+
     # TODO: add more complex test for file://
     @mock.patch('smart_open.smart_open_lib.file_smart_open')
     def test_file(self, mock_smart_open):
