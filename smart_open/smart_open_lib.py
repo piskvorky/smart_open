@@ -210,7 +210,7 @@ def s3_open_key(key, mode, **kwargs):
 
 def _wrap_codec(filename, mode, fileobj):
     if is_gzip(filename):
-        return gzip.GzipFile(fileobj=fileobj, mode=mode)
+        return contextlib.closing(gzip.GzipFile(fileobj=fileobj, mode=mode))
     #
     # TODO: add support for other codecs here.
     #

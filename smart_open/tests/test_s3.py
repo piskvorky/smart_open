@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import contextlib
 import logging
 import gzip
 import io
@@ -133,7 +134,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         expected = u'раcцветали яблони и груши, поплыли туманы над рекой...'.encode('utf-8')
         buf = io.BytesIO()
         buf.close = lambda: None  # keep buffer open so that we can .getvalue()
-        with gzip.GzipFile(fileobj=buf, mode='w') as zipfile:
+        with contextlib.closing(gzip.GzipFile(fileobj=buf, mode='w')) as zipfile:
             zipfile.write(expected)
         bucket, key = create_bucket_and_key(contents=buf.getvalue())
 
@@ -147,15 +148,12 @@ class BufferedInputBaseTest(unittest.TestCase):
         # Make sure the buffer we wrote is legitimate gzip.
         #
         sanity_buf = io.BytesIO(buf.getvalue())
-        with gzip.GzipFile(fileobj=sanity_buf) as zipfile:
+        with contextlib.closing(gzip.GzipFile(fileobj=sanity_buf)) as zipfile:
             self.assertEqual(zipfile.read(), expected)
 
-        #
-        # WTF?!
-        #
         _LOGGER.debug('starting actual test')
         with smart_open.s3.BufferedInputBase('mybucket', 'mykey') as fin:
-            with gzip.GzipFile(fileobj=fin) as zipfile:
+            with contextlib.closing(gzip.GzipFile(fileobj=fin)) as zipfile:
                 actual = zipfile.read()
 
         self.assertEqual(expected, actual)
