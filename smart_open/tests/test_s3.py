@@ -7,7 +7,6 @@ import unittest
 
 import boto
 import moto
-import nose.tools
 
 import smart_open
 import smart_open.s3
@@ -40,7 +39,6 @@ class BufferedInputBaseTest(unittest.TestCase):
     def tearDown(self):
         smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
 
-    @nose.tools.nottest
     def test_iter(self):
         """Are S3 files iterated over correctly?"""
         # a list of strings to test with
@@ -52,7 +50,6 @@ class BufferedInputBaseTest(unittest.TestCase):
         output = [line.rstrip(b'\n') for line in fin]
         self.assertEqual(output, expected)
 
-    @nose.tools.nottest
     def test_iter_context_manager(self):
         # same thing but using a context manager
         expected = u"hello wořld\nhow are you?".encode('utf8')
