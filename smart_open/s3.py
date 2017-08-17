@@ -206,7 +206,7 @@ class BufferedInputBase(io.BufferedIOBase):
         #
         # Fill our buffer to the required size.
         #
-        _LOGGER.debug('filling %r byte-long buffer up to %r bytes', len(self._buffer), size)
+        # _LOGGER.debug('filling %r byte-long buffer up to %r bytes', len(self._buffer), size)
         while len(self._buffer) < size and not self._eof:
             raw = self._raw_reader.read(size=io.DEFAULT_BUFFER_SIZE)
             if len(raw):
@@ -238,12 +238,12 @@ class BufferedInputBase(io.BufferedIOBase):
     #
     def _read_from_buffer(self, size):
         """Remove at most size bytes from our buffer and return them."""
-        _LOGGER.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
+        # _LOGGER.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
         assert size >= 0
         part = self._buffer[:size]
         self._buffer = self._buffer[size:]
         self._current_pos += len(part)
-        _LOGGER.debug('part: %r', part)
+        # _LOGGER.debug('part: %r', part)
         return part
 
 
@@ -331,7 +331,7 @@ multipart upload may fail")
         if not isinstance(b, six.binary_type):
             raise TypeError("input must be a binary string, got: %r", b)
 
-        _LOGGER.debug("writing %r bytes to %r", len(b), self._buf)
+        # _LOGGER.debug("writing %r bytes to %r", len(b), self._buf)
 
         self._buf.write(b)
         self._total_bytes += len(b)
