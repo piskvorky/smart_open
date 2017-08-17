@@ -181,6 +181,63 @@ class SmartOpenReadTest(unittest.TestCase):
     Test reading from files under various schemes.
 
     """
+
+    @mock_s3
+    def test_read_never_returns_none(self):
+        """read should never return None."""
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
+        test_string = u"ветер по морю гуляет..."
+        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_string.encode('utf8'))
+
+        r = smart_open.smart_open("s3://mybucket/mykey", "rb")
+        self.assertEquals(r.read(), test_string.encode("utf-8"))
+        self.assertEquals(r.read(), b"")
+        self.assertEquals(r.read(), b"")
+
+    @mock_s3
+    def test_readline(self):
+        """Does readline() return the correct file content?"""
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
+        test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
+        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_string)
+
+        reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
+        self.assertEquals(reader.readline(), u"hello žluťoučký world!\n".encode("utf-8"))
+
+    @mock_s3
+    def test_readline_iter(self):
+        """Does __iter__ return the correct file content?"""
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
+        lines = [u"всем привет!\n", u"что нового?"]
+        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+            fout.write("".join(lines).encode("utf-8"))
+
+        reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
+
+        actual_lines = [l.decode("utf-8") for l in reader]
+        self.assertEquals(2, len(actual_lines))
+        self.assertEquals(lines[0], actual_lines[0])
+        self.assertEquals(lines[1], actual_lines[1])
+
+    @mock_s3
+    def test_readline_eof(self):
+        """Does readline() return empty string on EOF?"""
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
+        with smart_open.smart_open("s3://mybucket/mykey", "wb"):
+            pass
+
+        reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
+
+        self.assertEquals(reader.readline(), b"")
+        self.assertEquals(reader.readline(), b"")
+        self.assertEquals(reader.readline(), b"")
+
     # TODO: add more complex test for file://
     @mock.patch('smart_open.smart_open_lib.file_smart_open')
     def test_file(self, mock_smart_open):
