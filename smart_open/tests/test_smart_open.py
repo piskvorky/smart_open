@@ -348,6 +348,12 @@ class SmartOpenReadTest(unittest.TestCase):
 
         smart_open_object.seek(0)
         self.assertEqual(content, smart_open_object.read(-1)) # same thing
+        
+        smart_open_object.seek(0)
+        self.assertEqual(content[:4], smart_open_object.read(4)) # Read 4 bytes
+
+        smart_open_object.seek(0)
+        self.assertEqual(content[:content.find(b'\n')+1], smart_open_object.readline()) # Read 1 line 
 
 
 class S3ReadStreamInnerTest(unittest.TestCase):
