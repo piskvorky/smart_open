@@ -532,7 +532,7 @@ class HdfsOpenWrite(object):
         self.out_pipe = subprocess.Popen(["hdfs","dfs","-put","-f","-",self.parsed_uri.uri_path], stdin=subprocess.PIPE)
 
     def write(self, b):
-        self.out_pipe.stdin.write(b)
+        return self.out_pipe.stdin.write(b)
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
@@ -833,11 +833,16 @@ class S3OpenWrite(object):
 
         if self.chunk_bytes >= self.min_part_size:
             buff = b"".join(self.lines)
-            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+            buff_len = len(buff)
+            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, buff_len, self.total_size / 1024.0 ** 3))
             self.mp.upload_part_from_file(BytesIO(buff), part_num=self.parts + 1)
             logger.debug("upload of part #%i finished" % self.parts)
             self.parts += 1
             self.lines, self.chunk_bytes = [], 0
+
+            return buff_len
+
+        return 0
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
@@ -935,11 +940,16 @@ class WebHdfsOpenWrite(object):
 
         if self.chunk_bytes >= self.min_part_size:
             buff = b"".join(self.lines)
-            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+            buff_len = len(buff)
+            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, buff_len, self.total_size / 1024.0 ** 3))
             self.upload(buff)
             logger.debug("upload of part #%i finished" % self.parts)
             self.parts += 1
             self.lines, self.chunk_bytes = [], 0
+
+            return buff_len
+
+        return 0
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
