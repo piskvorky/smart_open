@@ -393,6 +393,18 @@ class S3ReadStreamInnerTest(unittest.TestCase):
 class S3OpenReadTest(unittest.TestCase):
 
     @mock_s3
+    def test_open_and_close(self):
+        conn = boto.connect_s3()
+        conn.create_bucket("mybucket")
+        test_string = u"ветер по морю гуляет..."
+        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_string.encode('utf8'))
+
+        r = smart_open.S3OpenRead(conn.get_bucket("mybucket").get_key("mykey"))
+        r.flush()
+        r.close()
+
+    @mock_s3
     def test_read_never_returns_none(self):
         """read should never return None."""
         conn = boto.connect_s3()

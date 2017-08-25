@@ -470,6 +470,13 @@ class S3OpenRead(object):
         self.read_key.close(fast=True)
         self._open_reader()
 
+    def close(self):
+        self.read_key.close()
+
+    def flush(self):
+        # Resetting the unused buffer
+        self.reader.stream.unused_buffer = b''
+
     def __enter__(self):
         return self
 
@@ -843,6 +850,10 @@ class S3OpenWrite(object):
             return buff_len
 
         return 0
+
+    def flush(self):
+        # Implementing as no-op
+        pass
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
