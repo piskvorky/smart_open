@@ -840,19 +840,17 @@ class S3OpenWrite(object):
 
         if self.chunk_bytes >= self.min_part_size:
             buff = b"".join(self.lines)
-            buff_len = len(buff)
-            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, buff_len, self.total_size / 1024.0 ** 3))
+            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
             self.mp.upload_part_from_file(BytesIO(buff), part_num=self.parts + 1)
             logger.debug("upload of part #%i finished" % self.parts)
             self.parts += 1
             self.lines, self.chunk_bytes = [], 0
 
-            return buff_len
-
-        return 0
+        return len(b)
 
     def flush(self):
-        # Implementing as no-op
+        # Resetting the unused buffer
+        # Flush the write buffers of the stream if applicable, but because of how it is used, it should pass.
         pass
 
     def seek(self, offset, whence=None):
@@ -951,16 +949,13 @@ class WebHdfsOpenWrite(object):
 
         if self.chunk_bytes >= self.min_part_size:
             buff = b"".join(self.lines)
-            buff_len = len(buff)
-            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, buff_len, self.total_size / 1024.0 ** 3))
+            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
             self.upload(buff)
             logger.debug("upload of part #%i finished" % self.parts)
             self.parts += 1
             self.lines, self.chunk_bytes = [], 0
 
-            return buff_len
-
-        return 0
+        return len(b)
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
