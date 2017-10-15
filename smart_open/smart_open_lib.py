@@ -470,6 +470,13 @@ class S3OpenRead(object):
         self.read_key.close(fast=True)
         self._open_reader()
 
+    def close(self):
+        self.read_key.close()
+
+    def flush(self):
+        # Resetting the unused buffer
+        self.reader.stream.unused_buffer = b''
+
     def __enter__(self):
         return self
 
@@ -863,6 +870,10 @@ class S3OpenWrite(object):
             # So, instead, create an empty file like this
             logger.info("setting an empty value for the key")
             self.outkey.set_contents_from_string('')
+
+    def flush(self):
+        # Implementing as no-op
+        pass
 
     def __enter__(self):
         return self
