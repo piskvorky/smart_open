@@ -467,8 +467,18 @@ class S3OpenRead(object):
         """
         if whence != 0 or offset != 0:
             raise NotImplementedError("seek other than offset=0 not implemented yet")
-        self.read_key.close(fast=True)
+        self._regenerate_key()
         self._open_reader()
+
+    def _regenerate_key(self):
+        """
+        Regenerates `boto.s3.key.Key` object and 
+        overrides the read_key with the new object
+        """
+        bucket = self.read_key.bucket
+        key_name = self.read_key.name
+        del self.read_key
+        self.read_key = bucket.get_key(key_name)
 
     def __enter__(self):
         return self
