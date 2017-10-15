@@ -26,6 +26,9 @@ from smart_open import smart_open_lib
 
 logger = logging.getLogger(__name__)
 
+PY2 = sys.version_info[0] == 2
+CURR_DIR = os.path.abspath(os.path.dirname(__file__))
+
 
 class ParseUriTest(unittest.TestCase):
     """
@@ -45,7 +48,6 @@ class ParseUriTest(unittest.TestCase):
         # unknown scheme => default_scheme
         parsed_uri = smart_open.ParseUri("blah blah")
         self.assertEqual(parsed_uri.scheme, "file")
-
 
     def test_s3_uri(self):
         """Do S3 URIs parse correctly?"""
@@ -145,8 +147,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_http_bz2(self):
         """Can open bz2 via http?"""
         test_string = b'Hello World Compressed.'
-        test_file = tempfile.NamedTemporaryFile('wb', suffix='.bz2',
-                                                delete=False).name
+        test_file = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False).name
 
         with smart_open.smart_open(test_file, 'wb') as outfile:
             outfile.write(test_string)
@@ -157,10 +158,10 @@ class SmartOpenHttpTest(unittest.TestCase):
         if os.path.isfile(test_file):
             os.unlink(test_file)
 
-        responses.add(responses.GET, "http://127.0.0.1/data.bz2",
-                      body=compressed_data)
+        responses.add(responses.GET, "http://127.0.0.1/data.bz2", body=compressed_data)
         smart_open_object = smart_open.HttpOpenRead(
-            smart_open.ParseUri("http://127.0.0.1/data.bz2"))
+            smart_open.ParseUri("http://127.0.0.1/data.bz2")
+        )
 
         # decompress the gzip and get the same md5 hash
         self.assertEqual(smart_open_object.read(), test_string)
@@ -190,14 +191,12 @@ class SmartOpenReadTest(unittest.TestCase):
         # called with the correct path?
         mock_smart_open.assert_called_with(full_path, read_mode)
 
-
         full_path = 'aa#aa'
         read_mode = "rb"
         smart_open_object = smart_open.smart_open(full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
         mock_smart_open.assert_called_with(full_path, read_mode)
-
 
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)
@@ -249,24 +248,34 @@ class SmartOpenReadTest(unittest.TestCase):
         # no credentials
         smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
         smart_open_object.__iter__()
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None, profile_name=None, host='s3.amazonaws.com')
+        mock_boto.connect_s3.assert_called_with(
+            aws_access_key_id=None, aws_secret_access_key=None, profile_name=None, host='s3.amazonaws.com'
+        )
 
         # with credential
         smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
         smart_open_object.__iter__()
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret", profile_name=None, host='s3.amazonaws.com')
+        mock_boto.connect_s3.assert_called_with(
+            aws_access_key_id="access_id", aws_secret_access_key="access_secret",
+            profile_name=None, host='s3.amazonaws.com'
+        )
 
         # with credential profile
         smart_open_object = smart_open.smart_open("s3://mybucket/mykey", profile_name="my_credentials")
         smart_open_object.__iter__()
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None, profile_name="my_credentials", host='s3.amazonaws.com')
+        mock_boto.connect_s3.assert_called_with(
+            aws_access_key_id=None, aws_secret_access_key=None, profile_name="my_credentials", host='s3.amazonaws.com'
+        )
 
         # lookup bucket, key; call s3_iter_lines
         smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey")
         smart_open_object.__iter__()
 
         # Check that the port argument wasn't passed to the connection
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id='access_id', aws_secret_access_key='access_secret', host='s3.amazonaws.com', profile_name=None)
+        mock_boto.connect_s3.assert_called_with(
+            aws_access_key_id='access_id', aws_secret_access_key='access_secret',
+            host='s3.amazonaws.com', profile_name=None
+        )
         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
         mock_boto.connect_s3().get_bucket().get_key.assert_called_with("mykey")
         #
@@ -277,7 +286,10 @@ class SmartOpenReadTest(unittest.TestCase):
         # with user-specified host
         smart_open_object = smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey", host='aa.domain.com')
         smart_open_object.__iter__()
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id="access_id", aws_secret_access_key="access_secret", profile_name=None, host='aa.domain.com')
+        mock_boto.connect_s3.assert_called_with(
+            aws_access_key_id="access_id", aws_secret_access_key="access_secret",
+            profile_name=None, host='aa.domain.com'
+        )
 
     @mock_s3
     def test_s3_iter_moto(self):
@@ -344,10 +356,10 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(content[6:14], smart_open_object.read(8))  # ř is 2 bytes
 
         smart_open_object.seek(0)
-        self.assertEqual(content, smart_open_object.read()) # no size given => read whole file
+        self.assertEqual(content, smart_open_object.read())  # no size given => read whole file
 
         smart_open_object.seek(0)
-        self.assertEqual(content, smart_open_object.read(-1)) # same thing
+        self.assertEqual(content, smart_open_object.read(-1))  # same thing
 
 
 class S3ReadStreamInnerTest(unittest.TestCase):
@@ -478,13 +490,12 @@ class S3IterLinesTest(unittest.TestCase):
 
         self.assertEqual(b''.join(output), test_string)
 
-
     @mock_s3
     def test_s3_iter_lines_without_key(self):
         """Does s3_iter_lines fail on invalid input?"""
         # cannot use context manager for assertRaise in py2.6
         try:
-            for i in smart_open.S3OpenRead(None):
+            for _ in smart_open.S3OpenRead(None):
                 pass
         except TypeError:
             pass
@@ -492,7 +503,7 @@ class S3IterLinesTest(unittest.TestCase):
             self.fail("s3_iter_lines expected to fail on non-`boto.key.Key` inputs")
 
         try:
-            for i in smart_open.S3OpenRead("test"):
+            for _ in smart_open.S3OpenRead("test"):
                 pass
         except TypeError:
             pass
@@ -551,7 +562,9 @@ class SmartOpenTest(unittest.TestCase):
 
         # correct write mode, correct s3 URI
         smart_open.smart_open("s3://mybucket/mykey", "w")
-        mock_boto.connect_s3.assert_called_with(aws_access_key_id=None, aws_secret_access_key=None, profile_name=None, host='s3.amazonaws.com')
+        mock_boto.connect_s3.assert_called_with(
+            aws_access_key_id=None, aws_secret_access_key=None, profile_name=None, host='s3.amazonaws.com'
+        )
         mock_boto.connect_s3().lookup.return_value = True
         mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
         self.assertTrue(mock_write.called)
@@ -562,12 +575,16 @@ class SmartOpenTest(unittest.TestCase):
         smart_open_object = smart_open.HdfsOpenWrite(smart_open.ParseUri("hdfs:///tmp/test.txt"))
         smart_open_object.write("test")
         # called with the correct params?
-        mock_subprocess.Popen.assert_called_with(["hdfs","dfs","-put","-f","-","/tmp/test.txt"], stdin=mock_subprocess.PIPE)
+        mock_subprocess.Popen.assert_called_with(
+            ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"], stdin=mock_subprocess.PIPE
+        )
 
         # second possibility of schema
         smart_open_object = smart_open.HdfsOpenWrite(smart_open.ParseUri("hdfs://tmp/test.txt"))
         smart_open_object.write("test")
-        mock_subprocess.Popen.assert_called_with(["hdfs","dfs","-put","-f","-","/tmp/test.txt"], stdin=mock_subprocess.PIPE)
+        mock_subprocess.Popen.assert_called_with(
+            ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"], stdin=mock_subprocess.PIPE
+        )
 
     @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
@@ -665,7 +682,6 @@ class S3OpenWriteTest(unittest.TestCase):
         else:
             self.fail()
 
-
     @mock_s3
     def test_write_02(self):
         """Does s3 write unicode-utf8 conversion work?"""
@@ -681,7 +697,6 @@ class S3OpenWriteTest(unittest.TestCase):
         with smart_open_write as fin:
             fin.write(u"testžížáč")
             self.assertEqual(fin.total_size, 14)
-
 
     @mock_s3
     def test_write_03(self):
@@ -713,7 +728,6 @@ class S3OpenWriteTest(unittest.TestCase):
 
         self.assertEqual(output, [b"testtest\n", b"test"])
 
-
     @mock_s3
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
@@ -726,7 +740,7 @@ class S3OpenWriteTest(unittest.TestCase):
         mykey.bucket = mybucket
 
         smart_open_write = smart_open.S3OpenWrite(mykey)
-        with smart_open_write as fin:
+        with smart_open_write as _:
             pass
 
         # read back the same key and check its content
@@ -743,13 +757,15 @@ class WebHdfsWriteTest(unittest.TestCase):
 
     @responses.activate
     def test_initialize_write(self):
-        def request_callback(request):
+        def request_callback(_):
             resp_body = ""
             headers = {'location': 'http://127.0.0.1:8440/file'}
-            return (307, headers, resp_body)
+            return 307, headers, resp_body
+
         responses.add_callback(responses.PUT, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
         responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
-        smart_open_object = smart_open.WebHdfsOpenWrite(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
+        smart_open.WebHdfsOpenWrite(smart_open.ParseUri("webhdfs://127.0.0.1:8440/path/file"))
+
         assert len(responses.calls) == 2
         path, params = responses.calls[0].request.url.split("?")
         assert path == "http://127.0.0.1:8440/webhdfs/v1/path/file"
@@ -758,10 +774,10 @@ class WebHdfsWriteTest(unittest.TestCase):
 
     @responses.activate
     def test_write(self):
-        def request_callback(request):
+        def request_callback(_):
             resp_body = ""
             headers = {'location': 'http://127.0.0.1:8440/file'}
-            return (307, headers, resp_body)
+            return 307, headers, resp_body
 
         responses.add_callback(responses.PUT, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
         responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
@@ -770,12 +786,14 @@ class WebHdfsWriteTest(unittest.TestCase):
         def write_callback(request):
             assert request.body == u"žluťoučký koníček".encode('utf8')
             headers = {}
-            return (200, headers, "")
+            return 200, headers, ""
+
         test_string = u"žluťoučký koníček".encode('utf8')
         responses.add_callback(responses.POST, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
         responses.add_callback(responses.POST, "http://127.0.0.1:8440/file", callback=write_callback)
         smart_open_object.write(test_string)
         smart_open_object.close()
+
         assert len(responses.calls) == 4
         assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"
         assert responses.calls[3].request.url == "http://127.0.0.1:8440/file"
@@ -788,7 +806,7 @@ class S3IterBucketTest(unittest.TestCase):
     """
     def test_s3_iter_bucket_process_key_mock(self):
         """Is s3_iter_bucket_process_key called correctly?"""
-        attrs = {"name" : "fileA", "get_contents_as_string.return_value" : b"contentA"}
+        attrs = {"name": "fileA", "get_contents_as_string.return_value": b"contentA"}
         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
         mykey.configure_mock(**attrs)
 
@@ -797,7 +815,7 @@ class S3IterBucketTest(unittest.TestCase):
         self.assertEqual(content, b"contentA")
 
     def test_s3_iter_bucket_process_key_with_SSLError_mock(self):
-        attrs = {"name" : "fileA", "get_contents_as_string.return_value" : b"contentA"}
+        attrs = {"name": "fileA", "get_contents_as_string.return_value": b"contentA"}
         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
         mykey.configure_mock(**attrs)
 
@@ -846,15 +864,14 @@ class S3IterBucketTest(unittest.TestCase):
         self.assertEqual(key, mykey)
         self.assertEqual(content, b"contentA")
 
-
     @mock.patch('smart_open.multiprocessing.pool')
     def test_s3_iter_bucket_mock(self, mock_pool):
         """Is s3_iter_bucket called correctly?"""
-        attrs = {"name" : "fileA", "get_contents_as_string.return_value" : "contentA"}
+        attrs = {"name": "fileA", "get_contents_as_string.return_value": "contentA"}
         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
         mykey.configure_mock(**attrs)
 
-        attrs = {"list.return_value" : [mykey]}
+        attrs = {"list.return_value": [mykey]}
         mybucket = mock.Mock(spec=["list"])
         mybucket.configure_mock(**attrs)
 
@@ -864,7 +881,6 @@ class S3IterBucketTest(unittest.TestCase):
 
         mock_pool.Pool.assert_called_with(processes=16)
         self.assertTrue(mock_pool.Pool().imap_unordered.called)
-
 
     @mock_s3
     def test_s3_iter_bucket_moto(self):
@@ -906,11 +922,11 @@ class S3IterBucketTest(unittest.TestCase):
 
     @mock.patch('smart_open.multiprocessing.pool.Pool.imap_unordered', map)
     def test_s3_iter_bucket_with_SSLError_moto(self):
-        attrs = {"name" : "fileA", "get_contents_as_string.return_value" : b"contentA"}
+        attrs = {"name": "fileA", "get_contents_as_string.return_value": b"contentA"}
         mykey = mock.Mock(spec=["name", "get_contents_as_string"])
         mykey.configure_mock(**attrs)
 
-        attrs = {"list.return_value" : [mykey]}
+        attrs = {"list.return_value": [mykey]}
         mybucket = mock.Mock(spec=["list"])
         mybucket.configure_mock(**attrs)
 
@@ -944,9 +960,6 @@ class S3IterBucketTest(unittest.TestCase):
         mykey.get_contents_as_string.side_effect = [Exception, b"contentA"]
         self.assertRaises(Exception, lambda x: next(smart_open.s3_iter_bucket(x)), mybucket)
 
-
-PY2 = sys.version_info[0] == 2
-CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class CompressionFormatTest(unittest.TestCase):
     """
@@ -1014,11 +1027,24 @@ class MultistreamsBZ2Test(unittest.TestCase):
         b'postgres:x:101:102:PostgreSQL Server:/var/lib/pgsql:/bin/bash\n',
         b'mysql:x:102:103:MySQL server:/var/lib/mysql:/bin/bash\n',
         b'www:x:103:104::/var/www:/bin/false\n',
-        ]
+    ]
 
     TEXT = b''.join(TEXT_LINES)
 
-    DATA = b'BZh91AY&SY.\xc8N\x18\x00\x01>_\x80\x00\x10@\x02\xff\xf0\x01\x07n\x00?\xe7\xff\xe00\x01\x99\xaa\x00\xc0\x03F\x86\x8c#&\x83F\x9a\x03\x06\xa6\xd0\xa6\x93M\x0fQ\xa7\xa8\x06\x804hh\x12$\x11\xa4i4\xf14S\xd2<Q\xb5\x0fH\xd3\xd4\xdd\xd5\x87\xbb\xf8\x94\r\x8f\xafI\x12\xe1\xc9\xf8/E\x00pu\x89\x12]\xc9\xbbDL\nQ\x0e\t1\x12\xdf\xa0\xc0\x97\xac2O9\x89\x13\x94\x0e\x1c7\x0ed\x95I\x0c\xaaJ\xa4\x18L\x10\x05#\x9c\xaf\xba\xbc/\x97\x8a#C\xc8\xe1\x8cW\xf9\xe2\xd0\xd6M\xa7\x8bXa<e\x84t\xcbL\xb3\xa7\xd9\xcd\xd1\xcb\x84.\xaf\xb3\xab\xab\xad`n}\xa0lh\tE,\x8eZ\x15\x17VH>\x88\xe5\xcd9gd6\x0b\n\xe9\x9b\xd5\x8a\x99\xf7\x08.K\x8ev\xfb\xf7xw\xbb\xdf\xa1\x92\xf1\xdd|/";\xa2\xba\x9f\xd5\xb1#A\xb6\xf6\xb3o\xc9\xc5y\\\xebO\xe7\x85\x9a\xbc\xb6f8\x952\xd5\xd7"%\x89>V,\xf7\xa6z\xe2\x9f\xa3\xdf\x11\x11"\xd6E)I\xa9\x13^\xca\xf3r\xd0\x03U\x922\xf26\xec\xb6\xed\x8b\xc3U\x13\x9d\xc5\x170\xa4\xfa^\x92\xacDF\x8a\x97\xd6\x19\xfe\xdd\xb8\xbd\x1a\x9a\x19\xa3\x80ankR\x8b\xe5\xd83]\xa9\xc6\x08\x82f\xf6\xb9"6l$\xb8j@\xc0\x8a\xb0l1..\xbak\x83ls\x15\xbc\xf4\xc1\x13\xbe\xf8E\xb8\x9d\r\xa8\x9dk\x84\xd3n\xfa\xacQ\x07\xb1%y\xaav\xb4\x08\xe0z\x1b\x16\xf5\x04\xe9\xcc\xb9\x08z\x1en7.G\xfc]\xc9\x14\xe1B@\xbb!8`'
+    DATA = \
+        b'BZh91AY&SY.\xc8N\x18\x00\x01>_\x80\x00\x10@\x02\xff\xf0\x01\x07n\x00?\xe7\xff\xe00\x01\x99\xaa\x00' \
+        b'\xc0\x03F\x86\x8c#&\x83F\x9a\x03\x06\xa6\xd0\xa6\x93M\x0fQ\xa7\xa8\x06\x804hh\x12$\x11\xa4i4\xf14S' \
+        b'\xd2<Q\xb5\x0fH\xd3\xd4\xdd\xd5\x87\xbb\xf8\x94\r\x8f\xafI\x12\xe1\xc9\xf8/E\x00pu\x89\x12]\xc9' \
+        b'\xbbDL\nQ\x0e\t1\x12\xdf\xa0\xc0\x97\xac2O9\x89\x13\x94\x0e\x1c7\x0ed\x95I\x0c\xaaJ\xa4\x18L\x10' \
+        b'\x05#\x9c\xaf\xba\xbc/\x97\x8a#C\xc8\xe1\x8cW\xf9\xe2\xd0\xd6M\xa7\x8bXa<e\x84t\xcbL\xb3\xa7\xd9' \
+        b'\xcd\xd1\xcb\x84.\xaf\xb3\xab\xab\xad`n}\xa0lh\tE,\x8eZ\x15\x17VH>\x88\xe5\xcd9gd6\x0b\n\xe9\x9b' \
+        b'\xd5\x8a\x99\xf7\x08.K\x8ev\xfb\xf7xw\xbb\xdf\xa1\x92\xf1\xdd|/";\xa2\xba\x9f\xd5\xb1#A\xb6\xf6' \
+        b'\xb3o\xc9\xc5y\\\xebO\xe7\x85\x9a\xbc\xb6f8\x952\xd5\xd7"%\x89>V,\xf7\xa6z\xe2\x9f\xa3\xdf\x11' \
+        b'\x11"\xd6E)I\xa9\x13^\xca\xf3r\xd0\x03U\x922\xf26\xec\xb6\xed\x8b\xc3U\x13\x9d\xc5\x170\xa4\xfa^' \
+        b'\x92\xacDF\x8a\x97\xd6\x19\xfe\xdd\xb8\xbd\x1a\x9a\x19\xa3\x80ankR\x8b\xe5\xd83]\xa9\xc6\x08' \
+        b'\x82f\xf6\xb9"6l$\xb8j@\xc0\x8a\xb0l1..\xbak\x83ls\x15\xbc\xf4\xc1\x13\xbe\xf8E\xb8\x9d\r\xa8\x9dk' \
+        b'\x84\xd3n\xfa\xacQ\x07\xb1%y\xaav\xb4\x08\xe0z\x1b\x16\xf5\x04\xe9\xcc\xb9\x08z\x1en7.G\xfc]\xc9\x14' \
+        b'\xe1B@\xbb!8`'
 
     def create_temp_bz2(self, streams=1):
         f = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False)
