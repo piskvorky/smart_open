@@ -1,6 +1,6 @@
 import smart_open.gzipstreamfile
 import unittest
-import os.path as P
+import os
 import hashlib
 import logging
 import io
@@ -9,14 +9,14 @@ import zlib
 
 logger = logging.getLogger(__name__)
 
-CURR_DIR = P.abspath(P.dirname(__file__))
+CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 
 
 class TestSequenceFunctions(unittest.TestCase):
 
     def test_warc_md5sum(self):
         """Does the WARC md5 checksum match the expected value?"""
-        fpath = P.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
+        fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
         for read_size in [1, 2, 10, 28, 42, 100, 256, 512, 800]:
             f = open(fpath, "rb")
             gz = smart_open.gzipstreamfile.GzipStreamFile(f)
@@ -88,7 +88,7 @@ class S3ReadStreamInnerTest(unittest.TestCase):
 
     def test_read_until_eof(self):
         """The reader should correctly read until EOF."""
-        fpath = P.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
+        fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
         with open(fpath, "rb") as fin:
             expected = zlib.decompress(fin.read(), 16 + zlib.MAX_WBITS)
 
