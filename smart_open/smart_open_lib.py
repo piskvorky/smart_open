@@ -470,6 +470,13 @@ class S3OpenRead(object):
         self.read_key.close(fast=True)
         self._open_reader()
 
+    def close(self):
+        self.read_key.close()
+
+    def flush(self):
+        # Resetting the unused buffer
+        self.reader.stream.unused_buffer = b''
+
     def __enter__(self):
         return self
 
@@ -531,7 +538,7 @@ class HdfsOpenWrite(object):
         )
 
     def write(self, b):
-        self.out_pipe.stdin.write(b)
+        return self.out_pipe.stdin.write(b)
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
@@ -839,6 +846,13 @@ class S3OpenWrite(object):
             self.parts += 1
             self.lines, self.chunk_bytes = [], 0
 
+        return len(b)
+
+    def flush(self):
+        # Resetting the unused buffer
+        # Flush the write buffers of the stream if applicable, but because of how it is used, it should pass.
+        pass
+
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
 
@@ -947,6 +961,8 @@ class WebHdfsOpenWrite(object):
             logger.debug("upload of part #%i finished", self.parts)
             self.parts += 1
             self.lines, self.chunk_bytes = [], 0
+
+        return len(b)
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
