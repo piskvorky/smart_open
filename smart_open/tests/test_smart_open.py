@@ -10,6 +10,7 @@ import unittest
 import logging
 import tempfile
 import os
+import sys
 import hashlib
 
 import boto
