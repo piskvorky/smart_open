@@ -5,8 +5,6 @@
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
-#
-# flake8: noqa
 
 
 """
@@ -30,6 +28,12 @@ import sys
 import requests
 import io
 
+from boto.compat import BytesIO, urlsplit, six
+import boto.s3.connection
+import boto.s3.key
+from ssl import SSLError
+
+
 IS_PY2 = (sys.version_info[0] == 2)
 
 if IS_PY2:
@@ -38,14 +42,11 @@ import contextlib
 
 if sys.version_info[0] == 2:
     import httplib
+
 elif sys.version_info[0] == 3:
     import io as StringIO
     import http.client as httplib
 
-from boto.compat import BytesIO, urlsplit, six
-import boto.s3.connection
-import boto.s3.key
-from ssl import SSLError
 
 logger = logging.getLogger(__name__)
 
@@ -391,12 +392,12 @@ class HdfsOpenRead(object):
 
     """
     def __init__(self, parsed_uri):
-        if parsed_uri.scheme not in ("hdfs"):
+        if parsed_uri.scheme != "hdfs":
             raise TypeError("can only process HDFS files")
         self.parsed_uri = parsed_uri
 
     def __iter__(self):
-        hdfs = subprocess.Popen(["hdfs", "dfs", "-cat", self.parsed_uri.uri_path], stdout=subprocess.PIPE)
+        hdfs = subprocess.Popen(["hdfs", "dfs", '-text', self.parsed_uri.uri_path], stdout=subprocess.PIPE)
         return hdfs.stdout
 
     def read(self, size=None):
@@ -418,10 +419,12 @@ class HdfsOpenWrite(object):
 
     """
     def __init__(self, parsed_uri):
-        if parsed_uri.scheme not in ("hdfs"):
+        if parsed_uri.scheme != "hdfs":
             raise TypeError("can only process HDFS files")
         self.parsed_uri = parsed_uri
-        self.out_pipe = subprocess.Popen(["hdfs","dfs","-put","-f","-",self.parsed_uri.uri_path], stdin=subprocess.PIPE)
+        self.out_pipe = subprocess.Popen(
+            ["hdfs", "dfs", "-put", "-f", "-", self.parsed_uri.uri_path], stdin=subprocess.PIPE
+        )
 
     def write(self, b):
         self.out_pipe.stdin.write(b)
@@ -446,7 +449,7 @@ class WebHdfsOpenRead(object):
 
     """
     def __init__(self, parsed_uri):
-        if parsed_uri.scheme not in ("webhdfs"):
+        if parsed_uri.scheme != "webhdfs":
             raise TypeError("can only process WebHDFS files")
         self.parsed_uri = parsed_uri
         self.offset = 0
@@ -469,7 +472,7 @@ class WebHdfsOpenRead(object):
             self.offset = 0
         else:
             payload = {"op": "OPEN", "offset": self.offset, "length": size}
-            self.offset = self.offset + size
+            self.offset += size
         response = requests.get("http://" + self.parsed_uri.uri_path, params=payload, stream=True)
         return response.content
 
@@ -672,7 +675,7 @@ class WebHdfsOpenWrite(object):
 
     """
     def __init__(self, parsed_uri, min_part_size=WEBHDFS_MIN_PART_SIZE):
-        if parsed_uri.scheme not in ("webhdfs"):
+        if parsed_uri.scheme != "webhdfs":
             raise TypeError("can only process WebHDFS files")
         self.parsed_uri = parsed_uri
         self.closed = False
@@ -721,9 +724,12 @@ class WebHdfsOpenWrite(object):
 
         if self.chunk_bytes >= self.min_part_size:
             buff = b"".join(self.lines)
-            logger.info("uploading part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+            logger.info(
+                "uploading part #%i, %i bytes (total %.3fGB)",
+                self.parts, len(buff), self.total_size / 1024.0 ** 3
+            )
             self.upload(buff)
-            logger.debug("upload of part #%i finished" % self.parts)
+            logger.debug("upload of part #%i finished", self.parts)
             self.parts += 1
             self.lines, self.chunk_bytes = [], 0
 
@@ -733,9 +739,12 @@ class WebHdfsOpenWrite(object):
     def close(self):
         buff = b"".join(self.lines)
         if buff:
-            logger.info("uploading last part #%i, %i bytes (total %.3fGB)" % (self.parts, len(buff), self.total_size / 1024.0 ** 3))
+            logger.info(
+                "uploading last part #%i, %i bytes (total %.3fGB)",
+                self.parts, len(buff), self.total_size / 1024.0 ** 3
+            )
             self.upload(buff)
-            logger.debug("upload of last part #%i finished" % self.parts)
+            logger.debug("upload of last part #%i finished", self.parts)
         self.closed = True
 
     def __enter__(self):
@@ -800,17 +809,19 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
     keys = ({'key': key, 'retries': retries} for key in bucket.list(prefix=prefix) if accept_key(key.name))
 
     if MULTIPROCESSING:
-        logger.info("iterating over keys from %s with %i workers" % (bucket, workers))
+        logger.info("iterating over keys from %s with %i workers", bucket, workers)
         pool = multiprocessing.pool.Pool(processes=workers)
         iterator = pool.imap_unordered(s3_iter_bucket_process_key_with_kwargs, keys)
     else:
-        logger.info("iterating over keys from %s without multiprocessing" % bucket)
+        logger.info("iterating over keys from %s without multiprocessing", bucket)
         iterator = imap(s3_iter_bucket_process_key_with_kwargs, keys)
 
     for key_no, (key, content) in enumerate(iterator):
         if key_no % 1000 == 0:
-            logger.info("yielding key #%i: %s, size %i (total %.1fMB)" %
-                (key_no, key, len(content), total_size / 1024.0 ** 2))
+            logger.info(
+                "yielding key #%i: %s, size %i (total %.1fMB)",
+                key_no, key, len(content), total_size / 1024.0 ** 2
+            )
 
         yield key, content
         key.close()

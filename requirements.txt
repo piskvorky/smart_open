@@ -1,3 +1,0 @@
-boto
-requests
-bz2file
