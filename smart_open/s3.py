@@ -220,6 +220,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
     def terminate(self):
         """Do nothing."""
+        pass
 
     #
     # Internal methods.
