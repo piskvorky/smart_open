@@ -8,7 +8,7 @@ import logging
 import six
 
 
-_LOGGER = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 #
 # https://github.com/matthewwithanm/django-imagekit/commit/0d5bfe37517955cca2284735769fe1dffb38ed37
@@ -21,7 +21,7 @@ except AttributeError:
             pass
     _NULL_HANDLER = NullHandler()
 finally:
-    _LOGGER.addHandler(_NULL_HANDLER)
+    logger.addHandler(_NULL_HANDLER)
 
 
 START = 0
@@ -55,7 +55,7 @@ def _clamp(value, minval, maxval):
 
 
 def open(bucket_id, key_id, mode, **kwargs):
-    _LOGGER.debug('%r', locals())
+    logger.debug('%r', locals())
     if mode not in MODES:
         raise NotImplementedError('bad mode: %r expected one of %r' % (mode, MODES))
 
@@ -97,7 +97,7 @@ class RawReader(object):
         else:
             end = min(self._content_length, self.position + size)
         range_string = _range_string(self.position, stop=end)
-        _LOGGER.debug('range_string: %r', range_string)
+        logger.debug('range_string: %r', range_string)
         body = self._object.get(Range=range_string)['Body'].read()
         self.position += len(body)
         return body
@@ -128,7 +128,7 @@ class BufferedInputBase(io.BufferedIOBase):
     #
     def close(self):
         """Flush and close this stream."""
-        _LOGGER.debug("close: called")
+        logger.debug("close: called")
         self._object = None
 
     def readable(self):
@@ -148,7 +148,7 @@ class BufferedInputBase(io.BufferedIOBase):
         :param int whence: Where the offset is from.
 
         Returns the position after seeking."""
-        _LOGGER.debug('seeking to offset: %r whence: %r', offset, whence)
+        logger.debug('seeking to offset: %r whence: %r', offset, whence)
         if whence not in WHENCE_CHOICES:
             raise ValueError('invalid whence, expected one of %r' % WHENCE_CHOICES)
 
@@ -160,7 +160,7 @@ class BufferedInputBase(io.BufferedIOBase):
             new_position = self._content_length + offset
         new_position = _clamp(new_position, 0, self._content_length)
 
-        _LOGGER.debug('new_position: %r', new_position)
+        logger.debug('new_position: %r', new_position)
         self._current_pos = self._raw_reader.position = new_position
         self._buffer = b""
         self._eof = self._current_pos == self._content_length
@@ -206,13 +206,13 @@ class BufferedInputBase(io.BufferedIOBase):
         #
         # Fill our buffer to the required size.
         #
-        # _LOGGER.debug('filling %r byte-long buffer up to %r bytes', len(self._buffer), size)
+        # logger.debug('filling %r byte-long buffer up to %r bytes', len(self._buffer), size)
         while len(self._buffer) < size and not self._eof:
             raw = self._raw_reader.read(size=io.DEFAULT_BUFFER_SIZE)
             if len(raw):
                 self._buffer += raw
             else:
-                _LOGGER.debug('reached EOF while filling buffer')
+                logger.debug('reached EOF while filling buffer')
                 self._eof = True
 
         return self._read_from_buffer(size)
@@ -238,12 +238,12 @@ class BufferedInputBase(io.BufferedIOBase):
     #
     def _read_from_buffer(self, size):
         """Remove at most size bytes from our buffer and return them."""
-        # _LOGGER.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
+        # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
         assert size >= 0
         part = self._buffer[:size]
         self._buffer = self._buffer[size:]
         self._current_pos += len(part)
-        # _LOGGER.debug('part: %r', part)
+        # logger.debug('part: %r', part)
         return part
 
 
@@ -254,7 +254,7 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     def __init__(self, bucket, key, min_part_size=DEFAULT_MIN_PART_SIZE, **kwargs):
         if min_part_size < MIN_MIN_PART_SIZE:
-            _LOGGER.warning("S3 requires minimum part size >= 5MB; \
+            logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
 
         session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
@@ -282,13 +282,13 @@ multipart upload may fail")
     # Override some methods from io.IOBase.
     #
     def close(self):
-        _LOGGER.debug("closing")
+        logger.debug("closing")
         if self._buf.tell():
             self._upload_next_part()
 
         if self._total_bytes:
             self._mp.complete(MultipartUpload={'Parts': self._parts})
-            _LOGGER.debug("completed multipart upload")
+            logger.debug("completed multipart upload")
         elif self._mp:
             #
             # AWS complains with "The XML you provided was not well-formed or
@@ -297,13 +297,13 @@ multipart upload may fail")
             #
             # We work around this by creating an empty file explicitly.
             #
-            _LOGGER.info("empty input, ignoring multipart upload")
+            logger.info("empty input, ignoring multipart upload")
             assert self._mp, "no multipart upload in progress"
             self._mp.abort()
 
             self._object.put(Body=b'')
         self._mp = None
-        _LOGGER.debug("successfully closed")
+        logger.debug("successfully closed")
 
     @property
     def closed(self):
@@ -331,7 +331,7 @@ multipart upload may fail")
         if not isinstance(b, six.binary_type):
             raise TypeError("input must be a binary string, got: %r", b)
 
-        # _LOGGER.debug("writing %r bytes to %r", len(b), self._buf)
+        # logger.debug("writing %r bytes to %r", len(b), self._buf)
 
         self._buf.write(b)
         self._total_bytes += len(b)
@@ -352,13 +352,13 @@ multipart upload may fail")
     #
     def _upload_next_part(self):
         part_num = self._total_parts + 1
-        _LOGGER.info("uploading part #%i, %i bytes (total %.3fGB)",
-                     part_num, self._buf.tell(), self._total_bytes / 1024.0 ** 3)
+        logger.info("uploading part #%i, %i bytes (total %.3fGB)",
+                    part_num, self._buf.tell(), self._total_bytes / 1024.0 ** 3)
         self._buf.seek(0)
         part = self._mp.Part(part_num)
         upload = part.upload(Body=self._buf)
         self._parts.append({'ETag': upload['ETag'], 'PartNumber': part_num})
-        _LOGGER.debug("upload of part #%i finished" % part_num)
+        logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
         self._buf = io.BytesIO()
