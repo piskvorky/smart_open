@@ -37,9 +37,14 @@ from ssl import SSLError
 IS_PY2 = (sys.version_info[0] == 2)
 
 if IS_PY2:
+    import cStringIO as StringIO
+import contextlib
+
+if sys.version_info[0] == 2:
     import httplib
 
 elif sys.version_info[0] == 3:
+    import io as StringIO
     import http.client as httplib
 
 
@@ -56,10 +61,10 @@ except ImportError:
     logger.warning("multiprocessing could not be imported and won't be used")
     from itertools import imap
 
-from . import gzipstreamfile
+import gzip
+import smart_open.s3 as smart_open_s3
 
 
-S3_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for S3 multipart uploads
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 
@@ -124,10 +129,12 @@ def smart_open(uri, mode="rb", **kw):
       ...    print line
 
     """
+    logger.debug('%r', locals())
 
     # validate mode parameter
     if not isinstance(mode, six.string_types):
         raise TypeError('mode should be a string')
+
 
     if isinstance(uri, six.string_types):
         # this method just routes the request to classes handling the specific storage
@@ -138,42 +145,8 @@ def smart_open(uri, mode="rb", **kw):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
             return file_smart_open(parsed_uri.uri_path, mode)
-        elif parsed_uri.scheme in ("s3", "s3n", "s3u"):
-            kwargs = {}
-            # Get an S3 host. It is required for sigv4 operations.
-            host = kw.pop('host', parsed_uri.host)
-            port = kw.pop('port', parsed_uri.port)
-            if port != 443:
-                kwargs['port'] = port
-
-            if not kw.pop('is_secure', parsed_uri.scheme != 's3u'):
-                kwargs['is_secure'] = False
-                # If the security model docker is overridden, honor the host directly.
-                kwargs['calling_format'] = boto.s3.connection.OrdinaryCallingFormat()
-
-            # For credential order of precedence see
-            # http://boto.cloudhackers.com/en/latest/boto_config_tut.html#credentials
-            s3_connection = boto.connect_s3(
-                aws_access_key_id=parsed_uri.access_id,
-                host=host,
-                aws_secret_access_key=parsed_uri.access_secret,
-                profile_name=kw.pop('profile_name', None),
-                **kwargs)
-
-            bucket = s3_connection.get_bucket(parsed_uri.bucket_id)
-            if mode in ('r', 'rb'):
-                key = bucket.get_key(parsed_uri.key_id)
-                if key is None:
-                    raise KeyError(parsed_uri.key_id)
-                return S3OpenRead(key)
-            elif mode in ('w', 'wb'):
-                key = bucket.get_key(parsed_uri.key_id, validate=False)
-                if key is None:
-                    raise KeyError(parsed_uri.key_id)
-                return S3OpenWrite(key, **kw)
-            else:
-                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
-
+        elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
+            return s3_open_uri(parsed_uri, mode, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
             if mode in ('r', 'rb'):
                 return HdfsOpenRead(parsed_uri, **kw)
@@ -196,16 +169,120 @@ def smart_open(uri, mode="rb", **kw):
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif isinstance(uri, boto.s3.key.Key):
-        # handle case where we are given an S3 key directly
-        if mode in ('r', 'rb'):
-            return S3OpenRead(uri)
-        elif mode in ('w', 'wb'):
-            return S3OpenWrite(uri, **kw)
+        return s3_open_key(uri, mode, **kw)
     elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
         return uri
     else:
         raise TypeError('don\'t know how to handle uri %s' % repr(uri))
+
+
+def s3_open_uri(parsed_uri, mode, **kwargs):
+    logger.debug('%r', locals())
+    if parsed_uri.access_id is not None:
+        kwargs['aws_access_key_id'] = parsed_uri.access_id
+    if parsed_uri.access_secret is not None:
+        kwargs['aws_secret_access_key'] = parsed_uri.access_secret
+
+    # Get an S3 host. It is required for sigv4 operations.
+    host = kwargs.pop('host', None)
+    if host is not None:
+        kwargs['endpoint_url'] = 'http://' + host
+
+    #
+    # TODO: this is the wrong place to handle ignore_extension.
+    # It should happen at the highest level in the smart_open function, because
+    # it influences other file systems as well, not just S3.
+    #
+    if kwargs.pop("ignore_extension", False):
+        codec = None
+    else:
+        codec = _detect_codec(parsed_uri.key_id)
+
+    #
+    # Codecs work on a byte-level, so the underlying S3 object should
+    # always be reading bytes.
+    #
+    if codec and mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
+        s3_mode = smart_open_s3.READ_BINARY
+    elif codec and mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
+        s3_mode = smart_open_s3.WRITE_BINARY
+    else:
+        s3_mode = mode
+
+    #
+    # TODO: I'm not sure how to handle this with boto3.  Any ideas?
+    #
+    # https://github.com/boto/boto3/issues/334
+    #
+    # _setup_unsecured_mode()
+
+    fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, s3_mode, **kwargs)
+    return _CODECS[codec](fobj, mode)
+
+
+def _setup_unsecured_mode(parsed_uri, kwargs):
+    port = kwargs.pop('port', parsed_uri.port)
+    if port != 443:
+        kwargs['port'] = port
+
+    if not kwargs.pop('is_secure', parsed_uri.scheme != 's3u'):
+        kwargs['is_secure'] = False
+        # If the security model docker is overridden, honor the host directly.
+        kwargs['calling_format'] = boto.s3.connection.OrdinaryCallingFormat()
+
+
+def s3_open_key(key, mode, **kwargs):
+    logger.debug('%r', locals())
+    #
+    # TODO: handle boto3 keys as well
+    #
+    host = kwargs.pop('host', None)
+    if host is not None:
+        kwargs['endpoint_url'] = 'http://' + host
+
+    if kwargs.pop("ignore_extension", False):
+        codec = None
+    else:
+        codec = _detect_codec(key.name)
+
+    #
+    # Codecs work on a byte-level, so the underlying S3 object should
+    # always be reading bytes.
+    #
+    if codec and mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
+        s3_mode = smart_open_s3.READ_BINARY
+    elif codec and mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
+        s3_mode = smart_open_s3.WRITE_BINARY
+    else:
+        s3_mode = mode
+
+    logging.debug('codec: %r mode: %r s3_mode: %r', codec, mode, s3_mode)
+    fobj = smart_open_s3.open(key.bucket.name, key.name, s3_mode, **kwargs)
+    return _CODECS[codec](fobj, mode)
+
+
+def _detect_codec(filename):
+    if filename.endswith(".gz"):
+        return 'gzip'
+    return None
+
+
+def _wrap_gzip(fileobj, mode):
+    return contextlib.closing(gzip.GzipFile(fileobj=fileobj, mode=mode))
+
+
+def _wrap_none(fileobj, mode):
+    return fileobj
+
+
+_CODECS = {
+    None: _wrap_none,
+    'gzip': _wrap_gzip,
+    #
+    # TODO: add support for other codecs here.
+    #
+}
 
 
 class ParseUri(object):
@@ -309,177 +386,6 @@ class ParseUri(object):
             raise NotImplementedError("unknown URI scheme %r in %r" % (self.scheme, uri))
 
 
-def is_gzip(name):
-    """Return True if the name indicates that the file is compressed with
-    gzip."""
-    return name.endswith(".gz")
-
-
-class S3ReadStreamInner(object):
-
-    def __init__(self, stream):
-        self.stream = stream
-        self.unused_buffer = b''
-        self.closed = False
-        self.finished = False
-
-    def read_until_eof(self):
-        #
-        # This method is here because boto.s3.Key.read() reads the entire
-        # file, which isn't expected behavior.
-        #
-        # https://github.com/boto/boto/issues/3311
-        #
-        buf = b""
-        while not self.finished:
-            raw = self.stream.read(io.DEFAULT_BUFFER_SIZE)
-            if len(raw) > 0:
-                buf += raw
-            else:
-                self.finished = True
-        return buf
-
-    def read_from_buffer(self, size):
-        """Remove at most size bytes from our buffer and return them."""
-        part = self.unused_buffer[:size]
-        self.unused_buffer = self.unused_buffer[size:]
-        return part
-
-    def read(self, size=None):
-        if not size or size < 0:
-            return self.read_from_buffer(
-                len(self.unused_buffer)) + self.read_until_eof()
-
-        # Use unused data first
-        if len(self.unused_buffer) >= size:
-            return self.read_from_buffer(size)
-
-        # If the stream is finished and no unused raw data, return what we have
-        if self.stream.closed or self.finished:
-            self.finished = True
-            return self.read_from_buffer(size)
-
-        # Consume new data in chunks and return it.
-        while len(self.unused_buffer) < size:
-            raw = self.stream.read(io.DEFAULT_BUFFER_SIZE)
-            if len(raw):
-                self.unused_buffer += raw
-            else:
-                self.finished = True
-                break
-
-        return self.read_from_buffer(size)
-
-    def readinto(self, b):
-        # Read up to len(b) bytes into bytearray b
-        # Sadly not as efficient as lower level
-        data = self.read(len(b))
-        if not data:
-            return None
-        b[:len(data)] = data
-        return len(data)
-
-    def readable(self):
-        # io.BufferedReader needs us to appear readable
-        return True
-
-    def _checkReadable(self, msg=None):
-        # This is required to satisfy io.BufferedReader on Python 2.6.
-        # Another way to achieve this is to inherit from io.IOBase, but that
-        # leads to other problems.
-        return True
-
-
-class S3ReadStream(io.BufferedReader):
-
-    def __init__(self, key):
-        self.stream = S3ReadStreamInner(key)
-        super(S3ReadStream, self).__init__(self.stream)
-
-    def read(self, *args, **kwargs):
-        # Patch read to return '' instead of raise Value Error
-        # TODO: what actually raises ValueError in the following code?
-        try:
-            #
-            # io.BufferedReader behaves differently to a built-in file object.
-            # If the object is in non-blocking mode and no bytes are available,
-            # the former will return None. The latter returns an empty string.
-            # We want to behave like a built-in file object here.
-            #
-            result = super(S3ReadStream, self).read(*args, **kwargs)
-            if result is None:
-                return ""
-            return result
-        except ValueError:
-            return ''
-
-    def readline(self, *args, **kwargs):
-        # Patch readline to return '' instead of raise Value Error
-        # TODO: what actually raises ValueError in the following code?
-        try:
-            result = super(S3ReadStream, self).readline(*args, **kwargs)
-            return result
-        except ValueError:
-            return ''
-
-
-class S3OpenRead(object):
-    """
-    Implement streamed reader from S3, as an iterable & context manager.
-
-    Supports reading from gzip-compressed files.  Identifies such files by
-    their extension.
-
-    """
-    def __init__(self, read_key):
-        if not hasattr(read_key, "bucket") and not hasattr(read_key, "name") and not hasattr(read_key, "read") \
-                and not hasattr(read_key, "close"):
-            raise TypeError("can only process S3 keys")
-        self.read_key = read_key
-        self._open_reader()
-
-    def _open_reader(self):
-        if is_gzip(self.read_key.name):
-            self.reader = gzipstreamfile.GzipStreamFile(self.read_key)
-        else:
-            self.reader = S3ReadStream(self.read_key)
-
-    def __iter__(self):
-        for line in self.reader:
-            yield line
-
-    def readline(self):
-        return self.reader.readline()
-
-    def read(self, size=None):
-        """
-        Read a specified number of bytes from the key.
-
-        """
-        return self.reader.read(size)
-
-    def seek(self, offset, whence=0):
-        """
-        Seek to the specified position.
-
-        Only seeking to the beginning (offset=0) supported for now.
-
-        """
-        if whence != 0 or offset != 0:
-            raise NotImplementedError("seek other than offset=0 not implemented yet")
-        self.read_key.close(fast=True)
-        self._open_reader()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.read_key.close(fast=True)
-
-    def __str__(self):
-        return "%s<key: %s>" % (self.__class__.__name__, self.read_key)
-
-
 class HdfsOpenRead(object):
     """
     Implement streamed reader from HDFS, as an iterable & context manager.
@@ -489,7 +395,6 @@ class HdfsOpenRead(object):
         if parsed_uri.scheme != "hdfs":
             raise TypeError("can only process HDFS files")
         self.parsed_uri = parsed_uri
-        self._readline_iter = None
 
     def __iter__(self):
         hdfs = subprocess.Popen(["hdfs", "dfs", '-text', self.parsed_uri.uri_path], stdout=subprocess.PIPE)
@@ -497,15 +402,6 @@ class HdfsOpenRead(object):
 
     def read(self, size=None):
         raise NotImplementedError("read() not implemented yet")
-
-    def readline(self):
-        if self._readline_iter is None:
-            self._readline_iter = self.__iter__()
-        try:
-            return next(self._readline_iter)
-        except StopIteration:
-            # When readline runs out of data, it just returns an empty string
-            return ''
 
     def seek(self, offset, whence=None):
         raise NotImplementedError("seek() not implemented yet")
@@ -771,117 +667,6 @@ def HttpOpenRead(parsed_uri, mode='r', **kwargs):
         return compression_wrapper(buffer, fname, mode)
     else:
         return compression_wrapper(response, fname, mode)
-
-
-class S3OpenWrite(object):
-    """
-    Context manager for writing into S3 files.
-
-    """
-    def __init__(self, outkey, min_part_size=S3_MIN_PART_SIZE, **kw):
-        """
-        Streamed input is uploaded in chunks, as soon as `min_part_size` bytes are
-        accumulated (50MB by default). The minimum chunk size allowed by AWS S3
-        is 5MB.
-
-        """
-        if not hasattr(outkey, "bucket") and not hasattr(outkey, "name"):
-            raise TypeError("can only process S3 keys")
-
-        if is_gzip(outkey.name):
-            raise NotImplementedError("streaming write to S3 gzip not supported")
-
-        self.outkey = outkey
-        self.min_part_size = min_part_size
-
-        if min_part_size < 5 * 1024 ** 2:
-            logger.warning("S3 requires minimum part size >= 5MB; multipart upload may fail")
-
-        # initialize mulitpart upload
-        self.mp = self.outkey.bucket.initiate_multipart_upload(self.outkey, **kw)
-
-        # initialize stats
-        self.lines = []
-        self.total_size = 0
-        self.chunk_bytes = 0
-        self.parts = 0
-
-    def __str__(self):
-        return "%s<key: %s, min_part_size: %s>" % (self.__class__.__name__, self.outkey, self.min_part_size)
-
-    def write(self, b):
-        """
-        Write the given bytes (binary string) into the S3 file from constructor.
-
-        Note there's buffering happening under the covers, so this may not actually
-        do any HTTP transfer right away.
-
-        """
-        if isinstance(b, six.text_type):
-            # not part of API: also accept unicode => encode it as utf8
-            b = b.encode('utf8')
-
-        if not isinstance(b, six.binary_type):
-            raise TypeError("input must be a binary string")
-
-        self.lines.append(b)
-        self.chunk_bytes += len(b)
-        self.total_size += len(b)
-
-        if self.chunk_bytes >= self.min_part_size:
-            buff = b"".join(self.lines)
-            logger.info(
-                "uploading part #%i, %i bytes (total %.3fGB)",
-                self.parts, len(buff), self.total_size / 1024.0 ** 3
-            )
-            self.mp.upload_part_from_file(BytesIO(buff), part_num=self.parts + 1)
-            logger.debug("upload of part #%i finished", self.parts)
-            self.parts += 1
-            self.lines, self.chunk_bytes = [], 0
-
-    def seek(self, offset, whence=None):
-        raise NotImplementedError("seek() not implemented yet")
-
-    def close(self):
-        buff = b"".join(self.lines)
-        if buff:
-            logger.info(
-                "uploading last part #%i, %i bytes (total %.3fGB)",
-                self.parts, len(buff), self.total_size / 1024.0 ** 3
-            )
-            self.mp.upload_part_from_file(BytesIO(buff), part_num=self.parts + 1)
-            logger.debug("upload of last part #%i finished", self.parts)
-
-        if self.total_size:
-            self.mp.complete_upload()
-        else:
-            # AWS complains with
-            # "The XML you provided was not well-formed or did not validate against our published schema"
-            # when the input is completely empty => abort the upload, no file created
-            logger.info("empty input, ignoring multipart upload")
-            self.outkey.bucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
-            # So, instead, create an empty file like this
-            logger.info("setting an empty value for the key")
-            self.outkey.set_contents_from_string('')
-
-    def __enter__(self):
-        return self
-
-    def _termination_error(self):
-        logger.exception("encountered error while terminating multipart upload; attempting cancel")
-        self.outkey.bucket.cancel_multipart_upload(self.mp.key_name, self.mp.id)
-        logger.info("cancel completed")
-
-    def __exit__(self, type, value, traceback):
-        if type is not None:
-            self._termination_error()
-            return False
-
-        try:
-            self.close()
-        except:
-            self._termination_error()
-            raise
 
 
 class WebHdfsOpenWrite(object):

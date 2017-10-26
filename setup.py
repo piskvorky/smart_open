@@ -42,12 +42,14 @@ setup(
         'boto >= 2.32',
         'bz2file',
         'requests',
+        'boto3'
     ],
 
     tests_require=[
         'mock',
         'moto==0.4.31',
         'responses',
+        'unittest2'
     ],
 
 
