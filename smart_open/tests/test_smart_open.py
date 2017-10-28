@@ -122,10 +122,10 @@ class SmartOpenHttpTest(unittest.TestCase):
         """Does http authentication work correctly"""
         responses.add(responses.GET, "http://127.0.0.1/index.html", body='line1\nline2')
         _ = smart_open.HttpOpenRead(smart_open.ParseUri("http://127.0.0.1/index.html"), user='me', password='pass')
-        self.assertEquals(len(responses.calls), 1)
+        self.assertEqual(len(responses.calls), 1)
         actual_request = responses.calls[0].request
-        self.assert_('Authorization' in actual_request.headers)
-        self.assert_(actual_request.headers['Authorization'].startswith('Basic '))
+        self.assertTrue('Authorization' in actual_request.headers)
+        self.assertTrue(actual_request.headers['Authorization'].startswith('Basic '))
 
     @responses.activate
     def test_http_gz(self):
@@ -184,9 +184,9 @@ class SmartOpenReadTest(unittest.TestCase):
             fout.write(test_string.encode('utf8'))
 
         r = smart_open.smart_open("s3://mybucket/mykey", "rb")
-        self.assertEquals(r.read(), test_string.encode("utf-8"))
-        self.assertEquals(r.read(), b"")
-        self.assertEquals(r.read(), b"")
+        self.assertEqual(r.read(), test_string.encode("utf-8"))
+        self.assertEqual(r.read(), b"")
+        self.assertEqual(r.read(), b"")
 
     @mock_s3
     def test_readline(self):
@@ -198,7 +198,7 @@ class SmartOpenReadTest(unittest.TestCase):
             fout.write(test_string)
 
         reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
-        self.assertEquals(reader.readline(), u"hello žluťoučký world!\n".encode("utf-8"))
+        self.assertEqual(reader.readline(), u"hello žluťoučký world!\n".encode("utf-8"))
 
     @mock_s3
     def test_readline_iter(self):
@@ -212,9 +212,9 @@ class SmartOpenReadTest(unittest.TestCase):
         reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
 
         actual_lines = [l.decode("utf-8") for l in reader]
-        self.assertEquals(2, len(actual_lines))
-        self.assertEquals(lines[0], actual_lines[0])
-        self.assertEquals(lines[1], actual_lines[1])
+        self.assertEqual(2, len(actual_lines))
+        self.assertEqual(lines[0], actual_lines[0])
+        self.assertEqual(lines[1], actual_lines[1])
 
     @mock_s3
     def test_readline_eof(self):
@@ -226,9 +226,9 @@ class SmartOpenReadTest(unittest.TestCase):
 
         reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
 
-        self.assertEquals(reader.readline(), b"")
-        self.assertEquals(reader.readline(), b"")
-        self.assertEquals(reader.readline(), b"")
+        self.assertEqual(reader.readline(), b"")
+        self.assertEqual(reader.readline(), b"")
+        self.assertEqual(reader.readline(), b"")
 
     @mock_s3
     def test_s3_iter_lines(self):
@@ -911,11 +911,11 @@ class S3OpenTest(unittest.TestCase):
         key.set_contents_from_string(text.encode("utf-8"))
 
         with smart_open.s3_open_key(key, "r") as fin:
-            self.assertEquals(fin.read(), u"физкульт-привет!")
+            self.assertEqual(fin.read(), u"физкульт-привет!")
 
         parsed_uri = smart_open.ParseUri("s3://bucket/key")
         with smart_open.s3_open_uri(parsed_uri, "r") as fin:
-            self.assertEquals(fin.read(), u"физкульт-привет!")
+            self.assertEqual(fin.read(), u"физкульт-привет!")
 
     def test_bad_mode(self):
         """Bad mode should raise and exception."""
@@ -935,10 +935,10 @@ class S3OpenTest(unittest.TestCase):
             fout.write(text)
 
         with smart_open.s3_open_uri(uri, "r", encoding="koi8-r") as fin:
-            self.assertEquals(text, fin.read())
+            self.assertEqual(text, fin.read())
 
         with smart_open.s3_open_uri(uri, "rb") as fin:
-            self.assertEquals(text.encode("koi8-r"), fin.read())
+            self.assertEqual(text.encode("koi8-r"), fin.read())
 
         with smart_open.s3_open_uri(uri, "r", encoding="euc-jp") as fin:
             self.assertRaises(UnicodeDecodeError, fin.read)
@@ -963,13 +963,13 @@ class S3OpenTest(unittest.TestCase):
         #
         with smart_open.s3_open_uri(uri, "rb", ignore_extension=True) as fin:
             gz = gzip.GzipFile(fileobj=fin)
-            self.assertEquals(gz.read().decode("utf-8"), text)
+            self.assertEqual(gz.read().decode("utf-8"), text)
 
         #
         # We should be able to read it back as well.
         #
         with smart_open.s3_open_uri(uri, "rb") as fin:
-            self.assertEquals(fin.read().decode("utf-8"), text)
+            self.assertEqual(fin.read().decode("utf-8"), text)
 
     @mock_s3
     def test_gzip_write_mode(self):
