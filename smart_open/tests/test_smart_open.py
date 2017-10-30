@@ -131,8 +131,8 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_http_gz(self):
         """Can open gzip via http?"""
         fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
-        with open(fpath, 'rb') as file:
-            data = file.read()
+        with open(fpath, 'rb') as infile:
+            data = infile.read()
 
         responses.add(responses.GET, "http://127.0.0.1/data.gz",
                       body=data)
@@ -147,8 +147,8 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_http_bz2(self):
         """Can open bz2 via http?"""
         test_string = b'Hello World Compressed.'
-        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as file:
-            test_file = file.name
+        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as infile:
+            test_file = infile.name
 
         with smart_open.smart_open(test_file, 'wb') as outfile:
             outfile.write(test_string)
@@ -787,22 +787,22 @@ class CompressionFormatTest(unittest.TestCase):
     def test_open_gz(self):
         """Can open gzip?"""
         fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
-        with smart_open.smart_open(fpath) as file:
-            data = file.read()
+        with smart_open.smart_open(fpath) as infile:
+            data = infile.read()
         m = hashlib.md5(data)
         assert m.hexdigest() == '18473e60f8c7c98d29d65bf805736a0d', \
             'Failed to read gzip'
 
     def test_write_read_gz(self):
         """Can write and read gzip?"""
-        with tempfile.NamedTemporaryFile('wb', suffix='.gz', delete=False) as file:
-            test_file_name = file.name
+        with tempfile.NamedTemporaryFile('wb', suffix='.gz', delete=False) as infile:
+            test_file_name = infile.name
         self.write_read_assertion(test_file_name)
 
     def test_write_read_bz2(self):
         """Can write and read bz2?"""
-        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as file:
-            test_file_name = file.name
+        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as infile:
+            test_file_name = infile.name
         self.write_read_assertion(test_file_name)
 
 
