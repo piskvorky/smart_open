@@ -61,6 +61,11 @@ except ImportError:
     logger.warning("multiprocessing could not be imported and won't be used")
     from itertools import imap
 
+if IS_PY2:
+    from bz2file import BZ2File
+else:
+    from bz2 import BZ2File
+
 import gzip
 import smart_open.s3 as smart_open_s3
 
@@ -504,14 +509,40 @@ def make_closing(base, **attrs):
 
     This is needed for gzip.GzipFile, bz2.BZ2File etc in older Pythons (<=2.6), which otherwise
     raise "AttributeError: GzipFile instance has no attribute '__exit__'".
-
     """
     if not hasattr(base, '__enter__'):
         attrs['__enter__'] = lambda self: self
+
     if not hasattr(base, '__exit__'):
         attrs['__exit__'] = lambda self, type, value, traceback: self.close()
+
     return type('Closing' + base.__name__, (base, object), attrs)
 
+
+class ClosingBZ2File(make_closing(BZ2File)):
+    """
+    Implements wrapper for BZ2File that closes file object receieved as argument
+
+    """
+    def __init__(self, inner_stream, *args, **kwargs):
+        self.inner_stream = inner_stream
+        super(ClosingBZ2File, self).__init__(inner_stream, *args, **kwargs)
+
+    def close(self):
+        super(ClosingBZ2File, self).close()
+        if not self.inner_stream.closed:
+            self.inner_stream.close()
+
+class ClosingGzipFile(make_closing(gzip.GzipFile)):
+    """
+    Implement wrapper for GzipFile that closes file object receieved from arguments
+
+    """
+    def close(self):
+        fileobj = self.fileobj
+        super(ClosingGzipFile, self).close()
+        if not fileobj.closed:
+            fileobj.close()
 
 def compression_wrapper(file_obj, filename, mode):
     """
@@ -526,16 +557,9 @@ def compression_wrapper(file_obj, filename, mode):
     """
     _, ext = os.path.splitext(filename)
     if ext == '.bz2':
-        if IS_PY2:
-            from bz2file import BZ2File
-        else:
-            from bz2 import BZ2File
-        return make_closing(BZ2File)(file_obj, mode)
-
+        return ClosingBZ2File(file_obj, mode)
     elif ext == '.gz':
-        from gzip import GzipFile
-        return make_closing(GzipFile)(fileobj=file_obj, mode=mode)
-
+        return ClosingGzipFile(fileobj=file_obj, mode=mode)
     else:
         return file_obj
 
