@@ -21,6 +21,7 @@ The main methods are:
 
 """
 
+import codecs
 import logging
 import os
 import subprocess
@@ -32,6 +33,7 @@ from boto.compat import BytesIO, urlsplit, six
 import boto.s3.connection
 import boto.s3.key
 from ssl import SSLError
+import sys
 
 
 IS_PY2 = (sys.version_info[0] == 2)
@@ -71,6 +73,8 @@ import smart_open.s3 as smart_open_s3
 
 
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
+
+SYSTEM_ENCODING = sys.getdefaultencoding()
 
 
 def smart_open(uri, mode="rb", **kw):
@@ -149,7 +153,12 @@ def smart_open(uri, mode="rb", **kw):
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
-            return file_smart_open(parsed_uri.uri_path, mode)
+            file_smart_open_kw = {}
+            try:
+                file_smart_open_kw['encoding'] = kw.pop('encoding')
+            except KeyError:
+                pass
+            return file_smart_open(parsed_uri.uri_path, mode, **file_smart_open_kw)
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return s3_open_uri(parsed_uri, mode, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
@@ -544,6 +553,7 @@ class ClosingGzipFile(make_closing(gzip.GzipFile)):
         if not fileobj.closed:
             fileobj.close()
 
+
 def compression_wrapper(file_obj, filename, mode):
     """
     This function will wrap the file_obj with an appropriate
@@ -564,13 +574,65 @@ def compression_wrapper(file_obj, filename, mode):
         return file_obj
 
 
-def file_smart_open(fname, mode='rb'):
+def encoding_wrapper(fileobj, mode, **kwargs):
+    """Decode bytes into text, if necessary.
+
+    If mode specifies binary access, does nothing.
+
+    :arg fileobj: must quack like a filehandle object.
+    :arg str mode: is the mode which was originally requested by the user.
+    :arg kwargs: contain keyword arguments for TextIOWrapper.
+    :returns: a file object
+    """
+    logger.info('encoding_wrapper: %r', locals())
+
+    #
+    # If the mode is binary, but the user specified an encoding, assume they
+    # want text.  If we don't make this assumption, ignore the encoding and
+    # return bytes, smart_open behavior will diverge from the built-in open:
+    #
+    #   open(filename, encoding='utf-8') returns a text stream in Py3
+    #   smart_open(filename, encoding='utf-8') would return a byte stream
+    #       without our assumption, because the default mode is rb.
+    #
+    encoding = kwargs.pop("encoding", None)
+    if mode in ('rb', 'wb', 'ab') and encoding is None:
+        return fileobj
+
+    if encoding is None:
+        encoding = SYSTEM_ENCODING
+
+    if mode[0] == 'r':
+        decoder = codecs.getreader(encoding)
+    else:
+        decoder = codecs.getwriter(encoding)
+    return decoder(fileobj)
+
+
+def file_smart_open(fname, mode='rb', **kwargs):
     """
     Stream from/to local filesystem, transparently (de)compressing gzip and bz2
     files if necessary.
 
     """
-    return compression_wrapper(open(fname, mode), fname, mode)
+    #
+    # This is how we get from the filename to the end result.
+    # Decompression is optional, but it always accepts bytes and returns bytes.
+    # Decoding is also optional, accepts bytes and returns text.
+    # The diagram below is for reading, for writing, the flow is from right to
+    # left, but the code is identical.
+    #
+    #           open as binary         decompress?          decode?
+    # filename ---------------> bytes -------------> bytes ---------> text
+    #
+    try:
+        raw_mode = {'r': 'rb', 'w': 'wb', 'a': 'ab'}[mode]
+    except KeyError:
+        raw_mode = mode
+    raw_fobj = open(fname, raw_mode)
+    decompressed_fobj = compression_wrapper(raw_fobj, fname, raw_mode)
+    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, **kwargs)
+    return decoded_fobj
 
 
 class HttpReadStream(object):

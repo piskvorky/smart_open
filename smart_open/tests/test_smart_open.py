@@ -6,6 +6,7 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 
+import io
 import unittest
 import logging
 import tempfile
@@ -173,6 +174,23 @@ class SmartOpenReadTest(unittest.TestCase):
     Test reading from files under various schemes.
 
     """
+
+    def test_open_with_keywords(self):
+        """This test captures Issue #142."""
+        fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
+        with open(fpath, 'rb') as fin:
+            expected = fin.read().decode('cp852')
+        with smart_open.smart_open(fpath, encoding='cp852') as fin:
+            actual = fin.read()
+        self.assertEqual(expected, actual)
+
+    def test_open_with_keywords_explicit_r(self):
+        fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
+        with open(fpath, 'rb') as fin:
+            expected = fin.read().decode('cp852')
+        with smart_open.smart_open(fpath, mode='r', encoding='cp852') as fin:
+            actual = fin.read()
+        self.assertEqual(expected, actual)
 
     @mock_s3
     def test_read_never_returns_none(self):
