@@ -153,12 +153,7 @@ def smart_open(uri, mode="rb", **kw):
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
-            file_smart_open_kw = {}
-            try:
-                file_smart_open_kw['encoding'] = kw.pop('encoding')
-            except KeyError:
-                pass
-            return file_smart_open(parsed_uri.uri_path, mode, **file_smart_open_kw)
+            return file_smart_open(parsed_uri.uri_path, mode, encoding=kw.pop('encoding', None))
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return s3_open_uri(parsed_uri, mode, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
@@ -574,17 +569,18 @@ def compression_wrapper(file_obj, filename, mode):
         return file_obj
 
 
-def encoding_wrapper(fileobj, mode, **kwargs):
+def encoding_wrapper(fileobj, mode, encoding=None):
     """Decode bytes into text, if necessary.
 
-    If mode specifies binary access, does nothing.
+    If mode specifies binary access, does nothing, unless the encoding is
+    specified.  A non-null encoding implies text mode.
 
     :arg fileobj: must quack like a filehandle object.
     :arg str mode: is the mode which was originally requested by the user.
-    :arg kwargs: contain keyword arguments for TextIOWrapper.
+    :arg encoding: The text encoding to use.  If mode is binary, overrides mode.
     :returns: a file object
     """
-    logger.info('encoding_wrapper: %r', locals())
+    logger.debug('encoding_wrapper: %r', locals())
 
     #
     # If the mode is binary, but the user specified an encoding, assume they
@@ -595,7 +591,6 @@ def encoding_wrapper(fileobj, mode, **kwargs):
     #   smart_open(filename, encoding='utf-8') would return a byte stream
     #       without our assumption, because the default mode is rb.
     #
-    encoding = kwargs.pop("encoding", None)
     if mode in ('rb', 'wb', 'ab') and encoding is None:
         return fileobj
 
@@ -609,11 +604,15 @@ def encoding_wrapper(fileobj, mode, **kwargs):
     return decoder(fileobj)
 
 
-def file_smart_open(fname, mode='rb', **kwargs):
+def file_smart_open(fname, mode='rb', encoding=None):
     """
     Stream from/to local filesystem, transparently (de)compressing gzip and bz2
     files if necessary.
 
+    :arg str fname: The path to the file to open.
+    :arg str mode: The mode in which to open the file.
+    :arg str encoding: The text encoding to use.
+    :returns: A file object
     """
     #
     # This is how we get from the filename to the end result.
@@ -624,6 +623,7 @@ def file_smart_open(fname, mode='rb', **kwargs):
     #
     #           open as binary         decompress?          decode?
     # filename ---------------> bytes -------------> bytes ---------> text
+    #                          raw_fobj        decompressed_fobj   decoded_fobj
     #
     try:
         raw_mode = {'r': 'rb', 'w': 'wb', 'a': 'ab'}[mode]
@@ -631,7 +631,7 @@ def file_smart_open(fname, mode='rb', **kwargs):
         raw_mode = mode
     raw_fobj = open(fname, raw_mode)
     decompressed_fobj = compression_wrapper(raw_fobj, fname, raw_mode)
-    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, **kwargs)
+    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding)
     return decoded_fobj
 
 
