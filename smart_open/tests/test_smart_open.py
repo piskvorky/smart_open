@@ -1015,6 +1015,46 @@ class S3OpenTest(unittest.TestCase):
             smart_open.s3_open_uri(uri, "r")
             mock_open.assert_called_with('bucket', 'key.gz', 'rb')
 
+    @mock_s3
+    def test_read_encoding(self):
+        """Should open the file with the correct encoding, explicit text read."""
+        conn = boto.connect_s3()
+        conn.create_bucket('test-bucket')
+        key = "s3://bucket/key.txt"
+        text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
+        with smart_open.smart_open(key, 'wb') as fout:
+            fout.write(text.encode('koi8-r'))
+        with smart_open.smart_open(key, 'r', encoding='koi8-r') as fin:
+            actual = fin.read()
+        self.assertEqual(text, actual)
+
+    @mock_s3
+    def test_read_encoding_implicit_text(self):
+        """Should open the file with the correct encoding, implicit text read."""
+        conn = boto.connect_s3()
+        conn.create_bucket('test-bucket')
+        key = "s3://bucket/key.txt"
+        text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
+        with smart_open.smart_open(key, 'wb') as fout:
+            fout.write(text.encode('koi8-r'))
+        with smart_open.smart_open(key, encoding='koi8-r') as fin:
+            actual = fin.read()
+        self.assertEqual(text, actual)
+
+    @mock_s3
+    def test_write_encoding(self):
+        """Should open the file for writing with the correct encoding."""
+        conn = boto.connect_s3()
+        conn.create_bucket('test-bucket')
+        key = "s3://bucket/key.txt"
+        text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
+
+        with smart_open.smart_open(key, 'w', encoding='koi8-r') as fout:
+            fout.write(text)
+        with smart_open.smart_open(key, encoding='koi8-r') as fin:
+            actual = fin.read()
+        self.assertEqual(text, actual)
+
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)

@@ -140,10 +140,20 @@ def smart_open(uri, mode="rb", **kw):
     """
     logger.debug('%r', locals())
 
+    #
+    # This is a work-around for the problem described in Issue #144.
+    # If the user has explicitly specified an encoding, then assume they want
+    # us to open the destination in text mode, instead of the default binary.
+    #
+    # If we change the default mode to be text, and match the normal behavior
+    # of Py2 and 3, then the above assumption will be unnecessary.
+    #
+    if kw.get('encoding') is not None and 'b' in mode:
+        mode = mode.replace('b', '')
+
     # validate mode parameter
     if not isinstance(mode, six.string_types):
         raise TypeError('mode should be a string')
-
 
     if isinstance(uri, six.string_types):
         # this method just routes the request to classes handling the specific storage
