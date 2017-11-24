@@ -28,6 +28,7 @@ import subprocess
 import sys
 import requests
 import io
+import warnings
 
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.connection
@@ -167,6 +168,8 @@ def smart_open(uri, mode="rb", **kw):
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return s3_open_uri(parsed_uri, mode, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
+            if kw.get('encoding') is not None:
+                warnings.warn('Issue #146: encoding is not supported for HDFS, ignoring')
             if mode in ('r', 'rb'):
                 return HdfsOpenRead(parsed_uri, **kw)
             if mode in ('w', 'wb'):
@@ -174,6 +177,8 @@ def smart_open(uri, mode="rb", **kw):
             else:
                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         elif parsed_uri.scheme in ("webhdfs", ):
+            if kw.get('encoding') is not None:
+                warnings.warn('Issue #146: encoding is not supported for WebHDFS, ignoring')
             if mode in ('r', 'rb'):
                 return WebHdfsOpenRead(parsed_uri, **kw)
             elif mode in ('w', 'wb'):
@@ -181,6 +186,8 @@ def smart_open(uri, mode="rb", **kw):
             else:
                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         elif parsed_uri.scheme.startswith('http'):
+            if kw.get('encoding') is not None:
+                warnings.warn('Issue #146: encoding is not supported for HTTP, ignoring')
             if mode in ('r', 'rb'):
                 return HttpOpenRead(parsed_uri, **kw)
             else:
