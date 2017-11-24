@@ -77,6 +77,12 @@ WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart upl
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
+_ISSUE_146_FSTR = (
+    "You have explicitly specified encoding=%(encoding)s, but smart_open does "
+    "not currently support decoding text via the %(scheme)s scheme. "
+    "Re-open the file without specifying an encoding to suppress this warning."
+)
+
 
 def smart_open(uri, mode="rb", **kw):
     """
@@ -168,8 +174,9 @@ def smart_open(uri, mode="rb", **kw):
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return s3_open_uri(parsed_uri, mode, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
-            if kw.get('encoding') is not None:
-                warnings.warn('Issue #146: encoding is not supported for HDFS, ignoring')
+            encoding = kw.pop('encoding')
+            if encoding is not None:
+                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
             if mode in ('r', 'rb'):
                 return HdfsOpenRead(parsed_uri, **kw)
             if mode in ('w', 'wb'):
@@ -177,8 +184,9 @@ def smart_open(uri, mode="rb", **kw):
             else:
                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         elif parsed_uri.scheme in ("webhdfs", ):
-            if kw.get('encoding') is not None:
-                warnings.warn('Issue #146: encoding is not supported for WebHDFS, ignoring')
+            encoding = kw.pop('encoding')
+            if encoding is not None:
+                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
             if mode in ('r', 'rb'):
                 return WebHdfsOpenRead(parsed_uri, **kw)
             elif mode in ('w', 'wb'):
@@ -186,8 +194,9 @@ def smart_open(uri, mode="rb", **kw):
             else:
                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         elif parsed_uri.scheme.startswith('http'):
-            if kw.get('encoding') is not None:
-                warnings.warn('Issue #146: encoding is not supported for HTTP, ignoring')
+            encoding = kw.pop('encoding')
+            if encoding is not None:
+                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
             if mode in ('r', 'rb'):
                 return HttpOpenRead(parsed_uri, **kw)
             else:

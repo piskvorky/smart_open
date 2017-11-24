@@ -333,6 +333,17 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object.__iter__()
         mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-text", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
 
+    @mock.patch('smart_open.smart_open_lib.subprocess')
+    def test_hdfs_encoding(self, mock_subprocess):
+        """Is HDFS line iterator called correctly?"""
+        mock_subprocess.PIPE.return_value = "test"
+        with mock.patch('warnings.warn') as warn:
+            smart_open.smart_open("hdfs:///tmp/test.txt", encoding='utf-8')
+            expected = smart_open.smart_open_lib._ISSUE_146_FSTR % {
+                'encoding': 'utf-8', 'scheme': 'hdfs'
+            }
+            warn.assert_called_with(expected)
+
     @responses.activate
     def test_webhdfs(self):
         """Is webhdfs line iterator called correctly"""
@@ -341,6 +352,18 @@ class SmartOpenReadTest(unittest.TestCase):
         iterator = iter(smart_open_object)
         self.assertEqual(next(iterator).decode("utf-8"), "line1")
         self.assertEqual(next(iterator).decode("utf-8"), "line2")
+
+    @mock.patch('smart_open.smart_open_lib.subprocess')
+    def test_webhdfs_encoding(self, mock_subprocess):
+        """Is HDFS line iterator called correctly?"""
+        url = "webhdfs://127.0.0.1:8440/path/file"
+        mock_subprocess.PIPE.return_value = "test"
+        with mock.patch('warnings.warn') as warn:
+            smart_open.smart_open(url, encoding='utf-8')
+            expected = smart_open.smart_open_lib._ISSUE_146_FSTR % {
+                'encoding': 'utf-8', 'scheme': 'webhdfs'
+            }
+            warn.assert_called_with(expected)
 
     @responses.activate
     def test_webhdfs_read(self):
