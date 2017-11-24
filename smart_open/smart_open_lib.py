@@ -174,7 +174,7 @@ def smart_open(uri, mode="rb", **kw):
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return s3_open_uri(parsed_uri, mode, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
-            encoding = kw.pop('encoding')
+            encoding = kw.pop('encoding', None)
             if encoding is not None:
                 warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
             if mode in ('r', 'rb'):
@@ -184,7 +184,7 @@ def smart_open(uri, mode="rb", **kw):
             else:
                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         elif parsed_uri.scheme in ("webhdfs", ):
-            encoding = kw.pop('encoding')
+            encoding = kw.pop('encoding', None)
             if encoding is not None:
                 warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
             if mode in ('r', 'rb'):
@@ -194,7 +194,7 @@ def smart_open(uri, mode="rb", **kw):
             else:
                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         elif parsed_uri.scheme.startswith('http'):
-            encoding = kw.pop('encoding')
+            encoding = kw.pop('encoding', None)
             if encoding is not None:
                 warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
             if mode in ('r', 'rb'):
