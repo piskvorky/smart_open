@@ -333,6 +333,17 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object.__iter__()
         mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-text", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
 
+    @mock.patch('smart_open.smart_open_lib.subprocess')
+    def test_hdfs_encoding(self, mock_subprocess):
+        """Is HDFS line iterator called correctly?"""
+        mock_subprocess.PIPE.return_value = "test"
+        with mock.patch('warnings.warn') as warn:
+            smart_open.smart_open("hdfs:///tmp/test.txt", encoding='utf-8')
+            expected = smart_open.smart_open_lib._ISSUE_146_FSTR % {
+                'encoding': 'utf-8', 'scheme': 'hdfs'
+            }
+            warn.assert_called_with(expected)
+
     @responses.activate
     def test_webhdfs(self):
         """Is webhdfs line iterator called correctly"""
@@ -341,6 +352,18 @@ class SmartOpenReadTest(unittest.TestCase):
         iterator = iter(smart_open_object)
         self.assertEqual(next(iterator).decode("utf-8"), "line1")
         self.assertEqual(next(iterator).decode("utf-8"), "line2")
+
+    @mock.patch('smart_open.smart_open_lib.subprocess')
+    def test_webhdfs_encoding(self, mock_subprocess):
+        """Is HDFS line iterator called correctly?"""
+        url = "webhdfs://127.0.0.1:8440/path/file"
+        mock_subprocess.PIPE.return_value = "test"
+        with mock.patch('warnings.warn') as warn:
+            smart_open.smart_open(url, encoding='utf-8')
+            expected = smart_open.smart_open_lib._ISSUE_146_FSTR % {
+                'encoding': 'utf-8', 'scheme': 'webhdfs'
+            }
+            warn.assert_called_with(expected)
 
     @responses.activate
     def test_webhdfs_read(self):
@@ -1014,6 +1037,46 @@ class S3OpenTest(unittest.TestCase):
         with mock.patch('smart_open.smart_open_s3.open') as mock_open:
             smart_open.s3_open_uri(uri, "r")
             mock_open.assert_called_with('bucket', 'key.gz', 'rb')
+
+    @mock_s3
+    def test_read_encoding(self):
+        """Should open the file with the correct encoding, explicit text read."""
+        conn = boto.connect_s3()
+        conn.create_bucket('test-bucket')
+        key = "s3://bucket/key.txt"
+        text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
+        with smart_open.smart_open(key, 'wb') as fout:
+            fout.write(text.encode('koi8-r'))
+        with smart_open.smart_open(key, 'r', encoding='koi8-r') as fin:
+            actual = fin.read()
+        self.assertEqual(text, actual)
+
+    @mock_s3
+    def test_read_encoding_implicit_text(self):
+        """Should open the file with the correct encoding, implicit text read."""
+        conn = boto.connect_s3()
+        conn.create_bucket('test-bucket')
+        key = "s3://bucket/key.txt"
+        text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
+        with smart_open.smart_open(key, 'wb') as fout:
+            fout.write(text.encode('koi8-r'))
+        with smart_open.smart_open(key, encoding='koi8-r') as fin:
+            actual = fin.read()
+        self.assertEqual(text, actual)
+
+    @mock_s3
+    def test_write_encoding(self):
+        """Should open the file for writing with the correct encoding."""
+        conn = boto.connect_s3()
+        conn.create_bucket('test-bucket')
+        key = "s3://bucket/key.txt"
+        text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
+
+        with smart_open.smart_open(key, 'w', encoding='koi8-r') as fout:
+            fout.write(text)
+        with smart_open.smart_open(key, encoding='koi8-r') as fin:
+            actual = fin.read()
+        self.assertEqual(text, actual)
 
 
 if __name__ == '__main__':

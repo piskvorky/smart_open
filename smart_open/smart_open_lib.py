@@ -28,6 +28,7 @@ import subprocess
 import sys
 import requests
 import io
+import warnings
 
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.connection
@@ -75,6 +76,12 @@ import smart_open.s3 as smart_open_s3
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
+
+_ISSUE_146_FSTR = (
+    "You have explicitly specified encoding=%(encoding)s, but smart_open does "
+    "not currently support decoding text via the %(scheme)s scheme. "
+    "Re-open the file without specifying an encoding to suppress this warning."
+)
 
 
 def smart_open(uri, mode="rb", **kw):
@@ -140,10 +147,20 @@ def smart_open(uri, mode="rb", **kw):
     """
     logger.debug('%r', locals())
 
+    #
+    # This is a work-around for the problem described in Issue #144.
+    # If the user has explicitly specified an encoding, then assume they want
+    # us to open the destination in text mode, instead of the default binary.
+    #
+    # If we change the default mode to be text, and match the normal behavior
+    # of Py2 and 3, then the above assumption will be unnecessary.
+    #
+    if kw.get('encoding') is not None and 'b' in mode:
+        mode = mode.replace('b', '')
+
     # validate mode parameter
     if not isinstance(mode, six.string_types):
         raise TypeError('mode should be a string')
-
 
     if isinstance(uri, six.string_types):
         # this method just routes the request to classes handling the specific storage
@@ -157,6 +174,9 @@ def smart_open(uri, mode="rb", **kw):
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return s3_open_uri(parsed_uri, mode, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
+            encoding = kw.pop('encoding', None)
+            if encoding is not None:
+                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
             if mode in ('r', 'rb'):
                 return HdfsOpenRead(parsed_uri, **kw)
             if mode in ('w', 'wb'):
@@ -164,6 +184,9 @@ def smart_open(uri, mode="rb", **kw):
             else:
                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         elif parsed_uri.scheme in ("webhdfs", ):
+            encoding = kw.pop('encoding', None)
+            if encoding is not None:
+                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
             if mode in ('r', 'rb'):
                 return WebHdfsOpenRead(parsed_uri, **kw)
             elif mode in ('w', 'wb'):
@@ -171,6 +194,9 @@ def smart_open(uri, mode="rb", **kw):
             else:
                 raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
         elif parsed_uri.scheme.startswith('http'):
+            encoding = kw.pop('encoding', None)
+            if encoding is not None:
+                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
             if mode in ('r', 'rb'):
                 return HttpOpenRead(parsed_uri, **kw)
             else:
