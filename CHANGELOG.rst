@@ -1,3 +1,13 @@
+* 1.5.4, 30th November 2017
+
+  - Add naitive .gz support for HDFS (PR [#128](https://github.com/RaRe-Technologies/smart_open/pull/128), [@yupbank](https://github.com/))
+  - Drop python2.6 support + fix style (PR [#137](https://github.com/RaRe-Technologies/smart_open/pull/137), [@menshikh-iv](https://github.com/))
+  - Create separate compression-specific layer. Fix [#91](https://github.com/RaRe-Technologies/smart_open/issues/91) (PR [#131](https://github.com/RaRe-Technologies/smart_open/pull/131), [@mpenkov](https://github.com/))
+  - Fix ResourceWarnings + replace deprecated assertEquals (PR [#140](https://github.com/RaRe-Technologies/smart_open/pull/140), [@horpto](https://github.com/))
+  - Add encoding parameter to smart_open. Fix [#142](https://github.com/RaRe-Technologies/smart_open/issues/142) (PR [#143](https://github.com/RaRe-Technologies/smart_open/pull/143), [@mpenkov](https://github.com/))
+  - Add encoding tests for readers. Fix [#145](https://github.com/RaRe-Technologies/smart_open/issues/145), partial fix [#146](https://github.com/RaRe-Technologies/smart_open/issues/146) (PR [#147](https://github.com/RaRe-Technologies/smart_open/pull/147), [@mpenkov](https://github.com/))
+  - Fix file mode for updating case (PR [#150](https://github.com/RaRe-Technologies/smart_open/pull/150), [@menshikh-iv](https://github.com/))
+
 * 1.5.3, 18th May 2017
 
   - Remove GET parameters from url. Fix #120 (PR #121, @mcrowson)
