@@ -617,7 +617,7 @@ def encoding_wrapper(fileobj, mode, encoding=None):
     #   smart_open(filename, encoding='utf-8') would return a byte stream
     #       without our assumption, because the default mode is rb.
     #
-    if mode in ('rb', 'wb', 'ab') and encoding is None:
+    if 'b' in mode and encoding is None:
         return fileobj
 
     if encoding is None:
@@ -651,7 +651,7 @@ def file_smart_open(fname, mode='rb', encoding=None):
     # filename ---------------> bytes -------------> bytes ---------> text
     #                          raw_fobj        decompressed_fobj   decoded_fobj
     #
-    try:
+    try:  # TODO need to fix this place (for cases with r+ and so on)
         raw_mode = {'r': 'rb', 'w': 'wb', 'a': 'ab'}[mode]
     except KeyError:
         raw_mode = mode
