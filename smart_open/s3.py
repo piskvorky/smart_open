@@ -96,9 +96,11 @@ class BufferedInputBase(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key, **kwargs):
-        session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        s3 = session.resource('s3', **kwargs)
+    def __init__(self, bucket, key, s3=None, **kwargs):
+        if not s3:
+            session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
+            s3 = session.resource('s3', **kwargs)
+        
         self._object = s3.Object(bucket, key)
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
@@ -241,13 +243,14 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key, min_part_size=DEFAULT_MIN_PART_SIZE, **kwargs):
+    def __init__(self, bucket, key, min_part_size=DEFAULT_MIN_PART_SIZE, s3=None, **kwargs):
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
 
-        session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        s3 = session.resource('s3', **kwargs)
+        if not s3:
+            session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
+            s3 = session.resource('s3', **kwargs)
 
         #
         # https://stackoverflow.com/questions/26871884/how-can-i-easily-determine-if-a-boto-3-s3-bucket-resource-exists
