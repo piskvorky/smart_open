@@ -223,16 +223,22 @@ class BufferedInputBase(io.BufferedIOBase):
             raise NotImplementedError('limits other than -1 not implemented yet')
         the_line = io.BytesIO()
         while not (self._eof and len(self._buffer) == 0):
-            try:
+            #
+            # In the worst case, we're reading self._buffer twice here, once in
+            # the if condition, and once when calling index.
+            #
+            # This is sub-optimal, but better than the alternative: wrapping
+            # .index in a try..except, because that is slower.
+            #
+            if self._line_terminator in self._buffer:
                 next_newline = self._buffer.index(self._line_terminator)
-            except ValueError:
-                the_line.write(self._buffer)
-                self._buffer = b''
-                self._fill_buffer(self._buffer_size)
-            else:
                 the_line.write(self._buffer[:next_newline + 1])
                 self._buffer = self._buffer[next_newline + 1:]
                 break
+            else:
+                the_line.write(self._buffer)
+                self._buffer = b''
+                self._fill_buffer(self._buffer_size)
         return the_line.getvalue()
 
     def terminate(self):
