@@ -29,7 +29,6 @@ MODES = (READ, READ_BINARY, WRITE, WRITE_BINARY)
 """Allowed I/O modes for working with S3."""
 
 BINARY_NEWLINE = b'\n'
-TEXT_NEWLINE = b'\n'
 DEFAULT_BUFFER_SIZE = 256 * 1024
 
 
