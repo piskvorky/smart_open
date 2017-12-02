@@ -28,6 +28,10 @@ WRITE_BINARY = 'wb'
 MODES = (READ, READ_BINARY, WRITE, WRITE_BINARY)
 """Allowed I/O modes for working with S3."""
 
+BINARY_NEWLINE = b'\n'
+TEXT_NEWLINE = b'\n'
+DEFAULT_BUFFER_SIZE = 256 * 1024
+
 
 def _range_string(start, stop=None):
     #
@@ -47,7 +51,6 @@ def open(bucket_id, key_id, mode, **kwargs):
     if mode not in MODES:
         raise NotImplementedError('bad mode: %r expected one of %r' % (mode, MODES))
 
-    buffer_size = kwargs.pop("buffer_size", io.DEFAULT_BUFFER_SIZE)
     encoding = kwargs.pop("encoding", "utf-8")
     errors = kwargs.pop("errors", None)
     newline = kwargs.pop("newline", None)
@@ -96,7 +99,8 @@ class BufferedInputBase(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key, **kwargs):
+    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
+                 line_terminator=BINARY_NEWLINE, **kwargs):
         session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
         s3 = session.resource('s3', **kwargs)
         self._object = s3.Object(bucket, key)
@@ -105,6 +109,8 @@ class BufferedInputBase(io.BufferedIOBase):
         self._current_pos = 0
         self._buffer = b''
         self._eof = False
+        self._buffer_size = buffer_size
+        self._line_terminator = line_terminator
 
         #
         # This member is part of the io.BufferedIOBase interface.
@@ -195,14 +201,7 @@ class BufferedInputBase(io.BufferedIOBase):
         # Fill our buffer to the required size.
         #
         # logger.debug('filling %r byte-long buffer up to %r bytes', len(self._buffer), size)
-        while len(self._buffer) < size and not self._eof:
-            raw = self._raw_reader.read(size=io.DEFAULT_BUFFER_SIZE)
-            if len(raw):
-                self._buffer += raw
-            else:
-                logger.debug('reached EOF while filling buffer')
-                self._eof = True
-
+        self._fill_buffer(size)
         return self._read_from_buffer(size)
 
     def read1(self, size=-1):
@@ -217,6 +216,24 @@ class BufferedInputBase(io.BufferedIOBase):
             return 0
         b[:len(data)] = data
         return len(data)
+
+    def readline(self, limit=-1):
+        """Read up to and including the next newline.  Returns the bytes read."""
+        if limit != -1:
+            raise NotImplementedError('limits other than -1 not implemented yet')
+        the_line = io.BytesIO()
+        while not (self._eof and len(self._buffer) == 0):
+            try:
+                next_newline = self._buffer.index(self._line_terminator)
+            except ValueError:
+                the_line.write(self._buffer)
+                self._buffer = b''
+                self._fill_buffer(self._buffer_size)
+            else:
+                the_line.write(self._buffer[:next_newline + 1])
+                self._buffer = self._buffer[next_newline + 1:]
+                break
+        return the_line.getvalue()
 
     def terminate(self):
         """Do nothing."""
@@ -234,6 +251,15 @@ class BufferedInputBase(io.BufferedIOBase):
         self._current_pos += len(part)
         # logger.debug('part: %r', part)
         return part
+
+    def _fill_buffer(self, size):
+        while len(self._buffer) < size and not self._eof:
+            raw = self._raw_reader.read(size=self._buffer_size)
+            if len(raw):
+                self._buffer += raw
+            else:
+                logger.debug('reached EOF while filling buffer')
+                self._eof = True
 
 
 class BufferedOutputBase(io.BufferedIOBase):

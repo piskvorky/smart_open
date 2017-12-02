@@ -155,6 +155,26 @@ class BufferedInputBaseTest(unittest.TestCase):
 
         self.assertEqual(expected, actual)
 
+    def test_readline(self):
+        content = b'englishman\nin\nnew\nyork\n'
+        create_bucket_and_key(contents=content)
+
+        with smart_open.s3.BufferedInputBase('mybucket', 'mykey') as fin:
+            actual = list(fin)
+
+        expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
+        self.assertEqual(expected, actual)
+
+    def test_readline_tiny_buffer(self):
+        content = b'englishman\nin\nnew\nyork\n'
+        create_bucket_and_key(contents=content)
+
+        with smart_open.s3.BufferedInputBase('mybucket', 'mykey', buffer_size=8) as fin:
+            actual = list(fin)
+
+        expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
+        self.assertEqual(expected, actual)
+
 
 @moto.mock_s3
 class BufferedOutputBaseTest(unittest.TestCase):
