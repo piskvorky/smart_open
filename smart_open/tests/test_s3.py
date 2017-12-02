@@ -284,6 +284,12 @@ class BufferedOutputBaseTest(unittest.TestCase):
             actual = [line.rstrip() for line in fin]
         self.assertEqual(expected, actual)
 
+    def test_nonexisting_bucket(self):
+        expected = u"выйду ночью в поле с конём".encode('utf-8')
+        with self.assertRaises(ValueError):
+            with smart_open.s3.open('thisbucketdoesntexist', 'mykey', 'wb') as fout:
+                fout.write(expected)
+
 
 class ClampTest(unittest.TestCase):
     def test(self):
