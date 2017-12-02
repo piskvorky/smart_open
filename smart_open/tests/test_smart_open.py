@@ -1042,7 +1042,7 @@ class S3OpenTest(unittest.TestCase):
     def test_read_encoding(self):
         """Should open the file with the correct encoding, explicit text read."""
         conn = boto.connect_s3()
-        conn.create_bucket('test-bucket')
+        conn.create_bucket('bucket')
         key = "s3://bucket/key.txt"
         text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
         with smart_open.smart_open(key, 'wb') as fout:
@@ -1055,7 +1055,7 @@ class S3OpenTest(unittest.TestCase):
     def test_read_encoding_implicit_text(self):
         """Should open the file with the correct encoding, implicit text read."""
         conn = boto.connect_s3()
-        conn.create_bucket('test-bucket')
+        conn.create_bucket('bucket')
         key = "s3://bucket/key.txt"
         text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
         with smart_open.smart_open(key, 'wb') as fout:
@@ -1068,7 +1068,7 @@ class S3OpenTest(unittest.TestCase):
     def test_write_encoding(self):
         """Should open the file for writing with the correct encoding."""
         conn = boto.connect_s3()
-        conn.create_bucket('test-bucket')
+        conn.create_bucket('bucket')
         key = "s3://bucket/key.txt"
         text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
 
