@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import contextlib
 import logging
 import gzip
 import io
@@ -131,7 +130,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         expected = u'раcцветали яблони и груши, поплыли туманы над рекой...'.encode('utf-8')
         buf = io.BytesIO()
         buf.close = lambda: None  # keep buffer open so that we can .getvalue()
-        with contextlib.closing(gzip.GzipFile(fileobj=buf, mode='w')) as zipfile:
+        with gzip.GzipFile(fileobj=buf, mode='w') as zipfile:
             zipfile.write(expected)
         create_bucket_and_key(contents=buf.getvalue())
 
@@ -145,12 +144,12 @@ class BufferedInputBaseTest(unittest.TestCase):
         # Make sure the buffer we wrote is legitimate gzip.
         #
         sanity_buf = io.BytesIO(buf.getvalue())
-        with contextlib.closing(gzip.GzipFile(fileobj=sanity_buf)) as zipfile:
+        with gzip.GzipFile(fileobj=sanity_buf) as zipfile:
             self.assertEqual(zipfile.read(), expected)
 
         _LOGGER.debug('starting actual test')
         with smart_open.s3.BufferedInputBase('mybucket', 'mykey') as fin:
-            with contextlib.closing(gzip.GzipFile(fileobj=fin)) as zipfile:
+            with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
         self.assertEqual(expected, actual)
@@ -261,11 +260,11 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
         with smart_open.s3.BufferedOutputBase('mybucket', 'writekey') as fout:
-            with contextlib.closing(gzip.GzipFile(fileobj=fout, mode='w')) as zipfile:
+            with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
                 zipfile.write(expected)
 
         with smart_open.s3.BufferedInputBase('mybucket', 'writekey') as fin:
-            with contextlib.closing(gzip.GzipFile(fileobj=fin)) as zipfile:
+            with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
         self.assertEqual(expected, actual)

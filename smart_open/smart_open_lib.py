@@ -41,7 +41,6 @@ IS_PY2 = (sys.version_info[0] == 2)
 
 if IS_PY2:
     import cStringIO as StringIO
-import contextlib
 
 if sys.version_info[0] == 2:
     import httplib
@@ -304,7 +303,7 @@ def _detect_codec(filename):
 
 
 def _wrap_gzip(fileobj, mode):
-    return contextlib.closing(gzip.GzipFile(fileobj=fileobj, mode=mode))
+    return gzip.GzipFile(fileobj=fileobj, mode=mode)
 
 
 def _wrap_none(fileobj, mode):
