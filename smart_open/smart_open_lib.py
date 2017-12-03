@@ -82,6 +82,8 @@ _ISSUE_146_FSTR = (
     "Re-open the file without specifying an encoding to suppress this warning."
 )
 
+DEFAULT_ERRORS = 'strict'
+
 
 def smart_open(uri, mode="rb", **kw):
     """
@@ -169,7 +171,9 @@ def smart_open(uri, mode="rb", **kw):
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
-            return file_smart_open(parsed_uri.uri_path, mode, encoding=kw.pop('encoding', None))
+            encoding = kw.pop('encoding', None)
+            errors = kw.pop('errors', DEFAULT_ERRORS)
+            return file_smart_open(parsed_uri.uri_path, mode, encoding=encoding, errors=errors)
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return s3_open_uri(parsed_uri, mode, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
@@ -237,12 +241,12 @@ def s3_open_uri(parsed_uri, mode, **kwargs):
     # Codecs work on a byte-level, so the underlying S3 object should
     # always be reading bytes.
     #
-    if codec and mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
+    if mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
         s3_mode = smart_open_s3.READ_BINARY
-    elif codec and mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
+    elif mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
         s3_mode = smart_open_s3.WRITE_BINARY
     else:
-        s3_mode = mode
+        raise NotImplementedError('mode %r not implemented for S3' % mode)
 
     #
     # TODO: I'm not sure how to handle this with boto3.  Any ideas?
@@ -251,8 +255,12 @@ def s3_open_uri(parsed_uri, mode, **kwargs):
     #
     # _setup_unsecured_mode()
 
+    encoding = kwargs.get('encoding')
+    errors = kwargs.get('errors', DEFAULT_ERRORS)
     fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, s3_mode, **kwargs)
-    return _CODECS[codec](fobj, mode)
+    decompressed_fobj = _CODECS[codec](fobj, mode)
+    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
+    return decoded_fobj
 
 
 def _setup_unsecured_mode(parsed_uri, kwargs):
@@ -284,16 +292,20 @@ def s3_open_key(key, mode, **kwargs):
     # Codecs work on a byte-level, so the underlying S3 object should
     # always be reading bytes.
     #
-    if codec and mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
+    if mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
         s3_mode = smart_open_s3.READ_BINARY
-    elif codec and mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
+    elif mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
         s3_mode = smart_open_s3.WRITE_BINARY
     else:
-        s3_mode = mode
+        raise NotImplementedError('mode %r not implemented for S3' % mode)
 
     logging.debug('codec: %r mode: %r s3_mode: %r', codec, mode, s3_mode)
+    encoding = kwargs.get('encoding')
+    errors = kwargs.get('errors', DEFAULT_ERRORS)
     fobj = smart_open_s3.open(key.bucket.name, key.name, s3_mode, **kwargs)
-    return _CODECS[codec](fobj, mode)
+    decompressed_fobj = _CODECS[codec](fobj, mode)
+    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
+    return decoded_fobj
 
 
 def _detect_codec(filename):
@@ -594,7 +606,7 @@ def compression_wrapper(file_obj, filename, mode):
         return file_obj
 
 
-def encoding_wrapper(fileobj, mode, encoding=None):
+def encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
@@ -602,7 +614,8 @@ def encoding_wrapper(fileobj, mode, encoding=None):
 
     :arg fileobj: must quack like a filehandle object.
     :arg str mode: is the mode which was originally requested by the user.
-    :arg encoding: The text encoding to use.  If mode is binary, overrides mode.
+    :arg str encoding: The text encoding to use.  If mode is binary, overrides mode.
+    :arg str errors: The method to use when handling encoding/decoding errors.
     :returns: a file object
     """
     logger.debug('encoding_wrapper: %r', locals())
@@ -626,10 +639,10 @@ def encoding_wrapper(fileobj, mode, encoding=None):
         decoder = codecs.getreader(encoding)
     else:
         decoder = codecs.getwriter(encoding)
-    return decoder(fileobj)
+    return decoder(fileobj, errors=errors)
 
 
-def file_smart_open(fname, mode='rb', encoding=None):
+def file_smart_open(fname, mode='rb', encoding=None, errors=DEFAULT_ERRORS):
     """
     Stream from/to local filesystem, transparently (de)compressing gzip and bz2
     files if necessary.
@@ -637,6 +650,7 @@ def file_smart_open(fname, mode='rb', encoding=None):
     :arg str fname: The path to the file to open.
     :arg str mode: The mode in which to open the file.
     :arg str encoding: The text encoding to use.
+    :arg str errors: The method to use when handling encoding/decoding errors.
     :returns: A file object
     """
     #
@@ -656,7 +670,7 @@ def file_smart_open(fname, mode='rb', encoding=None):
         raw_mode = mode
     raw_fobj = open(fname, raw_mode)
     decompressed_fobj = compression_wrapper(raw_fobj, fname, raw_mode)
-    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding)
+    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
     return decoded_fobj
 
 
