@@ -977,12 +977,15 @@ class S3OpenTest(unittest.TestCase):
         text = u"физкульт-привет!"
         key.set_contents_from_string(text.encode("utf-8"))
 
-        with smart_open.s3_open_key(key, "r") as fin:
-            self.assertEqual(fin.read(), u"физкульт-привет!")
+        with smart_open.s3_open_key(key, "rb") as fin:
+            self.assertEqual(fin.read(), text.encode('utf-8'))
+
+        with smart_open.s3_open_key(key, "r", encoding='utf-8') as fin:
+            self.assertEqual(fin.read(), text)
 
         parsed_uri = smart_open.ParseUri("s3://bucket/key")
-        with smart_open.s3_open_uri(parsed_uri, "r") as fin:
-            self.assertEqual(fin.read(), u"физкульт-привет!")
+        with smart_open.s3_open_uri(parsed_uri, "r", encoding='utf-8') as fin:
+            self.assertEqual(fin.read(), text)
 
     def test_bad_mode(self):
         """Bad mode should raise and exception."""
