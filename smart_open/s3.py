@@ -58,7 +58,7 @@ def open(bucket_id, key_id, mode, **kwargs):
     s3_min_part_size = kwargs.pop("s3_min_part_size", DEFAULT_MIN_PART_SIZE)
 
     if mode in (READ, READ_BINARY):
-        fileobj = BufferedInputBase(bucket_id, key_id, **kwargs)
+        fileobj = SeekableBufferedInputBase(bucket_id, key_id, **kwargs)
     elif mode in (WRITE, WRITE_BINARY):
         fileobj = BufferedOutputBase(bucket_id, key_id, min_part_size=s3_min_part_size, **kwargs)
     else:
