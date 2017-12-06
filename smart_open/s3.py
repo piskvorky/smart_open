@@ -30,7 +30,7 @@ MODES = (READ, READ_BINARY, WRITE, WRITE_BINARY)
 """Allowed I/O modes for working with S3."""
 
 BINARY_NEWLINE = b'\n'
-DEFAULT_BUFFER_SIZE = 256 * 1024
+DEFAULT_BUFFER_SIZE = 128 * 1024
 
 
 def _range_string(start, stop=None):
