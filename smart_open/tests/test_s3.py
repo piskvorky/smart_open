@@ -29,7 +29,7 @@ def create_bucket_and_key(bucket_name='mybucket', key_name='mykey', contents=Non
 
 
 @moto.mock_s3
-class BufferedInputBaseTest(unittest.TestCase):
+class SeekableBufferedInputBaseTest(unittest.TestCase):
     def setUp(self):
         # lower the multipart upload size, to speed up these tests
         self.old_min_part_size = smart_open.s3.DEFAULT_MIN_PART_SIZE
@@ -45,7 +45,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         create_bucket_and_key(contents=expected)
 
         # connect to fake s3 and read from the fake key we filled above
-        fin = smart_open.s3.BufferedInputBase('mybucket', 'mykey')
+        fin = smart_open.s3.SeekableBufferedInputBase('mybucket', 'mykey')
         output = [line.rstrip(b'\n') for line in fin]
         self.assertEqual(output, expected.split(b'\n'))
 
@@ -53,7 +53,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         # same thing but using a context manager
         expected = u"hello wořld\nhow are you?".encode('utf8')
         create_bucket_and_key(contents=expected)
-        with smart_open.s3.BufferedInputBase('mybucket', 'mykey') as fin:
+        with smart_open.s3.SeekableBufferedInputBase('mybucket', 'mykey') as fin:
             output = [line.rstrip(b'\n') for line in fin]
             self.assertEqual(output, expected.split(b'\n'))
 
@@ -63,7 +63,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         create_bucket_and_key(contents=content)
         _LOGGER.debug('content: %r len: %r', content, len(content))
 
-        fin = smart_open.s3.BufferedInputBase('mybucket', 'mykey')
+        fin = smart_open.s3.SeekableBufferedInputBase('mybucket', 'mykey')
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
         self.assertEqual(content[14:], fin.read())  # read the rest
@@ -137,7 +137,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         #
         # Make sure we're reading things correctly.
         #
-        with smart_open.s3.BufferedInputBase('mybucket', 'mykey') as fin:
+        with smart_open.s3.SeekableBufferedInputBase('mybucket', 'mykey') as fin:
             self.assertEqual(fin.read(), buf.getvalue())
 
         #
@@ -148,7 +148,7 @@ class BufferedInputBaseTest(unittest.TestCase):
             self.assertEqual(zipfile.read(), expected)
 
         _LOGGER.debug('starting actual test')
-        with smart_open.s3.BufferedInputBase('mybucket', 'mykey') as fin:
+        with smart_open.s3.SeekableBufferedInputBase('mybucket', 'mykey') as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
@@ -263,7 +263,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
             with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
                 zipfile.write(expected)
 
-        with smart_open.s3.BufferedInputBase('mybucket', 'writekey') as fin:
+        with smart_open.s3.SeekableBufferedInputBase('mybucket', 'writekey') as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
