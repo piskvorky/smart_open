@@ -293,29 +293,29 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None)
+        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
 
         full_path = '/tmp/test#hash##more.txt'
         read_mode = "rb"
         smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None)
+        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
 
         full_path = 'aa#aa'
         read_mode = "rb"
         smart_open_object = smart_open.smart_open(full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None)
+        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
 
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)
 
-        smart_open_object = smart_open.smart_open(prefix+short_path, read_mode)
+        smart_open_object = smart_open.smart_open(prefix+short_path, read_mode, errors='strict')
         smart_open_object.__iter__()
         # called with the correct expanded path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None)
+        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
 
     # couldn't find any project for mocking up HDFS data
     # TODO: we want to test also a content of the files, not just fnc call params
@@ -420,6 +420,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
         self.assertEqual(content[14:], smart_open_object.read())  # read the rest
 
+    @unittest.skip('seek functionality for S3 currently disabled because of Issue #152')
     @mock_s3
     def test_s3_seek_moto(self):
         """Does seeking in S3 files work correctly?"""
@@ -485,15 +486,15 @@ class SmartOpenTest(unittest.TestCase):
 
         # correct read modes
         smart_open.smart_open("blah", "r")
-        mock_file.assert_called_with("blah", "r", encoding=None)
+        mock_file.assert_called_with("blah", "r", encoding=None, errors='strict')
 
         smart_open.smart_open("blah", "rb")
-        mock_file.assert_called_with("blah", "rb", encoding=None)
+        mock_file.assert_called_with("blah", "rb", encoding=None, errors='strict')
 
         short_path = "~/blah"
         full_path = os.path.expanduser(short_path)
         smart_open.smart_open(short_path, "rb")
-        mock_file.assert_called_with(full_path, "rb", encoding=None)
+        mock_file.assert_called_with(full_path, "rb", encoding=None, errors='strict')
 
         # correct write modes, incorrect scheme
         self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb+")
@@ -502,16 +503,16 @@ class SmartOpenTest(unittest.TestCase):
 
         # correct write mode, correct file:// URI
         smart_open.smart_open("blah", "w")
-        mock_file.assert_called_with("blah", "w", encoding=None)
+        mock_file.assert_called_with("blah", "w", encoding=None, errors='strict')
 
         smart_open.smart_open("file:///some/file.txt", "wb")
-        mock_file.assert_called_with("/some/file.txt", "wb", encoding=None)
+        mock_file.assert_called_with("/some/file.txt", "wb", encoding=None, errors='strict')
 
         smart_open.smart_open("file:///some/file.txt", "wb+")
-        mock_file.assert_called_with("/some/file.txt", "wb+", encoding=None)
+        mock_file.assert_called_with("/some/file.txt", "wb+", encoding=None, errors='strict')
 
         smart_open.smart_open("file:///some/file.txt", "w+")
-        mock_file.assert_called_with("/some/file.txt", "w+", encoding=None)
+        mock_file.assert_called_with("/some/file.txt", "w+", encoding=None, errors='strict')
 
     @mock.patch('boto3.Session')
     def test_s3_mode_mock(self, mock_session):
@@ -594,6 +595,32 @@ class SmartOpenTest(unittest.TestCase):
         output = list(smart_open.smart_open("s3://mybucket/newkey", "rb"))
 
         self.assertEqual(output, [test_string])
+
+    @mock_s3
+    def test_write_bad_encoding_strict(self):
+        """Should abort on encoding error."""
+        text = u'欲しい気持ちが成長しすぎて'
+
+        with self.assertRaises(UnicodeEncodeError):
+            with tempfile.NamedTemporaryFile('wb', delete=True) as infile:
+                with smart_open.smart_open(infile.name, 'w', encoding='koi8-r',
+                                           errors='strict') as fout:
+                    fout.write(text)
+
+    @mock_s3
+    def test_write_bad_encoding_replace(self):
+        """Should replace characters that failed to encode."""
+        text = u'欲しい気持ちが成長しすぎて'
+        expected = u'?' * len(text)
+
+        with tempfile.NamedTemporaryFile('wb', delete=True) as infile:
+            with smart_open.smart_open(infile.name, 'w', encoding='koi8-r',
+                                       errors='replace') as fout:
+                fout.write(text)
+            with smart_open.smart_open(infile.name, 'r', encoding='koi8-r') as fin:
+                actual = fin.read()
+
+        self.assertEqual(expected, actual)
 
 
 class WebHdfsWriteTest(unittest.TestCase):
@@ -951,12 +978,15 @@ class S3OpenTest(unittest.TestCase):
         text = u"физкульт-привет!"
         key.set_contents_from_string(text.encode("utf-8"))
 
-        with smart_open.s3_open_key(key, "r") as fin:
-            self.assertEqual(fin.read(), u"физкульт-привет!")
+        with smart_open.s3_open_key(key, "rb") as fin:
+            self.assertEqual(fin.read(), text.encode('utf-8'))
+
+        with smart_open.s3_open_key(key, "r", encoding='utf-8') as fin:
+            self.assertEqual(fin.read(), text)
 
         parsed_uri = smart_open.ParseUri("s3://bucket/key")
-        with smart_open.s3_open_uri(parsed_uri, "r") as fin:
-            self.assertEqual(fin.read(), u"физкульт-привет!")
+        with smart_open.s3_open_uri(parsed_uri, "r", encoding='utf-8') as fin:
+            self.assertEqual(fin.read(), text)
 
     def test_bad_mode(self):
         """Bad mode should raise and exception."""
@@ -1042,7 +1072,7 @@ class S3OpenTest(unittest.TestCase):
     def test_read_encoding(self):
         """Should open the file with the correct encoding, explicit text read."""
         conn = boto.connect_s3()
-        conn.create_bucket('test-bucket')
+        conn.create_bucket('bucket')
         key = "s3://bucket/key.txt"
         text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
         with smart_open.smart_open(key, 'wb') as fout:
@@ -1055,7 +1085,7 @@ class S3OpenTest(unittest.TestCase):
     def test_read_encoding_implicit_text(self):
         """Should open the file with the correct encoding, implicit text read."""
         conn = boto.connect_s3()
-        conn.create_bucket('test-bucket')
+        conn.create_bucket('bucket')
         key = "s3://bucket/key.txt"
         text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
         with smart_open.smart_open(key, 'wb') as fout:
@@ -1068,13 +1098,68 @@ class S3OpenTest(unittest.TestCase):
     def test_write_encoding(self):
         """Should open the file for writing with the correct encoding."""
         conn = boto.connect_s3()
-        conn.create_bucket('test-bucket')
+        conn.create_bucket('bucket')
         key = "s3://bucket/key.txt"
         text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
 
         with smart_open.smart_open(key, 'w', encoding='koi8-r') as fout:
             fout.write(text)
         with smart_open.smart_open(key, encoding='koi8-r') as fin:
+            actual = fin.read()
+        self.assertEqual(text, actual)
+
+    @mock_s3
+    def test_write_bad_encoding_strict(self):
+        """Should open the file for writing with the correct encoding."""
+        conn = boto.connect_s3()
+        conn.create_bucket('bucket')
+        key = "s3://bucket/key.txt"
+        text = u'欲しい気持ちが成長しすぎて'
+
+        with self.assertRaises(UnicodeEncodeError):
+            with smart_open.smart_open(key, 'w', encoding='koi8-r', errors='strict') as fout:
+                fout.write(text)
+
+    @mock_s3
+    def test_write_bad_encoding_replace(self):
+        """Should open the file for writing with the correct encoding."""
+        conn = boto.connect_s3()
+        conn.create_bucket('bucket')
+        key = "s3://bucket/key.txt"
+        text = u'欲しい気持ちが成長しすぎて'
+        expected = u'?' * len(text)
+
+        with smart_open.smart_open(key, 'w', encoding='koi8-r', errors='replace') as fout:
+            fout.write(text)
+        with smart_open.smart_open(key, encoding='koi8-r') as fin:
+            actual = fin.read()
+        self.assertEqual(expected, actual)
+
+    @mock_s3
+    def test_write_text_gzip(self):
+        """Should open the file for writing with the correct encoding."""
+        conn = boto.connect_s3()
+        conn.create_bucket('bucket')
+        key = "s3://bucket/key.txt.gz"
+        text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
+
+        with smart_open.smart_open(key, 'w', encoding='utf-8') as fout:
+            fout.write(text)
+        with smart_open.smart_open(key, 'r', encoding='utf-8') as fin:
+            actual = fin.read()
+        self.assertEqual(text, actual)
+
+    @mock_s3
+    def test_write_text_gzip_key(self):
+        """Should open the boto S3 key for writing with the correct encoding."""
+        conn = boto.connect_s3()
+        mybucket = conn.create_bucket('bucket')
+        mykey = boto.s3.key.Key(mybucket, 'key.txt.gz')
+        text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
+
+        with smart_open.smart_open(mykey, 'w', encoding='utf-8') as fout:
+            fout.write(text)
+        with smart_open.smart_open(mykey, 'r', encoding='utf-8') as fin:
             actual = fin.read()
         self.assertEqual(text, actual)
 

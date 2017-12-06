@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Implements file-like objects for reading and writing from/to S3."""
 import boto3
+import botocore.client
 
 import io
 import logging
@@ -28,6 +29,9 @@ WRITE_BINARY = 'wb'
 MODES = (READ, READ_BINARY, WRITE, WRITE_BINARY)
 """Allowed I/O modes for working with S3."""
 
+BINARY_NEWLINE = b'\n'
+DEFAULT_BUFFER_SIZE = 256 * 1024
+
 
 def _range_string(start, stop=None):
     #
@@ -47,7 +51,6 @@ def open(bucket_id, key_id, mode, **kwargs):
     if mode not in MODES:
         raise NotImplementedError('bad mode: %r expected one of %r' % (mode, MODES))
 
-    buffer_size = kwargs.pop("buffer_size", io.DEFAULT_BUFFER_SIZE)
     encoding = kwargs.pop("encoding", "utf-8")
     errors = kwargs.pop("errors", None)
     newline = kwargs.pop("newline", None)
@@ -55,7 +58,7 @@ def open(bucket_id, key_id, mode, **kwargs):
     s3_min_part_size = kwargs.pop("s3_min_part_size", DEFAULT_MIN_PART_SIZE)
 
     if mode in (READ, READ_BINARY):
-        fileobj = BufferedInputBase(bucket_id, key_id, **kwargs)
+        fileobj = SeekableBufferedInputBase(bucket_id, key_id, **kwargs)
     elif mode in (WRITE, WRITE_BINARY):
         fileobj = BufferedOutputBase(bucket_id, key_id, min_part_size=s3_min_part_size, **kwargs)
     else:
@@ -72,6 +75,21 @@ def open(bucket_id, key_id, mode, **kwargs):
 
 class RawReader(object):
     """Read an S3 object."""
+    def __init__(self, s3_object):
+        self.position = 0
+        self._object = s3_object
+        self._body = s3_object.get()['Body']
+
+    def read(self, size=-1):
+        if size == -1:
+            return self._body.read()
+        return self._body.read(size)
+
+
+class SeekableRawReader(object):
+    """Read an S3 object.
+
+    Support seeking around, but is slower than RawReader."""
     def __init__(self, s3_object):
         self.position = 0
         self._object = s3_object
@@ -92,11 +110,8 @@ class RawReader(object):
 
 
 class BufferedInputBase(io.BufferedIOBase):
-    """Reads bytes from S3.
-
-    Implements the io.BufferedIOBase interface of the standard library."""
-
-    def __init__(self, bucket, key, **kwargs):
+    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
+                 line_terminator=BINARY_NEWLINE, **kwargs):
         session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
         s3 = session.resource('s3', **kwargs)
         self._object = s3.Object(bucket, key)
@@ -105,6 +120,8 @@ class BufferedInputBase(io.BufferedIOBase):
         self._current_pos = 0
         self._buffer = b''
         self._eof = False
+        self._buffer_size = buffer_size
+        self._line_terminator = line_terminator
 
         #
         # This member is part of the io.BufferedIOBase interface.
@@ -122,6 +139,132 @@ class BufferedInputBase(io.BufferedIOBase):
     def readable(self):
         """Return True if the stream can be read from."""
         return True
+
+    def seekable(self):
+        return False
+
+    #
+    # io.BufferedIOBase methods.
+    #
+    def detach(self):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def read(self, size=-1):
+        """Read up to size bytes from the object and return them."""
+        if size <= 0:
+            if len(self._buffer):
+                from_buf = self._read_from_buffer(len(self._buffer))
+            else:
+                from_buf = b''
+            self._current_pos = self._content_length
+            return from_buf + self._raw_reader.read()
+
+        #
+        # Return unused data first
+        #
+        if len(self._buffer) >= size:
+            return self._read_from_buffer(size)
+
+        #
+        # If the stream is finished, return what we have.
+        #
+        if self._eof:
+            return self._read_from_buffer(len(self._buffer))
+
+        #
+        # Fill our buffer to the required size.
+        #
+        # logger.debug('filling %r byte-long buffer up to %r bytes', len(self._buffer), size)
+        self._fill_buffer(size)
+        return self._read_from_buffer(size)
+
+    def read1(self, size=-1):
+        """This is the same as read()."""
+        return self.read(size=size)
+
+    def readinto(self, b):
+        """Read up to len(b) bytes into b, and return the number of bytes
+        read."""
+        data = self.read(len(b))
+        if not data:
+            return 0
+        b[:len(data)] = data
+        return len(data)
+
+    def readline(self, limit=-1):
+        """Read up to and including the next newline.  Returns the bytes read."""
+        if limit != -1:
+            raise NotImplementedError('limits other than -1 not implemented yet')
+        the_line = io.BytesIO()
+        while not (self._eof and len(self._buffer) == 0):
+            #
+            # In the worst case, we're reading self._buffer twice here, once in
+            # the if condition, and once when calling index.
+            #
+            # This is sub-optimal, but better than the alternative: wrapping
+            # .index in a try..except, because that is slower.
+            #
+            if self._line_terminator in self._buffer:
+                next_newline = self._buffer.index(self._line_terminator)
+                the_line.write(self._buffer[:next_newline + 1])
+                self._buffer = self._buffer[next_newline + 1:]
+                break
+            else:
+                the_line.write(self._buffer)
+                self._buffer = b''
+                self._fill_buffer(self._buffer_size)
+        return the_line.getvalue()
+
+    def terminate(self):
+        """Do nothing."""
+        pass
+
+    #
+    # Internal methods.
+    #
+    def _read_from_buffer(self, size):
+        """Remove at most size bytes from our buffer and return them."""
+        # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
+        assert size >= 0
+        part = self._buffer[:size]
+        self._buffer = self._buffer[size:]
+        self._current_pos += len(part)
+        # logger.debug('part: %r', part)
+        return part
+
+    def _fill_buffer(self, size):
+        while len(self._buffer) < size and not self._eof:
+            raw = self._raw_reader.read(size=self._buffer_size)
+            if len(raw):
+                self._buffer += raw
+            else:
+                logger.debug('reached EOF while filling buffer')
+                self._eof = True
+
+
+class SeekableBufferedInputBase(BufferedInputBase):
+    """Reads bytes from S3.
+
+    Implements the io.BufferedIOBase interface of the standard library."""
+
+    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
+                 line_terminator=BINARY_NEWLINE, **kwargs):
+        session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
+        s3 = session.resource('s3', **kwargs)
+        self._object = s3.Object(bucket, key)
+        self._raw_reader = SeekableRawReader(self._object)
+        self._content_length = self._object.content_length
+        self._current_pos = 0
+        self._buffer = b''
+        self._eof = False
+        self._buffer_size = buffer_size
+        self._line_terminator = line_terminator
+
+        #
+        # This member is part of the io.BufferedIOBase interface.
+        #
+        self.raw = None
 
     def seekable(self):
         """If False, seek(), tell() and truncate() will raise IOError.
@@ -162,79 +305,6 @@ class BufferedInputBase(io.BufferedIOBase):
         """Unsupported."""
         raise io.UnsupportedOperation
 
-    #
-    # io.BufferedIOBase methods.
-    #
-    def detach(self):
-        """Unsupported."""
-        raise io.UnsupportedOperation
-
-    def read(self, size=-1):
-        """Read up to size bytes from the object and return them."""
-        if size <= 0:
-            if len(self._buffer):
-                from_buf = self._read_from_buffer(len(self._buffer))
-            else:
-                from_buf = b''
-            self._current_pos = self._content_length
-            return from_buf + self._raw_reader.read()
-
-        #
-        # Return unused data first
-        #
-        if len(self._buffer) >= size:
-            return self._read_from_buffer(size)
-
-        #
-        # If the stream is finished, return what we have.
-        #
-        if self._eof:
-            return self._read_from_buffer(len(self._buffer))
-
-        #
-        # Fill our buffer to the required size.
-        #
-        # logger.debug('filling %r byte-long buffer up to %r bytes', len(self._buffer), size)
-        while len(self._buffer) < size and not self._eof:
-            raw = self._raw_reader.read(size=io.DEFAULT_BUFFER_SIZE)
-            if len(raw):
-                self._buffer += raw
-            else:
-                logger.debug('reached EOF while filling buffer')
-                self._eof = True
-
-        return self._read_from_buffer(size)
-
-    def read1(self, size=-1):
-        """This is the same as read()."""
-        return self.read(size=size)
-
-    def readinto(self, b):
-        """Read up to len(b) bytes into b, and return the number of bytes
-        read."""
-        data = self.read(len(b))
-        if not data:
-            return 0
-        b[:len(data)] = data
-        return len(data)
-
-    def terminate(self):
-        """Do nothing."""
-        pass
-
-    #
-    # Internal methods.
-    #
-    def _read_from_buffer(self, size):
-        """Remove at most size bytes from our buffer and return them."""
-        # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
-        assert size >= 0
-        part = self._buffer[:size]
-        self._buffer = self._buffer[size:]
-        self._current_pos += len(part)
-        # logger.debug('part: %r', part)
-        return part
-
 
 class BufferedOutputBase(io.BufferedIOBase):
     """Writes bytes to S3.
@@ -252,7 +322,10 @@ multipart upload may fail")
         #
         # https://stackoverflow.com/questions/26871884/how-can-i-easily-determine-if-a-boto-3-s3-bucket-resource-exists
         #
-        s3.create_bucket(Bucket=bucket)
+        try:
+            s3.meta.client.head_bucket(Bucket=bucket)
+        except botocore.client.ClientError:
+            raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
         self._object = s3.Object(bucket, key)
         self._min_part_size = min_part_size
         self._mp = self._object.initiate_multipart_upload()
