@@ -73,7 +73,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         create_bucket_and_key(contents=content)
 
-        fin = smart_open.s3.BufferedInputBase('mybucket', 'mykey')
+        fin = smart_open.s3.SeekableBufferedInputBase('mybucket', 'mykey')
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
 
@@ -88,7 +88,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         create_bucket_and_key(contents=content)
 
-        fin = smart_open.s3.BufferedInputBase('mybucket', 'mykey')
+        fin = smart_open.s3.SeekableBufferedInputBase('mybucket', 'mykey')
         seek = fin.seek(6)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.tell(), 6)
@@ -99,7 +99,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         create_bucket_and_key(contents=content)
 
-        fin = smart_open.s3.BufferedInputBase('mybucket', 'mykey')
+        fin = smart_open.s3.SeekableBufferedInputBase('mybucket', 'mykey')
         self.assertEqual(fin.read(5), b'hello')
         seek = fin.seek(1, whence=smart_open.s3.CURRENT)
         self.assertEqual(seek, 6)
@@ -110,7 +110,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         create_bucket_and_key(contents=content)
 
-        fin = smart_open.s3.BufferedInputBase('mybucket', 'mykey')
+        fin = smart_open.s3.SeekableBufferedInputBase('mybucket', 'mykey')
         seek = fin.seek(-4, whence=smart_open.s3.END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
@@ -119,7 +119,7 @@ class BufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         create_bucket_and_key(contents=content)
 
-        fin = smart_open.s3.BufferedInputBase('mybucket', 'mykey')
+        fin = smart_open.s3.SeekableBufferedInputBase('mybucket', 'mykey')
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(content))

@@ -78,6 +78,21 @@ class RawReader(object):
     def __init__(self, s3_object):
         self.position = 0
         self._object = s3_object
+        self._body = s3_object.get()['Body']
+
+    def read(self, size=-1):
+        if size == -1:
+            return self._body.read()
+        return self._body.read(size)
+
+
+class SeekableRawReader(object):
+    """Read an S3 object.
+
+    Support seeking around, but is slower than RawReader."""
+    def __init__(self, s3_object):
+        self.position = 0
+        self._object = s3_object
         self._content_length = self._object.content_length
 
     def read(self, size=-1):
@@ -95,10 +110,6 @@ class RawReader(object):
 
 
 class BufferedInputBase(io.BufferedIOBase):
-    """Reads bytes from S3.
-
-    Implements the io.BufferedIOBase interface of the standard library."""
-
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=BINARY_NEWLINE, **kwargs):
         session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
@@ -130,43 +141,7 @@ class BufferedInputBase(io.BufferedIOBase):
         return True
 
     def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError.
-
-        We offer only seek support, and no truncate support."""
-        return True
-
-    def seek(self, offset, whence=START):
-        """Seek to the specified position.
-
-        :param int offset: The offset in bytes.
-        :param int whence: Where the offset is from.
-
-        Returns the position after seeking."""
-        logger.debug('seeking to offset: %r whence: %r', offset, whence)
-        if whence not in WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % WHENCE_CHOICES)
-
-        if whence == START:
-            new_position = offset
-        elif whence == CURRENT:
-            new_position = self._current_pos + offset
-        else:
-            new_position = self._content_length + offset
-        new_position = _clamp(new_position, 0, self._content_length)
-
-        logger.debug('new_position: %r', new_position)
-        self._current_pos = self._raw_reader.position = new_position
-        self._buffer = b""
-        self._eof = self._current_pos == self._content_length
-        return self._current_pos
-
-    def tell(self):
-        """Return the current position within the file."""
-        return self._current_pos
-
-    def truncate(self, size=None):
-        """Unsupported."""
-        raise io.UnsupportedOperation
+        return False
 
     #
     # io.BufferedIOBase methods.
@@ -266,6 +241,69 @@ class BufferedInputBase(io.BufferedIOBase):
             else:
                 logger.debug('reached EOF while filling buffer')
                 self._eof = True
+
+
+class SeekableBufferedInputBase(BufferedInputBase):
+    """Reads bytes from S3.
+
+    Implements the io.BufferedIOBase interface of the standard library."""
+
+    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
+                 line_terminator=BINARY_NEWLINE, **kwargs):
+        session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
+        s3 = session.resource('s3', **kwargs)
+        self._object = s3.Object(bucket, key)
+        self._raw_reader = SeekableRawReader(self._object)
+        self._content_length = self._object.content_length
+        self._current_pos = 0
+        self._buffer = b''
+        self._eof = False
+        self._buffer_size = buffer_size
+        self._line_terminator = line_terminator
+
+        #
+        # This member is part of the io.BufferedIOBase interface.
+        #
+        self.raw = None
+
+    def seekable(self):
+        """If False, seek(), tell() and truncate() will raise IOError.
+
+        We offer only seek support, and no truncate support."""
+        return True
+
+    def seek(self, offset, whence=START):
+        """Seek to the specified position.
+
+        :param int offset: The offset in bytes.
+        :param int whence: Where the offset is from.
+
+        Returns the position after seeking."""
+        logger.debug('seeking to offset: %r whence: %r', offset, whence)
+        if whence not in WHENCE_CHOICES:
+            raise ValueError('invalid whence, expected one of %r' % WHENCE_CHOICES)
+
+        if whence == START:
+            new_position = offset
+        elif whence == CURRENT:
+            new_position = self._current_pos + offset
+        else:
+            new_position = self._content_length + offset
+        new_position = _clamp(new_position, 0, self._content_length)
+
+        logger.debug('new_position: %r', new_position)
+        self._current_pos = self._raw_reader.position = new_position
+        self._buffer = b""
+        self._eof = self._current_pos == self._content_length
+        return self._current_pos
+
+    def tell(self):
+        """Return the current position within the file."""
+        return self._current_pos
+
+    def truncate(self, size=None):
+        """Unsupported."""
+        raise io.UnsupportedOperation
 
 
 class BufferedOutputBase(io.BufferedIOBase):

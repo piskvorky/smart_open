@@ -420,6 +420,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
         self.assertEqual(content[14:], smart_open_object.read())  # read the rest
 
+    @unittest.skip('seek functionality for S3 currently disabled because of Issue #152')
     @mock_s3
     def test_s3_seek_moto(self):
         """Does seeking in S3 files work correctly?"""
