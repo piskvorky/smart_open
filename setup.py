@@ -20,7 +20,6 @@ tests_require = [
     'mock',
     'moto==0.4.31',
     'responses',
-    'unittest2'
 ]
 
 setup(

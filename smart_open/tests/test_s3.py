@@ -2,12 +2,8 @@
 import logging
 import gzip
 import io
-import sys
 import os
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
+import unittest
 
 import boto3
 import moto
