@@ -300,7 +300,6 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-
         mock_smart_open.assert_called_with(full_path, read_mode, parents=False, encoding=None, errors='strict')
 
         full_path = 'aa#aa'
@@ -308,7 +307,6 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open(full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-
         mock_smart_open.assert_called_with(full_path, read_mode, parents=False, encoding=None, errors='strict')
 
         short_path = "~/tmp/test.txt"
@@ -317,7 +315,6 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open(prefix+short_path, read_mode, errors='strict')
         smart_open_object.__iter__()
         # called with the correct expanded path?
-
         mock_smart_open.assert_called_with(full_path, read_mode, parents=False, encoding=None, errors='strict')
 
     # couldn't find any project for mocking up HDFS data

@@ -680,7 +680,7 @@ def file_smart_open(fname, mode='rb', parents=False, encoding=None, errors=DEFAU
                     raise oerr
         else:
             os.makedirs(pdir, exist_ok=True)
-
+            
     try:  # TODO need to fix this place (for cases with r+ and so on)
         raw_mode = {'r': 'rb', 'w': 'wb', 'a': 'ab'}[mode]
     except KeyError:
