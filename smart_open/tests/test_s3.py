@@ -12,7 +12,7 @@ import smart_open
 import smart_open.s3
 
 
-BUCKET_NAME = 'test-smart-open'
+BUCKET_NAME = os.environ.get('SO_BUCKET_NAME', 'test-smartopen')
 KEY_NAME = 'test-key'
 WRITE_KEY_NAME = 'test-write-key'
 
