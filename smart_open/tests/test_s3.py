@@ -11,11 +11,12 @@ import moto
 import smart_open
 import smart_open.s3
 
-_LOGGER = logging.getLogger(__name__)
 
 BUCKET_NAME = 'test-smart-open'
 KEY_NAME = 'test-key'
 WRITE_KEY_NAME = 'test-write-key'
+
+logger = logging.getLogger(__name__)
 
 
 def maybe_mock_s3(func):
@@ -27,7 +28,7 @@ def maybe_mock_s3(func):
 
 def create_bucket_and_key(bucket_name=BUCKET_NAME, key_name=KEY_NAME, contents=None):
     # fake (or not) connection, bucket and key
-    _LOGGER.debug('%r', locals())
+    logger.debug('%r', locals())
     s3 = boto3.resource('s3')
 
     # cleanup bucket
@@ -82,7 +83,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         """Are S3 files read correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         create_bucket_and_key(contents=content)
-        _LOGGER.debug('content: %r len: %r', content, len(content))
+        logger.debug('content: %r len: %r', content, len(content))
 
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
         self.assertEqual(content[:6], fin.read(6))
@@ -168,7 +169,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         with gzip.GzipFile(fileobj=sanity_buf) as zipfile:
             self.assertEqual(zipfile.read(), expected)
 
-        _LOGGER.debug('starting actual test')
+        logger.debug('starting actual test')
         with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
@@ -234,7 +235,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
         smart_open_write = smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME)
         smart_open_write.tell()
-        _LOGGER.info("smart_open_write: %r", smart_open_write)
+        logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
             fout.write(u"testžížáč".encode("utf-8"))
             self.assertEqual(fout.tell(), 14)
@@ -265,7 +266,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
-        mybucket, mykey = create_bucket_and_key()
+        _ = create_bucket_and_key()
 
         smart_open_write = smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME)
         with smart_open_write as fout:  # noqa

@@ -6,7 +6,6 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 
-import io
 import unittest
 import logging
 import tempfile
