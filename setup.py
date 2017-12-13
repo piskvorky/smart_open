@@ -16,6 +16,13 @@ def read(fname):
     return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
 
 
+tests_require = [
+    'mock',
+    'moto==0.4.31',
+    'responses',
+    'unittest2'
+]
+
 setup(
     name='smart_open',
     version='1.5.5',
@@ -44,14 +51,10 @@ setup(
         'requests',
         'boto3'
     ],
-
-    tests_require=[
-        'mock',
-        'moto==0.4.31',
-        'responses',
-        'unittest2'
-    ],
-
+    tests_require=tests_require,
+    extras_require={
+        'test': tests_require,
+    },
 
     test_suite="smart_open.tests",
 
