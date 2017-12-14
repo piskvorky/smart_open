@@ -5,7 +5,7 @@ import subprocess
 
 import smart_open
 
-_S3_URL = os.environ.get('SMART_OPEN_S3_URL')
+_S3_URL = os.environ.get('SO_S3_URL')
 assert _S3_URL is not None, 'please set the SMART_OPEN_S3_URL environment variable'
 
 
