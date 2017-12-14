@@ -8,7 +8,7 @@ import subprocess
 import smart_open
 
 _S3_URL = os.environ.get('SO_S3_URL')
-assert _S3_URL is not None, 'please set the SMART_OPEN_S3_URL environment variable'
+assert _S3_URL is not None, 'please set the SO_S3_URL environment variable'
 
 
 def initialize_bucket():

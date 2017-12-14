@@ -14,6 +14,7 @@ matrix:
       env:
         - SO_DISABLE_MOCKS: "1"
         - SO_S3_URL: "s3://smart-open-py27-benchmark"
+        - SO_S3_RESULT_URL: "s3://smart-open-py27-benchmark-results"
 
     - python: '3.3'
 
@@ -25,6 +26,7 @@ matrix:
       env:
         - SO_DISABLE_MOCKS: "1"
         - SO_S3_URL: "s3://smart-open-py36-benchmark"
+        - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
 
 install:
   - pip install .[test]
@@ -37,7 +39,7 @@ script:
   - if [[ ${SO_DISABLE_MOCKS} = "1" ]]; then
       pip install pytest pytest_benchmark awscli;
       py.test integration-tests/test_s3.py --benchmark-save=`git rev-parse HEAD`;
-      aws s3 cp .benchmarks/*/*.json ${SO_S3_URL};
+      aws s3 cp .benchmarks/*/*.json ${SO_S3_RESULT_URL};
     fi
 
 
