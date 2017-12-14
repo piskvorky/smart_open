@@ -3,6 +3,7 @@ import logging
 import gzip
 import io
 import os
+import uuid
 import unittest
 
 import boto3
@@ -12,7 +13,7 @@ import smart_open
 import smart_open.s3
 
 
-BUCKET_NAME = os.environ.get('SO_BUCKET_NAME', 'test-smartopen')
+BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)  # generate random bucket (avoid race-condition in CI)
 KEY_NAME = 'test-key'
 WRITE_KEY_NAME = 'test-write-key'
 
@@ -26,19 +27,24 @@ def maybe_mock_s3(func):
         return moto.mock_s3(func)
 
 
-def create_bucket_and_key(bucket_name=BUCKET_NAME, key_name=KEY_NAME, contents=None):
-    # fake (or not) connection, bucket and key
-    logger.debug('%r', locals())
-    s3 = boto3.resource('s3')
-
-    # cleanup bucket
-    bucket_exist = False
+def cleanup_bucket(s3, delete_bucket=False):
     for bucket in s3.buckets.all():
         if bucket.name == BUCKET_NAME:
             for key in bucket.objects.all():
                 key.delete()
-            bucket_exist = True
-            break
+
+            if delete_bucket:
+                bucket.delete()
+                return False
+            return True
+    return False
+
+
+def create_bucket_and_key(bucket_name=BUCKET_NAME, key_name=KEY_NAME, contents=None):
+    # fake (or not) connection, bucket and key
+    logger.debug('%r', locals())
+    s3 = boto3.resource('s3')
+    bucket_exist = cleanup_bucket(s3)
 
     if not bucket_exist:
         mybucket = s3.create_bucket(Bucket=bucket_name)
@@ -59,6 +65,8 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
     def tearDown(self):
         smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
+        s3 = boto3.resource('s3')
+        cleanup_bucket(s3, delete_bucket=True)
 
     def test_iter(self):
         """Are S3 files iterated over correctly?"""
@@ -203,6 +211,10 @@ class BufferedOutputBaseTest(unittest.TestCase):
     Test writing into s3 files.
 
     """
+    def tearDown(self):
+        s3 = boto3.resource('s3')
+        cleanup_bucket(s3, delete_bucket=True)
+
     def test_write_01(self):
         """Does writing into s3 work correctly?"""
         create_bucket_and_key()

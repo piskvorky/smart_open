@@ -7,7 +7,6 @@ matrix:
     - python: '2.7'
       env:
         - SO_DISABLE_MOCKS: "1"
-        - SO_BUCKET_NAME: "test-smartopen-travis-ci-27"
         - secure: "GH+DI7f9QenVtTZFEfn4B8wO5JJK65PkHDg8vY/npdW51y5PPAynTEf/++D0H4tjwqMuXwB5lrbWfYeskf29Xuq5MT5+FixajZFcbhscoSM9CGABeph2s2+Hm4kSIKmjnTlQLgJHVbwypnlU/W4sfMCbqeOmv2fYXCCt0GhtnWc="
         - secure: "du3PQYEiDPw55TRzhk+Ocv1Gx1DuusbCSMVSQmccAoyOr7qxDqm+1jh2v13RmajNK7FnlKyC4xSTySVpSl70By2uhZlJT43EpenqIcpQWqUAm3nVr6etszdb1A6TfEGQrxZ8Y2j9KD6QAMNovsMZbl0bcDJDxTeFA4P/yU9UZcI="
 
@@ -20,7 +19,6 @@ matrix:
     - python: '3.6'
       env:
         - SO_DISABLE_MOCKS: "1"
-        - SO_BUCKET_NAME: "test-smartopen-travis-ci-36"
         - secure: "GH+DI7f9QenVtTZFEfn4B8wO5JJK65PkHDg8vY/npdW51y5PPAynTEf/++D0H4tjwqMuXwB5lrbWfYeskf29Xuq5MT5+FixajZFcbhscoSM9CGABeph2s2+Hm4kSIKmjnTlQLgJHVbwypnlU/W4sfMCbqeOmv2fYXCCt0GhtnWc="
         - secure: "du3PQYEiDPw55TRzhk+Ocv1Gx1DuusbCSMVSQmccAoyOr7qxDqm+1jh2v13RmajNK7FnlKyC4xSTySVpSl70By2uhZlJT43EpenqIcpQWqUAm3nVr6etszdb1A6TfEGQrxZ8Y2j9KD6QAMNovsMZbl0bcDJDxTeFA4P/yU9UZcI="
 
