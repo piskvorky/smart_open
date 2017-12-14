@@ -34,12 +34,10 @@ install:
 script:
   - python setup.py test
 
-
-after_success:
   - if [[ ${SO_DISABLE_MOCKS} = "1" ]]; then
       pip install pytest pytest_benchmark awscli;
       py.test integration-tests/test_s3.py --benchmark-save=`git rev-parse HEAD`;
-      aws s3 cp .benchmark/*/*.json ${SO_S3_URL};
+      aws s3 cp .benchmarks/*/*.json ${SO_S3_URL};
     fi
 
 
