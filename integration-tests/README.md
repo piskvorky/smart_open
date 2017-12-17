@@ -2,11 +2,11 @@ This directory contains integration tests for smart_open.
 To run the tests, you need read/write access to an S3 bucket.
 Also, you need to install py.test and its benchmarks addon:
 
-    pip install pytest pytest_benchmark
+    pip install -r requirements.txt
 
 Then, to run the tests, run:
 
-    SMART_OPEN_S3_URL=s3://bucket/smart_open_test py.test integration-tests/test_s3.py
+    SO_S3_URL=s3://bucket/smart_open_test py.test integration-tests/test_s3.py
 
 You may use any key name instead of "smart_open_test".
 It does not have to be an existing key.
