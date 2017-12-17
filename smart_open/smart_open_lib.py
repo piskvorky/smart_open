@@ -74,7 +74,7 @@ import smart_open.s3 as smart_open_s3
 
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
-SYSTEM_ENCODING = sys.getdefaultencoding()
+SYSTEM_ENCODING = 'utf-8'
 
 _ISSUE_146_FSTR = (
     "You have explicitly specified encoding=%(encoding)s, but smart_open does "
