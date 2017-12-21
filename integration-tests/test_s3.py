@@ -15,10 +15,10 @@ def initialize_bucket():
     subprocess.check_call(['aws', 's3', 'rm', '--recursive', _S3_URL])
 
 
-def write_read(key, content, write_mode, read_mode):
-    with smart_open.smart_open(key, write_mode) as fout:
+def write_read(key, content, write_mode, read_mode, encoding=None):
+    with smart_open.smart_open(key, write_mode, encoding=encoding) as fout:
         fout.write(content)
-    with smart_open.smart_open(key, read_mode) as fin:
+    with smart_open.smart_open(key, read_mode, encoding=encoding) as fin:
         actual = fin.read()
     return actual
 
@@ -28,7 +28,7 @@ def test_s3_readwrite_text(benchmark):
 
     key = _S3_URL + '/sanity.txt'
     text = 'с гранатою в кармане, с чекою в руке'
-    actual = benchmark(write_read, key, text, 'w', 'r')
+    actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8')
     assert actual == text
 
 
@@ -37,7 +37,7 @@ def test_s3_readwrite_text_gzip(benchmark):
 
     key = _S3_URL + '/sanity.txt.gz'
     text = 'не чайки здесь запели на знакомом языке'
-    actual = benchmark(write_read, key, text, 'w', 'r')
+    actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8')
     assert actual == text
 
 
