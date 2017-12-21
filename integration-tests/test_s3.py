@@ -83,3 +83,7 @@ def test_s3_performance_gz(benchmark):
     key = _S3_URL + '/performance.txt.gz'
     actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
     assert actual == one_megabyte
+
+
+def test_deliberately_fail_travis_build(benchmark):
+    assert False
