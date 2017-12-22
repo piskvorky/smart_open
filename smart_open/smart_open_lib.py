@@ -697,7 +697,7 @@ class HttpReadStream(object):
             auth = (user, password)
         else:
             auth = None
-        
+
         self.response = requests.get(url, auth=auth, stream=True)
 
         if not self.response.ok:
@@ -747,7 +747,7 @@ class HttpReadStream(object):
             if self._read_iter is None:
                 self._read_iter = self.response.iter_content(size)
                 self._read_buffer = next(self._read_iter)
-            
+
             while len(self._read_buffer) < size:
                 try:
                     self._read_buffer += next(self._read_iter)
@@ -760,7 +760,7 @@ class HttpReadStream(object):
                         return ''
                     else:
                         return retval
-            
+
             # If we got here, it means we have enough data in the buffer
             # to return to the caller.
             retval = self._read_buffer[:size]
