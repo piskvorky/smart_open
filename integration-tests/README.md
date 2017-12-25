@@ -17,7 +17,7 @@ Each test will run several times to obtain summary statistics such as min, max, 
 This allows us to detect regressions in performance.
 Here is some example output (you need a wide screen to get the best of it):
 
-```
+```bash
 (smartopen)sergeyich:smart_open misha$ SMART_OPEN_S3_URL=s3://bucket/smart_open_test py.test integration-tests/test_s3.py
 =============================================== test session starts ================================================
 platform darwin -- Python 3.6.3, pytest-3.3.0, py-1.5.2, pluggy-0.6.0
