@@ -24,7 +24,7 @@ tests_require = [
 
 setup(
     name='smart_open',
-    version='1.5.5',
+    version='1.5.6',
     description='Utils for streaming large files (S3, HDFS, gzip, bz2...)',
     long_description=read('README.rst'),
 
