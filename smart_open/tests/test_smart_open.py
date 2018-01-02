@@ -325,12 +325,17 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs:///tmp/test.txt"))
         smart_open_object.__iter__()
         # called with the correct params?
-        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-text", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-text", "hdfs:///tmp/test.txt"], stdout=mock_subprocess.PIPE)
 
-        # second possibility of schema
-        smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs://tmp/test.txt"))
+        # network location host in HDFS schema
+        smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs://host/tmp/test.txt"))
         smart_open_object.__iter__()
-        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-text", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-text", "hdfs://host/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+
+        # network location host and port in HDFS schema
+        smart_open_object = smart_open.HdfsOpenRead(smart_open.ParseUri("hdfs://host:port/tmp/test.txt"))
+        smart_open_object.__iter__()
+        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-text", "hdfs://host:port/tmp/test.txt"], stdout=mock_subprocess.PIPE)
 
     @mock.patch('smart_open.smart_open_lib.subprocess')
     def test_hdfs_encoding(self, mock_subprocess):
@@ -530,14 +535,21 @@ class SmartOpenTest(unittest.TestCase):
         smart_open_object.write("test")
         # called with the correct params?
         mock_subprocess.Popen.assert_called_with(
-            ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"], stdin=mock_subprocess.PIPE
+            ["hdfs", "dfs", "-put", "-f", "-", "hdfs:///tmp/test.txt"], stdin=mock_subprocess.PIPE
         )
 
-        # second possibility of schema
-        smart_open_object = smart_open.HdfsOpenWrite(smart_open.ParseUri("hdfs://tmp/test.txt"))
+        # network location host in HDFS schema
+        smart_open_object = smart_open.HdfsOpenWrite(smart_open.ParseUri("hdfs://host/tmp/test.txt"))
         smart_open_object.write("test")
         mock_subprocess.Popen.assert_called_with(
-            ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"], stdin=mock_subprocess.PIPE
+            ["hdfs", "dfs", "-put", "-f", "-", "hdfs://host/tmp/test.txt"], stdin=mock_subprocess.PIPE
+        )
+
+        # network location host and port in HDFS schema
+        smart_open_object = smart_open.HdfsOpenWrite(smart_open.ParseUri("hdfs://host:port/tmp/test.txt"))
+        smart_open_object.write("test")
+        mock_subprocess.Popen.assert_called_with(
+            ["hdfs", "dfs", "-put", "-f", "-", "hdfs://host:port/tmp/test.txt"], stdin=mock_subprocess.PIPE
         )
 
     @unittest.skip('Not sure how to implement unsecured mode with boto3')

@@ -346,7 +346,8 @@ class ParseUri(object):
       * s3://my_key:my_secret@my_bucket/my_key
       * s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
       * hdfs:///path/file
-      * hdfs://path/file
+      * hdfs://host/path/file
+      * hdfs://host:port/path/file
       * webhdfs://host:port/path/file
       * ./local/path/file
       * ~/local/path/file
@@ -354,6 +355,9 @@ class ParseUri(object):
       * ./local/path/file.gz
       * file:///home/user/file
       * file:///home/user/file.bz2
+
+    NOTE: hdfs://path/file does no longer work as it is against the URI
+    specification. 'path' here is nowadays interpreted as the host of the URI
 
     """
     def __init__(self, uri, default_scheme="file"):
@@ -370,8 +374,7 @@ class ParseUri(object):
         self.scheme = parsed_uri.scheme if parsed_uri.scheme else default_scheme
 
         if self.scheme == "hdfs":
-            self.uri_path = parsed_uri.netloc + parsed_uri.path
-            self.uri_path = "/" + self.uri_path.lstrip("/")
+            self.uri_path = uri
 
             if not self.uri_path:
                 raise RuntimeError("invalid HDFS URI: %s" % uri)
