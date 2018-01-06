@@ -36,6 +36,8 @@ import boto.s3.key
 from ssl import SSLError
 import sys
 
+import errno
+from ntpath import split
 
 IS_PY2 = (sys.version_info[0] == 2)
 
@@ -173,7 +175,8 @@ def smart_open(uri, mode="rb", **kw):
             # compression, if any, is determined by the filename extension (.gz, .bz2)
             encoding = kw.pop('encoding', None)
             errors = kw.pop('errors', DEFAULT_ERRORS)
-            return file_smart_open(parsed_uri.uri_path, mode, encoding=encoding, errors=errors)
+            parents = kw.pop('parents', False)
+            return file_smart_open(parsed_uri.uri_path, mode, parents=parents, encoding=encoding, errors=errors)
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return s3_open_uri(parsed_uri, mode, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
@@ -642,7 +645,7 @@ def encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     return decoder(fileobj, errors=errors)
 
 
-def file_smart_open(fname, mode='rb', encoding=None, errors=DEFAULT_ERRORS):
+def file_smart_open(fname, mode='rb', parents=False, encoding=None, errors=DEFAULT_ERRORS):
     """
     Stream from/to local filesystem, transparently (de)compressing gzip and bz2
     files if necessary.
@@ -664,6 +667,20 @@ def file_smart_open(fname, mode='rb', encoding=None, errors=DEFAULT_ERRORS):
     # filename ---------------> bytes -------------> bytes ---------> text
     #                          raw_fobj        decompressed_fobj   decoded_fobj
     #
+
+    if parents:
+        pdir, fil = split(fname)
+        if IS_PY2:
+            try:
+                os.makedirs(pdir)
+            except OSError as oerr:
+                if oerr.errno == errno.EEXIST and os.path.isdir(pdir):
+                    pass
+                else:
+                    raise oerr
+        else:
+            os.makedirs(pdir, exist_ok=True)
+            
     try:  # TODO need to fix this place (for cases with r+ and so on)
         raw_mode = {'r': 'rb', 'w': 'wb', 'a': 'ab'}[mode]
     except KeyError:
