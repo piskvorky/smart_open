@@ -902,7 +902,7 @@ def s3_iter_bucket_process_key(key, retries=3):
             pass
 
 
-def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16, retries=3):
+def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16, retries=3, ordered=False):
     """
     Iterate and download all S3 files under `bucket/prefix`, yielding out
     `(key, key content)` 2-tuples (generator).
@@ -934,9 +934,11 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
     keys = ({'key': key, 'retries': retries} for key in bucket.list(prefix=prefix) if accept_key(key.name))
 
     if MULTIPROCESSING:
-        logger.info("iterating over keys from %s with %i workers", bucket, workers)
+        liod = " in order" if ordered else ""
+        logger.info("iterating over keys%s from %s with %i workers", liod, bucket, workers)
         pool = multiprocessing.pool.Pool(processes=workers)
-        iterator = pool.imap_unordered(s3_iter_bucket_process_key_with_kwargs, keys)
+        map_fun = pool.imap if ordered else pool.imap_unordered
+        iterator = map_fun(s3_iter_bucket_process_key_with_kwargs, keys)
     else:
         logger.info("iterating over keys from %s without multiprocessing", bucket)
         iterator = imap(s3_iter_bucket_process_key_with_kwargs, keys)
