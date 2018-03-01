@@ -173,7 +173,11 @@ def smart_open(uri, mode="rb", **kw):
             # compression, if any, is determined by the filename extension (.gz, .bz2)
             encoding = kw.pop('encoding', None)
             errors = kw.pop('errors', DEFAULT_ERRORS)
-            return file_smart_open(parsed_uri.uri_path, mode, encoding=encoding, errors=errors)
+            ignore_extension = kw.pop('ignore_extension', False)
+            return file_smart_open(
+                parsed_uri.uri_path, mode, encoding=encoding, errors=errors,
+                ignore_extension=ignore_extension,
+            )
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return s3_open_uri(parsed_uri, mode, **kw)
         elif parsed_uri.scheme in ("hdfs", ):
@@ -215,7 +219,7 @@ def smart_open(uri, mode="rb", **kw):
         raise TypeError('don\'t know how to handle uri %s' % repr(uri))
 
 
-def s3_open_uri(parsed_uri, mode, **kwargs):
+def s3_open_uri(parsed_uri, mode, ignore_extension=False, **kwargs):
     logger.debug('%r', locals())
     if parsed_uri.access_id is not None:
         kwargs['aws_access_key_id'] = parsed_uri.access_id
@@ -226,16 +230,6 @@ def s3_open_uri(parsed_uri, mode, **kwargs):
     host = kwargs.pop('host', None)
     if host is not None:
         kwargs['endpoint_url'] = 'http://' + host
-
-    #
-    # TODO: this is the wrong place to handle ignore_extension.
-    # It should happen at the highest level in the smart_open function, because
-    # it influences other file systems as well, not just S3.
-    #
-    if kwargs.pop("ignore_extension", False):
-        codec = None
-    else:
-        codec = _detect_codec(parsed_uri.key_id)
 
     #
     # Codecs work on a byte-level, so the underlying S3 object should
@@ -258,7 +252,7 @@ def s3_open_uri(parsed_uri, mode, **kwargs):
     encoding = kwargs.get('encoding')
     errors = kwargs.get('errors', DEFAULT_ERRORS)
     fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, s3_mode, **kwargs)
-    decompressed_fobj = _CODECS[codec](fobj, mode)
+    decompressed_fobj = compression_wrapper(fobj, parsed_uri.key_id, mode, ignore_extension)
     decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
     return decoded_fobj
 
@@ -274,7 +268,7 @@ def _setup_unsecured_mode(parsed_uri, kwargs):
         kwargs['calling_format'] = boto.s3.connection.OrdinaryCallingFormat()
 
 
-def s3_open_key(key, mode, **kwargs):
+def s3_open_key(key, mode, ignore_extension=False, **kwargs):
     logger.debug('%r', locals())
     #
     # TODO: handle boto3 keys as well
@@ -282,11 +276,6 @@ def s3_open_key(key, mode, **kwargs):
     host = kwargs.pop('host', None)
     if host is not None:
         kwargs['endpoint_url'] = 'http://' + host
-
-    if kwargs.pop("ignore_extension", False):
-        codec = None
-    else:
-        codec = _detect_codec(key.name)
 
     #
     # Codecs work on a byte-level, so the underlying S3 object should
@@ -299,36 +288,13 @@ def s3_open_key(key, mode, **kwargs):
     else:
         raise NotImplementedError('mode %r not implemented for S3' % mode)
 
-    logging.debug('codec: %r mode: %r s3_mode: %r', codec, mode, s3_mode)
+    logging.debug('mode: %r s3_mode: %r', mode, s3_mode)
     encoding = kwargs.get('encoding')
     errors = kwargs.get('errors', DEFAULT_ERRORS)
     fobj = smart_open_s3.open(key.bucket.name, key.name, s3_mode, **kwargs)
-    decompressed_fobj = _CODECS[codec](fobj, mode)
+    decompressed_fobj = compression_wrapper(fobj, key.name, mode, ignore_extension)
     decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
     return decoded_fobj
-
-
-def _detect_codec(filename):
-    if filename.endswith(".gz"):
-        return 'gzip'
-    return None
-
-
-def _wrap_gzip(fileobj, mode):
-    return gzip.GzipFile(fileobj=fileobj, mode=mode)
-
-
-def _wrap_none(fileobj, mode):
-    return fileobj
-
-
-_CODECS = {
-    None: _wrap_none,
-    'gzip': _wrap_gzip,
-    #
-    # TODO: add support for other codecs here.
-    #
-}
 
 
 class ParseUri(object):
@@ -586,17 +552,23 @@ class ClosingGzipFile(make_closing(gzip.GzipFile)):
             fileobj.close()
 
 
-def compression_wrapper(file_obj, filename, mode):
+def compression_wrapper(file_obj, filename, mode, ignore_extension=False):
     """
     This function will wrap the file_obj with an appropriate
     [de]compression mechanism based on the extension of the filename.
 
+    if `ignore_extension` is True, the original file_obj is always returned
+    without any [de]compression mechanism added.
+
     file_obj must either be a filehandle object, or a class which behaves
-        like one.
+    like one.
 
     If the filename extension isn't recognized, will simply return the original
     file_obj.
     """
+    if ignore_extension:
+        return file_obj
+
     _, ext = os.path.splitext(filename)
     if ext == '.bz2':
         return ClosingBZ2File(file_obj, mode)
@@ -642,7 +614,7 @@ def encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     return decoder(fileobj, errors=errors)
 
 
-def file_smart_open(fname, mode='rb', encoding=None, errors=DEFAULT_ERRORS):
+def file_smart_open(fname, mode='rb', encoding=None, errors=DEFAULT_ERRORS, ignore_extension=False):
     """
     Stream from/to local filesystem, transparently (de)compressing gzip and bz2
     files if necessary.
@@ -651,6 +623,8 @@ def file_smart_open(fname, mode='rb', encoding=None, errors=DEFAULT_ERRORS):
     :arg str mode: The mode in which to open the file.
     :arg str encoding: The text encoding to use.
     :arg str errors: The method to use when handling encoding/decoding errors.
+    :arg bool ignore_extension: If True, skips the auto detect compression
+      by file extension.
     :returns: A file object
     """
     #
@@ -669,7 +643,7 @@ def file_smart_open(fname, mode='rb', encoding=None, errors=DEFAULT_ERRORS):
     except KeyError:
         raw_mode = mode
     raw_fobj = open(fname, raw_mode)
-    decompressed_fobj = compression_wrapper(raw_fobj, fname, raw_mode)
+    decompressed_fobj = compression_wrapper(raw_fobj, fname, raw_mode, ignore_extension)
     decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
     return decoded_fobj
 
@@ -774,7 +748,7 @@ class HttpReadStream(object):
         self.response.close()
 
 
-def HttpOpenRead(parsed_uri, mode='r', **kwargs):
+def HttpOpenRead(parsed_uri, mode='r', ignore_extension=False, **kwargs):
     if parsed_uri.scheme not in ('http', 'https'):
         raise TypeError("can only process http/https urls")
     if mode not in ('r', 'rb'):
@@ -789,9 +763,9 @@ def HttpOpenRead(parsed_uri, mode='r', **kwargs):
     if fname.endswith('.gz'):
         #  Gzip needs a seek-able filehandle, so we need to buffer it.
         buffer = make_closing(io.BytesIO)(response.binary_content())
-        return compression_wrapper(buffer, fname, mode)
+        return compression_wrapper(buffer, fname, mode, ignore_extension)
     else:
-        return compression_wrapper(response, fname, mode)
+        return compression_wrapper(response, fname, mode, ignore_extension)
 
 
 class WebHdfsOpenWrite(object):

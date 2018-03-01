@@ -144,6 +144,21 @@ class SmartOpenHttpTest(unittest.TestCase):
         self.assertEqual(m.hexdigest(), '18473e60f8c7c98d29d65bf805736a0d')
 
     @responses.activate
+    def test_http_gz_ignore_extension(self):
+        """Can open gzip as raw via http?"""
+        fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
+        with open(fpath, 'rb') as infile:
+            data = infile.read()
+
+        responses.add(responses.GET, "http://127.0.0.1/data.gz", body=data)
+        smart_open_object = smart_open.HttpOpenRead(
+            smart_open.ParseUri("http://127.0.0.1/data.gz?some_param=some_val"),
+            ignore_extension=True,
+        )
+
+        self.assertEqual(smart_open_object.read(), data)
+
+    @responses.activate
     def test_http_bz2(self):
         """Can open bz2 via http?"""
         test_string = b'Hello World Compressed.'
@@ -166,6 +181,18 @@ class SmartOpenHttpTest(unittest.TestCase):
 
         # decompress the gzip and get the same md5 hash
         self.assertEqual(smart_open_object.read(), test_string)
+
+    @responses.activate
+    def test_http_bz2_ignore_extension(self):
+        """Can open bz2 as raw via http?"""
+        body = b'not really bz2 but me hiding behind extension'
+        responses.add(responses.GET, "http://127.0.0.1/data.bz2", body=body)
+        smart_open_object = smart_open.HttpOpenRead(
+            smart_open.ParseUri("http://127.0.0.1/data.bz2?some_param=some_val"),
+            ignore_extension=True,
+        )
+
+        self.assertEqual(smart_open_object.read(), body)
 
 
 class SmartOpenReadTest(unittest.TestCase):
@@ -292,29 +319,40 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
+        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict', ignore_extension=False)
 
         full_path = '/tmp/test#hash##more.txt'
         read_mode = "rb"
         smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
+        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict', ignore_extension=False)
 
         full_path = 'aa#aa'
         read_mode = "rb"
         smart_open_object = smart_open.smart_open(full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
+        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict', ignore_extension=False)
 
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)
 
-        smart_open_object = smart_open.smart_open(prefix+short_path, read_mode, errors='strict')
+        smart_open_object = smart_open.smart_open(prefix+short_path, read_mode, errors='strict', ignore_extension=False)
         smart_open_object.__iter__()
         # called with the correct expanded path?
-        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict')
+        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict', ignore_extension=False)
+
+    @mock.patch('smart_open.smart_open_lib.file_smart_open')
+    def test_file_ignore_extension(self, mock_smart_open):
+        prefix = 'file://'
+        full_path = '/tmp/test.gz'
+        read_mode = 'rb'
+        smart_open_object = smart_open.smart_open(prefix + full_path, read_mode, ignore_extension=True)
+        smart_open_object.__iter__()
+
+        # called with the correct path and ignore_extension?
+        mock_smart_open.assert_called_with(full_path, read_mode, encoding=None, errors='strict', ignore_extension=True)
 
     # couldn't find any project for mocking up HDFS data
     # TODO: we want to test also a content of the files, not just fnc call params
@@ -485,15 +523,15 @@ class SmartOpenTest(unittest.TestCase):
 
         # correct read modes
         smart_open.smart_open("blah", "r")
-        mock_file.assert_called_with("blah", "r", encoding=None, errors='strict')
+        mock_file.assert_called_with("blah", "r", encoding=None, errors='strict', ignore_extension=False)
 
         smart_open.smart_open("blah", "rb")
-        mock_file.assert_called_with("blah", "rb", encoding=None, errors='strict')
+        mock_file.assert_called_with("blah", "rb", encoding=None, errors='strict', ignore_extension=False)
 
         short_path = "~/blah"
         full_path = os.path.expanduser(short_path)
         smart_open.smart_open(short_path, "rb")
-        mock_file.assert_called_with(full_path, "rb", encoding=None, errors='strict')
+        mock_file.assert_called_with(full_path, "rb", encoding=None, errors='strict', ignore_extension=False)
 
         # correct write modes, incorrect scheme
         self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb+")
@@ -502,16 +540,16 @@ class SmartOpenTest(unittest.TestCase):
 
         # correct write mode, correct file:// URI
         smart_open.smart_open("blah", "w")
-        mock_file.assert_called_with("blah", "w", encoding=None, errors='strict')
+        mock_file.assert_called_with("blah", "w", encoding=None, errors='strict', ignore_extension=False)
 
         smart_open.smart_open("file:///some/file.txt", "wb")
-        mock_file.assert_called_with("/some/file.txt", "wb", encoding=None, errors='strict')
+        mock_file.assert_called_with("/some/file.txt", "wb", encoding=None, errors='strict', ignore_extension=False)
 
         smart_open.smart_open("file:///some/file.txt", "wb+")
-        mock_file.assert_called_with("/some/file.txt", "wb+", encoding=None, errors='strict')
+        mock_file.assert_called_with("/some/file.txt", "wb+", encoding=None, errors='strict', ignore_extension=False)
 
         smart_open.smart_open("file:///some/file.txt", "w+")
-        mock_file.assert_called_with("/some/file.txt", "w+", encoding=None, errors='strict')
+        mock_file.assert_called_with("/some/file.txt", "w+", encoding=None, errors='strict', ignore_extension=False)
 
     @mock.patch('boto3.Session')
     def test_s3_mode_mock(self, mock_session):
@@ -866,11 +904,49 @@ class CompressionFormatTest(unittest.TestCase):
             test_file_name = infile.name
         self.write_read_assertion(test_file_name)
 
+    def test_open_gz_read_ignore_extension(self):
+        fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
+
+        with open(fpath, 'rb') as fp:
+            expected_data = fp.read()
+
+        with smart_open.smart_open(fpath, 'rb', ignore_extension=True) as infile:
+            data = infile.read()
+        assert data == expected_data
+
+        with smart_open.smart_open(fpath, 'rb', ignore_extension=True) as infile:
+            data = gzip.GzipFile(fileobj=infile).read()
+        m = hashlib.md5(data)
+        assert m.hexdigest() == '18473e60f8c7c98d29d65bf805736a0d', \
+            'Failed to read gzip file as raw'
+
+    def test_open_gz_rw_ignore_extension(self):
+        msg = b'wello horld!'
+
+        with tempfile.NamedTemporaryFile('wb', suffix='.gz', delete=False) as infile:
+            test_file_name = infile.name
+
+        with smart_open.smart_open(test_file_name, 'wb', ignore_extension=True) as fp:
+            fp.write(msg)
+
+        with smart_open.smart_open(test_file_name, 'rb', ignore_extension=True) as fp:
+            assert fp.read() == msg
+
     def test_write_read_bz2(self):
         """Can write and read bz2?"""
         with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as infile:
             test_file_name = infile.name
         self.write_read_assertion(test_file_name)
+
+    def test_open_bz2_ignore_extension(self):
+        msg = b'not really bz2 but me hiding behind extension'
+        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as infile:
+            infile.write(msg)
+            fpath = infile.name
+
+        with smart_open.smart_open(fpath, ignore_extension=True) as infile:
+            data = infile.read()
+        assert data == msg
 
 
 class MultistreamsBZ2Test(unittest.TestCase):

@@ -73,6 +73,11 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
   >>> with smart_open.smart_open('/home/radim/foo.txt.bz2', 'wb') as fout:
   ...    fout.write("some content\n")
 
+  >>> # ignore_extension flag can be used for overriding compression extension:
+  >>> with smart_open.smart_open('/home/radim/rawfile.gz', ignore_extension=True) as fout:
+  ...    print 'file md5: {}'.format(hashlib.md5(fout.read()).hexdigest())
+
+
 Since going over all (or select) keys in an S3 bucket is a very common operation,
 there's also an extra method ``smart_open.s3_iter_bucket()`` that does this efficiently,
 **processing the bucket keys in parallel** (using multiprocessing):
