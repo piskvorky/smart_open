@@ -191,6 +191,16 @@ class SmartOpenReadTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(expected, actual)
 
+    def test_open_pathlib_path(self):
+        """If ``pathlib.Path`` is available we should open it."""
+        try:
+            from pathlib import Path
+            fpath = Path(os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt'))
+            with smart_open.smart_open(fpath, encoding='cp852') as fin:
+                fin.read()
+        except ImportError:
+            pass
+
     @mock_s3
     def test_read_never_returns_none(self):
         """read should never return None."""
