@@ -10,6 +10,7 @@ import unittest
 import logging
 import tempfile
 import os
+import pkgutil
 import sys
 import hashlib
 
@@ -191,15 +192,23 @@ class SmartOpenReadTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(expected, actual)
 
-    def test_open_pathlib_path(self):
-        """If ``pathlib.Path`` is available we should open it."""
-        try:
-            from pathlib import Path
-            fpath = Path(os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt'))
-            with smart_open.smart_open(fpath, encoding='cp852') as fin:
-                fin.read()
-        except ImportError:
-            pass
+    @unittest.skipIf(
+        pkgutil.find_loader('pathlib') is None,
+        "do not test pathlib support if pathlib is not available")
+    def test_open_and_read_pathlib_path(self):
+        """If pathlib.Path is available we should be able to open and read."""
+        from pathlib import Path
+
+        # builtin open() supports pathlib.Path in python>=3.6 only
+        fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
+        path_open = Path(fpath) if sys.version_info >= (3, 6) else fpath
+        path_smart_open = Path(fpath)
+
+        with open(path_open, 'rb') as fin:
+            expected = fin.read().decode('cp852')
+        with smart_open.smart_open(path_smart_open, encoding='cp852') as fin:
+            actual = fin.read()
+        self.assertEqual(expected, actual)
 
     @mock_s3
     def test_read_never_returns_none(self):
