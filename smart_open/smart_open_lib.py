@@ -248,30 +248,12 @@ def s3_open_uri(parsed_uri, mode, **kwargs):
     else:
         raise NotImplementedError('mode %r not implemented for S3' % mode)
 
-    #
-    # TODO: I'm not sure how to handle this with boto3.  Any ideas?
-    #
-    # https://github.com/boto/boto3/issues/334
-    #
-    # _setup_unsecured_mode()
-
     encoding = kwargs.get('encoding')
     errors = kwargs.get('errors', DEFAULT_ERRORS)
     fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, s3_mode, **kwargs)
     decompressed_fobj = _CODECS[codec](fobj, mode)
     decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
     return decoded_fobj
-
-
-def _setup_unsecured_mode(parsed_uri, kwargs):
-    port = kwargs.pop('port', parsed_uri.port)
-    if port != 443:
-        kwargs['port'] = port
-
-    if not kwargs.pop('is_secure', parsed_uri.scheme != 's3u'):
-        kwargs['is_secure'] = False
-        # If the security model docker is overridden, honor the host directly.
-        kwargs['calling_format'] = boto.s3.connection.OrdinaryCallingFormat()
 
 
 def s3_open_key(key, mode, **kwargs):
