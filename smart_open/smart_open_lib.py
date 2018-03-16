@@ -29,6 +29,7 @@ import sys
 import requests
 import io
 import warnings
+import threading
 
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.connection
@@ -902,7 +903,7 @@ def s3_iter_bucket_process_key(key, retries=3):
             pass
 
 
-def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16, retries=3, ordered=False):
+def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16, retries=3, ordered=False, maxresults=None):
     """
     Iterate and download all S3 files under `bucket/prefix`, yielding out
     `(key, key content)` 2-tuples (generator).
@@ -933,6 +934,9 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
     total_size, key_no = 0, -1
     keys = ({'key': key, 'retries': retries} for key in bucket.list(prefix=prefix) if accept_key(key.name))
 
+    if maxresults:
+        keys = LimitingIterator(keys, maxresults)
+
     if MULTIPROCESSING:
         liod = " in order" if ordered else ""
         logger.info("iterating over keys%s from %s with %i workers", liod, bucket, workers)
@@ -951,6 +955,8 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
             )
 
         yield key, content
+        if maxresults:
+            keys.task_done()
         key.close()
         total_size += len(content)
 
@@ -962,6 +968,22 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
         pool.terminate()
 
     logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
+
+
+class LimitingIterator(object):
+    def __init__(self, underlying, limit):
+        self._it = iter(underlying)
+        self._sem = threading.BoundedSemaphore(limit)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self._sem.acquire()
+        return next(self._it)
+
+    def task_done(self):
+        self._sem.release()
 
 
 class WebHdfsException(Exception):
