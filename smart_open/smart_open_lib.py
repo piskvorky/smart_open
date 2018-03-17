@@ -27,8 +27,19 @@ import os
 import subprocess
 import sys
 import requests
+import importlib
 import io
 import warnings
+
+# Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
+# available. The builtin ``pathlib`` will be imported with higher precedence.
+for pathlib_module in ('pathlib', 'pathlib2'):
+    try:
+        pathlib = importlib.import_module(pathlib_module)
+        PATHLIB_SUPPORT = True
+        break
+    except ImportError:
+        PATHLIB_SUPPORT = False
 
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.connection
@@ -165,12 +176,8 @@ def smart_open(uri, mode="rb", **kw):
         raise TypeError('mode should be a string')
 
     # Support opening ``pathlib.Path`` objects by casting them to strings.
-    try:
-        from pathlib import Path
-        if isinstance(uri, Path):
-            uri = str(uri)
-    except ImportError:
-        pass
+    if PATHLIB_SUPPORT and isinstance(uri, pathlib.Path):
+        uri = str(uri)
 
     if isinstance(uri, six.string_types):
         # this method just routes the request to classes handling the specific storage
