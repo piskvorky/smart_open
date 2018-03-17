@@ -7,6 +7,9 @@ import uuid
 import unittest
 
 import boto3
+import botocore.client
+import boto.s3.bucket
+import mock
 import moto
 
 import smart_open
@@ -329,6 +332,150 @@ class ClampTest(unittest.TestCase):
         self.assertEqual(smart_open.s3._clamp(5, 0, 10), 5)
         self.assertEqual(smart_open.s3._clamp(11, 0, 10), 10)
         self.assertEqual(smart_open.s3._clamp(-1, 0, 10), 0)
+
+
+ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
+
+
+@maybe_mock_s3
+class IterBucketTest(unittest.TestCase):
+    def test_iter_bucket(self):
+        populate_bucket()
+        results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
+        self.assertEqual(len(results), 10)
+
+    def test_accepts_boto3_bucket(self):
+        populate_bucket()
+        s3 = boto3.resource('s3')
+        bucket = s3.Bucket(BUCKET_NAME)
+        results = list(smart_open.s3.iter_bucket(bucket))
+        self.assertEqual(len(results), 10)
+
+    def test_accepts_boto_bucket(self):
+        populate_bucket()
+        bucket = boto.s3.bucket.Bucket(name=BUCKET_NAME)
+        results = list(smart_open.s3.iter_bucket(bucket))
+        self.assertEqual(len(results), 10)
+
+    def test_list_bucket(self):
+        num_keys = 10
+        populate_bucket()
+        keys = list(smart_open.s3._list_bucket(BUCKET_NAME))
+        self.assertEqual(len(keys), num_keys)
+
+        expected = ['key_%d' % x for x in range(num_keys)]
+        self.assertEqual(sorted(keys), sorted(expected))
+
+    def test_list_bucket_long(self):
+        num_keys = 1010
+        populate_bucket(num_keys=num_keys)
+        keys = list(smart_open.s3._list_bucket(BUCKET_NAME))
+        self.assertEqual(len(keys), num_keys)
+
+        expected = ['key_%d' % x for x in range(num_keys)]
+        self.assertEqual(sorted(keys), sorted(expected))
+
+    def test_old(self):
+        """Does s3_iter_bucket work correctly?"""
+        create_bucket_and_key()
+
+        #
+        # Use an old-school boto Bucket class for historical reasons.
+        #
+        mybucket = boto.s3.bucket.Bucket(name=BUCKET_NAME)
+
+        # first, create some keys in the bucket
+        expected = {}
+        for key_no in range(200):
+            key_name = "mykey%s" % key_no
+            with smart_open.smart_open("s3://%s/%s" % (BUCKET_NAME, key_name), 'wb') as fout:
+                content = '\n'.join("line%i%i" % (key_no, line_no) for line_no in range(10)).encode('utf8')
+                fout.write(content)
+                expected[key_name] = content
+
+        # read all keys + their content back, in parallel, using s3_iter_bucket
+        result = {}
+        for k, c in smart_open.s3.iter_bucket(mybucket):
+            result[k] = c
+        self.assertEqual(expected, result)
+
+        # read some of the keys back, in parallel, using s3_iter_bucket
+        result = {}
+        for k, c in smart_open.s3.iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('4')):
+            result[k] = c
+        self.assertEqual(result, dict((k, c) for k, c in expected.items() if k.endswith('4')))
+
+        # read some of the keys back, in parallel, using s3_iter_bucket
+        result = dict(smart_open.s3.iter_bucket(mybucket, key_limit=10))
+        self.assertEqual(len(result), min(len(expected), 10))
+
+        for workers in [1, 4, 8, 16, 64]:
+            result = {}
+            for k, c in smart_open.s3.iter_bucket(mybucket):
+                result[k] = c
+            self.assertEqual(result, expected)
+
+
+@maybe_mock_s3
+class DownloadKeyTest(unittest.TestCase):
+
+    def test_happy(self):
+        contents = b'hello'
+        create_bucket_and_key(contents=contents)
+        expected = (KEY_NAME, contents)
+        actual = smart_open.s3._download_key(KEY_NAME, bucket_name=BUCKET_NAME)
+        self.assertEqual(expected, actual)
+
+    def test_intermittent_error(self):
+        contents = b'hello'
+        create_bucket_and_key(contents=contents)
+        expected = (KEY_NAME, contents)
+        side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, contents]
+        with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
+            actual = smart_open.s3._download_key(KEY_NAME, bucket_name=BUCKET_NAME)
+        self.assertEqual(expected, actual)
+
+    def test_persistent_error(self):
+        contents = b'hello'
+        create_bucket_and_key(contents=contents)
+        side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR,
+                       ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR]
+        with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
+            self.assertRaises(botocore.client.ClientError, smart_open.s3._download_key,
+                              KEY_NAME, bucket_name=BUCKET_NAME)
+
+    def test_intermittent_error_retries(self):
+        contents = b'hello'
+        create_bucket_and_key(contents=contents)
+        expected = (KEY_NAME, contents)
+        side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR,
+                       ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, contents]
+        with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
+            actual = smart_open.s3._download_key(KEY_NAME, bucket_name=BUCKET_NAME, retries=4)
+        self.assertEqual(expected, actual)
+
+    def test_propagates_other_exception(self):
+        contents = b'hello'
+        create_bucket_and_key(contents=contents)
+        with mock.patch('smart_open.s3._download_fileobj', side_effect=ValueError):
+            self.assertRaises(ValueError, smart_open.s3._download_key,
+                              KEY_NAME, bucket_name=BUCKET_NAME)
+
+
+def populate_bucket(bucket_name=BUCKET_NAME, num_keys=10):
+    # fake (or not) connection, bucket and key
+    logger.debug('%r', locals())
+    s3 = boto3.resource('s3')
+    bucket_exist = cleanup_bucket(s3)
+
+    if not bucket_exist:
+        mybucket = s3.create_bucket(Bucket=bucket_name)
+
+    mybucket = s3.Bucket(bucket_name)
+
+    for key_number in range(num_keys):
+        key_name = 'key_%d' % key_number
+        s3.Object(bucket_name, key_name).put(Body=str(key_number))
 
 
 if __name__ == '__main__':
