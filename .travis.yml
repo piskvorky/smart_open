@@ -30,7 +30,7 @@ matrix:
 
 install:
   - pip install .[test]
-  - pip uninstall botocore boto3
+  - pip uninstall --yes botocore boto3
   - pip install boto3
   - pip freeze
 
