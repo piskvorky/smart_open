@@ -45,10 +45,9 @@ setup(
     platforms='any',
 
     install_requires=[
-        'boto >= 2.32',
         'bz2file',
         'requests',
-        'boto3'
+        'boto3',
     ],
     tests_require=tests_require,
     extras_require={
