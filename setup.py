@@ -31,9 +31,9 @@ setup(
     packages=find_packages(),
     package_data={"smart_open.tests": ["test_data/*gz"]},
 
-    author=u'Radim Řehůřek',
+    author=u'Radim Řehůřek'.encode('utf-8'),
     author_email='me@radimrehurek.com',
-    maintainer=u'Radim Řehůřek',
+    maintainer=u'Radim Řehůřek'.encode('utf-8'),
     maintainer_email='me@radimrehurek.com',
 
     url='https://github.com/piskvorky/smart_open',
@@ -48,7 +48,7 @@ setup(
         'boto >= 2.32',
         'bz2file',
         'requests',
-        'boto3'
+        'boto3==1.6.10'
     ],
     tests_require=tests_require,
     extras_require={
