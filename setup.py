@@ -48,7 +48,7 @@ setup(
         'boto >= 2.32',
         'bz2file',
         'requests',
-        'boto3'
+        'boto3==1.6.10'
     ],
     tests_require=tests_require,
     extras_require={
