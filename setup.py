@@ -31,9 +31,9 @@ setup(
     packages=find_packages(),
     package_data={"smart_open.tests": ["test_data/*gz"]},
 
-    author=u'Radim Řehůřek',
+    author='Radim Rehurek',
     author_email='me@radimrehurek.com',
-    maintainer=u'Radim Řehůřek',
+    maintainer='Radim Rehurek',
     maintainer_email='me@radimrehurek.com',
 
     url='https://github.com/piskvorky/smart_open',
