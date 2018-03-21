@@ -6,12 +6,10 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 
-import importlib
 import unittest
 import logging
 import tempfile
 import os
-import pkgutil
 import sys
 import hashlib
 
@@ -193,33 +191,17 @@ class SmartOpenReadTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(expected, actual)
 
-    @unittest.skipIf(
-        (pkgutil.find_loader('pathlib') is None and
-         pkgutil.find_loader('pathlib2') is None),
+    @unittest.skipUnless(
+        smart_open_lib.PATHLIB_SUPPORT,
         "do not test pathlib support if pathlib or backport are not available")
     def test_open_and_read_pathlib_path(self):
         """If ``pathlib.Path`` is available we should be able to open and read."""
+        from smart_open.smart_open_lib import pathlib
+
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
-
-        # Import ``pathlib`` if the builtin ``pathlib`` or the backport
-        # ``pathlib2`` are available. The builtin ``pathlib`` will be imported
-        # with higher precedence.
-        for pathlib_module in ('pathlib', 'pathlib2'):
-            try:
-                pathlib = importlib.import_module(pathlib_module)
-                break
-            # Unit test will skip if either module is unavailable so it's safe
-            # to assume we can import _at least_ one working ``pathlib``.
-            except ImportError:
-                pass
-
-        # builtin open() supports pathlib.Path in python>=3.6 only
-        path_open = pathlib.Path(fpath) if sys.version_info >= (3, 6) else fpath
-        path_smart_open = pathlib.Path(fpath)
-
-        with open(path_open, 'rb') as fin:
+        with open(fpath, 'rb') as fin:
             expected = fin.read().decode('cp852')
-        with smart_open.smart_open(path_smart_open, encoding='cp852') as fin:
+        with smart_open.smart_open(pathlib.Path(fpath), mode='r', encoding='cp852') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
 
