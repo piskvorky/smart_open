@@ -27,8 +27,19 @@ import os
 import subprocess
 import sys
 import requests
+import importlib
 import io
 import warnings
+
+# Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
+# available. The builtin ``pathlib`` will be imported with higher precedence.
+for pathlib_module in ('pathlib', 'pathlib2'):
+    try:
+        pathlib = importlib.import_module(pathlib_module)
+        PATHLIB_SUPPORT = True
+        break
+    except ImportError:
+        PATHLIB_SUPPORT = False
 
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.connection
@@ -102,6 +113,7 @@ def smart_open(uri, mode="rb", **kw):
     3. a URI for Amazon's S3 (can also supply credentials inside the URI):
        `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
     4. an instance of the boto.s3.key.Key class.
+    5. an instance of the pathlib.Path class.
 
     Examples::
 
@@ -162,6 +174,10 @@ def smart_open(uri, mode="rb", **kw):
     # validate mode parameter
     if not isinstance(mode, six.string_types):
         raise TypeError('mode should be a string')
+
+    # Support opening ``pathlib.Path`` objects by casting them to strings.
+    if PATHLIB_SUPPORT and isinstance(uri, pathlib.Path):
+        uri = str(uri)
 
     if isinstance(uri, six.string_types):
         # this method just routes the request to classes handling the specific storage

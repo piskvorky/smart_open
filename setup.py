@@ -19,6 +19,7 @@ def read(fname):
 tests_require = [
     'mock',
     'moto==0.4.31',
+    'pathlib2',
     'responses',
 ]
 
