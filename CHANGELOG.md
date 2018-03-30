@@ -1,3 +1,13 @@
+* 1.5.7, 18th March 2018
+
+  - Fix author/maintainer fields in `setup.py`, avoid bug from `setuptools==39.0.0` and add workaround for `botocore` and `python==3.3`. Fix #176 (PR [#178](https://github.com/RaRe-Technologies/smart_open/pull/178) & [#177](https://github.com/RaRe-Technologies/smart_open/pull/177), [@menshikh-iv](https://github.com/menshikh-iv) & [@baldwindc](https://github.com/baldwindc))
+
+* 1.5.6, 28th December 2017
+
+  - Improve S3 read performance. Fix #152 (PR [#157](https://github.com/RaRe-Technologies/smart_open/pull/157), [@mpenkov](https://github.com/mpenkov))
+  - Add integration testing + benchmark with real S3. Partial fix #151, #156 (PR [#158](https://github.com/RaRe-Technologies/smart_open/pull/158), [@menshikh-iv](https://github.com/menshikh-iv) & [@mpenkov](https://github.com/mpenkov))
+  - Disable integration testing if secure vars isn't defined (PR [#157](https://github.com/RaRe-Technologies/smart_open/pull/158), [@menshikh-iv](https://github.com/menshikh-iv))
+
 * 1.5.5, 6th December 2017
 
   - Fix problems from 1.5.4 release. Fix #153, #154 , partial fix #152 (PR [#155](https://github.com/RaRe-Technologies/smart_open/pull/155), [@mpenkov](https://github.com/mpenkov))

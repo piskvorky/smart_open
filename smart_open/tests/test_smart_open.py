@@ -190,6 +190,20 @@ class SmartOpenReadTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(expected, actual)
 
+    @unittest.skipUnless(
+        smart_open_lib.PATHLIB_SUPPORT,
+        "do not test pathlib support if pathlib or backport are not available")
+    def test_open_and_read_pathlib_path(self):
+        """If ``pathlib.Path`` is available we should be able to open and read."""
+        from smart_open.smart_open_lib import pathlib
+
+        fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
+        with open(fpath, 'rb') as fin:
+            expected = fin.read().decode('cp852')
+        with smart_open.smart_open(pathlib.Path(fpath), mode='r', encoding='cp852') as fin:
+            actual = fin.read()
+        self.assertEqual(expected, actual)
+
     @mock_s3
     def test_read_never_returns_none(self):
         """read should never return None."""

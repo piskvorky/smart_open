@@ -30,12 +30,18 @@ matrix:
 
 install:
   - pip install .[test]
-  - pip uninstall --yes botocore boto3
+  - pip uninstall --yes botocore boto3  # workaround for avoid very similar conflict as in https://github.com/venth/aws-adfs/issues/52
   - pip install boto3
   - pip freeze
 
 
 script:
+  - if [[ ${TRAVIS_SECURE_ENV_VARS} = false ]]; then
+      echo "DISABLE INTEGRATION TESTING FOR S3";
+      unset SO_DISABLE_MOCKS;
+      unset SO_S3_URL;
+      unset SO_S3_RESULT_URL;
+    fi
   - python setup.py test
   - export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())')
   - if [[ ${SO_DISABLE_MOCKS} = "1" ]]; then

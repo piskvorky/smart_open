@@ -19,21 +19,22 @@ def read(fname):
 tests_require = [
     'mock',
     'moto==0.4.31',
+    'pathlib2',
     'responses',
 ]
 
 setup(
     name='smart_open',
-    version='1.5.5',
+    version='1.5.7',
     description='Utils for streaming large files (S3, HDFS, gzip, bz2...)',
     long_description=read('README.rst'),
 
     packages=find_packages(),
     package_data={"smart_open.tests": ["test_data/*gz"]},
 
-    author=u'Radim Řehůřek',
+    author='Radim Rehurek',
     author_email='me@radimrehurek.com',
-    maintainer=u'Radim Řehůřek',
+    maintainer='Radim Rehurek',
     maintainer_email='me@radimrehurek.com',
 
     url='https://github.com/piskvorky/smart_open',
