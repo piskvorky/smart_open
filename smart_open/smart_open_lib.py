@@ -42,9 +42,7 @@ for pathlib_module in ('pathlib', 'pathlib2'):
         PATHLIB_SUPPORT = False
 
 from boto.compat import BytesIO, urlsplit, six
-import boto.s3.connection
 import boto.s3.key
-from ssl import SSLError
 import sys
 
 
@@ -63,17 +61,6 @@ elif sys.version_info[0] == 3:
 
 logger = logging.getLogger(__name__)
 
-# Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
-# The only method currently relying on it is s3_iter_bucket, which is instructed
-# whether to use it by the MULTIPROCESSING flag.
-MULTIPROCESSING = False
-try:
-    import multiprocessing.pool
-    MULTIPROCESSING = True
-except ImportError:
-    logger.warning("multiprocessing could not be imported and won't be used")
-    from itertools import imap
-
 if IS_PY2:
     from bz2file import BZ2File
 else:
@@ -81,6 +68,7 @@ else:
 
 import gzip
 import smart_open.s3 as smart_open_s3
+from smart_open.s3 import iter_bucket as s3_iter_bucket
 
 
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
@@ -264,13 +252,6 @@ def s3_open_uri(parsed_uri, mode, **kwargs):
     else:
         raise NotImplementedError('mode %r not implemented for S3' % mode)
 
-    #
-    # TODO: I'm not sure how to handle this with boto3.  Any ideas?
-    #
-    # https://github.com/boto/boto3/issues/334
-    #
-    # _setup_unsecured_mode()
-
     encoding = kwargs.get('encoding')
     errors = kwargs.get('errors', DEFAULT_ERRORS)
     fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, s3_mode, **kwargs)
@@ -279,49 +260,18 @@ def s3_open_uri(parsed_uri, mode, **kwargs):
     return decoded_fobj
 
 
-def _setup_unsecured_mode(parsed_uri, kwargs):
-    port = kwargs.pop('port', parsed_uri.port)
-    if port != 443:
-        kwargs['port'] = port
-
-    if not kwargs.pop('is_secure', parsed_uri.scheme != 's3u'):
-        kwargs['is_secure'] = False
-        # If the security model docker is overridden, honor the host directly.
-        kwargs['calling_format'] = boto.s3.connection.OrdinaryCallingFormat()
-
-
 def s3_open_key(key, mode, **kwargs):
-    logger.debug('%r', locals())
-    #
-    # TODO: handle boto3 keys as well
-    #
-    host = kwargs.pop('host', None)
-    if host is not None:
-        kwargs['endpoint_url'] = 'http://' + host
-
-    if kwargs.pop("ignore_extension", False):
-        codec = None
-    else:
-        codec = _detect_codec(key.name)
-
-    #
-    # Codecs work on a byte-level, so the underlying S3 object should
-    # always be reading bytes.
-    #
-    if mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
-        s3_mode = smart_open_s3.READ_BINARY
-    elif mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
-        s3_mode = smart_open_s3.WRITE_BINARY
-    else:
-        raise NotImplementedError('mode %r not implemented for S3' % mode)
-
-    logging.debug('codec: %r mode: %r s3_mode: %r', codec, mode, s3_mode)
-    encoding = kwargs.get('encoding')
-    errors = kwargs.get('errors', DEFAULT_ERRORS)
-    fobj = smart_open_s3.open(key.bucket.name, key.name, s3_mode, **kwargs)
-    decompressed_fobj = _CODECS[codec](fobj, mode)
-    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
-    return decoded_fobj
+    try:
+        bucket_name, key_name = key.bucket_name, key.key
+        logging.warning('inferring S3 URL from boto3 Key object')
+    except AttributeError:
+        try:
+            bucket_name, key_name = key.bucket.name, key.name
+            logging.warning('inferring S3 URL from boto.s3.key.Key object')
+        except AttributeError:
+            raise ValueError('expected %r to be a boto or boto3 Key object' % key)
+    parsed_uri = ParseUri('s3://%s/%s' % (bucket_name, key_name))
+    return s3_open_uri(parsed_uri, mode, **kwargs)
 
 
 def _detect_codec(filename):
@@ -893,89 +843,6 @@ class WebHdfsOpenWrite(object):
 
     def __exit__(self, type, value, traceback):
         self.close()
-
-
-def s3_iter_bucket_process_key_with_kwargs(kwargs):
-    return s3_iter_bucket_process_key(**kwargs)
-
-
-def s3_iter_bucket_process_key(key, retries=3):
-    """
-    Conceptually part of `s3_iter_bucket`, but must remain top-level method because
-    of pickling visibility.
-
-    """
-    # Sometimes, https://github.com/boto/boto/issues/2409 can happen because of network issues on either side.
-    # Retry up to 3 times to ensure its not a transient issue.
-    for x in range(0, retries + 1):
-        try:
-            return key, key.get_contents_as_string()
-        except SSLError:
-            # Actually fail on last pass through the loop
-            if x == retries:
-                raise
-            # Otherwise, try again, as this might be a transient timeout
-            pass
-
-
-def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16, retries=3):
-    """
-    Iterate and download all S3 files under `bucket/prefix`, yielding out
-    `(key, key content)` 2-tuples (generator).
-
-    `accept_key` is a function that accepts a key name (unicode string) and
-    returns True/False, signalling whether the given key should be downloaded out or
-    not (default: accept all keys).
-
-    If `key_limit` is given, stop after yielding out that many results.
-
-    The keys are processed in parallel, using `workers` processes (default: 16),
-    to speed up downloads greatly. If multiprocessing is not available, thus
-    MULTIPROCESSING is False, this parameter will be ignored.
-
-    Example::
-
-      >>> mybucket = boto.connect_s3().get_bucket('mybucket')
-
-      >>> # get all JSON files under "mybucket/foo/"
-      >>> for key, content in s3_iter_bucket(mybucket, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
-      ...     print key, len(content)
-
-      >>> # limit to 10k files, using 32 parallel workers (default is 16)
-      >>> for key, content in s3_iter_bucket(mybucket, key_limit=10000, workers=32):
-      ...     print key, len(content)
-
-    """
-    total_size, key_no = 0, -1
-    keys = ({'key': key, 'retries': retries} for key in bucket.list(prefix=prefix) if accept_key(key.name))
-
-    if MULTIPROCESSING:
-        logger.info("iterating over keys from %s with %i workers", bucket, workers)
-        pool = multiprocessing.pool.Pool(processes=workers)
-        iterator = pool.imap_unordered(s3_iter_bucket_process_key_with_kwargs, keys)
-    else:
-        logger.info("iterating over keys from %s without multiprocessing", bucket)
-        iterator = imap(s3_iter_bucket_process_key_with_kwargs, keys)
-
-    for key_no, (key, content) in enumerate(iterator):
-        if key_no % 1000 == 0:
-            logger.info(
-                "yielding key #%i: %s, size %i (total %.1fMB)",
-                key_no, key, len(content), total_size / 1024.0 ** 2
-            )
-
-        yield key, content
-        key.close()
-        total_size += len(content)
-
-        if key_limit is not None and key_no + 1 >= key_limit:
-            # we were asked to output only a limited number of keys => we're done
-            break
-
-    if MULTIPROCESSING:
-        pool.terminate()
-
-    logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
 
 
 class WebHdfsException(Exception):

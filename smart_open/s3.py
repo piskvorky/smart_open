@@ -1,17 +1,29 @@
 # -*- coding: utf-8 -*-
 """Implements file-like objects for reading and writing from/to S3."""
-import boto3
-import botocore.client
 
 import io
+import contextlib
+import functools
+import itertools
 import logging
 
+import boto3
+import botocore.client
 import six
 
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+# Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
+# The only method currently relying on it is s3_iter_bucket, which is instructed
+# whether to use it by the MULTIPROCESSING flag.
+_MULTIPROCESSING = False
+try:
+    import multiprocessing.pool
+    _MULTIPROCESSING = True
+except ImportError:
+    logger.warning("multiprocessing could not be imported and won't be used")
 
 START = 0
 CURRENT = 1
@@ -447,3 +459,136 @@ multipart upload may fail")
             self.terminate()
         else:
             self.close()
+
+
+def iter_bucket(bucket_name, prefix='', accept_key=lambda key: True,
+                key_limit=None, workers=16, retries=3):
+    """
+    Iterate and download all S3 files under `bucket/prefix`, yielding out
+    `(key, key content)` 2-tuples (generator).
+
+    `accept_key` is a function that accepts a key name (unicode string) and
+    returns True/False, signalling whether the given key should be downloaded out or
+    not (default: accept all keys).
+
+    If `key_limit` is given, stop after yielding out that many results.
+
+    The keys are processed in parallel, using `workers` processes (default: 16),
+    to speed up downloads greatly. If multiprocessing is not available, thus
+    _MULTIPROCESSING is False, this parameter will be ignored.
+
+    Example::
+
+      >>> # get all JSON files under "mybucket/foo/"
+      >>> for key, content in iter_bucket(bucket_name, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
+      ...     print key, len(content)
+
+      >>> # limit to 10k files, using 32 parallel workers (default is 16)
+      >>> for key, content in iter_bucket(bucket_name, key_limit=10000, workers=32):
+      ...     print key, len(content)
+    """
+    #
+    # If people insist on giving us bucket instances, silently extract the name
+    # before moving on.  Works for boto3 as well as boto.
+    #
+    try:
+        bucket_name = bucket_name.name
+    except AttributeError:
+        pass
+
+    total_size, key_no = 0, -1
+    key_iterator = _list_bucket(bucket_name, prefix=prefix, accept_key=accept_key)
+    download_key = functools.partial(_download_key, bucket_name=bucket_name, retries=retries)
+
+    with _create_process_pool(processes=workers) as pool:
+        result_iterator = pool.imap_unordered(download_key, key_iterator)
+        for key_no, (key, content) in enumerate(result_iterator):
+            if True or key_no % 1000 == 0:
+                logger.info(
+                    "yielding key #%i: %s, size %i (total %.1fMB)",
+                    key_no, key, len(content), total_size / 1024.0 ** 2
+                )
+            yield key, content
+            total_size += len(content)
+
+            if key_limit is not None and key_no + 1 >= key_limit:
+                # we were asked to output only a limited number of keys => we're done
+                break
+    logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
+
+
+def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True):
+    client = boto3.client('s3')
+    ctoken = None
+
+    while True:
+        response = client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+        try:
+            content = response['Contents']
+        except KeyError:
+            pass
+        else:
+            for c in content:
+                key = c['Key']
+                if accept_key(key):
+                    yield key
+        ctoken = response.get('NextContinuationToken', None)
+        if not ctoken:
+            break
+
+
+def _download_key(key_name, bucket_name=None, retries=3):
+    if bucket_name is None:
+        raise ValueError('bucket_name may not be None')
+
+    #
+    # https://geekpete.com/blog/multithreading-boto3/
+    #
+    session = boto3.session.Session()
+    s3 = session.resource('s3')
+    bucket = s3.Bucket(bucket_name)
+
+    # Sometimes, https://github.com/boto/boto/issues/2409 can happen because of network issues on either side.
+    # Retry up to 3 times to ensure its not a transient issue.
+    for x in range(retries + 1):
+        try:
+            content_bytes = _download_fileobj(bucket, key_name)
+        except botocore.client.ClientError:
+            # Actually fail on last pass through the loop
+            if x == retries:
+                raise
+            # Otherwise, try again, as this might be a transient timeout
+            pass
+        else:
+            return key_name, content_bytes
+
+
+def _download_fileobj(bucket, key_name):
+    #
+    # This is a separate function only because it makes it easier to inject
+    # exceptions during tests.
+    #
+    buf = io.BytesIO()
+    bucket.download_fileobj(key_name, buf)
+    return buf.getvalue()
+
+
+class DummyPool(object):
+    """A class that mimics multiprocessing.pool.Pool for our purposes."""
+    def imap_unordered(self, function, items):
+        return six.moves.map(function, items)
+
+    def terminate(self):
+        pass
+
+
+@contextlib.contextmanager
+def _create_process_pool(processes=1):
+    if _MULTIPROCESSING and processes:
+        logger.info("creating pool with %i workers", processes)
+        pool = multiprocessing.pool.Pool(processes=processes)
+    else:
+        logger.info("creating dummy pool")
+        pool = DummyPool()
+    yield pool
+    pool.terminate()

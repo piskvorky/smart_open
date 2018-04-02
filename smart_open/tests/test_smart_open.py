@@ -13,11 +13,10 @@ import os
 import sys
 import hashlib
 
-import boto
+import boto3
 import mock
 from moto import mock_s3
 import responses
-from ssl import SSLError
 import gzip
 
 import smart_open
@@ -208,8 +207,9 @@ class SmartOpenReadTest(unittest.TestCase):
     @mock_s3
     def test_read_never_returns_none(self):
         """read should never return None."""
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='mybucket')
+
         test_string = u"ветер по морю гуляет..."
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_string.encode('utf8'))
@@ -222,8 +222,8 @@ class SmartOpenReadTest(unittest.TestCase):
     @mock_s3
     def test_readline(self):
         """Does readline() return the correct file content?"""
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='mybucket')
         test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_string)
@@ -234,8 +234,8 @@ class SmartOpenReadTest(unittest.TestCase):
     @mock_s3
     def test_readline_iter(self):
         """Does __iter__ return the correct file content?"""
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='mybucket')
         lines = [u"всем привет!\n", u"что нового?"]
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
             fout.write("".join(lines).encode("utf-8"))
@@ -250,8 +250,8 @@ class SmartOpenReadTest(unittest.TestCase):
     @mock_s3
     def test_readline_eof(self):
         """Does readline() return empty string on EOF?"""
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='mybucket')
         with smart_open.smart_open("s3://mybucket/mykey", "wb"):
             pass
 
@@ -265,8 +265,8 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_s3_iter_lines(self):
         """Does s3_iter_lines give correct content?"""
         # create fake bucket and fake key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='mybucket')
         test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
         with smart_open.smart_open("s3://mybucket/mykey", "wb") as fin:
             fin.write(test_string)
@@ -275,26 +275,6 @@ class SmartOpenReadTest(unittest.TestCase):
         reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
         output = list(reader)
         self.assertEqual(b''.join(output), test_string)
-
-    @mock_s3
-    def test_s3_iter_lines_without_key(self):
-        """Does s3_iter_lines fail on invalid input?"""
-        # cannot use context manager for assertRaise in py2.6
-        try:
-            for i in smart_open.s3_open_key(None):
-                pass
-        except TypeError:
-            pass
-        else:
-            self.fail("s3_iter_lines expected to fail on non-`boto.key.Key` inputs")
-
-        try:
-            for i in smart_open.s3_open_key("test"):
-                pass
-        except TypeError:
-            pass
-        else:
-            self.fail("s3_iter_lines extected to fail on non-`boto.key.Key` inputs")
 
     # TODO: add more complex test for file://
     @mock.patch('smart_open.smart_open_lib.file_smart_open')
@@ -392,8 +372,8 @@ class SmartOpenReadTest(unittest.TestCase):
         expected = [b"*" * 5 * 1024**2] + [b'0123456789'] * 1024 + [b"test"]
 
         # create fake bucket and fake key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='mybucket')
 
         with smart_open.smart_open("s3://mybucket/mykey", "wb", s3_min_part_size=5 * 1024**2) as fout:
             # write a single huge line (=full multipart upload)
@@ -419,8 +399,8 @@ class SmartOpenReadTest(unittest.TestCase):
     @mock_s3
     def test_s3_read_moto(self):
         """Are S3 files read correctly?"""
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='mybucket')
 
         # write some bogus key so we can check it below
         content = u"hello wořld\nhow are you?".encode('utf8')
@@ -437,8 +417,8 @@ class SmartOpenReadTest(unittest.TestCase):
     @mock_s3
     def test_s3_seek_moto(self):
         """Does seeking in S3 files work correctly?"""
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='mybucket')
 
         # write some bogus key so we can check it below
         content = u"hello wořld\nhow are you?".encode('utf8')
@@ -488,9 +468,8 @@ class SmartOpenTest(unittest.TestCase):
     Test reading and writing from/into files.
 
     """
-    @mock.patch('smart_open.smart_open_lib.boto')
     @mock.patch('smart_open.smart_open_lib.file_smart_open')
-    def test_file_mode_mock(self, mock_file, mock_boto):
+    def test_file_mode_mock(self, mock_file):
         """Are file:// open modes passed correctly?"""
         # incorrect file mode
         self.assertRaises(
@@ -554,48 +533,12 @@ class SmartOpenTest(unittest.TestCase):
             ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"], stdin=mock_subprocess.PIPE
         )
 
-    @unittest.skip('Not sure how to implement unsecured mode with boto3')
-    @mock.patch('smart_open.smart_open_lib.boto')
-    @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
-    def test_s3_unsecured_mode_mock(self, mock_write, mock_boto):
-        """Are s3u:// open modes passed correctly?"""
-        # Configure the mock boto.config.get to return default host
-        smart_open.smart_open_lib.boto.config.get.return_value = 'example.com'
-
-        # correct write mode, correct s3u URI
-        smart_open.smart_open("s3u://user:secret@example.com@mybucket/mykey", "w")
-        mock_boto.connect_s3.assert_called_with(
-            aws_access_key_id='user', aws_secret_access_key='secret',
-            profile_name=None, host='example.com', is_secure=False,
-            calling_format=mock_boto.s3.connection.OrdinaryCallingFormat())
-        mock_boto.connect_s3().lookup.return_value = True
-        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
-        self.assertTrue(mock_write.called)
-
-    @unittest.skip('Not sure how to implement unsecured mode with boto3')
-    @mock.patch('smart_open.smart_open_lib.boto')
-    @mock.patch('smart_open.smart_open_lib.S3OpenWrite')
-    def test_s3_unsecured_mode_with_port_mock(self, mock_write, mock_boto):
-        """Are s3u:// open modes passed correctly?"""
-        # Configure the mock boto.config.get to return default host
-        smart_open.smart_open_lib.boto.config.get.return_value = 'example.com'
-
-        # correct write mode, correct s3u URI
-        smart_open.smart_open("s3u://user:secret@example.com:2048@mybucket/mykey", "w")
-        mock_boto.connect_s3.assert_called_with(
-            aws_access_key_id='user', aws_secret_access_key='secret',
-            profile_name=None, host='example.com', is_secure=False, port=2048,
-            calling_format=mock_boto.s3.connection.OrdinaryCallingFormat())
-        mock_boto.connect_s3().lookup.return_value = True
-        mock_boto.connect_s3().get_bucket.assert_called_with("mybucket")
-        self.assertTrue(mock_write.called)
-
     @mock_s3
     def test_s3_modes_moto(self):
         """Do s3:// open modes work correctly?"""
         # fake bucket and key
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='mybucket')
         test_string = b"second test"
 
         # correct write mode, correct s3 URI
@@ -684,168 +627,6 @@ class WebHdfsWriteTest(unittest.TestCase):
         assert len(responses.calls) == 4
         assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"
         assert responses.calls[3].request.url == "http://127.0.0.1:8440/file"
-
-
-class S3IterBucketTest(unittest.TestCase):
-    """
-    Test parallel iteration of given bucket.
-
-    """
-    def test_s3_iter_bucket_process_key_mock(self):
-        """Is s3_iter_bucket_process_key called correctly?"""
-        attrs = {"name": "fileA", "get_contents_as_string.return_value": b"contentA"}
-        mykey = mock.Mock(spec=["name", "get_contents_as_string"])
-        mykey.configure_mock(**attrs)
-
-        key, content = smart_open.s3_iter_bucket_process_key(mykey)
-        self.assertEqual(key, mykey)
-        self.assertEqual(content, b"contentA")
-
-    def test_s3_iter_bucket_process_key_with_SSLError_mock(self):
-        attrs = {"name": "fileA", "get_contents_as_string.return_value": b"contentA"}
-        mykey = mock.Mock(spec=["name", "get_contents_as_string"])
-        mykey.configure_mock(**attrs)
-
-        # when get_contents_as_string always returns SSLError
-        mykey.get_contents_as_string.side_effect = SSLError
-        self.assertRaises(SSLError, smart_open.s3_iter_bucket_process_key, mykey)
-
-        # when get_contents_as_string only returns SSLError once, can still recover
-        mykey.get_contents_as_string.side_effect = [SSLError, b"contentA"]
-        key, content = smart_open.s3_iter_bucket_process_key(mykey)
-        self.assertEqual(key, mykey)
-        self.assertEqual(content, b"contentA")
-
-        # when get_contents_as_string fails up to three times, can still recover
-        mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, b"contentA"]
-        key, content = smart_open.s3_iter_bucket_process_key(mykey)
-        self.assertEqual(key, mykey)
-        self.assertEqual(content, b"contentA")
-
-        # but not more than three times ....
-        mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, SSLError, b"contentA"]
-        self.assertRaises(SSLError, smart_open.s3_iter_bucket_process_key, mykey)
-
-        # unless you specify more retries ....
-        mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, SSLError, b"contentA"]
-        key, content = smart_open.s3_iter_bucket_process_key(mykey, retries=4)
-        self.assertEqual(key, mykey)
-        self.assertEqual(content, b"contentA")
-
-        # some other exception always fails, and never retries
-        mykey.get_contents_as_string.side_effect = [Exception, b"contentA"]
-        self.assertRaises(Exception, smart_open.s3_iter_bucket_process_key, mykey)
-
-    @mock_s3
-    def test_s3_iter_bucket_process_key_moto(self):
-        """Does s3_iter_bucket_process_key work correctly?"""
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-
-        mykey = boto.s3.key.Key(mybucket)
-        mykey.key = "mykey"
-        mykey.set_contents_from_string("contentA")
-
-        key, content = smart_open.s3_iter_bucket_process_key(mykey)
-        self.assertEqual(key, mykey)
-        self.assertEqual(content, b"contentA")
-
-    @mock.patch('smart_open.multiprocessing.pool')
-    def test_s3_iter_bucket_mock(self, mock_pool):
-        """Is s3_iter_bucket called correctly?"""
-        attrs = {"name": "fileA", "get_contents_as_string.return_value": "contentA"}
-        mykey = mock.Mock(spec=["name", "get_contents_as_string"])
-        mykey.configure_mock(**attrs)
-
-        attrs = {"list.return_value": [mykey]}
-        mybucket = mock.Mock(spec=["list"])
-        mybucket.configure_mock(**attrs)
-
-        for key, content in smart_open.s3_iter_bucket(mybucket):
-            mock_pool.Pool.assert_called_with(processes=16)
-            mock_pool.Pool().imap_unordered.assert_called_with()
-
-        mock_pool.Pool.assert_called_with(processes=16)
-        self.assertTrue(mock_pool.Pool().imap_unordered.called)
-
-    @mock_s3
-    def test_s3_iter_bucket_moto(self):
-        """Does s3_iter_bucket work correctly?"""
-        conn = boto.connect_s3()
-        conn.create_bucket("mybucket")
-        mybucket = conn.get_bucket("mybucket")
-
-        # first, create some keys in the bucket
-        expected = {}
-        for key_no in range(200):
-            key_name = "mykey%s" % key_no
-            with smart_open.smart_open("s3://mybucket/%s" % key_name, 'wb') as fout:
-                content = '\n'.join("line%i%i" % (key_no, line_no) for line_no in range(10)).encode('utf8')
-                fout.write(content)
-                expected[key_name] = content
-
-        # read all keys + their content back, in parallel, using s3_iter_bucket
-        result = {}
-        for k, c in smart_open.s3_iter_bucket(mybucket):
-            result[k.name] = c
-        self.assertEqual(expected, result)
-
-        # read some of the keys back, in parallel, using s3_iter_bucket
-        result = {}
-        for k, c in smart_open.s3_iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('4')):
-            result[k.name] = c
-        self.assertEqual(result, dict((k, c) for k, c in expected.items() if k.endswith('4')))
-
-        # read some of the keys back, in parallel, using s3_iter_bucket
-        result = dict(smart_open.s3_iter_bucket(mybucket, key_limit=10))
-        self.assertEqual(len(result), min(len(expected), 10))
-
-        for workers in [1, 4, 8, 16, 64]:
-            result = {}
-            for k, c in smart_open.s3_iter_bucket(mybucket):
-                result[k.name] = c
-            self.assertEqual(result, expected)
-
-    @mock.patch('smart_open.multiprocessing.pool.Pool.imap_unordered', map)
-    def test_s3_iter_bucket_with_SSLError_moto(self):
-        attrs = {"name": "fileA", "get_contents_as_string.return_value": b"contentA"}
-        mykey = mock.Mock(spec=["name", "get_contents_as_string"])
-        mykey.configure_mock(**attrs)
-
-        attrs = {"list.return_value": [mykey]}
-        mybucket = mock.Mock(spec=["list"])
-        mybucket.configure_mock(**attrs)
-
-        # when get_contents_as_string always returns SSLError
-        mykey.get_contents_as_string.side_effect = SSLError
-        self.assertRaises(SSLError, lambda x: next(smart_open.s3_iter_bucket(x)), mybucket)
-
-        # when get_contents_as_string only returns SSLError once, can still recover
-        mykey.get_contents_as_string.side_effect = [SSLError, b"contentA"]
-        key, content = next(smart_open.s3_iter_bucket(mybucket))
-        self.assertEqual(key, mykey)
-        self.assertEqual(content, b"contentA")
-
-        # when get_contents_as_string fails up to three times, can still recover
-        mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, b"contentA"]
-        key, content = next(smart_open.s3_iter_bucket(mybucket))
-        self.assertEqual(key, mykey)
-        self.assertEqual(content, b"contentA")
-
-        # but not more than three times ....
-        mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, SSLError, b"contentA"]
-        self.assertRaises(SSLError, lambda x: next(smart_open.s3_iter_bucket(x)), mybucket)
-
-        # unless you specify more retries ....
-        mykey.get_contents_as_string.side_effect = [SSLError, SSLError, SSLError, SSLError, b"contentA"]
-        key, content = next(smart_open.s3_iter_bucket(mybucket, retries=4))
-        self.assertEqual(key, mykey)
-        self.assertEqual(content, b"contentA")
-
-        # some other exception always fails, and never retries
-        mykey.get_contents_as_string.side_effect = [Exception, b"contentA"]
-        self.assertRaises(Exception, lambda x: next(smart_open.s3_iter_bucket(x)), mybucket)
 
 
 class CompressionFormatTest(unittest.TestCase):
@@ -982,14 +763,12 @@ class S3OpenTest(unittest.TestCase):
     @mock_s3
     def test_r(self):
         """Reading a UTF string should work."""
-        conn = boto.connect_s3()
-        conn.create_bucket("bucket")
-        bucket = conn.get_bucket("bucket")
-        key = boto.s3.key.Key(bucket)
-        key.key = "key"
-
         text = u"физкульт-привет!"
-        key.set_contents_from_string(text.encode("utf-8"))
+
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
+        key = s3.Object('bucket', 'key')
+        key.put(Body=text.encode('utf-8'))
 
         with smart_open.s3_open_key(key, "rb") as fin:
             self.assertEqual(fin.read(), text.encode('utf-8'))
@@ -997,8 +776,8 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.s3_open_key(key, "r", encoding='utf-8') as fin:
             self.assertEqual(fin.read(), text)
 
-        parsed_uri = smart_open.ParseUri("s3://bucket/key")
-        with smart_open.s3_open_uri(parsed_uri, "r", encoding='utf-8') as fin:
+        uri = smart_open.ParseUri("s3://bucket/key")
+        with smart_open.s3_open_uri(uri, "r", encoding='utf-8') as fin:
             self.assertEqual(fin.read(), text)
 
     def test_bad_mode(self):
@@ -1009,8 +788,8 @@ class S3OpenTest(unittest.TestCase):
     @mock_s3
     def test_rw_encoding(self):
         """Should read and write text, respecting encodings, etc."""
-        conn = boto.connect_s3()
-        conn.create_bucket("bucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
 
         uri = smart_open.ParseUri("s3://bucket/key")
         text = u"расцветали яблони и груши"
@@ -1034,8 +813,8 @@ class S3OpenTest(unittest.TestCase):
     @mock_s3
     def test_rw_gzip(self):
         """Should read/write gzip files, implicitly and explicitly."""
-        conn = boto.connect_s3()
-        conn.create_bucket("bucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
         uri = smart_open.ParseUri("s3://bucket/key.gz")
 
         text = u"не слышны в саду даже шорохи"
@@ -1058,8 +837,8 @@ class S3OpenTest(unittest.TestCase):
     @mock_s3
     def test_gzip_write_mode(self):
         """Should always open in binary mode when writing through a codec."""
-        conn = boto.connect_s3()
-        conn.create_bucket("bucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
         uri = smart_open.ParseUri("s3://bucket/key.gz")
 
         with mock.patch('smart_open.smart_open_s3.open') as mock_open:
@@ -1069,8 +848,8 @@ class S3OpenTest(unittest.TestCase):
     @mock_s3
     def test_gzip_read_mode(self):
         """Should always open in binary mode when reading through a codec."""
-        conn = boto.connect_s3()
-        conn.create_bucket("bucket")
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
         uri = smart_open.ParseUri("s3://bucket/key.gz")
 
         text = u"если-б я был султан и имел трёх жён, то тройной красотой был бы окружён"
@@ -1084,8 +863,8 @@ class S3OpenTest(unittest.TestCase):
     @mock_s3
     def test_read_encoding(self):
         """Should open the file with the correct encoding, explicit text read."""
-        conn = boto.connect_s3()
-        conn.create_bucket('bucket')
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
         with smart_open.smart_open(key, 'wb') as fout:
@@ -1097,8 +876,8 @@ class S3OpenTest(unittest.TestCase):
     @mock_s3
     def test_read_encoding_implicit_text(self):
         """Should open the file with the correct encoding, implicit text read."""
-        conn = boto.connect_s3()
-        conn.create_bucket('bucket')
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
         with smart_open.smart_open(key, 'wb') as fout:
@@ -1110,8 +889,8 @@ class S3OpenTest(unittest.TestCase):
     @mock_s3
     def test_write_encoding(self):
         """Should open the file for writing with the correct encoding."""
-        conn = boto.connect_s3()
-        conn.create_bucket('bucket')
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
 
@@ -1124,8 +903,8 @@ class S3OpenTest(unittest.TestCase):
     @mock_s3
     def test_write_bad_encoding_strict(self):
         """Should open the file for writing with the correct encoding."""
-        conn = boto.connect_s3()
-        conn.create_bucket('bucket')
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'欲しい気持ちが成長しすぎて'
 
@@ -1136,8 +915,8 @@ class S3OpenTest(unittest.TestCase):
     @mock_s3
     def test_write_bad_encoding_replace(self):
         """Should open the file for writing with the correct encoding."""
-        conn = boto.connect_s3()
-        conn.create_bucket('bucket')
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'欲しい気持ちが成長しすぎて'
         expected = u'?' * len(text)
@@ -1151,28 +930,14 @@ class S3OpenTest(unittest.TestCase):
     @mock_s3
     def test_write_text_gzip(self):
         """Should open the file for writing with the correct encoding."""
-        conn = boto.connect_s3()
-        conn.create_bucket('bucket')
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt.gz"
         text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
 
         with smart_open.smart_open(key, 'w', encoding='utf-8') as fout:
             fout.write(text)
         with smart_open.smart_open(key, 'r', encoding='utf-8') as fin:
-            actual = fin.read()
-        self.assertEqual(text, actual)
-
-    @mock_s3
-    def test_write_text_gzip_key(self):
-        """Should open the boto S3 key for writing with the correct encoding."""
-        conn = boto.connect_s3()
-        mybucket = conn.create_bucket('bucket')
-        mykey = boto.s3.key.Key(mybucket, 'key.txt.gz')
-        text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
-
-        with smart_open.smart_open(mykey, 'w', encoding='utf-8') as fout:
-            fout.write(text)
-        with smart_open.smart_open(mykey, 'r', encoding='utf-8') as fin:
             actual = fin.read()
         self.assertEqual(text, actual)
 
