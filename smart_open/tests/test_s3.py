@@ -463,6 +463,24 @@ class DownloadKeyTest(unittest.TestCase):
                               KEY_NAME, bucket_name=BUCKET_NAME)
 
 
+@maybe_mock_s3
+class OpenTest(unittest.TestCase):
+
+    def test_read_never_returns_none(self):
+        """read should never return None."""
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket=BUCKET_NAME)
+
+        test_string = u"ветер по морю гуляет..."
+        with smart_open.s3.open(BUCKET_NAME, KEY_NAME, "wb") as fout:
+            fout.write(test_string.encode('utf8'))
+
+        r = smart_open.s3.open(BUCKET_NAME, KEY_NAME, "rb")
+        self.assertEqual(r.read(), test_string.encode("utf-8"))
+        self.assertEqual(r.read(), b"")
+        self.assertEqual(r.read(), b"")
+
+
 def populate_bucket(bucket_name=BUCKET_NAME, num_keys=10):
     # fake (or not) connection, bucket and key
     logger.debug('%r', locals())
