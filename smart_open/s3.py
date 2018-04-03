@@ -232,12 +232,10 @@ class BufferedInputBase(io.BufferedIOBase):
             #
             if self._line_terminator in self._buffer:
                 next_newline = self._buffer.index(self._line_terminator)
-                the_line.write(self._buffer[:next_newline + 1])
-                self._buffer = self._buffer[next_newline + 1:]
+                the_line.write(self._read_from_buffer(next_newline + 1))
                 break
             else:
-                the_line.write(self._buffer)
-                self._buffer = b''
+                the_line.write(self._read_from_buffer(len(self._buffer)))
                 self._fill_buffer(self._buffer_size)
         return the_line.getvalue()
 
