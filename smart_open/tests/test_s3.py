@@ -191,8 +191,13 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         create_bucket_and_key(contents=content)
 
-        with smart_open.s3.BufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+            fin.readline()
+            self.assertEqual(fin.tell(), content.index(b'\n')+1)
+
+            fin.seek(0)
             actual = list(fin)
+            self.assertEqual(fin.tell(), len(content))
 
         expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
         self.assertEqual(expected, actual)
