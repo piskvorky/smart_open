@@ -4,7 +4,7 @@ import logging
 import requests
 import six
 
-if six.PY2 == 2:
+if six.PY2:
     import httplib
 else:
     import http.client as httplib
