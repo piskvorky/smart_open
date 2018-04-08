@@ -19,6 +19,7 @@ import mock
 from moto import mock_s3
 import responses
 import gzip
+import six
 
 import smart_open
 from smart_open import smart_open_lib
@@ -131,6 +132,7 @@ class SmartOpenHttpTest(unittest.TestCase):
         self.assertTrue(actual_request.headers['Authorization'].startswith('Basic '))
 
     @responses.activate
+    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
     def test_http_gz(self):
         """Can open gzip via http?"""
         fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
@@ -148,6 +150,7 @@ class SmartOpenHttpTest(unittest.TestCase):
         self.assertEqual(m.hexdigest(), expected_hash)
 
     @responses.activate
+    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
     def test_http_gz_noquerystring(self):
         """Can open gzip via http?"""
         fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
