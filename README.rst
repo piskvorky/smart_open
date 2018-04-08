@@ -6,7 +6,7 @@ smart_open -- utils for streaming large files
 
 
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
-.. |Travis| image:: https://img.shields.io/travis/RaRe-Technologies/smart_open.svg?branch=master
+.. |Travis| image:: https://travis-ci.org/RaRe-Technologies/smart_open.svg?branch=master
 .. _Travis: https://travis-ci.org/RaRe-Technologies/smart_open
 .. _License: https://github.com/RaRe-Technologies/smart_open/blob/master/LICENSE
 
