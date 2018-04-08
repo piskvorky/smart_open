@@ -28,7 +28,7 @@ import subprocess
 import sys
 import requests
 import importlib
-import io
+import ioq
 import warnings
 
 # Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
