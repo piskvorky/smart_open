@@ -507,7 +507,7 @@ class SmartOpenTest(unittest.TestCase):
         #
         with mock.patch('smart_open.smart_open_lib.open',
                         mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
-            with smart_open.smart_open("blah", "r") as fin:
+            with smart_open.smart_open("blah", "r", encoding='utf-8') as fin:
                 self.assertEqual(fin.read(), as_text)
                 mock_open.assert_called_with("blah", "rb")
 
@@ -532,19 +532,19 @@ class SmartOpenTest(unittest.TestCase):
         # correct write mode, correct file:// URI
         with mock.patch('smart_open.smart_open_lib.open',
                         mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
-            with smart_open.smart_open("blah", "w") as fout:
+            with smart_open.smart_open("blah", "w", encoding='utf-8') as fout:
                 mock_open.assert_called_with("blah", "wb")
                 fout.write(as_text)
 
         with mock.patch('smart_open.smart_open_lib.open',
                         mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
-            with smart_open.smart_open("/some/file.txt", "w") as fout:
+            with smart_open.smart_open("/some/file.txt", "w", encoding='utf-8') as fout:
                 mock_open.assert_called_with("/some/file.txt", "wb")
                 fout.write(as_text)
 
         with mock.patch('smart_open.smart_open_lib.open',
                         mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
-            with smart_open.smart_open("/some/file.txt", "w+") as fout:
+            with smart_open.smart_open("/some/file.txt", "w+", encoding='utf-8') as fout:
                 mock_open.assert_called_with("/some/file.txt", "wb+")
                 fout.write(as_text)
 
