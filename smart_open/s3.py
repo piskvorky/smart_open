@@ -114,6 +114,16 @@ class SeekableRawReader(object):
         self._position = position
         range_string = _range_string(self._position)
         logger.debug('content_length: %r range_string: %r', self._content_length, range_string)
+
+        #
+        # Close old body explicitly.
+        # When first seek(), self._body is not exist. Catch the exception and do nothing.
+        #
+        try:
+            self._body.close()
+        except AttributeError as e:
+            pass
+
         if position == self._content_length == 0 or position == self._content_length:
             #
             # When reading, we can't seek to the first byte of an empty file.
