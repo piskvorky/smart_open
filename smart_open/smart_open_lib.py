@@ -449,7 +449,15 @@ class ClosingGzipFile(_make_closing(gzip.GzipFile)):
 
 def _need_to_buffer(file_obj, mode, ext):
     """Returns True if we need to buffer the whole file in memory in order to proceed."""
-    return six.PY2 and mode.startswith('r') and ext in ('.gz', '.bz2') and not file_obj.seekable()
+    try:
+        is_seekable = file_obj.seekable()
+    except AttributeError:
+        #
+        # Under Py2, built-in file objects returned by open do not have
+        # .seekable, but have a .seek method instead.
+        #
+        is_seekable = hasattr(file_obj, 'seek')
+    return six.PY2 and mode.startswith('r') and ext in ('.gz', '.bz2') and not is_seekable
 
 
 def _compression_wrapper(file_obj, filename, mode):
