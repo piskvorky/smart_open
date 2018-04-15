@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 import logging
 import subprocess
 import unittest
+import os.path as P
 
 import six
 
@@ -13,11 +14,12 @@ import smart_open
 
 PORT = 8008
 GZIP_MAGIC = b'\x1f\x8b'
+CURR_DIR = P.dirname(P.abspath(__file__))
 
 
 def startup_server(port=PORT):
     command = ['python', '-m', 'SimpleHTTPServer', str(port)]
-    return subprocess.Popen(command)
+    return subprocess.Popen(command, cwd=CURR_DIR)
 
 
 class ReadTest(unittest.TestCase):
