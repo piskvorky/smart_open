@@ -6,6 +6,14 @@ import requests
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+_HEADERS = {'Accept-Encoding': 'identity'}
+"""The headers we send to the server with every HTTP request.
+
+For now, we ask the server to send us the files as they are.
+Sometimes, servers compress the file for more efficient transfer, in which case
+the client (us) has to decompress them with the appropriate algorithm.
+"""
+
 
 class BufferedInputBase(io.BufferedIOBase):
     """
@@ -28,7 +36,7 @@ class BufferedInputBase(io.BufferedIOBase):
         else:
             auth = None
 
-        self.response = requests.get(url, auth=auth, stream=True)
+        self.response = requests.get(url, auth=auth, stream=True, headers=_HEADERS)
 
         if not self.response.ok:
             self.response.raise_for_status()
