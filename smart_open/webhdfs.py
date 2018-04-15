@@ -130,7 +130,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         response = requests.post(uri, data=data,
                                  headers={'content-type': 'application/octet-stream'})
         if not response.status_code == httplib.OK:
-            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
+            raise WebHdfsException(str(response.status_code) + "\n" + repr(response.content))
 
     def write(self, b):
         """
