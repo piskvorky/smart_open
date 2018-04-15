@@ -7,6 +7,7 @@ import logging
 import subprocess
 import unittest
 import os.path as P
+import time
 
 import six
 
@@ -19,7 +20,9 @@ CURR_DIR = P.dirname(P.abspath(__file__))
 
 def startup_server(port=PORT):
     command = ['python', '-m', 'SimpleHTTPServer', str(port)]
-    return subprocess.Popen(command, cwd=CURR_DIR)
+    sub = subprocess.Popen(command, cwd=CURR_DIR)
+    time.sleep(1)
+    return sub
 
 
 class ReadTest(unittest.TestCase):
