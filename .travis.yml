@@ -44,8 +44,10 @@ script:
     fi
   - python setup.py test
   - export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())')
+  - pip install pytest
+  - py.test integration-tests/test_http.py
   - if [[ ${SO_DISABLE_MOCKS} = "1" ]]; then
-      pip install pytest pytest_benchmark awscli;
+      pip install pytest_benchmark awscli;
       set -e;
       py.test integration-tests/test_s3.py --benchmark-save=`git rev-parse HEAD`;
       set +e;

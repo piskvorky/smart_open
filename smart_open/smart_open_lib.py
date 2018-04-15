@@ -24,7 +24,7 @@ The main methods are:
 import codecs
 import logging
 import os
-import subprocess
+import os.path as P
 import sys
 import requests
 import importlib
@@ -44,20 +44,11 @@ for pathlib_module in ('pathlib', 'pathlib2'):
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
 import sys
+from ssl import SSLError
+from six.moves.urllib import parse as urlparse
 
 
 IS_PY2 = (sys.version_info[0] == 2)
-
-if IS_PY2:
-    import cStringIO as StringIO
-
-if sys.version_info[0] == 2:
-    import httplib
-
-elif sys.version_info[0] == 3:
-    import io as StringIO
-    import http.client as httplib
-
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +60,10 @@ else:
 import gzip
 import smart_open.s3 as smart_open_s3
 from smart_open.s3 import iter_bucket as s3_iter_bucket
+import smart_open.hdfs as smart_open_hdfs
+import smart_open.webhdfs as smart_open_webhdfs
+import smart_open.http as smart_open_http
 
-
-WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
@@ -80,6 +72,7 @@ _ISSUE_146_FSTR = (
     "not currently support decoding text via the %(scheme)s scheme. "
     "Re-open the file without specifying an encoding to suppress this warning."
 )
+_ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
 
 DEFAULT_ERRORS = 'strict'
 
@@ -167,60 +160,135 @@ def smart_open(uri, mode="rb", **kw):
     if PATHLIB_SUPPORT and isinstance(uri, pathlib.Path):
         uri = str(uri)
 
+    #
+    # Our API is very liberal with keyword arguments, making it a bit hard to
+    # manage them.  Capture the keyword arguments we'll be using in this
+    # function in advance to reduce the confusion in downstream functions.
+    #
+    # explicit_encoding is what we've been explicitly told to use.  encoding is
+    # what we'll actually end up using.  The two may be different if the user
+    # didn't actually specify the encoding.
+    #
+    ignore_extension = kw.pop('ignore_extension', False)
+    explicit_encoding = kw.get('encoding', None)
+    encoding = kw.pop('encoding', SYSTEM_ENCODING)
+
+    #
+    # This is how we get from the filename to the end result.  Decompression is
+    # optional, but it always accepts bytes and returns bytes.
+    #
+    # Decoding is also optional, accepts bytes and returns text.  The diagram
+    # below is for reading, for writing, the flow is from right to left, but
+    # the code is identical.
+    #
+    #           open as binary         decompress?          decode?
+    # filename ---------------> bytes -------------> bytes ---------> text
+    #                          binary             decompressed       decode
+    #
+    try:
+        binary_mode = {'r': 'rb', 'r+': 'rb+',
+                       'w': 'wb', 'w+': 'wb+',
+                       'a': 'ab', 'a+': 'ab+'}[mode]
+    except KeyError:
+        binary_mode = mode
+    binary, filename = _open_binary_stream(uri, binary_mode, **kw)
+    if ignore_extension:
+        decompressed = binary
+    else:
+        decompressed = _compression_wrapper(binary, filename, mode)
+
+    if 'b' not in mode or explicit_encoding is not None:
+        errors = kw.pop('errors', 'strict')
+        decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
+    else:
+        decoded = decompressed
+
+    return decoded
+
+
+def _open_binary_stream(uri, mode, **kw):
+    """Open an arbitrary URI in the specified binary mode.
+
+    Not all modes are supported for all protocols.
+
+    :arg uri: The URI to open.  May be a string, or something else.
+    :arg str mode: The mode to open with.  Must be rb, wb or ab.
+    :arg kw: TODO: document this.
+    :returns: A file object and the filename
+    :rtype: tuple
+    """
+    if mode not in ('rb', 'rb+', 'wb', 'wb+', 'ab', 'ab+'):
+        #
+        # This should really be a ValueError, but for the sake of compatibility
+        # with older versions, which raise NotImplementedError, we do the same.
+        #
+        raise NotImplementedError('unsupported mode: %r' % mode)
+
     if isinstance(uri, six.string_types):
         # this method just routes the request to classes handling the specific storage
         # schemes, depending on the URI protocol in `uri`
+        filename = uri.split('/')[-1]
         parsed_uri = ParseUri(uri)
+        unsupported = "%r mode not supported for %r scheme" % (mode, parsed_uri.scheme)
 
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
-            encoding = kw.pop('encoding', None)
-            errors = kw.pop('errors', DEFAULT_ERRORS)
-            return file_smart_open(parsed_uri.uri_path, mode, encoding=encoding, errors=errors)
+            fobj = open(parsed_uri.uri_path, mode)
+            return fobj, filename
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
-            return s3_open_uri(parsed_uri, mode, **kw)
+            return _s3_open_uri(parsed_uri, mode, **kw), filename
         elif parsed_uri.scheme in ("hdfs", ):
-            encoding = kw.pop('encoding', None)
-            if encoding is not None:
-                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
-            if mode in ('r', 'rb'):
-                return HdfsOpenRead(parsed_uri, **kw)
-            if mode in ('w', 'wb'):
-                return HdfsOpenWrite(parsed_uri, **kw)
+            if mode == 'rb':
+                return smart_open_hdfs.CliRawInputBase(parsed_uri.uri_path), filename
+            elif mode == 'wb':
+                return smart_open_hdfs.CliRawOutputBase(parsed_uri.uri_path), filename
             else:
-                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+                raise NotImplementedError(unsupported)
         elif parsed_uri.scheme in ("webhdfs", ):
-            encoding = kw.pop('encoding', None)
-            if encoding is not None:
-                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
-            if mode in ('r', 'rb'):
-                return WebHdfsOpenRead(parsed_uri, **kw)
-            elif mode in ('w', 'wb'):
-                return WebHdfsOpenWrite(parsed_uri, **kw)
+            if mode == 'rb':
+                fobj = smart_open_webhdfs.BufferedInputBase(parsed_uri.uri_path, **kw)
+            elif mode == 'wb':
+                fobj = smart_open_webhdfs.BufferedOutputBase(parsed_uri.uri_path, **kw)
             else:
-                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+                raise NotImplementedError(unsupported)
+            return fobj, filename
         elif parsed_uri.scheme.startswith('http'):
-            encoding = kw.pop('encoding', None)
-            if encoding is not None:
-                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
-            if mode in ('r', 'rb'):
-                return HttpOpenRead(parsed_uri, **kw)
+            #
+            # The URI may contain a query string and fragments, which interfere
+            # with out compressed/uncompressed estimation.
+            #
+            filename = P.basename(urlparse.urlparse(uri).path)
+            if mode == 'rb':
+                return smart_open_http.BufferedInputBase(uri, **kw), filename
             else:
-                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+                raise NotImplementedError(unsupported)
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif isinstance(uri, boto.s3.key.Key):
-        return s3_open_key(uri, mode, **kw)
+        logger.debug('%r', locals())
+        #
+        # TODO: handle boto3 keys as well
+        #
+        host = kw.pop('host', None)
+        if host is not None:
+            kw['endpoint_url'] = 'http://' + host
+        return smart_open_s3.open(uri.bucket.name, uri.name, mode, **kw), uri.name
     elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
-        return uri
+        filename = '/tmp/unknown'
+        return uri, filename
     else:
         raise TypeError('don\'t know how to handle uri %s' % repr(uri))
 
 
-def s3_open_uri(parsed_uri, mode, **kwargs):
-    logger.debug('%r', locals())
+def _s3_open_uri(parsed_uri, mode, **kwargs):
+    logger.debug('s3_open_uri: %r', locals())
+    if mode in ('r', 'w'):
+        raise ValueError('this function can only open binary streams. '
+                         'Use smart_open.smart_open() to open text streams.')
+    elif mode not in ('rb', 'wb'):
+        raise NotImplementedError('unsupported mode: %r', mode)
     if parsed_uri.access_id is not None:
         kwargs['aws_access_key_id'] = parsed_uri.access_id
     if parsed_uri.access_secret is not None:
@@ -231,70 +299,7 @@ def s3_open_uri(parsed_uri, mode, **kwargs):
     if host is not None:
         kwargs['endpoint_url'] = 'http://' + host
 
-    #
-    # TODO: this is the wrong place to handle ignore_extension.
-    # It should happen at the highest level in the smart_open function, because
-    # it influences other file systems as well, not just S3.
-    #
-    if kwargs.pop("ignore_extension", False):
-        codec = None
-    else:
-        codec = _detect_codec(parsed_uri.key_id)
-
-    #
-    # Codecs work on a byte-level, so the underlying S3 object should
-    # always be reading bytes.
-    #
-    if mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
-        s3_mode = smart_open_s3.READ_BINARY
-    elif mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
-        s3_mode = smart_open_s3.WRITE_BINARY
-    else:
-        raise NotImplementedError('mode %r not implemented for S3' % mode)
-
-    encoding = kwargs.get('encoding')
-    errors = kwargs.get('errors', DEFAULT_ERRORS)
-    fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, s3_mode, **kwargs)
-    decompressed_fobj = _CODECS[codec](fobj, mode)
-    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
-    return decoded_fobj
-
-
-def s3_open_key(key, mode, **kwargs):
-    try:
-        bucket_name, key_name = key.bucket_name, key.key
-        logging.warning('inferring S3 URL from boto3 Key object')
-    except AttributeError:
-        try:
-            bucket_name, key_name = key.bucket.name, key.name
-            logging.warning('inferring S3 URL from boto.s3.key.Key object')
-        except AttributeError:
-            raise ValueError('expected %r to be a boto or boto3 Key object' % key)
-    parsed_uri = ParseUri('s3://%s/%s' % (bucket_name, key_name))
-    return s3_open_uri(parsed_uri, mode, **kwargs)
-
-
-def _detect_codec(filename):
-    if filename.endswith(".gz"):
-        return 'gzip'
-    return None
-
-
-def _wrap_gzip(fileobj, mode):
-    return gzip.GzipFile(fileobj=fileobj, mode=mode)
-
-
-def _wrap_none(fileobj, mode):
-    return fileobj
-
-
-_CODECS = {
-    None: _wrap_none,
-    'gzip': _wrap_gzip,
-    #
-    # TODO: add support for other codecs here.
-    #
-}
+    return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
 
 class ParseUri(object):
@@ -398,118 +403,7 @@ class ParseUri(object):
             raise NotImplementedError("unknown URI scheme %r in %r" % (self.scheme, uri))
 
 
-class HdfsOpenRead(object):
-    """
-    Implement streamed reader from HDFS, as an iterable & context manager.
-
-    """
-    def __init__(self, parsed_uri):
-        if parsed_uri.scheme != "hdfs":
-            raise TypeError("can only process HDFS files")
-        self.parsed_uri = parsed_uri
-
-    def __iter__(self):
-        hdfs = subprocess.Popen(["hdfs", "dfs", '-text', self.parsed_uri.uri_path], stdout=subprocess.PIPE)
-        return hdfs.stdout
-
-    def read(self, size=None):
-        raise NotImplementedError("read() not implemented yet")
-
-    def seek(self, offset, whence=None):
-        raise NotImplementedError("seek() not implemented yet")
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        pass
-
-
-class HdfsOpenWrite(object):
-    """
-    Implement streamed writer from HDFS, as an iterable & context manager.
-
-    """
-    def __init__(self, parsed_uri):
-        if parsed_uri.scheme != "hdfs":
-            raise TypeError("can only process HDFS files")
-        self.parsed_uri = parsed_uri
-        self.out_pipe = subprocess.Popen(
-            ["hdfs", "dfs", "-put", "-f", "-", self.parsed_uri.uri_path], stdin=subprocess.PIPE
-        )
-
-    def write(self, b):
-        self.out_pipe.stdin.write(b)
-
-    def seek(self, offset, whence=None):
-        raise NotImplementedError("seek() not implemented yet")
-
-    def __enter__(self):
-        return self
-
-    def close(self):
-        self.out_pipe.stdin.close()
-
-    def __exit__(self, type, value, traceback):
-        self.close()
-
-
-class WebHdfsOpenRead(object):
-    """
-    Implement streamed reader from WebHDFS, as an iterable & context manager.
-    NOTE: it does not support kerberos authentication yet
-
-    """
-    def __init__(self, parsed_uri):
-        if parsed_uri.scheme != "webhdfs":
-            raise TypeError("can only process WebHDFS files")
-        self.parsed_uri = parsed_uri
-        self.offset = 0
-
-    def __iter__(self):
-        payload = {"op": "OPEN"}
-        response = requests.get("http://" + self.parsed_uri.uri_path, params=payload, stream=True)
-        return response.iter_lines()
-
-    def read(self, size=None):
-        """
-        Read the specific number of bytes from the file
-
-        Note read() and line iteration (`for line in self: ...`) each have their
-        own file position, so they are independent. Doing a `read` will not affect
-        the line iteration, and vice versa.
-        """
-        if not size or size < 0:
-            payload = {"op": "OPEN", "offset": self.offset}
-            self.offset = 0
-        else:
-            payload = {"op": "OPEN", "offset": self.offset, "length": size}
-            self.offset += size
-        response = requests.get("http://" + self.parsed_uri.uri_path, params=payload, stream=True)
-        return response.content
-
-    def seek(self, offset, whence=0):
-        """
-        Seek to the specified position.
-
-        Only seeking to the beginning (offset=0) supported for now.
-
-        """
-        if whence == 0 and offset == 0:
-            self.offset = 0
-        elif whence == 0:
-            self.offset = offset
-        else:
-            raise NotImplementedError("operations with whence not implemented yet")
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        pass
-
-
-def make_closing(base, **attrs):
+def _make_closing(base, **attrs):
     """
     Add support for `with Base(attrs) as fout:` to the base class if it's missing.
     The base class' `close()` method will be called on context exit, to always close the file properly.
@@ -526,7 +420,7 @@ def make_closing(base, **attrs):
     return type('Closing' + base.__name__, (base, object), attrs)
 
 
-class ClosingBZ2File(make_closing(BZ2File)):
+class ClosingBZ2File(_make_closing(BZ2File)):
     """
     Implements wrapper for BZ2File that closes file object receieved as argument
 
@@ -540,7 +434,8 @@ class ClosingBZ2File(make_closing(BZ2File)):
         if not self.inner_stream.closed:
             self.inner_stream.close()
 
-class ClosingGzipFile(make_closing(gzip.GzipFile)):
+
+class ClosingGzipFile(_make_closing(gzip.GzipFile)):
     """
     Implement wrapper for GzipFile that closes file object receieved from arguments
 
@@ -552,7 +447,20 @@ class ClosingGzipFile(make_closing(gzip.GzipFile)):
             fileobj.close()
 
 
-def compression_wrapper(file_obj, filename, mode):
+def _need_to_buffer(file_obj, mode, ext):
+    """Returns True if we need to buffer the whole file in memory in order to proceed."""
+    try:
+        is_seekable = file_obj.seekable()
+    except AttributeError:
+        #
+        # Under Py2, built-in file objects returned by open do not have
+        # .seekable, but have a .seek method instead.
+        #
+        is_seekable = hasattr(file_obj, 'seek')
+    return six.PY2 and mode.startswith('r') and ext in ('.gz', '.bz2') and not is_seekable
+
+
+def _compression_wrapper(file_obj, filename, mode):
     """
     This function will wrap the file_obj with an appropriate
     [de]compression mechanism based on the extension of the filename.
@@ -564,6 +472,11 @@ def compression_wrapper(file_obj, filename, mode):
     file_obj.
     """
     _, ext = os.path.splitext(filename)
+
+    if _need_to_buffer(file_obj, mode, ext):
+        warnings.warn('streaming gzip support unavailable, see %s' % _ISSUE_189_URL)
+        file_obj = io.BytesIO(file_obj.read())
+
     if ext == '.bz2':
         return ClosingBZ2File(file_obj, mode)
     elif ext == '.gz':
@@ -572,7 +485,7 @@ def compression_wrapper(file_obj, filename, mode):
         return file_obj
 
 
-def encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
+def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
@@ -606,246 +519,3 @@ def encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     else:
         decoder = codecs.getwriter(encoding)
     return decoder(fileobj, errors=errors)
-
-
-def file_smart_open(fname, mode='rb', encoding=None, errors=DEFAULT_ERRORS):
-    """
-    Stream from/to local filesystem, transparently (de)compressing gzip and bz2
-    files if necessary.
-
-    :arg str fname: The path to the file to open.
-    :arg str mode: The mode in which to open the file.
-    :arg str encoding: The text encoding to use.
-    :arg str errors: The method to use when handling encoding/decoding errors.
-    :returns: A file object
-    """
-    #
-    # This is how we get from the filename to the end result.
-    # Decompression is optional, but it always accepts bytes and returns bytes.
-    # Decoding is also optional, accepts bytes and returns text.
-    # The diagram below is for reading, for writing, the flow is from right to
-    # left, but the code is identical.
-    #
-    #           open as binary         decompress?          decode?
-    # filename ---------------> bytes -------------> bytes ---------> text
-    #                          raw_fobj        decompressed_fobj   decoded_fobj
-    #
-    try:  # TODO need to fix this place (for cases with r+ and so on)
-        raw_mode = {'r': 'rb', 'w': 'wb', 'a': 'ab'}[mode]
-    except KeyError:
-        raw_mode = mode
-    raw_fobj = open(fname, raw_mode)
-    decompressed_fobj = compression_wrapper(raw_fobj, fname, raw_mode)
-    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
-    return decoded_fobj
-
-
-class HttpReadStream(object):
-    """
-    Implement streamed reader from a web site, as an iterable & context manager.
-    Supports Kerberos and Basic HTTP authentication.
-
-    As long as you don't mix different access patterns (readline vs readlines vs
-    read(n) vs read() vs iteration) this will load efficiently in memory.
-
-    """
-    def __init__(self, url, mode='r', kerberos=False, user=None, password=None):
-        """
-        If Kerberos is True, will attempt to use the local Kerberos credentials.
-        Otherwise, will try to use "basic" HTTP authentication via username/password.
-
-        If none of those are set, will connect unauthenticated.
-        """
-        if kerberos:
-            import requests_kerberos
-            auth = requests_kerberos.HTTPKerberosAuth()
-        elif user is not None and password is not None:
-            auth = (user, password)
-        else:
-            auth = None
-
-        self.response = requests.get(url, auth=auth, stream=True)
-
-        if not self.response.ok:
-            self.response.raise_for_status()
-
-        self.mode = mode
-        self._read_buffer = None
-        self._read_iter = None
-        self._readline_iter = None
-
-    def __iter__(self):
-        return self.response.iter_lines()
-
-    def binary_content(self):
-        """Return the content of the request as bytes."""
-        return self.response.content
-
-    def readline(self):
-        """
-        Mimics the readline call to a filehandle object.
-        """
-        if self._readline_iter is None:
-            self._readline_iter = self.response.iter_lines()
-
-        try:
-            return next(self._readline_iter)
-        except StopIteration:
-            # When readline runs out of data, it just returns an empty string
-            return ''
-
-    def readlines(self):
-        """
-        Mimics the readlines call to a filehandle object.
-        """
-        return list(self.response.iter_lines())
-
-    def seek(self):
-        raise NotImplementedError('seek() is not implemented')
-
-    def read(self, size=None):
-        """
-        Mimics the read call to a filehandle object.
-        """
-        if size is None:
-            return self.response.content
-        else:
-            if self._read_iter is None:
-                self._read_iter = self.response.iter_content(size)
-                self._read_buffer = next(self._read_iter)
-
-            while len(self._read_buffer) < size:
-                try:
-                    self._read_buffer += next(self._read_iter)
-                except StopIteration:
-                    # Oops, ran out of data early.
-                    retval = self._read_buffer
-                    self._read_buffer = ''
-                    if len(retval) == 0:
-                        # When read runs out of data, it just returns empty
-                        return ''
-                    else:
-                        return retval
-
-            # If we got here, it means we have enough data in the buffer
-            # to return to the caller.
-            retval = self._read_buffer[:size]
-            self._read_buffer = self._read_buffer[size:]
-            return retval
-
-    def __enter__(self, *args, **kwargs):
-        return self
-
-    def __exit__(self, *args, **kwargs):
-        self.response.close()
-
-
-def HttpOpenRead(parsed_uri, mode='r', **kwargs):
-    if parsed_uri.scheme not in ('http', 'https'):
-        raise TypeError("can only process http/https urls")
-    if mode not in ('r', 'rb'):
-        raise NotImplementedError('Streaming write to http not supported')
-
-    url = parsed_uri.uri_path
-
-    response = HttpReadStream(url, **kwargs)
-
-    fname = urlsplit(url, allow_fragments=False).path.split('/')[-1]
-
-    if fname.endswith('.gz'):
-        #  Gzip needs a seek-able filehandle, so we need to buffer it.
-        buffer = make_closing(io.BytesIO)(response.binary_content())
-        return compression_wrapper(buffer, fname, mode)
-    else:
-        return compression_wrapper(response, fname, mode)
-
-
-class WebHdfsOpenWrite(object):
-    """
-    Context manager for writing into webhdfs files
-
-    """
-    def __init__(self, parsed_uri, min_part_size=WEBHDFS_MIN_PART_SIZE):
-        if parsed_uri.scheme != "webhdfs":
-            raise TypeError("can only process WebHDFS files")
-        self.parsed_uri = parsed_uri
-        self.closed = False
-        self.min_part_size = min_part_size
-        # creating empty file first
-        payload = {"op": "CREATE", "overwrite": True}
-        init_response = requests.put("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
-        if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
-            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
-        uri = init_response.headers['location']
-        response = requests.put(uri, data="", headers={'content-type': 'application/octet-stream'})
-        if not response.status_code == httplib.CREATED:
-            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
-        self.lines = []
-        self.parts = 0
-        self.chunk_bytes = 0
-        self.total_size = 0
-
-    def upload(self, data):
-        payload = {"op": "APPEND"}
-        init_response = requests.post("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
-        if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
-            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
-        uri = init_response.headers['location']
-        response = requests.post(uri, data=data, headers={'content-type': 'application/octet-stream'})
-        if not response.status_code == httplib.OK:
-            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
-
-    def write(self, b):
-        """
-        Write the given bytes (binary string) into the WebHDFS file from constructor.
-
-        """
-        if self.closed:
-            raise ValueError("I/O operation on closed file")
-        if isinstance(b, six.text_type):
-            # not part of API: also accept unicode => encode it as utf8
-            b = b.encode('utf8')
-
-        if not isinstance(b, six.binary_type):
-            raise TypeError("input must be a binary string")
-
-        self.lines.append(b)
-        self.chunk_bytes += len(b)
-        self.total_size += len(b)
-
-        if self.chunk_bytes >= self.min_part_size:
-            buff = b"".join(self.lines)
-            logger.info(
-                "uploading part #%i, %i bytes (total %.3fGB)",
-                self.parts, len(buff), self.total_size / 1024.0 ** 3
-            )
-            self.upload(buff)
-            logger.debug("upload of part #%i finished", self.parts)
-            self.parts += 1
-            self.lines, self.chunk_bytes = [], 0
-
-    def seek(self, offset, whence=None):
-        raise NotImplementedError("seek() not implemented yet")
-
-    def close(self):
-        buff = b"".join(self.lines)
-        if buff:
-            logger.info(
-                "uploading last part #%i, %i bytes (total %.3fGB)",
-                self.parts, len(buff), self.total_size / 1024.0 ** 3
-            )
-            self.upload(buff)
-            logger.debug("upload of last part #%i finished", self.parts)
-        self.closed = True
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()
-
-
-class WebHdfsException(Exception):
-    def __init__(self, msg=str()):
-        self.msg = msg
-        super(WebHdfsException, self).__init__(self.msg)

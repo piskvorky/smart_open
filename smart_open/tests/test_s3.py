@@ -311,13 +311,6 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
         self.assertEqual(expected, actual)
 
-    def test_text_iterator(self):
-        expected = u"выйду ночью в поле с конём".split(u' ')
-        create_bucket_and_key(contents="\n".join(expected).encode('utf-8'))
-        with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'r') as fin:
-            actual = [line.rstrip() for line in fin]
-        self.assertEqual(expected, actual)
-
     def test_binary_iterator(self):
         expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
         create_bucket_and_key(contents=b"\n".join(expected))
