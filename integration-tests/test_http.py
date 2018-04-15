@@ -41,7 +41,6 @@ class ReadTest(unittest.TestCase):
         self.assertTrue(text.startswith('В начале июля, в чрезвычайно'.encode('utf-8')))
         self.assertTrue(text.endswith('улизнуть, чтобы никто не видал.\n'.encode('utf-8')))
 
-    @unittest.skipIf(six.PY2, 'gzip support does not work on Py2')
     def test_read_gzip_text(self):
         url = 'http://localhost:%d/smart_open/tests/test_data/crime-and-punishment.txt.gz' % PORT
         with smart_open.smart_open(url, encoding='utf-8') as fin:

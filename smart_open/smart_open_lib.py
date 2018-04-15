@@ -72,6 +72,7 @@ _ISSUE_146_FSTR = (
     "not currently support decoding text via the %(scheme)s scheme. "
     "Re-open the file without specifying an encoding to suppress this warning."
 )
+_ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
 
 DEFAULT_ERRORS = 'strict'
 
@@ -446,6 +447,11 @@ class ClosingGzipFile(_make_closing(gzip.GzipFile)):
             fileobj.close()
 
 
+def _need_to_buffer(file_obj, mode, ext):
+    """Returns True if we need to buffer the whole file in memory in order to proceed."""
+    return six.PY2 and mode.startswith('r') and ext in ('.gz', '.bz2') and not file_obj.seekable()
+
+
 def _compression_wrapper(file_obj, filename, mode):
     """
     This function will wrap the file_obj with an appropriate
@@ -458,6 +464,11 @@ def _compression_wrapper(file_obj, filename, mode):
     file_obj.
     """
     _, ext = os.path.splitext(filename)
+
+    if _need_to_buffer(file_obj, mode, ext):
+        warnings.warn('streaming gzip support unavailable, see %s' % _ISSUE_189_URL)
+        file_obj = io.BytesIO(file_obj.read())
+
     if ext == '.bz2':
         return ClosingBZ2File(file_obj, mode)
     elif ext == '.gz':
