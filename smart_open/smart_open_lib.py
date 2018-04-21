@@ -241,11 +241,16 @@ def _shortcut_open(uri, mode, **kw):
         return None
 
     open_kwargs = {}
-    encoding =  kw.get('encoding', None)
+    errors = kw.get('errors')
+    if errors is not None:
+        open_kwargs['errors'] = errors
+
+    encoding = kw.get('encoding')
     if encoding is not None:
         open_kwargs['encoding'] = encoding
+        mode = mode.replace('b', '')
 
-    return io.open(uri, mode, **open_kwargs)
+    return io.open(parsed_uri.uri_path, mode, **open_kwargs)
 
 
 def _open_binary_stream(uri, mode, **kw):
@@ -276,7 +281,7 @@ def _open_binary_stream(uri, mode, **kw):
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
-            fobj = open(parsed_uri.uri_path, mode)
+            fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return _s3_open_uri(parsed_uri, mode, **kw), filename
