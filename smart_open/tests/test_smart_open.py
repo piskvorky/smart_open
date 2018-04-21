@@ -201,6 +201,12 @@ class SmartOpenReadTest(unittest.TestCase):
 
     """
 
+    def test_shortcut(self):
+        fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
+        with mock.patch('io.open') as mock_open:
+            smart_open.smart_open(fpath, 'r').read()
+        mock_open.assert_called_with(fpath, 'r')
+
     def test_open_with_keywords(self):
         """This test captures Issue #142."""
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
