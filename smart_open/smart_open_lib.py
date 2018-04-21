@@ -141,6 +141,13 @@ def smart_open(uri, mode="rb", **kw):
     """
     logger.debug('%r', locals())
 
+    if not isinstance(mode, six.string_types):
+        raise TypeError('mode should be a string')
+
+    fobj = _shortcut_open(uri, mode, **kw)
+    if fobj is not None:
+        return fobj
+
     #
     # This is a work-around for the problem described in Issue #144.
     # If the user has explicitly specified an encoding, then assume they want
@@ -151,10 +158,6 @@ def smart_open(uri, mode="rb", **kw):
     #
     if kw.get('encoding') is not None and 'b' in mode:
         mode = mode.replace('b', '')
-
-    # validate mode parameter
-    if not isinstance(mode, six.string_types):
-        raise TypeError('mode should be a string')
 
     # Support opening ``pathlib.Path`` objects by casting them to strings.
     if PATHLIB_SUPPORT and isinstance(uri, pathlib.Path):
@@ -206,6 +209,50 @@ def smart_open(uri, mode="rb", **kw):
     return decoded
 
 
+def _shortcut_open(uri, mode, **kw):
+    """Try to open the URI using the standard library io.open function.
+
+    This can be much faster than the alternative of opening in binary mode and
+    then decoding.
+
+    This is only possible under the following conditions:
+
+        1. Opening a local file
+        2. Ignore extension is set to True
+
+    If it is not possible to use the built-in open for the specified URI, returns None.
+
+    :param str uri: A string indicating what to open.
+    :param str mode: The mode to pass to the open function.
+    :param dict kw:
+    :returns: The opened file
+    :rtype: file
+    """
+    if not isinstance(uri, six.string_types):
+        return None
+
+    parsed_uri = ParseUri(uri)
+    if parsed_uri.scheme != 'file':
+        return None
+
+    _, extension = P.splitext(parsed_uri.uri_path)
+    ignore_extension = kw.get('ignore_extension', False)
+    if extension in ('.gz', '.bz2') and not ignore_extension:
+        return None
+
+    open_kwargs = {}
+    errors = kw.get('errors')
+    if errors is not None:
+        open_kwargs['errors'] = errors
+
+    encoding = kw.get('encoding')
+    if encoding is not None:
+        open_kwargs['encoding'] = encoding
+        mode = mode.replace('b', '')
+
+    return io.open(parsed_uri.uri_path, mode, **open_kwargs)
+
+
 def _open_binary_stream(uri, mode, **kw):
     """Open an arbitrary URI in the specified binary mode.
 
@@ -234,7 +281,7 @@ def _open_binary_stream(uri, mode, **kw):
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
-            fobj = open(parsed_uri.uri_path, mode)
+            fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return _s3_open_uri(parsed_uri, mode, **kw), filename

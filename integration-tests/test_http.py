@@ -15,7 +15,7 @@ import smart_open
 
 GZIP_MAGIC = b'\x1f\x8b'
 BASE_URL = ('https://raw.githubusercontent.com/RaRe-Technologies/smart_open/'
-           'refactor-rebased/smart_open/tests/test_data/')
+           'master/smart_open/tests/test_data/')
 
 
 

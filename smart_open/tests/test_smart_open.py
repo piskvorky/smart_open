@@ -201,6 +201,12 @@ class SmartOpenReadTest(unittest.TestCase):
 
     """
 
+    def test_shortcut(self):
+        fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
+        with mock.patch('io.open') as mock_open:
+            smart_open.smart_open(fpath, 'r').read()
+        mock_open.assert_called_with(fpath, 'r')
+
     def test_open_with_keywords(self):
         """This test captures Issue #142."""
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
@@ -305,7 +311,7 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(b''.join(output), test_string)
 
     # TODO: add more complex test for file://
-    @mock.patch('smart_open.smart_open_lib.open')
+    @mock.patch('io.open')
     def test_file(self, mock_smart_open):
         """Is file:// line iterator called correctly?"""
         prefix = "file://"
@@ -336,7 +342,7 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open(prefix+short_path, read_mode, errors='strict')
         smart_open_object.__iter__()
         # called with the correct expanded path?
-        mock_smart_open.assert_called_with(full_path, read_mode)
+        mock_smart_open.assert_called_with(full_path, read_mode, errors='strict')
 
     # couldn't find any project for mocking up HDFS data
     # TODO: we want to test also a content of the files, not just fnc call params
@@ -505,22 +511,19 @@ class SmartOpenTest(unittest.TestCase):
         # _initially_ got opened, we now also check the end result: if the
         # contents got decoded correctly.
         #
-        with mock.patch('smart_open.smart_open_lib.open',
-                        mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
+        with mock.patch('io.open', mock.Mock(return_value=io.StringIO(as_text))) as mock_open:
             with smart_open.smart_open("blah", "r", encoding='utf-8') as fin:
                 self.assertEqual(fin.read(), as_text)
-                mock_open.assert_called_with("blah", "rb")
+                mock_open.assert_called_with("blah", "r", encoding='utf-8')
 
-        with mock.patch('smart_open.smart_open_lib.open',
-                        mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
+        with mock.patch('io.open', mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
             with smart_open.smart_open("blah", "rb") as fin:
                 self.assertEqual(fin.read(), as_bytes)
                 mock_open.assert_called_with("blah", "rb")
 
         short_path = "~/blah"
         full_path = os.path.expanduser(short_path)
-        with mock.patch('smart_open.smart_open_lib.open',
-                        mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
+        with mock.patch('io.open', mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
             with smart_open.smart_open(short_path, "rb") as fin:
                 mock_open.assert_called_with(full_path, "rb")
 
@@ -530,26 +533,22 @@ class SmartOpenTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "wb+")
 
         # correct write mode, correct file:// URI
-        with mock.patch('smart_open.smart_open_lib.open',
-                        mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
+        with mock.patch('io.open', mock.Mock(return_value=io.StringIO(as_text))) as mock_open:
             with smart_open.smart_open("blah", "w", encoding='utf-8') as fout:
-                mock_open.assert_called_with("blah", "wb")
+                mock_open.assert_called_with("blah", "w", encoding='utf-8')
                 fout.write(as_text)
 
-        with mock.patch('smart_open.smart_open_lib.open',
-                        mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
+        with mock.patch('io.open', mock.Mock(return_value=io.StringIO(as_text))) as mock_open:
             with smart_open.smart_open("/some/file.txt", "w", encoding='utf-8') as fout:
-                mock_open.assert_called_with("/some/file.txt", "wb")
+                mock_open.assert_called_with("/some/file.txt", "w", encoding='utf-8')
                 fout.write(as_text)
 
-        with mock.patch('smart_open.smart_open_lib.open',
-                        mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
+        with mock.patch('io.open', mock.Mock(return_value=io.StringIO(as_text))) as mock_open:
             with smart_open.smart_open("/some/file.txt", "w+", encoding='utf-8') as fout:
-                mock_open.assert_called_with("/some/file.txt", "wb+")
+                mock_open.assert_called_with("/some/file.txt", "w+", encoding='utf-8')
                 fout.write(as_text)
 
-        with mock.patch('smart_open.smart_open_lib.open',
-                        mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
+        with mock.patch('io.open', mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
             with smart_open.smart_open("/some/file.txt", "wb+") as fout:
                 mock_open.assert_called_with("/some/file.txt", "wb+")
                 fout.write(as_bytes)
