@@ -39,20 +39,20 @@ class ParseUriTest(unittest.TestCase):
         """Do URIs schemes parse correctly?"""
         # supported schemes
         for scheme in ("s3", "s3n", "hdfs", "file", "http", "https"):
-            parsed_uri = smart_open.ParseUri(scheme + "://mybucket/mykey")
+            parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
             self.assertEqual(parsed_uri.scheme, scheme)
 
         # unsupported scheme => NotImplementedError
-        self.assertRaises(NotImplementedError, smart_open.ParseUri, "foobar://mybucket/mykey")
+        self.assertRaises(NotImplementedError, smart_open_lib._parse_uri, "foobar://mybucket/mykey")
 
         # unknown scheme => default_scheme
-        parsed_uri = smart_open.ParseUri("blah blah")
+        parsed_uri = smart_open_lib._parse_uri("blah blah")
         self.assertEqual(parsed_uri.scheme, "file")
 
     def test_s3_uri(self):
         """Do S3 URIs parse correctly?"""
         # correct uri without credentials
-        parsed_uri = smart_open.ParseUri("s3://mybucket/mykey")
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey")
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.key_id, "mykey")
@@ -60,7 +60,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_secret, None)
 
         # correct uri, key contains slash
-        parsed_uri = smart_open.ParseUri("s3://mybucket/mydir/mykey")
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey")
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.key_id, "mydir/mykey")
@@ -68,7 +68,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_secret, None)
 
         # correct uri with credentials
-        parsed_uri = smart_open.ParseUri("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")
+        parsed_uri = smart_open_lib._parse_uri("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.key_id, "mykey")
@@ -76,7 +76,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_secret, "acces/sse_cr-et")
 
         # correct uri, contains credentials
-        parsed_uri = smart_open.ParseUri("s3://accessid:access/secret@mybucket/mykey")
+        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/mykey")
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.key_id, "mykey")
@@ -84,17 +84,17 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_secret, "access/secret")
 
         # incorrect uri - only two '@' in uri are allowed
-        self.assertRaises(RuntimeError, smart_open.ParseUri, "s3://access_id@access_secret@mybucket@port/mykey")
+        self.assertRaises(RuntimeError, smart_open_lib._parse_uri, "s3://access_id@access_secret@mybucket@port/mykey")
 
     def test_webhdfs_uri(self):
         """Do webhdfs URIs parse correctly"""
         # valid uri, no query
-        parsed_uri = smart_open.ParseUri("webhdfs://host:port/path/file")
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:port/path/file")
         self.assertEqual(parsed_uri.scheme, "webhdfs")
         self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file")
 
         # valid uri, with query
-        parsed_uri = smart_open.ParseUri("webhdfs://host:port/path/file?query_part_1&query_part2")
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:port/path/file?query_part_1&query_part2")
         self.assertEqual(parsed_uri.scheme, "webhdfs")
         self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file?query_part_1&query_part2")
 
@@ -825,7 +825,7 @@ class S3OpenTest(unittest.TestCase):
 
     def test_bad_mode(self):
         """Bad mode should raise and exception."""
-        uri = smart_open.ParseUri("s3://bucket/key")
+        uri = smart_open_lib._parse_uri("s3://bucket/key")
         self.assertRaises(NotImplementedError, smart_open.smart_open, uri, "x")
 
     @mock_s3
@@ -881,7 +881,7 @@ class S3OpenTest(unittest.TestCase):
         """Should always open in binary mode when writing through a codec."""
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='bucket')
-        uri = smart_open.ParseUri("s3://bucket/key.gz")
+        uri = smart_open_lib._parse_uri("s3://bucket/key.gz")
 
         with mock.patch('smart_open.smart_open_s3.open') as mock_open:
             smart_open.smart_open("s3://bucket/key.gz", "wb")
