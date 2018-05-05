@@ -179,7 +179,9 @@ class BufferedInputBase(io.BufferedIOBase):
 
     def read(self, size=-1):
         """Read up to size bytes from the object and return them."""
-        if size <= 0:
+        if size == 0:
+            return b''
+        elif size < 0:
             if len(self._buffer):
                 from_buf = self._read_from_buffer(len(self._buffer))
             else:
