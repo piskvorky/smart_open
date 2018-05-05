@@ -59,6 +59,11 @@ else:
     from bz2 import BZ2File
 
 import gzip
+
+#
+# This module defines a function called smart_open so we cannot use
+# smart_open.submodule to reference to the submodules.
+#
 import smart_open.s3 as smart_open_s3
 from smart_open.s3 import iter_bucket as s3_iter_bucket
 import smart_open.hdfs as smart_open_hdfs
@@ -502,50 +507,6 @@ def _parse_uri_file(parsed_uri):
     return Uri(scheme='file', uri_path=uri_path)
 
 
-def _make_closing(base, **attrs):
-    """
-    Add support for `with Base(attrs) as fout:` to the base class if it's missing.
-    The base class' `close()` method will be called on context exit, to always close the file properly.
-
-    This is needed for gzip.GzipFile, bz2.BZ2File etc in older Pythons (<=2.6), which otherwise
-    raise "AttributeError: GzipFile instance has no attribute '__exit__'".
-    """
-    if not hasattr(base, '__enter__'):
-        attrs['__enter__'] = lambda self: self
-
-    if not hasattr(base, '__exit__'):
-        attrs['__exit__'] = lambda self, type, value, traceback: self.close()
-
-    return type('Closing' + base.__name__, (base, object), attrs)
-
-
-class ClosingBZ2File(_make_closing(BZ2File)):
-    """
-    Implements wrapper for BZ2File that closes file object receieved as argument
-
-    """
-    def __init__(self, inner_stream, *args, **kwargs):
-        self.inner_stream = inner_stream
-        super(ClosingBZ2File, self).__init__(inner_stream, *args, **kwargs)
-
-    def close(self):
-        super(ClosingBZ2File, self).close()
-        if not self.inner_stream.closed:
-            self.inner_stream.close()
-
-
-class ClosingGzipFile(_make_closing(gzip.GzipFile)):
-    """
-    Implement wrapper for GzipFile that closes file object receieved from arguments
-
-    """
-    def close(self):
-        fileobj = self.fileobj
-        super(ClosingGzipFile, self).close()
-        if not fileobj.closed:
-            fileobj.close()
-
-
 def _need_to_buffer(file_obj, mode, ext):
     """Returns True if we need to buffer the whole file in memory in order to proceed."""
     try:
@@ -577,9 +538,9 @@ def _compression_wrapper(file_obj, filename, mode):
         file_obj = io.BytesIO(file_obj.read())
 
     if ext == '.bz2':
-        return ClosingBZ2File(file_obj, mode)
+        return BZ2File(file_obj, mode)
     elif ext == '.gz':
-        return ClosingGzipFile(fileobj=file_obj, mode=mode)
+        return gzip.GzipFile(fileobj=file_obj, mode=mode)
     else:
         return file_obj
 
