@@ -212,6 +212,15 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
         self.assertEqual(expected, actual)
 
+    def test_read0_does_not_return_data(self):
+        content = b'englishman\nin\nnew\nyork\n'
+        create_bucket_and_key(contents=content)
+
+        with smart_open.s3.BufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+            data = fin.read(0)
+
+        self.assertEqual(data, b'')
+
 
 @maybe_mock_s3
 class BufferedOutputBaseTest(unittest.TestCase):
