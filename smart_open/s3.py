@@ -136,11 +136,66 @@ class SeekableRawReader(object):
         return binary
 
 
-class BufferedInputBase(io.BufferedIOBase):
+class Boto3ParamsMixin(object):
+
+    #
+    # Documented parameters of `resource()`
+    # http://boto3.readthedocs.io/en/latest/reference/core/session.html#boto3.session.Session.resource
+    #
+    SESSION_RESOURCE_PARAMS = (
+        'service_name',
+        'region_name',
+        'api_version',
+        'use_ssl',
+        'verify',
+        'endpoint_url',
+        'aws_access_key_id',
+        'aws_secret_access_key',
+        'aws_session_token',
+        'config'
+    )
+
+    #
+    # Documented parameters of `initiate_multipart_upload`
+    # http://boto3.readthedocs.io/en/latest/reference/services/s3.html#S3.Object.initiate_multipart_upload
+    #
+    MULTI_PART_UPLOAD_PARAMS = (
+        'ACL',
+        'CacheControl',
+        'ContentDisposition',
+        'ContentEncoding',
+        'ContentLanguage',
+        'ContentType',
+        'Expires',
+        'GrantFullControl',
+        'GrantRead',
+        'GrantReadACP',
+        'GrantWriteACP',
+        'Metadata',
+        'ServerSideEncryption',
+        'StorageClass',
+        'WebsiteRedirectLocation',
+        'SSECustomerAlgorithm',
+        'SSECustomerKey',
+        'SSEKMSKeyId',
+        'RequestPayer',
+        'Tagging'
+    )
+
+    def _extract_params(self, kwargs, param_keys):
+
+        return {
+            param_key: kwargs[param_key]
+            for param_key in param_keys
+            if param_key in kwargs
+        }
+
+class BufferedInputBase(Boto3ParamsMixin, io.BufferedIOBase):
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=BINARY_NEWLINE, **kwargs):
         session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        s3 = session.resource('s3', **kwargs)
+        s3 = session.resource('s3',
+            **(self._extract_params(kwargs, self.SESSION_RESOURCE_PARAMS)))
         self._object = s3.Object(bucket, key)
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
@@ -278,7 +333,8 @@ class SeekableBufferedInputBase(BufferedInputBase):
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=BINARY_NEWLINE, **kwargs):
         session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        s3 = session.resource('s3', **kwargs)
+        s3 = session.resource('s3',
+            **(self._extract_params(kwargs, self.SESSION_RESOURCE_PARAMS)))
         self._object = s3.Object(bucket, key)
         self._raw_reader = SeekableRawReader(self._object)
         self._content_length = self._object.content_length
@@ -334,7 +390,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         raise io.UnsupportedOperation
 
 
-class BufferedOutputBase(io.BufferedIOBase):
+class BufferedOutputBase(Boto3ParamsMixin, io.BufferedIOBase):
     """Writes bytes to S3.
 
     Implements the io.BufferedIOBase interface of the standard library."""
@@ -345,7 +401,8 @@ class BufferedOutputBase(io.BufferedIOBase):
 multipart upload may fail")
 
         session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        s3 = session.resource('s3', **kwargs)
+        s3 = session.resource('s3',
+            **(self._extract_params(kwargs, self.SESSION_RESOURCE_PARAMS)))
 
         #
         # https://stackoverflow.com/questions/26871884/how-can-i-easily-determine-if-a-boto-3-s3-bucket-resource-exists
@@ -356,7 +413,8 @@ multipart upload may fail")
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
         self._object = s3.Object(bucket, key)
         self._min_part_size = min_part_size
-        self._mp = self._object.initiate_multipart_upload()
+        self._mp = self._object.initiate_multipart_upload(**(
+            self._extract_params(kwargs, self.MULTI_PART_UPLOAD_PARAMS)))
 
         self._buf = io.BytesIO()
         self._total_bytes = 0
