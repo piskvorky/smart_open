@@ -344,6 +344,10 @@ class BufferedOutputBase(io.BufferedIOBase):
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
 
+        options = {}
+        if kwargs.get('metadata', None):
+            options = kwargs.pop('metadata', None)
+
         session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
         s3 = session.resource('s3', **kwargs)
 
@@ -356,7 +360,7 @@ multipart upload may fail")
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
         self._object = s3.Object(bucket, key)
         self._min_part_size = min_part_size
-        self._mp = self._object.initiate_multipart_upload()
+        self._mp = self._object.initiate_multipart_upload(**options)
 
         self._buf = io.BytesIO()
         self._total_bytes = 0

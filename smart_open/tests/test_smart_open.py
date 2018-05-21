@@ -600,6 +600,19 @@ class SmartOpenTest(unittest.TestCase):
         self.assertEqual(output, [test_string])
 
     @mock_s3
+    def test_s3_metadata_write(self):
+        conn = boto.connect_s3()
+        bucket = conn.create_bucket('mybucket')
+        data = "test data"
+        options = {'metadata': {'ContentType': 'text/plain', 'ContentEncoding': 'gzip'}}
+        with smart_open.smart_open('s3://mybucket/newkey.txt.gz', 'wb', **options) as fout:
+            fout.write(data)
+
+        key = bucket.get_key('newkey.txt.gz')
+        self.assertEqual(key.content_type, 'text/plain')
+        self.assertEqual(key.content_encoding, 'gzip')
+
+    @mock_s3
     def test_write_bad_encoding_strict(self):
         """Should abort on encoding error."""
         text = u'欲しい気持ちが成長しすぎて'
