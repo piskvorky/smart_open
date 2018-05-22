@@ -601,15 +601,18 @@ class SmartOpenTest(unittest.TestCase):
 
     @mock_s3
     def test_s3_metadata_write(self):
+        path = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt.gz')
+        data = ""
+        with smart_open.smart_open(path, 'rb') as fd:
+            data = fd.read()
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
-        data = "test data"
         options = {'metadata': {'ContentType': 'text/plain', 'ContentEncoding': 'gzip'}}
-        with smart_open.smart_open('s3://mybucket/newkey.txt.gz', 'wb', **options) as fout:
+        with smart_open.smart_open('s3://mybucket/crime-and-punishment.txt.gz', 'wb', **options) as fout:
             fout.write(data)
 
-        key = s3.Object('mybucket', 'newkey.txt.gz')
-        self.assertEqual(key.content_type, 'text/plain')
+        key = s3.Object('mybucket', 'crime-and-punishment.txt.gz')
+        self.assertIn('text/plain', key.content_type)
         self.assertEqual(key.content_encoding, 'gzip')
 
     @mock_s3
