@@ -140,7 +140,7 @@ class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=BINARY_NEWLINE, **kwargs):
         session = kwargs.pop(
-            'session',
+            's3_session',
             boto3.Session(profile_name=kwargs.pop('profile_name', None))
         )
         s3 = session.resource('s3', **kwargs)
@@ -281,7 +281,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=BINARY_NEWLINE, **kwargs):
         session = kwargs.pop(
-            'session',
+            's3_session',
             boto3.Session(profile_name=kwargs.pop('profile_name', None))
         )
         s3 = session.resource('s3', **kwargs)
@@ -351,7 +351,7 @@ class BufferedOutputBase(io.BufferedIOBase):
 multipart upload may fail")
 
         session = kwargs.pop(
-            'session',
+            's3_session',
             boto3.Session(profile_name=kwargs.pop('profile_name', None))
         )
         s3 = session.resource('s3', **kwargs)
