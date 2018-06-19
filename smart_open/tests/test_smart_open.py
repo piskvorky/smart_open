@@ -488,7 +488,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         )
 
     def test_s3_upload(self, mock_session):
-        smart_open.smart_open("s3://bucket/key", 'wb', multipart_upload={
+        smart_open.smart_open("s3://bucket/key", 'wb', s3_upload={
             'ServerSideEncryption': 'AES256',
             'ContentType': 'application/json'
         })
@@ -631,13 +631,12 @@ class SmartOpenTest(unittest.TestCase):
         s3.create_bucket(Bucket='mybucket')
 
         # Write data, with multipart_upload options
-        multipart_upload = {
-            'ContentType': 'text/plain',
-            'ContentEncoding': 'gzip'
-        }
         write_stream = smart_open.smart_open(
             's3://mybucket/crime-and-punishment.txt.gz', 'wb',
-            multipart_upload=multipart_upload
+            s3_upload={
+                'ContentType': 'text/plain',
+                'ContentEncoding': 'gzip'
+            }
         )
         with write_stream as fout:
             fout.write(data)
