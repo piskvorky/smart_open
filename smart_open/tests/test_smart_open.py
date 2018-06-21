@@ -505,8 +505,6 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         )
 
 
-
-
 class SmartOpenTest(unittest.TestCase):
     """
     Test reading and writing from/into files.

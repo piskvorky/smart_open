@@ -100,9 +100,7 @@ There are a few optional keyword arguments that are useful only for S3 access.
 
   >>> smart_open.smart_open('s3://', host='s3.amazonaws.com')
   >>> smart_open.smart_open('s3://', profile_name='my-profile')
-  >>> smart_open.smart_open('s3://', s3_upload={
-      'ServerSideEncryption': 'AES256'
-  })
+  >>> smart_open.smart_open('s3://', s3_upload={ 'ServerSideEncryption': 'AES256' })
 
 The `host` and `profile` arguments are both passed to `boto.s3_connect()` as keyword arguments.
 
