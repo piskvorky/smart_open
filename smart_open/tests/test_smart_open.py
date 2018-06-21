@@ -529,8 +529,6 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         session.resource.assert_called_with('s3')
 
 
-
-
 class SmartOpenTest(unittest.TestCase):
     """
     Test reading and writing from/into files.
