@@ -15,10 +15,10 @@ def initialize_bucket():
     subprocess.check_call(['aws', 's3', 'rm', '--recursive', _S3_URL])
 
 
-def write_read(key, content, write_mode, read_mode, encoding=None):
-    with smart_open.smart_open(key, write_mode, encoding=encoding) as fout:
+def write_read(key, content, write_mode, read_mode, encoding=None, **kwargs):
+    with smart_open.smart_open(key, write_mode, encoding=encoding, **kwargs) as fout:
         fout.write(content)
-    with smart_open.smart_open(key, read_mode, encoding=encoding) as fin:
+    with smart_open.smart_open(key, read_mode, encoding=encoding, **kwargs) as fin:
         actual = fin.read()
     return actual
 
@@ -83,3 +83,15 @@ def test_s3_performance_gz(benchmark):
     key = _S3_URL + '/performance.txt.gz'
     actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
     assert actual == one_megabyte
+
+def test_s3_encrypted_file(benchmark):
+    initialize_bucket()
+
+    key = _S3_URL + '/sanity.txt'
+    text = 'с гранатою в кармане, с чекою в руке'
+    actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8', multipart_upload={
+        'ServerSideEncryption': 'AES256'
+    })
+    assert actual == text
+
+

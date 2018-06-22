@@ -487,6 +487,23 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             endpoint_url='http://aa.domain.com'
         )
 
+    def test_s3_upload(self, mock_session):
+        smart_open.smart_open("s3://bucket/key", 'wb', s3_upload={
+            'ServerSideEncryption': 'AES256',
+            'ContentType': 'application/json'
+        })
+
+        # Locate the s3.Object instance (mock)
+        s3_resource = mock_session.return_value.resource.return_value
+        s3_object = s3_resource.Object.return_value
+
+        # Check that `initiate_multipart_upload` was called
+        # with the desired args
+        s3_object.initiate_multipart_upload.assert_called_with(
+            ServerSideEncryption='AES256',
+            ContentType='application/json'
+        )
+
 
 class SmartOpenTest(unittest.TestCase):
     """
@@ -598,6 +615,33 @@ class SmartOpenTest(unittest.TestCase):
         output = list(smart_open.smart_open("s3://mybucket/newkey", "rb"))
 
         self.assertEqual(output, [test_string])
+
+    @mock_s3
+    def test_s3_metadata_write(self):
+        # Read local file fixture
+        path = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt.gz')
+        data = ""
+        with smart_open.smart_open(path, 'rb') as fd:
+            data = fd.read()
+
+        # Create a test bucket
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='mybucket')
+
+        # Write data, with multipart_upload options
+        write_stream = smart_open.smart_open(
+            's3://mybucket/crime-and-punishment.txt.gz', 'wb',
+            s3_upload={
+                'ContentType': 'text/plain',
+                'ContentEncoding': 'gzip'
+            }
+        )
+        with write_stream as fout:
+            fout.write(data)
+
+        key = s3.Object('mybucket', 'crime-and-punishment.txt.gz')
+        self.assertIn('text/plain', key.content_type)
+        self.assertEqual(key.content_encoding, 'gzip')
 
     @mock_s3
     def test_write_bad_encoding_strict(self):

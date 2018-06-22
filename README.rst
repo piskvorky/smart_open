@@ -100,8 +100,12 @@ There are a few optional keyword arguments that are useful only for S3 access.
 
   >>> smart_open.smart_open('s3://', host='s3.amazonaws.com')
   >>> smart_open.smart_open('s3://', profile_name='my-profile')
+  >>> smart_open.smart_open('s3://', s3_upload={ 'ServerSideEncryption': 'AES256' })
 
-These are both passed to `boto.s3_connect()` as keyword arguments.
+The `host` and `profile` arguments are both passed to `boto.s3_connect()` as keyword arguments.
+
+The `s3_upload` argument accepts a dict of any parameters accepted by `initiate_multipart_upload <https://boto3.readthedocs.io/en/latest/reference/services/s3.html#S3.ObjectSummary.initiate_multipart_upload/>`_.
+
 The S3 reader supports gzipped content, as long as the key is obviously a gzipped file (e.g. ends with ".gz").
 
 Why?
