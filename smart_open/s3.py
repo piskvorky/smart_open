@@ -139,7 +139,10 @@ class SeekableRawReader(object):
 class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=BINARY_NEWLINE, **kwargs):
-        session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
+        session = kwargs.pop(
+            's3_session',
+            boto3.Session(profile_name=kwargs.pop('profile_name', None))
+        )
         s3 = session.resource('s3', **kwargs)
         self._object = s3.Object(bucket, key)
         self._raw_reader = RawReader(self._object)
@@ -277,7 +280,10 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=BINARY_NEWLINE, **kwargs):
-        session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
+        session = kwargs.pop(
+            's3_session',
+            boto3.Session(profile_name=kwargs.pop('profile_name', None))
+        )
         s3 = session.resource('s3', **kwargs)
         self._object = s3.Object(bucket, key)
         self._raw_reader = SeekableRawReader(self._object)
@@ -344,7 +350,10 @@ class BufferedOutputBase(io.BufferedIOBase):
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
 
-        session = boto3.Session(profile_name=kwargs.pop('profile_name', None))
+        session = kwargs.pop(
+            's3_session',
+            boto3.Session(profile_name=kwargs.pop('profile_name', None))
+        )
         s3 = session.resource('s3', **kwargs)
 
         #

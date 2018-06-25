@@ -461,13 +461,14 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(content, smart_open_object.read(-1))  # same thing
 
 
-@mock.patch('boto3.Session')
 class SmartOpenS3KwargsTest(unittest.TestCase):
+    @mock.patch('boto3.Session')
     def test_no_kwargs(self, mock_session):
         smart_open.smart_open('s3://mybucket/mykey')
         mock_session.assert_called_with(profile_name=None)
         mock_session.return_value.resource.assert_called_with('s3')
 
+    @mock.patch('boto3.Session')
     def test_credentials(self, mock_session):
         smart_open.smart_open('s3://access_id:access_secret@mybucket/mykey')
         mock_session.assert_called_with(profile_name=None)
@@ -475,11 +476,13 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             's3', aws_access_key_id='access_id', aws_secret_access_key='access_secret'
         )
 
+    @mock.patch('boto3.Session')
     def test_profile(self, mock_session):
         smart_open.smart_open('s3://mybucket/mykey', profile_name='my_credentials')
         mock_session.assert_called_with(profile_name='my_credentials')
         mock_session.return_value.resource.assert_called_with('s3')
 
+    @mock.patch('boto3.Session')
     def test_host(self, mock_session):
         smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey", host='aa.domain.com')
         mock_session.return_value.resource.assert_called_with(
@@ -487,6 +490,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             endpoint_url='http://aa.domain.com'
         )
 
+    @mock.patch('boto3.Session')
     def test_s3_upload(self, mock_session):
         smart_open.smart_open("s3://bucket/key", 'wb', s3_upload={
             'ServerSideEncryption': 'AES256',
@@ -503,6 +507,26 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             ServerSideEncryption='AES256',
             ContentType='application/json'
         )
+
+    def test_session_read_mode(self):
+        """
+        Read stream should use a custom boto3.Session
+        """
+        session = boto3.Session()
+        session.resource = mock.MagicMock()
+
+        smart_open.smart_open('s3://bucket/key', s3_session=session)
+        session.resource.assert_called_with('s3')
+
+    def test_session_write_mode(self):
+        """
+        Write stream should use a custom boto3.Session
+        """
+        session = boto3.Session()
+        session.resource = mock.MagicMock()
+
+        smart_open.smart_open('s3://bucket/key', 'wb', s3_session=session)
+        session.resource.assert_called_with('s3')
 
 
 class SmartOpenTest(unittest.TestCase):
