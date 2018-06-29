@@ -2,7 +2,7 @@
 smart_open -- utils for streaming large files
 =============================================
 
-|License|_ |Travis|_ 
+|License|_ |Travis|_
 
 
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
@@ -18,60 +18,60 @@ It is well tested (using `moto <https://github.com/spulec/moto>`_), well documen
 
 .. code-block:: python
 
+  >>> # stream from/to compressed files, with transparent (de)compression:
+  >>> for line in smart_open.smart_open('./foo.txt.gz', 'rb'):
+  ...    print(line.decode('utf8'))
+
+  >>> with smart_open.smart_open('/home/radim/foo.txt.bz2', 'wb') as fout:
+  ...    fout.write(b"some content\n")
+
   >>> # stream lines from an S3 object
   >>> for line in smart_open.smart_open('s3://mybucket/mykey.txt'):
-  ...    print line
+  ...    print(line.decode('utf8'))
 
   >>> # using a completely custom s3 server, like s3proxy:
-  >>> for line in smart_open.smart_open('s3u://user:secret@host:port@mybucket/mykey.txt'):
-  ...    print line
+  >>> for line in smart_open.smart_open('s3u://user:secret@host:port@mybucket/mykey.txt', 'rb'):
+  ...    print(line.decode('utf8'))
 
   >>> # you can also use a boto.s3.key.Key instance directly:
   >>> key = boto.connect_s3().get_bucket("my_bucket").get_key("my_key")
-  >>> with smart_open.smart_open(key) as fin:
+  >>> with smart_open.smart_open(key, 'rb') as fin:
   ...     for line in fin:
-  ...         print line
+  ...         print(line.decode('utf8'))
 
   >>> # can use context managers too:
-  >>> with smart_open.smart_open('s3://mybucket/mykey.txt') as fin:
+  >>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'rb') as fin:
   ...     for line in fin:
-  ...         print line
-  ...     fin.seek(0)  # seek to the beginning
-  ...     print fin.read(1000)  # read 1000 bytes
+  ...         print(line.decode('utf8'))
+  ...     fin.seek(0)  # seek back to the beginning
+  ...     x = fin.read(1000)  # read 1000 bytes
 
   >>> # stream from HDFS
-  >>> for line in smart_open.smart_open('hdfs://user/hadoop/my_file.txt'):
-  ...     print line
+  >>> for line in smart_open.smart_open('hdfs://user/hadoop/my_file.txt', 'rb'):
+  ...     print(line.decode('utf8'))
 
   >>> # stream from HTTP
-  >>> for line in smart_open.smart_open('http://example.com/index.html'):
-  ...     print line
+  >>> for line in smart_open.smart_open('http://example.com/index.html', 'rb'):
+  ...     print(line.decode('utf8'))
 
   >>> # stream from WebHDFS
-  >>> for line in smart_open.smart_open('webhdfs://host:port/user/hadoop/my_file.txt'):
-  ...     print line
+  >>> for line in smart_open.smart_open('webhdfs://host:port/user/hadoop/my_file.txt', 'rb'):
+  ...     print(line.decode('utf8'))
 
   >>> # stream content *into* S3 (write mode):
   >>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'wb') as fout:
-  ...     for line in ['first line', 'second line', 'third line']:
-  ...          fout.write(line + '\n')
+  ...     for line in ['first line\n', 'second line\n', 'third line\n']:
+  ...          fout.write(line.encode('utf8'))
 
   >>> # stream content *into* HDFS (write mode):
   >>> with smart_open.smart_open('hdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
-  ...     for line in ['first line', 'second line', 'third line']:
-  ...          fout.write(line + '\n')
+  ...     for line in ['first line\n', 'second line'n', 'third line'n']:
+  ...          fout.write(line.encode('utf8'))
 
   >>> # stream content *into* WebHDFS (write mode):
   >>> with smart_open.smart_open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
-  ...     for line in ['first line', 'second line', 'third line']:
-  ...          fout.write(line + '\n')
-
-  >>> # stream from/to local compressed files:
-  >>> for line in smart_open.smart_open('./foo.txt.gz'):
-  ...    print line
-
-  >>> with smart_open.smart_open('/home/radim/foo.txt.bz2', 'wb') as fout:
-  ...    fout.write("some content\n")
+  ...     for line in ['first line\n', 'second line\n', 'third line\n']:
+  ...          fout.write(line.encode('utf8'))
 
 Since going over all (or select) keys in an S3 bucket is a very common operation,
 there's also an extra method ``smart_open.s3_iter_bucket()`` that does this efficiently,
@@ -82,7 +82,7 @@ there's also an extra method ``smart_open.s3_iter_bucket()`` that does this effi
   >>> # get all JSON files under "mybucket/foo/"
   >>> bucket = boto.connect_s3().get_bucket('mybucket')
   >>> for key, content in s3_iter_bucket(bucket, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
-  ...     print key, len(content)
+  ...     print(key, len(content))
 
 For more info (S3 credentials in URI, minimum S3 part size...) and full method signatures, check out the API docs:
 
@@ -146,17 +146,13 @@ Todo
 
 ``smart_open`` is an ongoing effort. Suggestions, pull request and improvements welcome!
 
-On the roadmap:
-
-* better documentation for the default ``file://`` scheme
-
 Comments, bug reports
 ---------------------
 
-``smart_open`` lives on `github <https://github.com/RaRe-Technologies/smart_open>`_. You can file
+``smart_open`` lives on `Github <https://github.com/RaRe-Technologies/smart_open>`_. You can file
 issues or pull requests there.
 
 ----------------
 
 ``smart_open`` is open source software released under the `MIT license <https://github.com/piskvorky/smart_open/blob/master/LICENSE>`_.
-Copyright (c) 2015-now `Radim Řehůřek <http://radimrehurek.com>`_.
+Copyright (c) 2015-now `Radim Řehůřek <https://radimrehurek.com>`_.
