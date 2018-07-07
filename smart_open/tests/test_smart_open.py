@@ -203,7 +203,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     def test_shortcut(self):
         fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
-        with mock.patch('io.open') as mock_open:
+        with mock.patch('smart_open.smart_open_lib.open') as mock_open:
             smart_open.smart_open(fpath, 'r').read()
         mock_open.assert_called_with(fpath, 'r')
 
@@ -311,7 +311,7 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(b''.join(output), test_string)
 
     # TODO: add more complex test for file://
-    @mock.patch('io.open')
+    @mock.patch('smart_open.smart_open_lib.open')
     def test_file(self, mock_smart_open):
         """Is file:// line iterator called correctly?"""
         prefix = "file://"
