@@ -339,6 +339,14 @@ class SmartOpenReadTest(unittest.TestCase):
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)
 
+    @mock.patch('smart_open.smart_open_lib.open')
+    def test_file_errors(self, mock_smart_open):
+        prefix = "file://"
+        full_path = '/tmp/test.txt'
+        read_mode = "rb"
+        short_path = "~/tmp/test.txt"
+        full_path = os.path.expanduser(short_path)
+
         smart_open_object = smart_open.smart_open(prefix+short_path, read_mode, errors='strict')
         smart_open_object.__iter__()
         # called with the correct expanded path?
