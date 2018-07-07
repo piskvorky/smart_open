@@ -284,6 +284,16 @@ def _shortcut_open(uri, mode, **kw):
         open_kwargs['encoding'] = encoding
         mode = mode.replace('b', '')
 
+    #
+    # Under Py3, the built-in open accepts kwargs, and it's OK to use that.
+    # Under Py2, the built-in open _doesn't_ accept kwargs, but we still use it
+    # whenever possible (see issue #207).  If we're under Py2 and have to use
+    # kwargs, then we have no option other to use io.open.
+    #
+    if six.PY3:
+        return open(parsed_uri.uri_path, mode, **open_kwargs)
+    elif not open_kwargs:
+        return open(parsed_uri.uri_path, mode)
     return io.open(parsed_uri.uri_path, mode, **open_kwargs)
 
 
