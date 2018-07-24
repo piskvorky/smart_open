@@ -5,6 +5,10 @@ import avro.io
 import avro.datafile
 import pandas as pn
 import smart_open
+import six
+
+if six.PY3:
+    assert False, 'this code only runs on Py2.7'
 
 _S3_URL = os.environ.get('SO_S3_URL')
 assert _S3_URL is not None, 'please set the SO_S3_URL environment variable'
