@@ -9,32 +9,36 @@ import smart_open
 _S3_URL = os.environ.get('SO_S3_URL')
 assert _S3_URL is not None, 'please set the SO_S3_URL environment variable'
 
+
 def gen_schema(paramNames):
-	paramNamesLen = len(paramNames)
-	
+    paramNamesLen = len(paramNames)
 
-	dataName = 'schema'
-	avroSchemaOut = "{\n\t\"type\": 	\"record\", \"name\": \"%s\", \"namespace\": \"com.sandisk.bigdata\", \n \t\"fields\": [" %(dataName)  
-	
+    dataName = 'schema'
+    avroSchemaOut = (
+        "{\n\t\"type\":     \"record\", \"name\": \"%s\", "
+        "\"namespace\": \"com.sandisk.bigdata\", \n \t\"fields\": [" % (dataName)
+    )
 
-	if paramNamesLen==0:
-		#no parameters, no schema file generation
-		avroSchemaOut = ''
-	   
-	else:
-		#generate file
-		for ii in range(paramNamesLen):
-			typeString = "[\"%s\", \"null\"]" %('String')
-			schemaString = "{ \"name\":\"%s\", \"type\":%s, \"default\":null}" % (paramNames[ii], typeString)
-			if ii == 0:
-				avroSchemaOut += schemaString + ',\n'
-			elif ii <len(paramNames)-1:
-				avroSchemaOut += "\t\t\t" + schemaString + ',\n'
-			else:
-				avroSchemaOut += "\t\t\t" + schemaString + '\n'
-		avroSchemaOut += "\n \t\t\t]\n}"
-		
-	return avroSchemaOut
+    if paramNamesLen == 0:
+        # no parameters, no schema file generation
+        avroSchemaOut = ''
+    else:
+        # generate file
+        for ii in range(paramNamesLen):
+            typeString = "[\"%s\", \"null\"]" % ('String')
+            schemaString = "{ \"name\":\"%s\", \"type\":%s, \"default\":null}" % (
+                paramNames[ii], typeString
+            )
+            if ii == 0:
+                avroSchemaOut += schemaString + ',\n'
+            elif ii < len(paramNames)-1:
+                avroSchemaOut += "\t\t\t" + schemaString + ',\n'
+            else:
+                avroSchemaOut += "\t\t\t" + schemaString + '\n'
+        avroSchemaOut += "\n \t\t\t]\n}"
+
+    return avroSchemaOut
+
 
 if not P.isfile('index_2018.csv'):
     os.system('aws s3 cp s3://irs-form-990/index_2018.csv .')
