@@ -46,7 +46,7 @@ if not P.isfile('index_2018.csv'):
 with open('index_2018.csv') as fin:
     data = pn.read_csv(fin, header=1, error_bad_lines=False).fillna('NA')
 
-schema = gen_schema(xa.columns)
+schema = gen_schema(data.columns)
 
 output_url = _S3_URL + '/issue_209/out.avro'
 
