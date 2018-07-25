@@ -29,7 +29,8 @@ def gen_schema(paramNames):
     else:
         # generate file
         for ii in range(paramNamesLen):
-            typeString = "[\"%s\", \"null\"]" % ('String')
+            typeString = "[\"null\",\"%s\"]"% ('string')
+            #typeString = "[\"%s\", \"null\"]" 
             schemaString = "{ \"name\":\"%s\", \"type\":%s, \"default\":null}" % (
                 paramNames[ii], typeString
             )
@@ -50,11 +51,12 @@ if not P.isfile('index_2018.csv'):
 with open('index_2018.csv') as fin:
     data = pn.read_csv(fin, header=1, error_bad_lines=False).fillna('NA')
 
-schema = gen_schema(data.columns)
+avroSchemaOut = gen_schema(data.columns)
 
 output_url = _S3_URL + '/issue_209/out.avro'
 
 with smart_open.smart_open(output_url, 'wb') as foutd:
+    schema = avro.schema.parse(avroSchemaOut)
     dictRes = data.to_dict(orient='records')
     writer = avro.datafile.DataFileWriter(foutd, avro.io.DatumWriter(), schema)
     for ll, row in enumerate(dictRes):
