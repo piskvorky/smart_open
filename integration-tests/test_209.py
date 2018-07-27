@@ -1,3 +1,4 @@
+import json
 import os
 import os.path as P
 import warnings
@@ -22,38 +23,15 @@ if _NUMROWS is not None:
     _NUMROWS = int(_NUMROWS)
 
 
-def gen_schema(paramNames, dataName, paramTypes=''):
-    paramNamesLen = len(paramNames)
-    paramTypeLen = len(paramTypes)
-
-    if paramTypeLen > 0 and paramNamesLen <> paramTypeLen:
-        raise('There is an issue with parameter type length! fix it!')
-
-    avroSchemaOut = "{\n\t\"type\":     \"record\", \"name\": \"%s\", \"namespace\": \"namespace\", \n \t\"fields\": [" % (
-        dataName)
-
-    if paramNamesLen == 0:
-        # no parameters, no schema file generation
-        avroSchemaOut = ''
-
-    else:
-
-        for ii in range(paramNamesLen):
-            if paramTypeLen < 1:
-                typeString = "[\"null\",\"string\"]"
-            else:
-                typeString = "[\"%s\", \"null\"]" % paramTypes[ii]
-            schemaString = "{ \"name\":\"%s\", \"type\":%s, \"default\":null}" % (
-                paramNames[ii], typeString)
-            if ii == 0:
-                avroSchemaOut += schemaString + ',\n'
-            elif ii < len(paramNames)-1:
-                avroSchemaOut += "\t\t\t" + schemaString + ',\n'
-            else:
-                avroSchemaOut += "\t\t\t" + schemaString + '\n'
-        avroSchemaOut += "\n \t\t\t]\n}"
-
-    return avroSchemaOut
+def gen_schema(data):
+    schema = {
+        'type': 'record', 'name': 'data', 'namespace': 'namespace',
+        'fields': [
+            {'name': field, 'type': ['null', 'string'], 'default': None}
+            for field in data.columns
+        ]
+    }
+    return json.dumps(schema, indent=4)
 
 
 if not P.isfile('index_2018.csv'):
@@ -63,7 +41,7 @@ with open('index_2018.csv') as fin:
     data = pn.read_csv(fin, header=0, error_bad_lines=False,
                        nrows=_NUMROWS, dtype='str').fillna('NA')
 
-avroSchemaOut = gen_schema(data.columns, dataName='data', paramTypes='')
+avroSchemaOut = gen_schema(data)
 
 with open('schema.out', 'wb') as fout:
     fout.write(avroSchemaOut)
