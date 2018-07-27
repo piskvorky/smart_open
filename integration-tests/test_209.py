@@ -66,21 +66,23 @@ with smart_open.smart_open('local.avro', 'wb') as foutd:
     logging.critical('writing to %r', foutd)
     write_avro(foutd)
 
-#
-# This is a sanity check.  We're effectively writing to disk, and then
-# writing from disk to S3 via smart_open
-#
-with smart_open.smart_open(output_url, 'wb') as foutd:
-    logging.critical('writing to %r', foutd)
-    with open('local.avro', 'rb') as fin:
-        while True:
-            buf = fin.read(io.DEFAULT_BUFFER_SIZE)
-            if not buf:
-                break
-            foutd.write(buf)
-os.system('aws s3 cp %s remote.avro' % output_url)
-subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
-print('sanity check OK')
+
+if False:
+    #
+    # This is a sanity check.  We're effectively writing to disk, and then
+    # writing from disk to S3 via smart_open
+    #
+    with smart_open.smart_open(output_url, 'wb') as foutd:
+        logging.critical('writing to %r', foutd)
+        with open('local.avro', 'rb') as fin:
+            while True:
+                buf = fin.read(io.DEFAULT_BUFFER_SIZE)
+                if not buf:
+                    break
+                foutd.write(buf)
+    os.system('aws s3 cp %s remote.avro' % output_url)
+    subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
+    print('sanity check OK')
 
 
 if False:
