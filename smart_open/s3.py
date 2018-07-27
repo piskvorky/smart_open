@@ -430,6 +430,18 @@ multipart upload may fail")
         if not isinstance(b, six.binary_type):
             raise TypeError("input must be a binary string, got: %r", b)
 
+        #
+        # debugging issue 209
+        #
+        if not hasattr(self, '_written_bytes'):
+            self._written_bytes = 0
+        self._written_bytes += len(b)
+        if self._written_bytes in range(704, 736):
+            import binascii
+            logger.critical('wrote %d bytes (%d total)', len(b), self._written_bytes)
+            logger.critical('%s', _insert_spaces(binascii.hexlify(b)))
+
+
         # logger.debug("writing %r bytes to %r", len(b), self._buf)
 
         self._buf.write(b)
@@ -470,6 +482,14 @@ multipart upload may fail")
             self.terminate()
         else:
             self.close()
+
+
+def _insert_spaces(the_string):
+    def gen(stringy):
+        while stringy:
+            yield stringy[:4]
+            stringy = stringy[4:]
+    return ' '.join(gen(the_string))
 
 
 def iter_bucket(bucket_name, prefix='', accept_key=lambda key: True,
