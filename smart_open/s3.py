@@ -441,6 +441,15 @@ multipart upload may fail")
             logger.critical('wrote %d bytes (%d total)', len(b), self._written_bytes)
             logger.critical('%s', _insert_spaces(binascii.hexlify(b)))
 
+            if False:
+                #
+                # https://stackoverflow.com/questions/2654113/python-how-to-get-the-callers-method-name-in-the-called-method
+                #
+                import inspect
+                curframe = inspect.currentframe()
+                calframe = inspect.getouterframes(curframe, 2)
+                logger.critical('caller: %s:%d', calframe[1][1], calframe[1][2])
+
 
         # logger.debug("writing %r bytes to %r", len(b), self._buf)
 

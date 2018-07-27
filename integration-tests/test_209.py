@@ -63,13 +63,13 @@ def write_avro(foutd):
 
 
 with smart_open.smart_open('local.avro', 'wb') as foutd:
+    logging.critical('writing to %r', foutd)
     write_avro(foutd)
 
 #
 # This is a sanity check.  We're effectively writing to disk, and then
 # writing from disk to S3 via smart_open
 #
-
 with smart_open.smart_open(output_url, 'wb') as foutd:
     logging.critical('writing to %r', foutd)
     with open('local.avro', 'rb') as fin:
@@ -83,24 +83,25 @@ subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
 print('sanity check OK')
 
 
-#
-# Mirrors the way avro writes to S3 via smart_open
-#
-BUFLEN = [4, 1, 1, 11, 1, 1, 680, 1, 10, 1, 4, 1, 16, 1, 1, 1, 1, 1, 64064, 16]
-assert sum(BUFLEN) == len(open('local.avro').read())
+if False:
+    #
+    # Mirrors the way avro writes to S3 via smart_open
+    #
+    BUFLEN = [4, 1, 1, 11, 1, 1, 680, 1, 10, 1, 4, 1, 16, 1, 1, 1, 1, 1, 64064, 16]
+    assert sum(BUFLEN) == len(open('local.avro').read())
 
 
-with smart_open.smart_open(output_url, 'wb') as foutd:
-    logging.critical('writing to %r', foutd)
-    with open('local.avro', 'rb') as fin:
-        for buflen in BUFLEN:
-            buf = fin.read(buflen)
-            if not buf:
-                break
-            foutd.write(buf)
-os.system('aws s3 cp %s remote.avro' % output_url)
-subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
-print('sanity check 2 OK')
+    with smart_open.smart_open(output_url, 'wb') as foutd:
+        logging.critical('writing to %r', foutd)
+        with open('local.avro', 'rb') as fin:
+            for buflen in BUFLEN:
+                buf = fin.read(buflen)
+                if not buf:
+                    break
+                foutd.write(buf)
+    os.system('aws s3 cp %s remote.avro' % output_url)
+    subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
+    print('sanity check 2 OK')
 
 #
 # This is the real test.  We're writing to S3 on the fly.  We somehow end up
