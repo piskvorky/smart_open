@@ -1,6 +1,8 @@
+import io
 import json
 import os
 import os.path as P
+import subprocess
 import warnings
 
 import avro.io
@@ -57,12 +59,35 @@ def write_avro(foutd):
         writer.append(row)
 
 
+with smart_open.smart_open('local.avro', 'wb') as foutd:
+    write_avro(foutd)
+
+#
+# This is a sanity check.  We're effectively writing to disk, and then
+# writing from disk to S3 via smart_open
+#
+with smart_open.smart_open(output_url, 'wb') as foutd:
+    with open('local.avro', 'rb') as fin:
+        while True:
+            buf = fin.read(io.DEFAULT_BUFFER_SIZE)
+            if not buf:
+                break
+            foutd.write(buf)
+os.system('aws s3 cp %s remote.avro' % output_url)
+subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
+print('sanity check OK')
+
+#
+# This is the real test.  We're writing to S3 on the fly.  We somehow end up
+# with a different file.
+#
 with smart_open.smart_open(output_url, 'wb') as foutd:
     write_avro(foutd)
-
-with open('local.avro', 'wb') as foutd:
-    write_avro(foutd)
-
 os.system('aws s3 cp %s remote.avro' % output_url)
 
-os.system('diff local.avro remote.avro')
+try:
+    subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
+except subprocess.CalledProcessError:
+    print('test NG')
+else:
+    print('test OK')
