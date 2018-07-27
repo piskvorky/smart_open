@@ -274,6 +274,13 @@ def _shortcut_open(uri, mode, **kw):
     if extension in ('.gz', '.bz2') and not ignore_extension:
         return None
 
+    #
+    # https://docs.python.org/2/library/functions.html#open
+    #
+    # buffering: 0: off; 1: on; negative number: use system default
+    #
+    buffering = kw.get('buffering', -1)
+
     open_kwargs = {}
     errors = kw.get('errors')
     if errors is not None:
@@ -291,10 +298,10 @@ def _shortcut_open(uri, mode, **kw):
     # kwargs, then we have no option other to use io.open.
     #
     if six.PY3:
-        return open(parsed_uri.uri_path, mode, **open_kwargs)
+        return open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
     elif not open_kwargs:
-        return open(parsed_uri.uri_path, mode)
-    return io.open(parsed_uri.uri_path, mode, **open_kwargs)
+        return open(parsed_uri.uri_path, mode, buffering=buffering)
+    return io.open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
 
 
 def _open_binary_stream(uri, mode, **kw):
