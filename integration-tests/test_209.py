@@ -4,10 +4,13 @@ import logging
 import os
 import os.path as P
 import subprocess
+import urlparse
 import warnings
 
 import avro.io
 import avro.datafile
+import boto3
+import moto
 import smart_open
 import six
 
@@ -26,6 +29,13 @@ assert _S3_URL is not None, 'please set the SO_S3_URL environment variable'
 _NUMROWS = os.environ.get('SO_NUMROWS')
 if _NUMROWS is not None:
     _NUMROWS = int(_NUMROWS)
+
+
+def maybe_mock_s3(func):
+    if os.environ.get('SO_ENABLE_MOCKS') == "1":
+        return moto.mock_s3(func)
+    else:
+        return func
 
 
 def gen_schema(data):
@@ -105,14 +115,35 @@ if False:
     subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
     print('sanity check 2 OK')
 
-#
-# This is the real test.  We're writing to S3 on the fly.  We somehow end up
-# with a different file.
-#
-with smart_open.smart_open(output_url, 'wb') as foutd:
-    logging.critical('writing to %r', foutd)
-    write_avro(foutd)
-os.system('aws s3 cp %s remote.avro' % output_url)
+
+def split_s3_url(url):
+    parsed = urlparse.urlparse(url)
+    return parsed.netloc, parsed.path[1:]
+
+
+@maybe_mock_s3
+def run():
+    #
+    # This is the real test.  We're writing to S3 on the fly.  We somehow end up
+    # with a different file.
+    #
+    bucket_name, key_name = split_s3_url(output_url)
+    logging.critical('output_url: %r bucket_name: %r key_name: %r', output_url, bucket_name, key_name)
+
+    s3 = boto3.resource('s3')
+    if os.environ.get('SO_ENABLE_MOCKS') == "1":
+        s3.create_bucket(Bucket=bucket_name)
+
+    with smart_open.smart_open(output_url, 'wb') as foutd:
+        logging.critical('writing to %r', foutd)
+        write_avro(foutd)
+
+    with open('remote.avro', 'wb') as fout:
+        fout.write(s3.Object(bucket_name, key_name).get()['Body'].read())
+
+
+run()
+
 
 try:
     subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
