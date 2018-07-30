@@ -97,27 +97,6 @@ if False:
     print('sanity check OK')
 
 
-if False:
-    #
-    # Mirrors the way avro writes to S3 via smart_open
-    #
-    BUFLEN = [4, 1, 1, 11, 1, 1, 680, 1, 10, 1, 4, 1, 16, 1, 1, 1, 1, 1, 64064, 16]
-    assert sum(BUFLEN) == len(open('local.avro').read())
-
-
-    with smart_open.smart_open(output_url, 'wb') as foutd:
-        logging.critical('writing to %r', foutd)
-        with open('local.avro', 'rb') as fin:
-            for buflen in BUFLEN:
-                buf = fin.read(buflen)
-                if not buf:
-                    break
-                foutd.write(buf)
-    os.system('aws s3 cp %s remote.avro' % output_url)
-    subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
-    print('sanity check 2 OK')
-
-
 def split_s3_url(url):
     parsed = urlparse.urlparse(url)
     return parsed.netloc, parsed.path[1:]
