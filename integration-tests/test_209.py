@@ -10,6 +10,7 @@ import warnings
 import avro.io
 import avro.datafile
 import boto3
+import mock
 import moto
 import smart_open
 import six
@@ -64,6 +65,7 @@ avroSchemaOut = gen_schema(data)
 output_url = _S3_URL + '/issue_209/out.avro'
 
 
+@mock.patch('avro.datafile.DataFileWriter.generate_sync_marker', mock.Mock(return_value=b'0123456789abcdef'))
 def write_avro(foutd):
     schema = avro.schema.parse(avroSchemaOut)
     dictRes = data.to_dict(orient='records')
