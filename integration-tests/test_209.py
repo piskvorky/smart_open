@@ -123,6 +123,19 @@ def split_s3_url(url):
     return parsed.netloc, parsed.path[1:]
 
 
+def read_avro(fin):
+    reader = avro.datafile.DataFileReader(fin, avro.io.DatumReader())
+    return list(reader)
+
+
+def diff(file1, file2):
+    with open(file1, 'rb') as fin:
+        records1 = read_avro(fin)
+    with open(file2, 'rb') as fin:
+        records2 = read_avro(fin)
+    return 0 if records1 == records2 else 1
+
+
 @maybe_mock_s3
 def run():
     #
@@ -144,12 +157,10 @@ def run():
         fout.write(s3.Object(bucket_name, key_name).get()['Body'].read())
 
 
+    if diff('local.avro', 'remote.avro'):
+        print('test NG')
+    else:
+        print('test OK')
+
+
 run()
-
-
-try:
-    subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
-except subprocess.CalledProcessError:
-    print('test NG')
-else:
-    print('test OK')
