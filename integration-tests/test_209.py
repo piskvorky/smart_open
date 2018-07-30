@@ -59,9 +59,6 @@ with open('index_2018.csv') as fin:
 
 avroSchemaOut = gen_schema(data)
 
-# with open('schema.out', 'wb') as fout:
-#     fout.write(avroSchemaOut)
-
 output_url = _S3_URL + '/issue_209/out.avro'
 
 
