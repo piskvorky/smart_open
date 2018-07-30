@@ -74,27 +74,15 @@ def write_avro(foutd):
         writer.append(row)
 
 
-with smart_open.smart_open('local.avro', 'wb') as foutd:
+with open('local.avro', 'wb') as foutd:
     logging.critical('writing to %r', foutd)
     write_avro(foutd)
 
-
-if False:
-    #
-    # This is a sanity check.  We're effectively writing to disk, and then
-    # writing from disk to S3 via smart_open
-    #
-    with smart_open.smart_open(output_url, 'wb') as foutd:
-        logging.critical('writing to %r', foutd)
-        with open('local.avro', 'rb') as fin:
-            while True:
-                buf = fin.read(io.DEFAULT_BUFFER_SIZE)
-                if not buf:
-                    break
-                foutd.write(buf)
-    os.system('aws s3 cp %s remote.avro' % output_url)
-    subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
-    print('sanity check OK')
+with smart_open.smart_open('local-so.avro', 'wb') as foutd:
+    logging.critical('writing to %r', foutd)
+    write_avro(foutd)
+subprocess.check_call(['diff', 'local.avro', 'local-so.avro'])
+print('sanity check OK')
 
 
 def split_s3_url(url):
@@ -117,10 +105,6 @@ def diff(file1, file2):
 
 @maybe_mock_s3
 def run():
-    #
-    # This is the real test.  We're writing to S3 on the fly.  We somehow end up
-    # with a different file.
-    #
     bucket_name, key_name = split_s3_url(output_url)
     logging.critical('output_url: %r bucket_name: %r key_name: %r', output_url, bucket_name, key_name)
 
@@ -135,11 +119,13 @@ def run():
     with open('remote.avro', 'wb') as fout:
         fout.write(s3.Object(bucket_name, key_name).get()['Body'].read())
 
-
     if diff('local.avro', 'remote.avro'):
         print('test NG')
     else:
         print('test OK')
+
+    subprocess.check_call(['diff', 'local.avro', 'remote.avro'])
+    print('binary check OK')
 
 
 run()

@@ -284,7 +284,7 @@ def _shortcut_open(uri, mode, **kw):
         open_kwargs['encoding'] = encoding
         mode = mode.replace('b', '')
 
-    return _decorate(io.open(parsed_uri.uri_path, mode, **open_kwargs))
+    return io.open(parsed_uri.uri_path, mode, **open_kwargs)
 
 
 def _insert_spaces(the_string):
@@ -293,25 +293,6 @@ def _insert_spaces(the_string):
             yield stringy[:4]
             stringy = stringy[4:]
     return ' '.join(gen(the_string))
-
-
-def _decorate(f):
-    """For debugging issue 209."""
-    outer_write = f.write
-
-    def inner_write(b):
-        f._written_bytes += len(b)
-        if f._written_bytes in range(704, 736):
-            import binascii
-            logger.critical('wrote %d bytes (%d total)', len(b), f._written_bytes)
-            logger.critical('%s', _insert_spaces(binascii.hexlify(b)))
-
-        outer_write(b)
-
-    if f.writable:
-        f._written_bytes = 0
-        f.write = inner_write
-    return f
 
 
 def _open_binary_stream(uri, mode, **kw):
@@ -342,7 +323,7 @@ def _open_binary_stream(uri, mode, **kw):
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
-            fobj = _decorate(io.open(parsed_uri.uri_path, mode))
+            fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return _s3_open_uri(parsed_uri, mode, **kw), filename

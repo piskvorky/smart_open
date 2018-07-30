@@ -430,29 +430,6 @@ multipart upload may fail")
         if not isinstance(b, six.binary_type):
             raise TypeError("input must be a binary string, got: %r", b)
 
-        #
-        # debugging issue 209
-        #
-        if not hasattr(self, '_written_bytes'):
-            self._written_bytes = 0
-        self._written_bytes += len(b)
-        if self._written_bytes in range(704, 736):
-            import binascii
-            logger.critical('wrote %d bytes (%d total)', len(b), self._written_bytes)
-            logger.critical('%s', _insert_spaces(binascii.hexlify(b)))
-
-            if False:
-                #
-                # https://stackoverflow.com/questions/2654113/python-how-to-get-the-callers-method-name-in-the-called-method
-                #
-                import inspect
-                curframe = inspect.currentframe()
-                calframe = inspect.getouterframes(curframe, 2)
-                logger.critical('caller: %s:%d', calframe[1][1], calframe[1][2])
-
-
-        # logger.debug("writing %r bytes to %r", len(b), self._buf)
-
         self._buf.write(b)
         self._total_bytes += len(b)
 
