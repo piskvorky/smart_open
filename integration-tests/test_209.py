@@ -57,18 +57,33 @@ with open('index_2018.csv') as fin:
     data = pn.read_csv(fin, header=0, error_bad_lines=False,
                        nrows=_NUMROWS, dtype='str').fillna('NA')
 
+num_csv_rows = len(data.index)
 avroSchemaOut = gen_schema(data)
 
 output_url = _S3_URL + '/issue_209/out.avro'
 
+@mock.patch('avro.datafile.DataFileWriter.generate_sync_marker', mock.Mock(return_value=b'0123456789abcdef'))
+def write_avro_context_manager(foutd):
+    schema = avro.schema.parse(avroSchemaOut)
+    dictRes = data.to_dict(orient='records')
+    with avro.datafile.DataFileWriter(foutd, avro.io.DatumWriter(), schema) as writer:
+        for ll, row in enumerate(dictRes):
+            writer.append(row)
 
 @mock.patch('avro.datafile.DataFileWriter.generate_sync_marker', mock.Mock(return_value=b'0123456789abcdef'))
-def write_avro(foutd):
+def write_avro_manual_close(foutd):
     schema = avro.schema.parse(avroSchemaOut)
     dictRes = data.to_dict(orient='records')
     writer = avro.datafile.DataFileWriter(foutd, avro.io.DatumWriter(), schema)
     for ll, row in enumerate(dictRes):
         writer.append(row)
+    writer.close()
+
+
+#
+# The above two functions appear to work identically.
+#
+write_avro = write_avro_context_manager
 
 
 with open('local.avro', 'wb') as foutd:
@@ -97,6 +112,10 @@ def diff(file1, file2):
         records1 = read_avro(fin)
     with open(file2, 'rb') as fin:
         records2 = read_avro(fin)
+    if len(records1) != num_csv_rows:
+        print('%s contains %r records, but I expected %r' % (file1, len(records1), num_csv_rows))
+    if len(records2) != num_csv_rows:
+        print('%s contains %r records, but I expected %r' % (file2, len(records1), num_csv_rows))
     return 0 if records1 == records2 else 1
 
 

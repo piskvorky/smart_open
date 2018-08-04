@@ -387,6 +387,7 @@ multipart upload may fail")
 
         if self._total_bytes:
             self._mp.complete(MultipartUpload={'Parts': self._parts})
+            self._total_bytes = 0
             logger.debug("completed multipart upload")
         elif self._mp:
             #
