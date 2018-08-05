@@ -342,6 +342,15 @@ class BufferedOutputBaseTest(unittest.TestCase):
         fout.close()
         fout.close()
 
+    def test_flush_close(self):
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='test_flush_close')
+        text = u'там за туманами, вечными, пьяными'.encode('utf-8')
+        fout = smart_open.s3.open('test_double_close', 'key', 'wb')
+        fout.write(text)
+        fout.flush()
+        fout.close()
+
 
 class ClampTest(unittest.TestCase):
     def test(self):

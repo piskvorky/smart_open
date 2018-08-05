@@ -377,6 +377,9 @@ multipart upload may fail")
         #
         self.raw = None
 
+    def flush(self):
+        pass
+
     #
     # Override some methods from io.IOBase.
     #
