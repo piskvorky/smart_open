@@ -28,6 +28,10 @@ matrix:
         - SO_S3_URL: "s3://smart-open-py36-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
 
+    - python: '3.7'
+      dist: xenial    # required for Python 3.7 (travis-ci/travis-ci#9069)
+      sudo: required  # required for Python 3.7 (travis-ci/travis-ci#9069)
+
 install:
   - pip install .[test]
   - pip uninstall --yes botocore boto3  # workaround for avoid very similar conflict as in https://github.com/venth/aws-adfs/issues/52
