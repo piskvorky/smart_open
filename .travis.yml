@@ -1,6 +1,6 @@
 language: python
 dist: trusty
-sudo: false
+sudo: required  # required for Python 3.7 (travis-ci/travis-ci#9069)
 
 env:
   global:
