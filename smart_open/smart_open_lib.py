@@ -435,7 +435,7 @@ def _parse_uri_hdfs(parsed_uri):
     uri_path = parsed_uri.netloc + parsed_uri.path
     uri_path = "/" + uri_path.lstrip("/")
     if not uri_path:
-        raise RuntimeError("invalid HDFS URI: %s" % uri)
+        raise RuntimeError("invalid HDFS URI: %s" % parsed_uri)
     return Uri(scheme='hdfs', uri_path=uri_path)
 
 
@@ -445,7 +445,7 @@ def _parse_uri_webhdfs(parsed_uri):
     if parsed_uri.query:
         uri_path += "?" + parsed_uri.query
     if not uri_path:
-        raise RuntimeError("invalid WebHDFS URI: %s" % uri)
+        raise RuntimeError("invalid WebHDFS URI: %s" % parsed_uri)
     return Uri(scheme='webhdfs', uri_path=uri_path)
 
 
@@ -502,7 +502,7 @@ def _parse_uri_file(parsed_uri):
     uri_path = os.path.expanduser(uri_path)
 
     if not uri_path:
-        raise RuntimeError("invalid file URI: %s" % uri)
+        raise RuntimeError("invalid file URI: %s" % parsed_uri)
 
     return Uri(scheme='file', uri_path=uri_path)
 
