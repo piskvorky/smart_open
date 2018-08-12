@@ -4,7 +4,6 @@
 import io
 import contextlib
 import functools
-import itertools
 import logging
 
 import boto3
