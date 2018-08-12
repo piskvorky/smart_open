@@ -473,14 +473,6 @@ multipart upload may fail")
             self.close()
 
 
-def _insert_spaces(the_string):
-    def gen(stringy):
-        while stringy:
-            yield stringy[:4]
-            stringy = stringy[4:]
-    return ' '.join(gen(the_string))
-
-
 def iter_bucket(bucket_name, prefix='', accept_key=lambda key: True,
                 key_limit=None, workers=16, retries=3):
     """
