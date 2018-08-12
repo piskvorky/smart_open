@@ -287,14 +287,6 @@ def _shortcut_open(uri, mode, **kw):
     return io.open(parsed_uri.uri_path, mode, **open_kwargs)
 
 
-def _insert_spaces(the_string):
-    def gen(stringy):
-        while stringy:
-            yield stringy[:4]
-            stringy = stringy[4:]
-    return ' '.join(gen(the_string))
-
-
 def _open_binary_stream(uri, mode, **kw):
     """Open an arbitrary URI in the specified binary mode.
 
