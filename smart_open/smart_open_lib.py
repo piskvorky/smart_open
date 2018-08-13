@@ -903,7 +903,9 @@ def s3_iter_bucket_process_key(key, retries=3):
             pass
 
 
-def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=None, workers=16, retries=3, ordered=False, maxresults=None):
+def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True,
+                   key_limit=None, workers=16, retries=3, ordered=False,
+                   max_in_memory=None):
     """
     Iterate and download all S3 files under `bucket/prefix`, yielding out
     `(key, key content)` 2-tuples (generator).
@@ -917,6 +919,16 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
     The keys are processed in parallel, using `workers` processes (default: 16),
     to speed up downloads greatly. If multiprocessing is not available, thus
     MULTIPROCESSING is False, this parameter will be ignored.
+
+    If `ordered` is `False` (the default), keys will be yielded as soon as they
+    become available. If `True`, they will be yielded in the same order they
+    are received from S3 (UTF-8 binary order).
+
+    Because I/O is done by workers in the background, a number of files may
+    exist in memory, waiting to be consumed. When iterating through a large
+    number of files, this may consume more system memory than is desired or
+    available. `max_in_memory` can be used to control the number of files in
+    memory at any one time. If `None` (the default), the number is unlimited.
 
     Example::
 
@@ -934,8 +946,8 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
     total_size, key_no = 0, -1
     keys = ({'key': key, 'retries': retries} for key in bucket.list(prefix=prefix) if accept_key(key.name))
 
-    if maxresults:
-        keys = LimitingIterator(keys, maxresults)
+    if max_in_memory:
+        keys = LimitingIterator(keys, max_in_memory)
 
     if MULTIPROCESSING:
         liod = " in order" if ordered else ""
@@ -955,7 +967,7 @@ def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True, key_limit=Non
             )
 
         yield key, content
-        if maxresults:
+        if max_in_memory:
             keys.task_done()
         key.close()
         total_size += len(content)
