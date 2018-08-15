@@ -22,47 +22,36 @@ The main methods are:
 """
 
 import codecs
+import collections
 import logging
 import os
-import subprocess
+import os.path as P
 import sys
 import requests
+import importlib
 import io
 import warnings
-import threading
+
+# Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
+# available. The builtin ``pathlib`` will be imported with higher precedence.
+for pathlib_module in ('pathlib', 'pathlib2'):
+    try:
+        pathlib = importlib.import_module(pathlib_module)
+        PATHLIB_SUPPORT = True
+        break
+    except ImportError:
+        PATHLIB_SUPPORT = False
 
 from boto.compat import BytesIO, urlsplit, six
-import boto.s3.connection
 import boto.s3.key
-from ssl import SSLError
 import sys
+from ssl import SSLError
+from six.moves.urllib import parse as urlparse
 
 
 IS_PY2 = (sys.version_info[0] == 2)
 
-if IS_PY2:
-    import cStringIO as StringIO
-
-if sys.version_info[0] == 2:
-    import httplib
-
-elif sys.version_info[0] == 3:
-    import io as StringIO
-    import http.client as httplib
-
-
 logger = logging.getLogger(__name__)
-
-# Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
-# The only method currently relying on it is s3_iter_bucket, which is instructed
-# whether to use it by the MULTIPROCESSING flag.
-MULTIPROCESSING = False
-try:
-    import multiprocessing.pool
-    MULTIPROCESSING = True
-except ImportError:
-    logger.warning("multiprocessing could not be imported and won't be used")
-    from itertools import imap
 
 if IS_PY2:
     from bz2file import BZ2File
@@ -70,10 +59,17 @@ else:
     from bz2 import BZ2File
 
 import gzip
+
+#
+# This module defines a function called smart_open so we cannot use
+# smart_open.submodule to reference to the submodules.
+#
 import smart_open.s3 as smart_open_s3
+from smart_open.s3 import iter_bucket as s3_iter_bucket
+import smart_open.hdfs as smart_open_hdfs
+import smart_open.webhdfs as smart_open_webhdfs
+import smart_open.http as smart_open_http
 
-
-WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
@@ -82,8 +78,37 @@ _ISSUE_146_FSTR = (
     "not currently support decoding text via the %(scheme)s scheme. "
     "Re-open the file without specifying an encoding to suppress this warning."
 )
+_ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
 
 DEFAULT_ERRORS = 'strict'
+
+
+Uri = collections.namedtuple(
+    'Uri', 
+    (
+        'scheme',
+        'uri_path',
+        'bucket_id',
+        'key_id',
+        'port',
+        'host',
+        'ordinary_calling_format',
+        'access_id',
+        'access_secret',
+    )
+)
+"""Represents all the options that we parse from user input.
+
+Some of the above options only make sense for certain protocols, e.g.
+bucket_id is only for S3.
+"""
+#
+# Set the default values for all Uri fields to be None.  This allows us to only
+# specify the relevant fields when constructing a Uri.
+#
+# https://stackoverflow.com/questions/11351032/namedtuple-and-default-values-for-optional-keyword-arguments
+#
+Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
 
 
 def smart_open(uri, mode="rb", **kw):
@@ -103,6 +128,7 @@ def smart_open(uri, mode="rb", **kw):
     3. a URI for Amazon's S3 (can also supply credentials inside the URI):
        `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
     4. an instance of the boto.s3.key.Key class.
+    5. an instance of the pathlib.Path class.
 
     Examples::
 
@@ -149,6 +175,13 @@ def smart_open(uri, mode="rb", **kw):
     """
     logger.debug('%r', locals())
 
+    if not isinstance(mode, six.string_types):
+        raise TypeError('mode should be a string')
+
+    fobj = _shortcut_open(uri, mode, **kw)
+    if fobj is not None:
+        return fobj
+
     #
     # This is a work-around for the problem described in Issue #144.
     # If the user has explicitly specified an encoding, then assume they want
@@ -160,64 +193,200 @@ def smart_open(uri, mode="rb", **kw):
     if kw.get('encoding') is not None and 'b' in mode:
         mode = mode.replace('b', '')
 
-    # validate mode parameter
-    if not isinstance(mode, six.string_types):
-        raise TypeError('mode should be a string')
+    # Support opening ``pathlib.Path`` objects by casting them to strings.
+    if PATHLIB_SUPPORT and isinstance(uri, pathlib.Path):
+        uri = str(uri)
+
+    #
+    # Our API is very liberal with keyword arguments, making it a bit hard to
+    # manage them.  Capture the keyword arguments we'll be using in this
+    # function in advance to reduce the confusion in downstream functions.
+    #
+    # explicit_encoding is what we've been explicitly told to use.  encoding is
+    # what we'll actually end up using.  The two may be different if the user
+    # didn't actually specify the encoding.
+    #
+    ignore_extension = kw.pop('ignore_extension', False)
+    explicit_encoding = kw.get('encoding', None)
+    encoding = kw.pop('encoding', SYSTEM_ENCODING)
+
+    #
+    # This is how we get from the filename to the end result.  Decompression is
+    # optional, but it always accepts bytes and returns bytes.
+    #
+    # Decoding is also optional, accepts bytes and returns text.  The diagram
+    # below is for reading, for writing, the flow is from right to left, but
+    # the code is identical.
+    #
+    #           open as binary         decompress?          decode?
+    # filename ---------------> bytes -------------> bytes ---------> text
+    #                          binary             decompressed       decode
+    #
+    try:
+        binary_mode = {'r': 'rb', 'r+': 'rb+',
+                       'w': 'wb', 'w+': 'wb+',
+                       'a': 'ab', 'a+': 'ab+'}[mode]
+    except KeyError:
+        binary_mode = mode
+    binary, filename = _open_binary_stream(uri, binary_mode, **kw)
+    if ignore_extension:
+        decompressed = binary
+    else:
+        decompressed = _compression_wrapper(binary, filename, mode)
+
+    if 'b' not in mode or explicit_encoding is not None:
+        errors = kw.pop('errors', 'strict')
+        decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
+    else:
+        decoded = decompressed
+
+    return decoded
+
+
+def _shortcut_open(uri, mode, **kw):
+    """Try to open the URI using the standard library io.open function.
+
+    This can be much faster than the alternative of opening in binary mode and
+    then decoding.
+
+    This is only possible under the following conditions:
+
+        1. Opening a local file
+        2. Ignore extension is set to True
+
+    If it is not possible to use the built-in open for the specified URI, returns None.
+
+    :param str uri: A string indicating what to open.
+    :param str mode: The mode to pass to the open function.
+    :param dict kw:
+    :returns: The opened file
+    :rtype: file
+    """
+    if not isinstance(uri, six.string_types):
+        return None
+
+    parsed_uri = _parse_uri(uri)
+    if parsed_uri.scheme != 'file':
+        return None
+
+    _, extension = P.splitext(parsed_uri.uri_path)
+    ignore_extension = kw.get('ignore_extension', False)
+    if extension in ('.gz', '.bz2') and not ignore_extension:
+        return None
+
+    #
+    # https://docs.python.org/2/library/functions.html#open
+    #
+    # buffering: 0: off; 1: on; negative number: use system default
+    #
+    buffering = kw.get('buffering', -1)
+
+    open_kwargs = {}
+    errors = kw.get('errors')
+    if errors is not None:
+        open_kwargs['errors'] = errors
+
+    encoding = kw.get('encoding')
+    if encoding is not None:
+        open_kwargs['encoding'] = encoding
+        mode = mode.replace('b', '')
+
+    #
+    # Under Py3, the built-in open accepts kwargs, and it's OK to use that.
+    # Under Py2, the built-in open _doesn't_ accept kwargs, but we still use it
+    # whenever possible (see issue #207).  If we're under Py2 and have to use
+    # kwargs, then we have no option other to use io.open.
+    #
+    if six.PY3:
+        return open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
+    elif not open_kwargs:
+        return open(parsed_uri.uri_path, mode, buffering=buffering)
+    return io.open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
+
+
+def _open_binary_stream(uri, mode, **kw):
+    """Open an arbitrary URI in the specified binary mode.
+
+    Not all modes are supported for all protocols.
+
+    :arg uri: The URI to open.  May be a string, or something else.
+    :arg str mode: The mode to open with.  Must be rb, wb or ab.
+    :arg kw: TODO: document this.
+    :returns: A file object and the filename
+    :rtype: tuple
+    """
+    if mode not in ('rb', 'rb+', 'wb', 'wb+', 'ab', 'ab+'):
+        #
+        # This should really be a ValueError, but for the sake of compatibility
+        # with older versions, which raise NotImplementedError, we do the same.
+        #
+        raise NotImplementedError('unsupported mode: %r' % mode)
 
     if isinstance(uri, six.string_types):
         # this method just routes the request to classes handling the specific storage
         # schemes, depending on the URI protocol in `uri`
-        parsed_uri = ParseUri(uri)
+        filename = uri.split('/')[-1]
+        parsed_uri = _parse_uri(uri)
+        unsupported = "%r mode not supported for %r scheme" % (mode, parsed_uri.scheme)
 
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
-            encoding = kw.pop('encoding', None)
-            errors = kw.pop('errors', DEFAULT_ERRORS)
-            return file_smart_open(parsed_uri.uri_path, mode, encoding=encoding, errors=errors)
+            fobj = io.open(parsed_uri.uri_path, mode)
+            return fobj, filename
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
-            return s3_open_uri(parsed_uri, mode, **kw)
+            return _s3_open_uri(parsed_uri, mode, **kw), filename
         elif parsed_uri.scheme in ("hdfs", ):
-            encoding = kw.pop('encoding', None)
-            if encoding is not None:
-                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
-            if mode in ('r', 'rb'):
-                return HdfsOpenRead(parsed_uri, **kw)
-            if mode in ('w', 'wb'):
-                return HdfsOpenWrite(parsed_uri, **kw)
+            if mode == 'rb':
+                return smart_open_hdfs.CliRawInputBase(parsed_uri.uri_path), filename
+            elif mode == 'wb':
+                return smart_open_hdfs.CliRawOutputBase(parsed_uri.uri_path), filename
             else:
-                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+                raise NotImplementedError(unsupported)
         elif parsed_uri.scheme in ("webhdfs", ):
-            encoding = kw.pop('encoding', None)
-            if encoding is not None:
-                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
-            if mode in ('r', 'rb'):
-                return WebHdfsOpenRead(parsed_uri, **kw)
-            elif mode in ('w', 'wb'):
-                return WebHdfsOpenWrite(parsed_uri, **kw)
+            if mode == 'rb':
+                fobj = smart_open_webhdfs.BufferedInputBase(parsed_uri.uri_path, **kw)
+            elif mode == 'wb':
+                fobj = smart_open_webhdfs.BufferedOutputBase(parsed_uri.uri_path, **kw)
             else:
-                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+                raise NotImplementedError(unsupported)
+            return fobj, filename
         elif parsed_uri.scheme.startswith('http'):
-            encoding = kw.pop('encoding', None)
-            if encoding is not None:
-                warnings.warn(_ISSUE_146_FSTR % {'encoding': encoding, 'scheme': parsed_uri.scheme})
-            if mode in ('r', 'rb'):
-                return HttpOpenRead(parsed_uri, **kw)
+            #
+            # The URI may contain a query string and fragments, which interfere
+            # with out compressed/uncompressed estimation.
+            #
+            filename = P.basename(urlparse.urlparse(uri).path)
+            if mode == 'rb':
+                return smart_open_http.BufferedInputBase(uri, **kw), filename
             else:
-                raise NotImplementedError("file mode %s not supported for %r scheme", mode, parsed_uri.scheme)
+                raise NotImplementedError(unsupported)
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif isinstance(uri, boto.s3.key.Key):
-        return s3_open_key(uri, mode, **kw)
+        logger.debug('%r', locals())
+        #
+        # TODO: handle boto3 keys as well
+        #
+        host = kw.pop('host', None)
+        if host is not None:
+            kw['endpoint_url'] = 'http://' + host
+        return smart_open_s3.open(uri.bucket.name, uri.name, mode, **kw), uri.name
     elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
-        return uri
+        filename = '/tmp/unknown'
+        return uri, filename
     else:
         raise TypeError('don\'t know how to handle uri %s' % repr(uri))
 
 
-def s3_open_uri(parsed_uri, mode, **kwargs):
-    logger.debug('%r', locals())
+def _s3_open_uri(parsed_uri, mode, **kwargs):
+    logger.debug('s3_open_uri: %r', locals())
+    if mode in ('r', 'w'):
+        raise ValueError('this function can only open binary streams. '
+                         'Use smart_open.smart_open() to open text streams.')
+    elif mode not in ('rb', 'wb'):
+        raise NotImplementedError('unsupported mode: %r', mode)
     if parsed_uri.access_id is not None:
         kwargs['aws_access_key_id'] = parsed_uri.access_id
     if parsed_uri.access_secret is not None:
@@ -228,113 +397,12 @@ def s3_open_uri(parsed_uri, mode, **kwargs):
     if host is not None:
         kwargs['endpoint_url'] = 'http://' + host
 
-    #
-    # TODO: this is the wrong place to handle ignore_extension.
-    # It should happen at the highest level in the smart_open function, because
-    # it influences other file systems as well, not just S3.
-    #
-    if kwargs.pop("ignore_extension", False):
-        codec = None
-    else:
-        codec = _detect_codec(parsed_uri.key_id)
-
-    #
-    # Codecs work on a byte-level, so the underlying S3 object should
-    # always be reading bytes.
-    #
-    if mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
-        s3_mode = smart_open_s3.READ_BINARY
-    elif mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
-        s3_mode = smart_open_s3.WRITE_BINARY
-    else:
-        raise NotImplementedError('mode %r not implemented for S3' % mode)
-
-    #
-    # TODO: I'm not sure how to handle this with boto3.  Any ideas?
-    #
-    # https://github.com/boto/boto3/issues/334
-    #
-    # _setup_unsecured_mode()
-
-    encoding = kwargs.get('encoding')
-    errors = kwargs.get('errors', DEFAULT_ERRORS)
-    fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, s3_mode, **kwargs)
-    decompressed_fobj = _CODECS[codec](fobj, mode)
-    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
-    return decoded_fobj
+    return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
 
-def _setup_unsecured_mode(parsed_uri, kwargs):
-    port = kwargs.pop('port', parsed_uri.port)
-    if port != 443:
-        kwargs['port'] = port
-
-    if not kwargs.pop('is_secure', parsed_uri.scheme != 's3u'):
-        kwargs['is_secure'] = False
-        # If the security model docker is overridden, honor the host directly.
-        kwargs['calling_format'] = boto.s3.connection.OrdinaryCallingFormat()
-
-
-def s3_open_key(key, mode, **kwargs):
-    logger.debug('%r', locals())
-    #
-    # TODO: handle boto3 keys as well
-    #
-    host = kwargs.pop('host', None)
-    if host is not None:
-        kwargs['endpoint_url'] = 'http://' + host
-
-    if kwargs.pop("ignore_extension", False):
-        codec = None
-    else:
-        codec = _detect_codec(key.name)
-
-    #
-    # Codecs work on a byte-level, so the underlying S3 object should
-    # always be reading bytes.
-    #
-    if mode in (smart_open_s3.READ, smart_open_s3.READ_BINARY):
-        s3_mode = smart_open_s3.READ_BINARY
-    elif mode in (smart_open_s3.WRITE, smart_open_s3.WRITE_BINARY):
-        s3_mode = smart_open_s3.WRITE_BINARY
-    else:
-        raise NotImplementedError('mode %r not implemented for S3' % mode)
-
-    logging.debug('codec: %r mode: %r s3_mode: %r', codec, mode, s3_mode)
-    encoding = kwargs.get('encoding')
-    errors = kwargs.get('errors', DEFAULT_ERRORS)
-    fobj = smart_open_s3.open(key.bucket.name, key.name, s3_mode, **kwargs)
-    decompressed_fobj = _CODECS[codec](fobj, mode)
-    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
-    return decoded_fobj
-
-
-def _detect_codec(filename):
-    if filename.endswith(".gz"):
-        return 'gzip'
-    return None
-
-
-def _wrap_gzip(fileobj, mode):
-    return gzip.GzipFile(fileobj=fileobj, mode=mode)
-
-
-def _wrap_none(fileobj, mode):
-    return fileobj
-
-
-_CODECS = {
-    None: _wrap_none,
-    'gzip': _wrap_gzip,
-    #
-    # TODO: add support for other codecs here.
-    #
-}
-
-
-class ParseUri(object):
+def _parse_uri(uri_as_string):
     """
-    Parse the given URI.
+    Parse the given URI from a string.
 
     Supported URI schemes are "file", "s3", "s3n", "s3u" and "hdfs".
 
@@ -355,239 +423,121 @@ class ParseUri(object):
       * ./local/path/file.gz
       * file:///home/user/file
       * file:///home/user/file.bz2
-
     """
-    def __init__(self, uri, default_scheme="file"):
-        """
-        Assume `default_scheme` if no scheme given in `uri`.
+    if os.name == 'nt':
+        # urlsplit doesn't work on Windows -- it parses the drive as the scheme...
+        if '://' not in uri_as_string:
+            # no protocol given => assume a local file
+            uri_as_string = 'file://' + uri_as_string
+    parsed_uri = urlsplit(uri_as_string, allow_fragments=False)
 
-        """
-        if os.name == 'nt':
-            # urlsplit doesn't work on Windows -- it parses the drive as the scheme...
-            if '://' not in uri:
-                # no protocol given => assume a local file
-                uri = 'file://' + uri
-        parsed_uri = urlsplit(uri, allow_fragments=False)
-        self.scheme = parsed_uri.scheme if parsed_uri.scheme else default_scheme
-
-        if self.scheme == "hdfs":
-            self.uri_path = parsed_uri.netloc + parsed_uri.path
-            self.uri_path = "/" + self.uri_path.lstrip("/")
-
-            if not self.uri_path:
-                raise RuntimeError("invalid HDFS URI: %s" % uri)
-        elif self.scheme == "webhdfs":
-            self.uri_path = parsed_uri.netloc + "/webhdfs/v1" + parsed_uri.path
-            if parsed_uri.query:
-                self.uri_path += "?" + parsed_uri.query
-
-            if not self.uri_path:
-                raise RuntimeError("invalid WebHDFS URI: %s" % uri)
-        elif self.scheme in ("s3", "s3n", "s3u"):
-            self.bucket_id = (parsed_uri.netloc + parsed_uri.path).split('@')
-            self.key_id = None
-            self.port = 443
-            self.host = boto.config.get('s3', 'host', 's3.amazonaws.com')
-            self.ordinary_calling_format = False
-            if len(self.bucket_id) == 1:
-                # URI without credentials: s3://bucket/object
-                self.bucket_id, self.key_id = self.bucket_id[0].split('/', 1)
-                # "None" credentials are interpreted as "look for credentials in other locations" by boto
-                self.access_id, self.access_secret = None, None
-            elif len(self.bucket_id) == 2 and len(self.bucket_id[0].split(':')) == 2:
-                # URI in full format: s3://key:secret@bucket/object
-                # access key id: [A-Z0-9]{20}
-                # secret access key: [A-Za-z0-9/+=]{40}
-                acc, self.bucket_id = self.bucket_id
-                self.access_id, self.access_secret = acc.split(':')
-                self.bucket_id, self.key_id = self.bucket_id.split('/', 1)
-            elif len(self.bucket_id) == 3 and len(self.bucket_id[0].split(':')) == 2:
-                # or URI in extended format: s3://key:secret@server[:port]@bucket/object
-                acc,  server, self.bucket_id = self.bucket_id
-                self.access_id, self.access_secret = acc.split(':')
-                self.bucket_id, self.key_id = self.bucket_id.split('/', 1)
-                server = server.split(':')
-                self.ordinary_calling_format = True
-                self.host = server[0]
-                if len(server) == 2:
-                    self.port = int(server[1])
-            else:
-                # more than 2 '@' means invalid uri
-                # Bucket names must be at least 3 and no more than 63 characters long.
-                # Bucket names must be a series of one or more labels.
-                # Adjacent labels are separated by a single period (.).
-                # Bucket names can contain lowercase letters, numbers, and hyphens.
-                # Each label must start and end with a lowercase letter or a number.
-                raise RuntimeError("invalid S3 URI: %s" % uri)
-        elif self.scheme == 'file':
-            self.uri_path = parsed_uri.netloc + parsed_uri.path
-
-            # '~/tmp' may be expanded to '/Users/username/tmp'
-            self.uri_path = os.path.expanduser(self.uri_path)
-
-            if not self.uri_path:
-                raise RuntimeError("invalid file URI: %s" % uri)
-        elif self.scheme.startswith('http'):
-            self.uri_path = uri
-        else:
-            raise NotImplementedError("unknown URI scheme %r in %r" % (self.scheme, uri))
-
-
-class HdfsOpenRead(object):
-    """
-    Implement streamed reader from HDFS, as an iterable & context manager.
-
-    """
-    def __init__(self, parsed_uri):
-        if parsed_uri.scheme != "hdfs":
-            raise TypeError("can only process HDFS files")
-        self.parsed_uri = parsed_uri
-
-    def __iter__(self):
-        hdfs = subprocess.Popen(["hdfs", "dfs", '-text', self.parsed_uri.uri_path], stdout=subprocess.PIPE)
-        return hdfs.stdout
-
-    def read(self, size=None):
-        raise NotImplementedError("read() not implemented yet")
-
-    def seek(self, offset, whence=None):
-        raise NotImplementedError("seek() not implemented yet")
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        pass
-
-
-class HdfsOpenWrite(object):
-    """
-    Implement streamed writer from HDFS, as an iterable & context manager.
-
-    """
-    def __init__(self, parsed_uri):
-        if parsed_uri.scheme != "hdfs":
-            raise TypeError("can only process HDFS files")
-        self.parsed_uri = parsed_uri
-        self.out_pipe = subprocess.Popen(
-            ["hdfs", "dfs", "-put", "-f", "-", self.parsed_uri.uri_path], stdin=subprocess.PIPE
+    if parsed_uri.scheme == "hdfs":
+        return _parse_uri_hdfs(parsed_uri)
+    elif parsed_uri.scheme == "webhdfs":
+        return _parse_uri_webhdfs(parsed_uri)
+    elif parsed_uri.scheme in ("s3", "s3n", "s3u"):
+        return _parse_uri_s3x(parsed_uri)
+    elif parsed_uri.scheme in ('file', '', None):
+        return _parse_uri_file(parsed_uri)
+    elif parsed_uri.scheme.startswith('http'):
+        return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
+    else:
+        raise NotImplementedError(
+            "unknown URI scheme %r in %r" % (parsed_uri.scheme, uri_as_string)
         )
 
-    def write(self, b):
-        self.out_pipe.stdin.write(b)
 
-    def seek(self, offset, whence=None):
-        raise NotImplementedError("seek() not implemented yet")
-
-    def __enter__(self):
-        return self
-
-    def close(self):
-        self.out_pipe.stdin.close()
-
-    def __exit__(self, type, value, traceback):
-        self.close()
+def _parse_uri_hdfs(parsed_uri):
+    assert parsed_uri.scheme == 'hdfs'
+    uri_path = parsed_uri.netloc + parsed_uri.path
+    uri_path = "/" + uri_path.lstrip("/")
+    if not uri_path:
+        raise RuntimeError("invalid HDFS URI: %s" % parsed_uri)
+    return Uri(scheme='hdfs', uri_path=uri_path)
 
 
-class WebHdfsOpenRead(object):
-    """
-    Implement streamed reader from WebHDFS, as an iterable & context manager.
-    NOTE: it does not support kerberos authentication yet
-
-    """
-    def __init__(self, parsed_uri):
-        if parsed_uri.scheme != "webhdfs":
-            raise TypeError("can only process WebHDFS files")
-        self.parsed_uri = parsed_uri
-        self.offset = 0
-
-    def __iter__(self):
-        payload = {"op": "OPEN"}
-        response = requests.get("http://" + self.parsed_uri.uri_path, params=payload, stream=True)
-        return response.iter_lines()
-
-    def read(self, size=None):
-        """
-        Read the specific number of bytes from the file
-
-        Note read() and line iteration (`for line in self: ...`) each have their
-        own file position, so they are independent. Doing a `read` will not affect
-        the line iteration, and vice versa.
-        """
-        if not size or size < 0:
-            payload = {"op": "OPEN", "offset": self.offset}
-            self.offset = 0
-        else:
-            payload = {"op": "OPEN", "offset": self.offset, "length": size}
-            self.offset += size
-        response = requests.get("http://" + self.parsed_uri.uri_path, params=payload, stream=True)
-        return response.content
-
-    def seek(self, offset, whence=0):
-        """
-        Seek to the specified position.
-
-        Only seeking to the beginning (offset=0) supported for now.
-
-        """
-        if whence == 0 and offset == 0:
-            self.offset = 0
-        elif whence == 0:
-            self.offset = offset
-        else:
-            raise NotImplementedError("operations with whence not implemented yet")
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        pass
+def _parse_uri_webhdfs(parsed_uri):
+    assert parsed_uri.scheme == 'webhdfs'
+    uri_path = parsed_uri.netloc + "/webhdfs/v1" + parsed_uri.path
+    if parsed_uri.query:
+        uri_path += "?" + parsed_uri.query
+    if not uri_path:
+        raise RuntimeError("invalid WebHDFS URI: %s" % parsed_uri)
+    return Uri(scheme='webhdfs', uri_path=uri_path)
 
 
-def make_closing(base, **attrs):
-    """
-    Add support for `with Base(attrs) as fout:` to the base class if it's missing.
-    The base class' `close()` method will be called on context exit, to always close the file properly.
+def _parse_uri_s3x(parsed_uri):
+    assert parsed_uri.scheme in ("s3", "s3n", "s3u")
 
-    This is needed for gzip.GzipFile, bz2.BZ2File etc in older Pythons (<=2.6), which otherwise
-    raise "AttributeError: GzipFile instance has no attribute '__exit__'".
-    """
-    if not hasattr(base, '__enter__'):
-        attrs['__enter__'] = lambda self: self
+    bucket_id = (parsed_uri.netloc + parsed_uri.path).split('@')
+    key_id = None
+    port = 443
+    host = boto.config.get('s3', 'host', 's3.amazonaws.com')
+    ordinary_calling_format = False
+    if len(bucket_id) == 1:
+        # URI without credentials: s3://bucket/object
+        bucket_id, key_id = bucket_id[0].split('/', 1)
+        # "None" credentials are interpreted as "look for credentials in other locations" by boto
+        access_id, access_secret = None, None
+    elif len(bucket_id) == 2 and len(bucket_id[0].split(':')) == 2:
+        # URI in full format: s3://key:secret@bucket/object
+        # access key id: [A-Z0-9]{20}
+        # secret access key: [A-Za-z0-9/+=]{40}
+        acc, bucket_id = bucket_id
+        access_id, access_secret = acc.split(':')
+        bucket_id, key_id = bucket_id.split('/', 1)
+    elif len(bucket_id) == 3 and len(bucket_id[0].split(':')) == 2:
+        # or URI in extended format: s3://key:secret@server[:port]@bucket/object
+        acc,  server, bucket_id = bucket_id
+        access_id, access_secret = acc.split(':')
+        bucket_id, key_id = bucket_id.split('/', 1)
+        server = server.split(':')
+        ordinary_calling_format = True
+        host = server[0]
+        if len(server) == 2:
+            port = int(server[1])
+    else:
+        # more than 2 '@' means invalid uri
+        # Bucket names must be at least 3 and no more than 63 characters long.
+        # Bucket names must be a series of one or more labels.
+        # Adjacent labels are separated by a single period (.).
+        # Bucket names can contain lowercase letters, numbers, and hyphens.
+        # Each label must start and end with a lowercase letter or a number.
+        raise RuntimeError("invalid S3 URI: %s" % str(parsed_uri))
 
-    if not hasattr(base, '__exit__'):
-        attrs['__exit__'] = lambda self, type, value, traceback: self.close()
-
-    return type('Closing' + base.__name__, (base, object), attrs)
-
-
-class ClosingBZ2File(make_closing(BZ2File)):
-    """
-    Implements wrapper for BZ2File that closes file object receieved as argument
-
-    """
-    def __init__(self, inner_stream, *args, **kwargs):
-        self.inner_stream = inner_stream
-        super(ClosingBZ2File, self).__init__(inner_stream, *args, **kwargs)
-
-    def close(self):
-        super(ClosingBZ2File, self).close()
-        if not self.inner_stream.closed:
-            self.inner_stream.close()
-
-class ClosingGzipFile(make_closing(gzip.GzipFile)):
-    """
-    Implement wrapper for GzipFile that closes file object receieved from arguments
-
-    """
-    def close(self):
-        fileobj = self.fileobj
-        super(ClosingGzipFile, self).close()
-        if not fileobj.closed:
-            fileobj.close()
+    return Uri(
+        scheme=parsed_uri.scheme, bucket_id=bucket_id, key_id=key_id,
+        port=port, host=host, ordinary_calling_format=ordinary_calling_format,
+        access_id=access_id, access_secret=access_secret
+    )
 
 
-def compression_wrapper(file_obj, filename, mode):
+def _parse_uri_file(parsed_uri):
+    assert parsed_uri.scheme in (None, '', 'file')
+    uri_path = parsed_uri.netloc + parsed_uri.path
+    # '~/tmp' may be expanded to '/Users/username/tmp'
+    uri_path = os.path.expanduser(uri_path)
+
+    if not uri_path:
+        raise RuntimeError("invalid file URI: %s" % parsed_uri)
+
+    return Uri(scheme='file', uri_path=uri_path)
+
+
+def _need_to_buffer(file_obj, mode, ext):
+    """Returns True if we need to buffer the whole file in memory in order to proceed."""
+    try:
+        is_seekable = file_obj.seekable()
+    except AttributeError:
+        #
+        # Under Py2, built-in file objects returned by open do not have
+        # .seekable, but have a .seek method instead.
+        #
+        is_seekable = hasattr(file_obj, 'seek')
+    return six.PY2 and mode.startswith('r') and ext in ('.gz', '.bz2') and not is_seekable
+
+
+def _compression_wrapper(file_obj, filename, mode):
     """
     This function will wrap the file_obj with an appropriate
     [de]compression mechanism based on the extension of the filename.
@@ -599,15 +549,20 @@ def compression_wrapper(file_obj, filename, mode):
     file_obj.
     """
     _, ext = os.path.splitext(filename)
+
+    if _need_to_buffer(file_obj, mode, ext):
+        warnings.warn('streaming gzip support unavailable, see %s' % _ISSUE_189_URL)
+        file_obj = io.BytesIO(file_obj.read())
+
     if ext == '.bz2':
-        return ClosingBZ2File(file_obj, mode)
+        return BZ2File(file_obj, mode)
     elif ext == '.gz':
-        return ClosingGzipFile(fileobj=file_obj, mode=mode)
+        return gzip.GzipFile(fileobj=file_obj, mode=mode)
     else:
         return file_obj
 
 
-def encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
+def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
@@ -641,364 +596,3 @@ def encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     else:
         decoder = codecs.getwriter(encoding)
     return decoder(fileobj, errors=errors)
-
-
-def file_smart_open(fname, mode='rb', encoding=None, errors=DEFAULT_ERRORS):
-    """
-    Stream from/to local filesystem, transparently (de)compressing gzip and bz2
-    files if necessary.
-
-    :arg str fname: The path to the file to open.
-    :arg str mode: The mode in which to open the file.
-    :arg str encoding: The text encoding to use.
-    :arg str errors: The method to use when handling encoding/decoding errors.
-    :returns: A file object
-    """
-    #
-    # This is how we get from the filename to the end result.
-    # Decompression is optional, but it always accepts bytes and returns bytes.
-    # Decoding is also optional, accepts bytes and returns text.
-    # The diagram below is for reading, for writing, the flow is from right to
-    # left, but the code is identical.
-    #
-    #           open as binary         decompress?          decode?
-    # filename ---------------> bytes -------------> bytes ---------> text
-    #                          raw_fobj        decompressed_fobj   decoded_fobj
-    #
-    try:  # TODO need to fix this place (for cases with r+ and so on)
-        raw_mode = {'r': 'rb', 'w': 'wb', 'a': 'ab'}[mode]
-    except KeyError:
-        raw_mode = mode
-    raw_fobj = open(fname, raw_mode)
-    decompressed_fobj = compression_wrapper(raw_fobj, fname, raw_mode)
-    decoded_fobj = encoding_wrapper(decompressed_fobj, mode, encoding=encoding, errors=errors)
-    return decoded_fobj
-
-
-class HttpReadStream(object):
-    """
-    Implement streamed reader from a web site, as an iterable & context manager.
-    Supports Kerberos and Basic HTTP authentication.
-
-    As long as you don't mix different access patterns (readline vs readlines vs
-    read(n) vs read() vs iteration) this will load efficiently in memory.
-
-    """
-    def __init__(self, url, mode='r', kerberos=False, user=None, password=None):
-        """
-        If Kerberos is True, will attempt to use the local Kerberos credentials.
-        Otherwise, will try to use "basic" HTTP authentication via username/password.
-
-        If none of those are set, will connect unauthenticated.
-        """
-        if kerberos:
-            import requests_kerberos
-            auth = requests_kerberos.HTTPKerberosAuth()
-        elif user is not None and password is not None:
-            auth = (user, password)
-        else:
-            auth = None
-
-        self.response = requests.get(url, auth=auth, stream=True)
-
-        if not self.response.ok:
-            self.response.raise_for_status()
-
-        self.mode = mode
-        self._read_buffer = None
-        self._read_iter = None
-        self._readline_iter = None
-
-    def __iter__(self):
-        return self.response.iter_lines()
-
-    def binary_content(self):
-        """Return the content of the request as bytes."""
-        return self.response.content
-
-    def readline(self):
-        """
-        Mimics the readline call to a filehandle object.
-        """
-        if self._readline_iter is None:
-            self._readline_iter = self.response.iter_lines()
-
-        try:
-            return next(self._readline_iter)
-        except StopIteration:
-            # When readline runs out of data, it just returns an empty string
-            return ''
-
-    def readlines(self):
-        """
-        Mimics the readlines call to a filehandle object.
-        """
-        return list(self.response.iter_lines())
-
-    def seek(self):
-        raise NotImplementedError('seek() is not implemented')
-
-    def read(self, size=None):
-        """
-        Mimics the read call to a filehandle object.
-        """
-        if size is None:
-            return self.response.content
-        else:
-            if self._read_iter is None:
-                self._read_iter = self.response.iter_content(size)
-                self._read_buffer = next(self._read_iter)
-
-            while len(self._read_buffer) < size:
-                try:
-                    self._read_buffer += next(self._read_iter)
-                except StopIteration:
-                    # Oops, ran out of data early.
-                    retval = self._read_buffer
-                    self._read_buffer = ''
-                    if len(retval) == 0:
-                        # When read runs out of data, it just returns empty
-                        return ''
-                    else:
-                        return retval
-
-            # If we got here, it means we have enough data in the buffer
-            # to return to the caller.
-            retval = self._read_buffer[:size]
-            self._read_buffer = self._read_buffer[size:]
-            return retval
-
-    def __enter__(self, *args, **kwargs):
-        return self
-
-    def __exit__(self, *args, **kwargs):
-        self.response.close()
-
-
-def HttpOpenRead(parsed_uri, mode='r', **kwargs):
-    if parsed_uri.scheme not in ('http', 'https'):
-        raise TypeError("can only process http/https urls")
-    if mode not in ('r', 'rb'):
-        raise NotImplementedError('Streaming write to http not supported')
-
-    url = parsed_uri.uri_path
-
-    response = HttpReadStream(url, **kwargs)
-
-    fname = urlsplit(url, allow_fragments=False).path.split('/')[-1]
-
-    if fname.endswith('.gz'):
-        #  Gzip needs a seek-able filehandle, so we need to buffer it.
-        buffer = make_closing(io.BytesIO)(response.binary_content())
-        return compression_wrapper(buffer, fname, mode)
-    else:
-        return compression_wrapper(response, fname, mode)
-
-
-class WebHdfsOpenWrite(object):
-    """
-    Context manager for writing into webhdfs files
-
-    """
-    def __init__(self, parsed_uri, min_part_size=WEBHDFS_MIN_PART_SIZE):
-        if parsed_uri.scheme != "webhdfs":
-            raise TypeError("can only process WebHDFS files")
-        self.parsed_uri = parsed_uri
-        self.closed = False
-        self.min_part_size = min_part_size
-        # creating empty file first
-        payload = {"op": "CREATE", "overwrite": True}
-        init_response = requests.put("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
-        if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
-            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
-        uri = init_response.headers['location']
-        response = requests.put(uri, data="", headers={'content-type': 'application/octet-stream'})
-        if not response.status_code == httplib.CREATED:
-            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
-        self.lines = []
-        self.parts = 0
-        self.chunk_bytes = 0
-        self.total_size = 0
-
-    def upload(self, data):
-        payload = {"op": "APPEND"}
-        init_response = requests.post("http://" + self.parsed_uri.uri_path, params=payload, allow_redirects=False)
-        if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
-            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
-        uri = init_response.headers['location']
-        response = requests.post(uri, data=data, headers={'content-type': 'application/octet-stream'})
-        if not response.status_code == httplib.OK:
-            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
-
-    def write(self, b):
-        """
-        Write the given bytes (binary string) into the WebHDFS file from constructor.
-
-        """
-        if self.closed:
-            raise ValueError("I/O operation on closed file")
-        if isinstance(b, six.text_type):
-            # not part of API: also accept unicode => encode it as utf8
-            b = b.encode('utf8')
-
-        if not isinstance(b, six.binary_type):
-            raise TypeError("input must be a binary string")
-
-        self.lines.append(b)
-        self.chunk_bytes += len(b)
-        self.total_size += len(b)
-
-        if self.chunk_bytes >= self.min_part_size:
-            buff = b"".join(self.lines)
-            logger.info(
-                "uploading part #%i, %i bytes (total %.3fGB)",
-                self.parts, len(buff), self.total_size / 1024.0 ** 3
-            )
-            self.upload(buff)
-            logger.debug("upload of part #%i finished", self.parts)
-            self.parts += 1
-            self.lines, self.chunk_bytes = [], 0
-
-    def seek(self, offset, whence=None):
-        raise NotImplementedError("seek() not implemented yet")
-
-    def close(self):
-        buff = b"".join(self.lines)
-        if buff:
-            logger.info(
-                "uploading last part #%i, %i bytes (total %.3fGB)",
-                self.parts, len(buff), self.total_size / 1024.0 ** 3
-            )
-            self.upload(buff)
-            logger.debug("upload of last part #%i finished", self.parts)
-        self.closed = True
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()
-
-
-def s3_iter_bucket_process_key_with_kwargs(kwargs):
-    return s3_iter_bucket_process_key(**kwargs)
-
-
-def s3_iter_bucket_process_key(key, retries=3):
-    """
-    Conceptually part of `s3_iter_bucket`, but must remain top-level method because
-    of pickling visibility.
-
-    """
-    # Sometimes, https://github.com/boto/boto/issues/2409 can happen because of network issues on either side.
-    # Retry up to 3 times to ensure its not a transient issue.
-    for x in range(0, retries + 1):
-        try:
-            return key, key.get_contents_as_string()
-        except SSLError:
-            # Actually fail on last pass through the loop
-            if x == retries:
-                raise
-            # Otherwise, try again, as this might be a transient timeout
-            pass
-
-
-def s3_iter_bucket(bucket, prefix='', accept_key=lambda key: True,
-                   key_limit=None, workers=16, retries=3, ordered=False,
-                   max_in_memory=None):
-    """
-    Iterate and download all S3 files under `bucket/prefix`, yielding out
-    `(key, key content)` 2-tuples (generator).
-
-    `accept_key` is a function that accepts a key name (unicode string) and
-    returns True/False, signalling whether the given key should be downloaded out or
-    not (default: accept all keys).
-
-    If `key_limit` is given, stop after yielding out that many results.
-
-    The keys are processed in parallel, using `workers` processes (default: 16),
-    to speed up downloads greatly. If multiprocessing is not available, thus
-    MULTIPROCESSING is False, this parameter will be ignored.
-
-    If `ordered` is `False` (the default), keys will be yielded as soon as they
-    become available. If `True`, they will be yielded in the same order they
-    are received from S3 (UTF-8 binary order).
-
-    Because I/O is done by workers in the background, a number of files may
-    exist in memory, waiting to be consumed. When iterating through a large
-    number of files, this may consume more system memory than is desired or
-    available. `max_in_memory` can be used to control the number of files in
-    memory at any one time. If `None` (the default), the number is unlimited.
-
-    Example::
-
-      >>> mybucket = boto.connect_s3().get_bucket('mybucket')
-
-      >>> # get all JSON files under "mybucket/foo/"
-      >>> for key, content in s3_iter_bucket(mybucket, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
-      ...     print key, len(content)
-
-      >>> # limit to 10k files, using 32 parallel workers (default is 16)
-      >>> for key, content in s3_iter_bucket(mybucket, key_limit=10000, workers=32):
-      ...     print key, len(content)
-
-    """
-    total_size, key_no = 0, -1
-    keys = ({'key': key, 'retries': retries} for key in bucket.list(prefix=prefix) if accept_key(key.name))
-
-    if max_in_memory:
-        keys = LimitingIterator(keys, max_in_memory)
-
-    if MULTIPROCESSING:
-        liod = " in order" if ordered else ""
-        logger.info("iterating over keys%s from %s with %i workers", liod, bucket, workers)
-        pool = multiprocessing.pool.Pool(processes=workers)
-        map_fun = pool.imap if ordered else pool.imap_unordered
-        iterator = map_fun(s3_iter_bucket_process_key_with_kwargs, keys)
-    else:
-        logger.info("iterating over keys from %s without multiprocessing", bucket)
-        iterator = imap(s3_iter_bucket_process_key_with_kwargs, keys)
-
-    for key_no, (key, content) in enumerate(iterator):
-        if key_no % 1000 == 0:
-            logger.info(
-                "yielding key #%i: %s, size %i (total %.1fMB)",
-                key_no, key, len(content), total_size / 1024.0 ** 2
-            )
-
-        yield key, content
-        if max_in_memory:
-            keys.task_done()
-        key.close()
-        total_size += len(content)
-
-        if key_limit is not None and key_no + 1 >= key_limit:
-            # we were asked to output only a limited number of keys => we're done
-            break
-
-    if MULTIPROCESSING:
-        pool.terminate()
-
-    logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
-
-
-class LimitingIterator(object):
-    def __init__(self, underlying, limit):
-        self._it = iter(underlying)
-        self._sem = threading.BoundedSemaphore(limit)
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        self._sem.acquire()
-        return next(self._it)
-
-    def task_done(self):
-        self._sem.release()
-
-
-class WebHdfsException(Exception):
-    def __init__(self, msg=str()):
-        self.msg = msg
-        super(WebHdfsException, self).__init__(self.msg)

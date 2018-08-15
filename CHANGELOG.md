@@ -1,3 +1,21 @@
+* 1.6.0, 29th June 2018
+
+  - Migrate to `boto3`. Fix #43 (PR [#164](https://github.com/RaRe-Technologies/smart_open/pull/164), [@mpenkov](https://github.com/mpenkov))
+  - Refactoring smart_open to share compression and encoding functionality (PR [#185](https://github.com/RaRe-Technologies/smart_open/pull/185), [@mpenkov](https://github.com/mpenkov))
+  - Drop `python2.6` compatibility. Fix #156 (PR [#192](https://github.com/RaRe-Technologies/smart_open/pull/192), [@mpenkov](https://github.com/mpenkov))
+  - Accept a custom `boto3.Session` instance (support STS AssumeRole). Fix #130, #149, #199 (PR [#201](https://github.com/RaRe-Technologies/smart_open/pull/201), [@eschwartz](https://github.com/eschwartz))
+  - Accept `multipart_upload` parameters (supports ServerSideEncryption) for `S3`. Fix (PR [#202](https://github.com/RaRe-Technologies/smart_open/pull/202), [@eschwartz](https://github.com/eschwartz))
+  - Add support for `pathlib.Path`. Fix #170 (PR [#175](https://github.com/RaRe-Technologies/smart_open/pull/175), [@clintval](https://github.com/clintval))
+  - Fix performance regression using local file-system. Fix #184 (PR [#190](https://github.com/RaRe-Technologies/smart_open/pull/190), [@mpenkov](https://github.com/mpenkov))
+  - Replace `ParsedUri` class with functions, cleanup internal argument parsing (PR [#191](https://github.com/RaRe-Technologies/smart_open/pull/191), [@mpenkov](https://github.com/mpenkov))
+  - Handle edge case (read 0 bytes) in read function. Fix #171 (PR [#193](https://github.com/RaRe-Technologies/smart_open/pull/193), [@mpenkov](https://github.com/mpenkov))
+  - Fix bug with changing `f._current_pos` when call `f.readline()` (PR [#182](https://github.com/RaRe-Technologies/smart_open/pull/182), [@inksink](https://github.com/inksink))
+  - Сlose the old body explicitly after `seek` for `S3`. Fix #187 (PR [#188](https://github.com/RaRe-Technologies/smart_open/pull/188), [@inksink](https://github.com/inksink))
+
+* 1.5.7, 18th March 2018
+
+  - Fix author/maintainer fields in `setup.py`, avoid bug from `setuptools==39.0.0` and add workaround for `botocore` and `python==3.3`. Fix #176 (PR [#178](https://github.com/RaRe-Technologies/smart_open/pull/178) & [#177](https://github.com/RaRe-Technologies/smart_open/pull/177), [@menshikh-iv](https://github.com/menshikh-iv) & [@baldwindc](https://github.com/baldwindc))
+
 * 1.5.6, 28th December 2017
 
   - Improve S3 read performance. Fix #152 (PR [#157](https://github.com/RaRe-Technologies/smart_open/pull/157), [@mpenkov](https://github.com/mpenkov))

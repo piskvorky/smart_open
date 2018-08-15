@@ -30,6 +30,8 @@ matrix:
 
 install:
   - pip install .[test]
+  - pip uninstall --yes botocore boto3  # workaround for avoid very similar conflict as in https://github.com/venth/aws-adfs/issues/52
+  - pip install boto3
   - pip freeze
 
 
@@ -42,14 +44,18 @@ script:
     fi
   - python setup.py test
   - export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())')
+  - pip install pytest
+  - py.test integration-tests/test_http.py
   - if [[ ${SO_DISABLE_MOCKS} = "1" ]]; then
-      pip install pytest pytest_benchmark awscli;
+      pip install pytest_benchmark awscli;
       set -e;
       py.test integration-tests/test_s3.py --benchmark-save=`git rev-parse HEAD`;
       set +e;
       aws s3 cp .benchmarks/*/*.json ${SO_S3_RESULT_URL};
       aws s3 rm --recursive $SO_S3_URL;
     fi
+  - pip install numpy
+  - py.test integration-tests/test_207.py
 
 
 cache:
