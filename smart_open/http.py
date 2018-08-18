@@ -30,6 +30,7 @@ class BufferedInputBase(io.BufferedIOBase):
         """
         if kerberos:
             import requests_kerberos
+
             auth = requests_kerberos.HTTPKerberosAuth()
         elif user is not None and password is not None:
             auth = (user, password)
@@ -112,5 +113,5 @@ class BufferedInputBase(io.BufferedIOBase):
         data = self.read(len(b))
         if not data:
             return 0
-        b[:len(data)] = data
+        b[: len(data)] = data
         return len(data)

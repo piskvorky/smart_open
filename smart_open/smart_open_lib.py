@@ -49,7 +49,7 @@ from ssl import SSLError
 from six.moves.urllib import parse as urlparse
 
 
-IS_PY2 = (sys.version_info[0] == 2)
+IS_PY2 = sys.version_info[0] == 2
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ DEFAULT_ERRORS = 'strict'
 
 
 Uri = collections.namedtuple(
-    'Uri', 
+    'Uri',
     (
         'scheme',
         'uri_path',
@@ -95,7 +95,7 @@ Uri = collections.namedtuple(
         'ordinary_calling_format',
         'access_id',
         'access_secret',
-    )
+    ),
 )
 """Represents all the options that we parse from user input.
 
@@ -223,9 +223,7 @@ def smart_open(uri, mode="rb", **kw):
     #                          binary             decompressed       decode
     #
     try:
-        binary_mode = {'r': 'rb', 'r+': 'rb+',
-                       'w': 'wb', 'w+': 'wb+',
-                       'a': 'ab', 'a+': 'ab+'}[mode]
+        binary_mode = {'r': 'rb', 'r+': 'rb+', 'w': 'wb', 'w+': 'wb+', 'a': 'ab', 'a+': 'ab+'}[mode]
     except KeyError:
         binary_mode = mode
     binary, filename = _open_binary_stream(uri, binary_mode, **kw)
@@ -329,21 +327,21 @@ def _open_binary_stream(uri, mode, **kw):
         parsed_uri = _parse_uri(uri)
         unsupported = "%r mode not supported for %r scheme" % (mode, parsed_uri.scheme)
 
-        if parsed_uri.scheme in ("file", ):
+        if parsed_uri.scheme in ("file",):
             # local files -- both read & write supported
             # compression, if any, is determined by the filename extension (.gz, .bz2)
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             return _s3_open_uri(parsed_uri, mode, **kw), filename
-        elif parsed_uri.scheme in ("hdfs", ):
+        elif parsed_uri.scheme in ("hdfs",):
             if mode == 'rb':
                 return smart_open_hdfs.CliRawInputBase(parsed_uri.uri_path), filename
             elif mode == 'wb':
                 return smart_open_hdfs.CliRawOutputBase(parsed_uri.uri_path), filename
             else:
                 raise NotImplementedError(unsupported)
-        elif parsed_uri.scheme in ("webhdfs", ):
+        elif parsed_uri.scheme in ("webhdfs",):
             if mode == 'rb':
                 fobj = smart_open_webhdfs.BufferedInputBase(parsed_uri.uri_path, **kw)
             elif mode == 'wb':
@@ -383,8 +381,9 @@ def _open_binary_stream(uri, mode, **kw):
 def _s3_open_uri(parsed_uri, mode, **kwargs):
     logger.debug('s3_open_uri: %r', locals())
     if mode in ('r', 'w'):
-        raise ValueError('this function can only open binary streams. '
-                         'Use smart_open.smart_open() to open text streams.')
+        raise ValueError(
+            'this function can only open binary streams. ' 'Use smart_open.smart_open() to open text streams.'
+        )
     elif mode not in ('rb', 'wb'):
         raise NotImplementedError('unsupported mode: %r', mode)
     if parsed_uri.access_id is not None:
@@ -442,9 +441,7 @@ def _parse_uri(uri_as_string):
     elif parsed_uri.scheme.startswith('http'):
         return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
     else:
-        raise NotImplementedError(
-            "unknown URI scheme %r in %r" % (parsed_uri.scheme, uri_as_string)
-        )
+        raise NotImplementedError("unknown URI scheme %r in %r" % (parsed_uri.scheme, uri_as_string))
 
 
 def _parse_uri_hdfs(parsed_uri):
@@ -488,7 +485,7 @@ def _parse_uri_s3x(parsed_uri):
         bucket_id, key_id = bucket_id.split('/', 1)
     elif len(bucket_id) == 3 and len(bucket_id[0].split(':')) == 2:
         # or URI in extended format: s3://key:secret@server[:port]@bucket/object
-        acc,  server, bucket_id = bucket_id
+        acc, server, bucket_id = bucket_id
         access_id, access_secret = acc.split(':')
         bucket_id, key_id = bucket_id.split('/', 1)
         server = server.split(':')
@@ -506,9 +503,14 @@ def _parse_uri_s3x(parsed_uri):
         raise RuntimeError("invalid S3 URI: %s" % str(parsed_uri))
 
     return Uri(
-        scheme=parsed_uri.scheme, bucket_id=bucket_id, key_id=key_id,
-        port=port, host=host, ordinary_calling_format=ordinary_calling_format,
-        access_id=access_id, access_secret=access_secret
+        scheme=parsed_uri.scheme,
+        bucket_id=bucket_id,
+        key_id=key_id,
+        port=port,
+        host=host,
+        ordinary_calling_format=ordinary_calling_format,
+        access_id=access_id,
+        access_secret=access_secret,
     )
 
 

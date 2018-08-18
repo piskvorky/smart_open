@@ -41,11 +41,10 @@ def maybe_mock_s3(func):
 
 def gen_schema(data):
     schema = {
-        'type': 'record', 'name': 'data', 'namespace': 'namespace',
-        'fields': [
-            {'name': field, 'type': ['null', 'string'], 'default': None}
-            for field in data.columns
-        ]
+        'type': 'record',
+        'name': 'data',
+        'namespace': 'namespace',
+        'fields': [{'name': field, 'type': ['null', 'string'], 'default': None} for field in data.columns],
     }
     return json.dumps(schema, indent=4)
 
@@ -54,13 +53,13 @@ if not P.isfile('index_2018.csv'):
     os.system('aws s3 cp s3://irs-form-990/index_2018.csv .')
 
 with open('index_2018.csv') as fin:
-    data = pn.read_csv(fin, header=0, error_bad_lines=False,
-                       nrows=_NUMROWS, dtype='str').fillna('NA')
+    data = pn.read_csv(fin, header=0, error_bad_lines=False, nrows=_NUMROWS, dtype='str').fillna('NA')
 
 num_csv_rows = len(data.index)
 avroSchemaOut = gen_schema(data)
 
 output_url = _S3_URL + '/issue_209/out.avro'
+
 
 @mock.patch('avro.datafile.DataFileWriter.generate_sync_marker', mock.Mock(return_value=b'0123456789abcdef'))
 def write_avro_context_manager(foutd):
@@ -69,6 +68,7 @@ def write_avro_context_manager(foutd):
     with avro.datafile.DataFileWriter(foutd, avro.io.DatumWriter(), schema) as writer:
         for ll, row in enumerate(dictRes):
             writer.append(row)
+
 
 @mock.patch('avro.datafile.DataFileWriter.generate_sync_marker', mock.Mock(return_value=b'0123456789abcdef'))
 def write_avro_manual_close(foutd):

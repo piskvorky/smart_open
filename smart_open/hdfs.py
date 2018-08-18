@@ -59,7 +59,7 @@ class CliRawInputBase(io.RawIOBase):
         data = self.read(len(b))
         if not data:
             return 0
-        b[:len(data)] = data
+        b[: len(data)] = data
         return len(data)
 
 
@@ -68,10 +68,10 @@ class CliRawOutputBase(io.RawIOBase):
 
     Implements the io.RawIOBase interface of the standard library.
     """
+
     def __init__(self, uri):
         self._uri = uri
-        self._sub = subprocess.Popen(["hdfs", "dfs", '-put', '-f', '-', self._uri],
-                                     stdin=subprocess.PIPE)
+        self._sub = subprocess.Popen(["hdfs", "dfs", '-put', '-f', '-', self._uri], stdin=subprocess.PIPE)
 
         #
         # This member is part of the io.RawIOBase interface.
