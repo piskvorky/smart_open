@@ -6,6 +6,7 @@ import smart_open
 open_fn = smart_open.smart_open
 # open_fn = open
 
+
 def report_time_iterate_rows(file_name, report_every=100000):
     start = time.time()
     last = start
@@ -14,11 +15,13 @@ def report_time_iterate_rows(file_name, report_every=100000):
             if not (i % report_every):
                 current = time.time()
                 time_taken = current - last
-                print('Time taken for %d rows: %.2f seconds, %.2f rows/s' % (
-                    report_every, time_taken, report_every / time_taken))
+                print(
+                    'Time taken for %d rows: %.2f seconds, %.2f rows/s'
+                    % (report_every, time_taken, report_every / time_taken)
+                )
                 last = current
     total = time.time() - start
-    print('Total: %d rows, %.2f seconds, %.2f rows/s' % (
-        i, total, i / total))
+    print('Total: %d rows, %.2f seconds, %.2f rows/s' % (i, total, i / total))
+
 
 report_time_iterate_rows(sys.argv[1])

@@ -20,6 +20,7 @@ logger.addHandler(logging.NullHandler())
 _MULTIPROCESSING = False
 try:
     import multiprocessing.pool
+
     _MULTIPROCESSING = True
 except ImportError:
     logger.warning("multiprocessing could not be imported and won't be used")
@@ -29,7 +30,7 @@ CURRENT = 1
 END = 2
 WHENCE_CHOICES = (START, CURRENT, END)
 
-DEFAULT_MIN_PART_SIZE = 50 * 1024**2
+DEFAULT_MIN_PART_SIZE = 50 * 1024 ** 2
 """Default minimum part size for S3 multipart uploads"""
 MIN_MIN_PART_SIZE = 5 * 1024 ** 2
 """The absolute minimum permitted by Amazon."""
@@ -78,6 +79,7 @@ def open(bucket_id, key_id, mode, **kwargs):
 
 class RawReader(object):
     """Read an S3 object."""
+
     def __init__(self, s3_object):
         self.position = 0
         self._object = s3_object
@@ -136,12 +138,8 @@ class SeekableRawReader(object):
 
 
 class BufferedInputBase(io.BufferedIOBase):
-    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, **kwargs):
-        session = kwargs.pop(
-            's3_session',
-            boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        )
+    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE, line_terminator=BINARY_NEWLINE, **kwargs):
+        session = kwargs.pop('s3_session', boto3.Session(profile_name=kwargs.pop('profile_name', None)))
         s3 = session.resource('s3', **kwargs)
         self._object = s3.Object(bucket, key)
         self._raw_reader = RawReader(self._object)
@@ -220,7 +218,7 @@ class BufferedInputBase(io.BufferedIOBase):
         data = self.read(len(b))
         if not data:
             return 0
-        b[:len(data)] = data
+        b[: len(data)] = data
         return len(data)
 
     def readline(self, limit=-1):
@@ -277,12 +275,8 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, **kwargs):
-        session = kwargs.pop(
-            's3_session',
-            boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        )
+    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE, line_terminator=BINARY_NEWLINE, **kwargs):
+        session = kwargs.pop('s3_session', boto3.Session(profile_name=kwargs.pop('profile_name', None)))
         s3 = session.resource('s3', **kwargs)
         self._object = s3.Object(bucket, key)
         self._raw_reader = SeekableRawReader(self._object)
@@ -346,13 +340,12 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     def __init__(self, bucket, key, min_part_size=DEFAULT_MIN_PART_SIZE, s3_upload=None, **kwargs):
         if min_part_size < MIN_MIN_PART_SIZE:
-            logger.warning("S3 requires minimum part size >= 5MB; \
-multipart upload may fail")
+            logger.warning(
+                "S3 requires minimum part size >= 5MB; \
+multipart upload may fail"
+            )
 
-        session = kwargs.pop(
-            's3_session',
-            boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        )
+        session = kwargs.pop('s3_session', boto3.Session(profile_name=kwargs.pop('profile_name', None)))
         s3 = session.resource('s3', **kwargs)
 
         #
@@ -451,8 +444,9 @@ multipart upload may fail")
     #
     def _upload_next_part(self):
         part_num = self._total_parts + 1
-        logger.info("uploading part #%i, %i bytes (total %.3fGB)",
-                    part_num, self._buf.tell(), self._total_bytes / 1024.0 ** 3)
+        logger.info(
+            "uploading part #%i, %i bytes (total %.3fGB)", part_num, self._buf.tell(), self._total_bytes / 1024.0 ** 3
+        )
         self._buf.seek(0)
         part = self._mp.Part(part_num)
         upload = part.upload(Body=self._buf)
@@ -472,8 +466,7 @@ multipart upload may fail")
             self.close()
 
 
-def iter_bucket(bucket_name, prefix='', accept_key=lambda key: True,
-                key_limit=None, workers=16, retries=3):
+def iter_bucket(bucket_name, prefix='', accept_key=lambda key: True, key_limit=None, workers=16, retries=3):
     """
     Iterate and download all S3 files under `bucket/prefix`, yielding out
     `(key, key content)` 2-tuples (generator).
@@ -516,8 +509,7 @@ def iter_bucket(bucket_name, prefix='', accept_key=lambda key: True,
         for key_no, (key, content) in enumerate(result_iterator):
             if True or key_no % 1000 == 0:
                 logger.info(
-                    "yielding key #%i: %s, size %i (total %.1fMB)",
-                    key_no, key, len(content), total_size / 1024.0 ** 2
+                    "yielding key #%i: %s, size %i (total %.1fMB)", key_no, key, len(content), total_size / 1024.0 ** 2
                 )
             yield key, content
             total_size += len(content)
@@ -586,6 +578,7 @@ def _download_fileobj(bucket, key_name):
 
 class DummyPool(object):
     """A class that mimics multiprocessing.pool.Pool for our purposes."""
+
     def imap_unordered(self, function, items):
         return six.moves.map(function, items)
 

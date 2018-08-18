@@ -64,7 +64,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
     def setUp(self):
         # lower the multipart upload size, to speed up these tests
         self.old_min_part_size = smart_open.s3.DEFAULT_MIN_PART_SIZE
-        smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024**2
+        smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024 ** 2
 
     def tearDown(self):
         smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
@@ -193,7 +193,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
         with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
             fin.readline()
-            self.assertEqual(fin.tell(), content.index(b'\n')+1)
+            self.assertEqual(fin.tell(), content.index(b'\n') + 1)
 
             fin.seek(0)
             actual = list(fin)
@@ -228,6 +228,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
     Test writing into s3 files.
 
     """
+
     def tearDown(self):
         s3 = boto3.resource('s3')
         cleanup_bucket(s3, delete_bucket=True)
@@ -274,9 +275,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
         create_bucket_and_key()
 
         # write
-        smart_open_write = smart_open.s3.BufferedOutputBase(
-            BUCKET_NAME, WRITE_KEY_NAME, min_part_size=10
-        )
+        smart_open_write = smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME, min_part_size=10)
         with smart_open_write as fout:
             fout.write(b"test")
             self.assertEqual(fout._buf.tell(), 4)
@@ -444,7 +443,6 @@ class IterBucketTest(unittest.TestCase):
 
 @maybe_mock_s3
 class DownloadKeyTest(unittest.TestCase):
-
     def test_happy(self):
         contents = b'hello'
         create_bucket_and_key(contents=contents)
@@ -464,18 +462,23 @@ class DownloadKeyTest(unittest.TestCase):
     def test_persistent_error(self):
         contents = b'hello'
         create_bucket_and_key(contents=contents)
-        side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR,
-                       ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR]
+        side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR]
         with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
-            self.assertRaises(botocore.client.ClientError, smart_open.s3._download_key,
-                              KEY_NAME, bucket_name=BUCKET_NAME)
+            self.assertRaises(
+                botocore.client.ClientError, smart_open.s3._download_key, KEY_NAME, bucket_name=BUCKET_NAME
+            )
 
     def test_intermittent_error_retries(self):
         contents = b'hello'
         create_bucket_and_key(contents=contents)
         expected = (KEY_NAME, contents)
-        side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR,
-                       ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, contents]
+        side_effect = [
+            ARBITRARY_CLIENT_ERROR,
+            ARBITRARY_CLIENT_ERROR,
+            ARBITRARY_CLIENT_ERROR,
+            ARBITRARY_CLIENT_ERROR,
+            contents,
+        ]
         with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
             actual = smart_open.s3._download_key(KEY_NAME, bucket_name=BUCKET_NAME, retries=4)
         self.assertEqual(expected, actual)
@@ -484,13 +487,11 @@ class DownloadKeyTest(unittest.TestCase):
         contents = b'hello'
         create_bucket_and_key(contents=contents)
         with mock.patch('smart_open.s3._download_fileobj', side_effect=ValueError):
-            self.assertRaises(ValueError, smart_open.s3._download_key,
-                              KEY_NAME, bucket_name=BUCKET_NAME)
+            self.assertRaises(ValueError, smart_open.s3._download_key, KEY_NAME, bucket_name=BUCKET_NAME)
 
 
 @maybe_mock_s3
 class OpenTest(unittest.TestCase):
-
     def test_read_never_returns_none(self):
         """read should never return None."""
         s3 = boto3.resource('s3')

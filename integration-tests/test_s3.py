@@ -63,7 +63,7 @@ def test_s3_performance(benchmark):
     initialize_bucket()
 
     one_megabyte = io.BytesIO()
-    for _ in range(1024*128):
+    for _ in range(1024 * 128):
         one_megabyte.write(b'01234567')
     one_megabyte = one_megabyte.getvalue()
 
@@ -76,7 +76,7 @@ def test_s3_performance_gz(benchmark):
     initialize_bucket()
 
     one_megabyte = io.BytesIO()
-    for _ in range(1024*128):
+    for _ in range(1024 * 128):
         one_megabyte.write(b'01234567')
     one_megabyte = one_megabyte.getvalue()
 
@@ -84,14 +84,11 @@ def test_s3_performance_gz(benchmark):
     actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
     assert actual == one_megabyte
 
+
 def test_s3_encrypted_file(benchmark):
     initialize_bucket()
 
     key = _S3_URL + '/sanity.txt'
     text = 'с гранатою в кармане, с чекою в руке'
-    actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8', s3_upload={
-        'ServerSideEncryption': 'AES256'
-    })
+    actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8', s3_upload={'ServerSideEncryption': 'AES256'})
     assert actual == text
-
-
