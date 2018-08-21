@@ -449,7 +449,7 @@ class IterBucketTest(unittest.TestCase):
         key_cnt = 0
         with mock.patch('smart_open.s3._download_fileobj', new=ooo_download):
             for i, (k, _) in enumerate(smart_open.s3.iter_bucket(bucket, ordered=True)):
-                self.assertEqual(k, f"key_{i}")
+                self.assertEqual(k, "key_" + str(i))
                 key_cnt += 1
         self.assertGreaterEqual(key_cnt, 2)
 
