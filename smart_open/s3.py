@@ -2,10 +2,12 @@
 """Implements file-like objects for reading and writing from/to S3."""
 
 import io
+import sys
 import contextlib
 import functools
 import logging
 import threading
+import itertools
 
 import boto3
 import botocore.client
@@ -519,31 +521,63 @@ def iter_bucket(bucket_name, prefix='', accept_key=lambda key: True,
     except AttributeError:
         pass
 
-    total_size, key_no = 0, -1
+    sum_size, key_no = 0, -1
     key_iterator = _list_bucket(bucket_name, prefix=prefix, accept_key=accept_key)
     download_key = functools.partial(_download_key, bucket_name=bucket_name, retries=retries)
 
-    if max_in_memory:
-        key_iterator = LimitingIterator(key_iterator)
+    if key_limit is not None:
+        key_iterator = itertools.islice(key_iterator, 0, key_limit)
+
+    if not max_in_memory:
+        max_in_memory = sys.maxsize
+
+    outstanding = []
+    it_going = {"v": True}  # Crummy, PY2-compat. way of boxing this flag
+    ready_ev = multiprocessing.Event()
 
     with _create_process_pool(processes=workers) as pool:
-        map_fun = pool.imap if ordered else pool.imap_unordered
-        result_iterator = map_fun(download_key, key_iterator)
-        for key_no, (key, content) in enumerate(result_iterator):
-            if True or key_no % 1000 == 0:
+        while 1:
+            # Accumulate all completed tasks (only take contiguous if `ordered`)
+            completed_idxs = []
+            for i, t in enumerate(outstanding):
+                if t.ready():
+                    completed_idxs.append(i)
+                elif ordered:
+                    break
+            completed = [outstanding[i].get(0) for i in completed_idxs]
+            for i in reversed(completed_idxs):
+                del outstanding[i]
+
+            # Enqueue tasks up to min of 2x worker count and `maxresults`
+            while it_going['v'] and len(outstanding) < min(max_in_memory, workers):
+                try:
+                    next_key = next(key_iterator)
+                except StopIteration:
+                    logger.debug("got StopIteration; breaking")
+                    it_going['v'] = False
+                    break
+                r = pool.apply_async(download_key, args=(next_key,),
+                                     callback=lambda _: ready_ev.set())
+                outstanding.append(r)
+
+            # Process and yield `completed`
+            for key, content in completed:
                 logger.info(
                     "yielding key #%i: %s, size %i (total %.1fMB)",
-                    key_no, key, len(content), total_size / 1024.0 ** 2
+                    key_no, key, len(content), sum_size / 1024.0 ** 2
                 )
-            yield key, content
-            if max_in_memory:
-                key_iterator.task_done()
-            total_size += len(content)
+                yield key, content
+                sum_size += len(content)
+                key_no += 1
 
-            if key_limit is not None and key_no + 1 >= key_limit:
-                # we were asked to output only a limited number of keys => we're done
+            # If any tasks enqueued, wait for a signal; else we're done
+            if outstanding:
+                ready_ev.wait(timeout=0.01)
+                ready_ev.clear()
+            else:
                 break
-    logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
+
+    logger.info("processed %i keys, total size %i" % (key_no + 1, sum_size))
 
 
 def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True):
@@ -622,21 +656,7 @@ def _create_process_pool(processes=1):
     else:
         logger.info("creating dummy pool")
         pool = DummyPool()
-    yield pool
-    pool.terminate()
-
-
-class LimitingIterator(object):
-     def __init__(self, underlying, limit):
-         self._it = iter(underlying)
-         self._sem = threading.BoundedSemaphore(limit)
-
-     def __iter__(self):
-         return self
-
-     def __next__(self):
-         self._sem.acquire()
-         return next(self._it)
-
-     def task_done(self):
-         self._sem.release()
+    try:
+        yield pool
+    finally:
+        pool.terminate()

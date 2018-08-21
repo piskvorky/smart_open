@@ -3,6 +3,7 @@ import logging
 import gzip
 import io
 import os
+import time
 import uuid
 import unittest
 
@@ -401,13 +402,64 @@ class IterBucketTest(unittest.TestCase):
         expected = ['key_%d' % x for x in range(num_keys)]
         self.assertEqual(sorted(keys), sorted(expected))
 
+    def test_respects_max_in_memory(self):
+        "Make sure no more than `max_in_memory` keys are consumed from path."
+
+        yield_cnt = {'val': 0}
+        orig_list_bucket = smart_open.s3._list_bucket
+
+        def counting_lb(*args, **kwargs):
+            for x in orig_list_bucket(*args, **kwargs):
+                yield_cnt['val'] = yield_cnt['val'] + 1
+                yield x
+
+        populate_bucket()
+        bucket = boto.s3.bucket.Bucket(name=BUCKET_NAME)
+        with mock.patch('smart_open.s3._list_bucket', new=counting_lb):
+            it = smart_open.s3.iter_bucket(bucket, workers=2, max_in_memory=3)
+            next(it)  # consume 1, so we expect 3 or 4 total
+        self.assertIn(yield_cnt['val'], (3, 4))
+
+    def test_propogates_exceptions_from_key_iterator(self):
+        """Ensure exceptions raised by bucket key iterator are propogated."""
+
+        orig_list_bucket = smart_open.s3._list_bucket
+        def throwing_lb(*args, **kwargs):
+            for i, x in enumerate(orig_list_bucket(*args, **kwargs)):
+                if i == 1:
+                    raise Exception("Test exception")
+                yield x
+
+        populate_bucket()
+        bucket = boto.s3.bucket.Bucket(name=BUCKET_NAME)
+        with self.assertRaises(Exception):
+            with mock.patch('smart_open.s3._list_bucket', new=throwing_lb):
+                list(smart_open.s3.iter_bucket(bucket))
+
+    def test_correctly_orders(self):
+
+        orig_download_fileobj = smart_open.s3._download_fileobj
+        def ooo_download(bucket, key_name):
+            if int(key_name.split("_")[1]) == 1:
+                time.sleep(2.5)
+            return orig_download_fileobj(bucket, key_name)
+
+        populate_bucket()
+        bucket = boto.s3.bucket.Bucket(name=BUCKET_NAME)
+        key_cnt = 0
+        with mock.patch('smart_open.s3._download_fileobj', new=ooo_download):
+            for i, (k, _) in enumerate(smart_open.s3.iter_bucket(bucket, ordered=True)):
+                self.assertEqual(k, f"key_{i}")
+                key_cnt += 1
+        self.assertGreaterEqual(key_cnt, 2)
+
     def test_old(self):
         """Does s3_iter_bucket work correctly?"""
         create_bucket_and_key()
 
         #
         # Use an old-school boto Bucket class for historical reasons.
-        #
+        
         mybucket = boto.s3.bucket.Bucket(name=BUCKET_NAME)
 
         # first, create some keys in the bucket
