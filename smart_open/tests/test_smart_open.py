@@ -13,6 +13,7 @@ import tempfile
 import os
 import sys
 import hashlib
+import unittest
 
 import boto3
 import mock
@@ -216,6 +217,14 @@ class SmartOpenHttpTest(unittest.TestCase):
         self.assertEqual(smart_open_object.read(), test_string)
 
 
+#
+# What exactly to patch here differs on _how_ we're opening the file.
+# See the _shortcut_open function for details.
+#
+_IO_OPEN = 'io.open'
+_BUILTIN_OPEN = 'smart_open.smart_open_lib.open'
+
+
 class SmartOpenReadTest(unittest.TestCase):
     """
     Test reading from files under various schemes.
@@ -224,9 +233,9 @@ class SmartOpenReadTest(unittest.TestCase):
 
     def test_shortcut(self):
         fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
-        with mock.patch('io.open') as mock_open:
+        with mock.patch('smart_open.smart_open_lib.open') as mock_open:
             smart_open.smart_open(fpath, 'r').read()
-        mock_open.assert_called_with(fpath, 'r')
+        mock_open.assert_called_with(fpath, 'r', buffering=-1)
 
     def test_open_with_keywords(self):
         """This test captures Issue #142."""
@@ -332,7 +341,7 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(b''.join(output), test_string)
 
     # TODO: add more complex test for file://
-    @mock.patch('io.open')
+    @mock.patch('smart_open.smart_open_lib.open')
     def test_file(self, mock_smart_open):
         """Is file:// line iterator called correctly?"""
         prefix = "file://"
@@ -341,29 +350,52 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode)
+        mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
         full_path = '/tmp/test#hash##more.txt'
         read_mode = "rb"
         smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode)
+        mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
         full_path = 'aa#aa'
         read_mode = "rb"
         smart_open_object = smart_open.smart_open(full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode)
+        mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
+        short_path = "~/tmp/test.txt"
+        full_path = os.path.expanduser(short_path)
+
+    @mock.patch(_IO_OPEN if six.PY2 else _BUILTIN_OPEN)
+    def test_file_errors(self, mock_smart_open):
+        prefix = "file://"
+        full_path = '/tmp/test.txt'
+        read_mode = "r"
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)
 
         smart_open_object = smart_open.smart_open(prefix+short_path, read_mode, errors='strict')
         smart_open_object.__iter__()
         # called with the correct expanded path?
-        mock_smart_open.assert_called_with(full_path, read_mode, errors='strict')
+        mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1, errors='strict')
+
+    @mock.patch(_BUILTIN_OPEN)
+    def test_file_buffering(self, mock_smart_open):
+        smart_open_object = smart_open.smart_open('/tmp/somefile', 'rb', buffering=0)
+        smart_open_object.__iter__()
+        # called with the correct expanded path?
+        mock_smart_open.assert_called_with('/tmp/somefile', 'rb', buffering=0)
+
+    @unittest.skip('smart_open does not currently accept additional positional args')
+    @mock.patch(_BUILTIN_OPEN)
+    def test_file_buffering2(self, mock_smart_open):
+        smart_open_object = smart_open.smart_open('/tmp/somefile', 'rb', 0)
+        smart_open_object.__iter__()
+        # called with the correct expanded path?
+        mock_smart_open.assert_called_with('/tmp/somefile', 'rb', buffering=0)
 
     # couldn't find any project for mocking up HDFS data
     # TODO: we want to test also a content of the files, not just fnc call params
@@ -555,17 +587,14 @@ class SmartOpenTest(unittest.TestCase):
     Test reading and writing from/into files.
 
     """
-    @mock.patch('smart_open.smart_open_lib.boto')
-    def test_file_mode_mock(self, mock_boto):
+    def setUp(self):
+        self.as_text = u'куда идём мы с пятачком - большой большой секрет'
+        self.as_bytes = self.as_text.encode('utf-8')
+        self.stringio = io.StringIO(self.as_text)
+        self.bytesio = io.BytesIO(self.as_bytes)
+
+    def test_file_mode_mock(self):
         """Are file:// open modes passed correctly?"""
-        as_text = u'куда идём мы с пятачком - большой большой секрет'
-        as_bytes = as_text.encode('utf-8')
-
-        # incorrect file mode
-        self.assertRaises(
-            NotImplementedError, smart_open.smart_open, "s3://bucket/key", "x"
-        )
-
         # correct read modes
         #
         # We always open files in binary mode first, but engage
@@ -573,47 +602,63 @@ class SmartOpenTest(unittest.TestCase):
         # _initially_ got opened, we now also check the end result: if the
         # contents got decoded correctly.
         #
-        with mock.patch('io.open', mock.Mock(return_value=io.StringIO(as_text))) as mock_open:
+
+    def test_text(self):
+        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
+        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("blah", "r", encoding='utf-8') as fin:
-                self.assertEqual(fin.read(), as_text)
-                mock_open.assert_called_with("blah", "r", encoding='utf-8')
+                self.assertEqual(fin.read(), self.as_text)
+                mock_open.assert_called_with("blah", "r", buffering=-1, encoding='utf-8')
 
-        with mock.patch('io.open', mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
+    def test_binary(self):
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
             with smart_open.smart_open("blah", "rb") as fin:
-                self.assertEqual(fin.read(), as_bytes)
-                mock_open.assert_called_with("blah", "rb")
+                self.assertEqual(fin.read(), self.as_bytes)
+                mock_open.assert_called_with("blah", "rb", buffering=-1)
 
+    def test_expanded_path(self):
         short_path = "~/blah"
         full_path = os.path.expanduser(short_path)
-        with mock.patch('io.open', mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open(short_path, "rb") as fin:
-                mock_open.assert_called_with(full_path, "rb")
+                mock_open.assert_called_with(full_path, "rb", buffering=-1)
+
+    def test_incorrect(self):
+        # incorrect file mode
+        self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "x")
 
         # correct write modes, incorrect scheme
         self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb+")
         self.assertRaises(NotImplementedError, smart_open.smart_open, "http:///blah.txt", "w")
         self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "wb+")
 
+    def test_write_utf8(self):
         # correct write mode, correct file:// URI
-        with mock.patch('io.open', mock.Mock(return_value=io.StringIO(as_text))) as mock_open:
+        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
+        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("blah", "w", encoding='utf-8') as fout:
-                mock_open.assert_called_with("blah", "w", encoding='utf-8')
-                fout.write(as_text)
+                mock_open.assert_called_with("blah", "w", buffering=-1, encoding='utf-8')
+                fout.write(self.as_text)
 
-        with mock.patch('io.open', mock.Mock(return_value=io.StringIO(as_text))) as mock_open:
+    def test_write_utf8_absolute_path(self):
+        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
+        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("/some/file.txt", "w", encoding='utf-8') as fout:
-                mock_open.assert_called_with("/some/file.txt", "w", encoding='utf-8')
-                fout.write(as_text)
+                mock_open.assert_called_with("/some/file.txt", "w", buffering=-1, encoding='utf-8')
+                fout.write(self.as_text)
 
-        with mock.patch('io.open', mock.Mock(return_value=io.StringIO(as_text))) as mock_open:
+    def test_append_utf8(self):
+        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
+        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("/some/file.txt", "w+", encoding='utf-8') as fout:
-                mock_open.assert_called_with("/some/file.txt", "w+", encoding='utf-8')
-                fout.write(as_text)
+                mock_open.assert_called_with("/some/file.txt", "w+", buffering=-1, encoding='utf-8')
+                fout.write(self.as_text)
 
-        with mock.patch('io.open', mock.Mock(return_value=io.BytesIO(as_bytes))) as mock_open:
+    def test_append_binary_absolute_path(self):
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
             with smart_open.smart_open("/some/file.txt", "wb+") as fout:
-                mock_open.assert_called_with("/some/file.txt", "wb+")
-                fout.write(as_bytes)
+                mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1)
+                fout.write(self.as_bytes)
 
     @mock.patch('boto3.Session')
     def test_s3_mode_mock(self, mock_session):

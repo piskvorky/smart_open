@@ -4,7 +4,6 @@
 import io
 import contextlib
 import functools
-import itertools
 import logging
 
 import boto3
@@ -377,6 +376,9 @@ multipart upload may fail")
         #
         self.raw = None
 
+    def flush(self):
+        pass
+
     #
     # Override some methods from io.IOBase.
     #
@@ -385,7 +387,7 @@ multipart upload may fail")
         if self._buf.tell():
             self._upload_next_part()
 
-        if self._total_bytes:
+        if self._total_bytes and self._mp:
             self._mp.complete(MultipartUpload={'Parts': self._parts})
             logger.debug("completed multipart upload")
         elif self._mp:
@@ -429,8 +431,6 @@ multipart upload may fail")
         do any HTTP transfer right away."""
         if not isinstance(b, six.binary_type):
             raise TypeError("input must be a binary string, got: %r", b)
-
-        # logger.debug("writing %r bytes to %r", len(b), self._buf)
 
         self._buf.write(b)
         self._total_bytes += len(b)
