@@ -119,6 +119,14 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "webhdfs")
         self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file?query_part_1&query_part2")
 
+    def test_uri_from_issue_223_works(self):
+        parsed_uri = smart_open_lib._parse_uri("s3://:@omax-mis/twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "omax-mis")
+        self.assertEqual(parsed_uri.key_id, "twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6")
+        self.assertEqual(parsed_uri.access_id, "")
+        self.assertEqual(parsed_uri.access_secret, "")
+
 
 class SmartOpenHttpTest(unittest.TestCase):
     """
