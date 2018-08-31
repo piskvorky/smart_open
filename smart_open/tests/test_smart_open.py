@@ -59,7 +59,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, None)
         self.assertEqual(parsed_uri.access_secret, None)
 
-        # correct uri, key contains slash
+    def test_s3_uri_contains_slash(self):
         parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey")
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
@@ -67,7 +67,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, None)
         self.assertEqual(parsed_uri.access_secret, None)
 
-        # correct uri with credentials
+    def test_s3_uri_with_credentials(self):
         parsed_uri = smart_open_lib._parse_uri("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
@@ -75,7 +75,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, "ACCESSID456")
         self.assertEqual(parsed_uri.access_secret, "acces/sse_cr-et")
 
-        # correct uri, contains credentials
+    def test_s3_uri_with_credentials2(self):
         parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/mykey")
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
@@ -83,7 +83,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, "accessid")
         self.assertEqual(parsed_uri.access_secret, "access/secret")
 
-        # correct uri, contains credentials and '@' in object name
+    def test_s3_uri_has_atmark_in_key_name(self):
         parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/my@ke@y")
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
@@ -91,7 +91,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, "accessid")
         self.assertEqual(parsed_uri.access_secret, "access/secret")
 
-        # correct uri, contains credentials, host, port and '@' in object name
+    def test_s3_uri_has_atmark_in_key_name2(self):
         parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y")
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
@@ -101,10 +101,10 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.host, "hostname")
         self.assertEqual(parsed_uri.port, 1234)
 
-        # incorrect uri - bucket can't contain '@'
+    def test_s3_invalid_url_atmark_in_bucket_name(self):
         self.assertRaises(RuntimeError, smart_open_lib._parse_uri, "s3://access_id:access_secret@my@bucket@port/mykey")
 
-        # incorrect uri - colon should separate secret and key
+    def test_s3_invalid_uri_missing_colon(self):
         self.assertRaises(RuntimeError, smart_open_lib._parse_uri, "s3://access_id@access_secret@mybucket@port/mykey")
 
     def test_webhdfs_uri(self):
