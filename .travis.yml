@@ -29,9 +29,8 @@ matrix:
         - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
 
 install:
+  - pip install --upgrade setuptools
   - pip install .[test]
-  - pip uninstall --yes botocore boto3  # workaround for avoid very similar conflict as in https://github.com/venth/aws-adfs/issues/52
-  - pip install boto3
   - pip freeze
 
 
