@@ -16,10 +16,6 @@ matrix:
         - SO_S3_URL: "s3://smart-open-py27-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py27-benchmark-results"
 
-    - python: '3.3'
-
-    - python: '3.4'
-
     - python: '3.5'
 
     - python: '3.6'
