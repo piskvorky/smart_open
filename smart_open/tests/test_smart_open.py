@@ -84,7 +84,28 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, "accessid")
         self.assertEqual(parsed_uri.access_secret, "access/secret")
 
-        # incorrect uri - only two '@' in uri are allowed
+        # correct uri, contains credentials and '@' in object name
+        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/my@ke@y")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "my@ke@y")
+        self.assertEqual(parsed_uri.access_id, "accessid")
+        self.assertEqual(parsed_uri.access_secret, "access/secret")
+
+        # correct uri, contains credentials, host, port and '@' in object name
+        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "dir/my@ke@y")
+        self.assertEqual(parsed_uri.access_id, "accessid")
+        self.assertEqual(parsed_uri.access_secret, "access/secret")
+        self.assertEqual(parsed_uri.host, "hostname")
+        self.assertEqual(parsed_uri.port, 1234)
+
+        # incorrect uri - bucket can't contain '@'
+        self.assertRaises(RuntimeError, smart_open_lib._parse_uri, "s3://access_id:access_secret@my@bucket@port/mykey")
+
+        # incorrect uri - colon should separate secret and key
         self.assertRaises(RuntimeError, smart_open_lib._parse_uri, "s3://access_id@access_secret@mybucket@port/mykey")
 
     def test_webhdfs_uri(self):
