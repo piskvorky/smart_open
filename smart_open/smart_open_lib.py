@@ -452,7 +452,8 @@ def _parse_uri_hdfs(parsed_uri):
     uri_path = parsed_uri.netloc + parsed_uri.path
     uri_path = "/" + uri_path.lstrip("/")
     if not uri_path:
-        raise RuntimeError("invalid HDFS URI: %s" % parsed_uri)
+        raise RuntimeError("invalid HDFS URI: %s" % str(parsed_uri))
+
     return Uri(scheme='hdfs', uri_path=uri_path)
 
 
@@ -462,42 +463,44 @@ def _parse_uri_webhdfs(parsed_uri):
     if parsed_uri.query:
         uri_path += "?" + parsed_uri.query
     if not uri_path:
-        raise RuntimeError("invalid WebHDFS URI: %s" % parsed_uri)
+        raise RuntimeError("invalid WebHDFS URI: %s" % str(parsed_uri))
+
     return Uri(scheme='webhdfs', uri_path=uri_path)
 
 
 def _parse_uri_s3x(parsed_uri):
     assert parsed_uri.scheme in ("s3", "s3n", "s3u")
 
-    bucket_id = (parsed_uri.netloc + parsed_uri.path).split('@')
-    key_id = None
     port = 443
     host = boto.config.get('s3', 'host', 's3.amazonaws.com')
     ordinary_calling_format = False
-    if len(bucket_id) == 1:
-        # URI without credentials: s3://bucket/object
-        bucket_id, key_id = bucket_id[0].split('/', 1)
-        # "None" credentials are interpreted as "look for credentials in other locations" by boto
-        access_id, access_secret = None, None
-    elif len(bucket_id) == 2 and len(bucket_id[0].split(':')) == 2:
-        # URI in full format: s3://key:secret@bucket/object
-        # access key id: [A-Z0-9]{20}
-        # secret access key: [A-Za-z0-9/+=]{40}
-        acc, bucket_id = bucket_id
-        access_id, access_secret = acc.split(':')
-        bucket_id, key_id = bucket_id.split('/', 1)
-    elif len(bucket_id) == 3 and len(bucket_id[0].split(':')) == 2:
-        # or URI in extended format: s3://key:secret@server[:port]@bucket/object
-        acc,  server, bucket_id = bucket_id
-        access_id, access_secret = acc.split(':')
-        bucket_id, key_id = bucket_id.split('/', 1)
-        server = server.split(':')
-        ordinary_calling_format = True
-        host = server[0]
-        if len(server) == 2:
-            port = int(server[1])
-    else:
-        # more than 2 '@' means invalid uri
+
+    # Common URI template [secret:key@][host[:port]@]bucket/object
+    try:
+        uri = parsed_uri.netloc + parsed_uri.path
+        # Separate authentication from URI if exist
+        if ':' in uri.split('@')[0]:
+            auth, uri = uri.split('@', 1)
+            access_id, access_secret = auth.split(':')
+        else:
+            # "None" credentials are interpreted as "look for credentials in other locations" by boto
+            access_id, access_secret = None, None
+
+        # Split [host[:port]@]bucket/path
+        host_bucket, key_id = uri.split('/', 1)
+        if '@' in host_bucket:
+            host_port, bucket_id = host_bucket.split('@')
+            ordinary_calling_format = True
+            if ':' in host_port:
+                server = host_port.split(':')
+                host = server[0]
+                if len(server) == 2:
+                    port = int(server[1])
+            else:
+                host = host_port
+        else:
+            bucket_id = host_bucket
+    except Exception:
         # Bucket names must be at least 3 and no more than 63 characters long.
         # Bucket names must be a series of one or more labels.
         # Adjacent labels are separated by a single period (.).
@@ -519,7 +522,7 @@ def _parse_uri_file(parsed_uri):
     uri_path = os.path.expanduser(uri_path)
 
     if not uri_path:
-        raise RuntimeError("invalid file URI: %s" % parsed_uri)
+        raise RuntimeError("invalid file URI: %s" % str(parsed_uri))
 
     return Uri(scheme='file', uri_path=uri_path)
 
