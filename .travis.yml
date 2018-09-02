@@ -16,10 +16,6 @@ matrix:
         - SO_S3_URL: "s3://smart-open-py27-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py27-benchmark-results"
 
-    - python: '3.3'
-
-    - python: '3.4'
-
     - python: '3.5'
 
     - python: '3.6'
@@ -37,9 +33,8 @@ matrix:
       sudo: required  # required for Python 3.7 (travis-ci/travis-ci#9069)
 
 install:
+  - pip install --upgrade setuptools
   - pip install .[test]
-  - pip uninstall --yes botocore boto3  # workaround for avoid very similar conflict as in https://github.com/venth/aws-adfs/issues/52
-  - pip install boto3
   - pip freeze
 
 
@@ -62,6 +57,8 @@ script:
       aws s3 cp .benchmarks/*/*.json ${SO_S3_RESULT_URL};
       aws s3 rm --recursive $SO_S3_URL;
     fi
+  - pip install numpy
+  - py.test integration-tests/test_207.py
 
 
 cache:

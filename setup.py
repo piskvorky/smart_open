@@ -18,7 +18,7 @@ def read(fname):
 
 tests_require = [
     'mock',
-    'moto==0.4.31',
+    'moto',
     'pathlib2',
     'responses',
 ]
@@ -49,7 +49,10 @@ setup(
         'boto >= 2.32',
         'bz2file',
         'requests',
-        'boto3'
+        # Temporary pin boto3 & botocore, because moto doesn't work with new version
+        # See https://github.com/spulec/moto/issues/1793
+        'boto3 < 1.8.0',
+        'botocore < 1.11.0'
     ],
     tests_require=tests_require,
     extras_require={
@@ -65,8 +68,6 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Topic :: System :: Distributed Computing',

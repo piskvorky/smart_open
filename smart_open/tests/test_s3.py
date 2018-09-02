@@ -333,6 +333,24 @@ class BufferedOutputBaseTest(unittest.TestCase):
             with smart_open.s3.open('thisbucketdoesntexist', 'mykey', 'wb') as fout:
                 fout.write(expected)
 
+    def test_double_close(self):
+        create_bucket_and_key()
+
+        text = u'там за туманами, вечными, пьяными'.encode('utf-8')
+        fout = smart_open.s3.open(BUCKET_NAME, 'key', 'wb')
+        fout.write(text)
+        fout.close()
+        fout.close()
+
+    def test_flush_close(self):
+        create_bucket_and_key()
+
+        text = u'там за туманами, вечными, пьяными'.encode('utf-8')
+        fout = smart_open.s3.open(BUCKET_NAME, 'key', 'wb')
+        fout.write(text)
+        fout.flush()
+        fout.close()
+
 
 class ClampTest(unittest.TestCase):
     def test(self):
