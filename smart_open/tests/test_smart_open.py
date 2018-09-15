@@ -358,21 +358,21 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1, errors='strict')
+        mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
         full_path = '/tmp/test#hash##more.txt'
         read_mode = "rb"
         smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1, errors='strict')
+        mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
         full_path = 'aa#aa'
         read_mode = "rb"
         smart_open_object = smart_open.smart_open(full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
-        mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1, errors='strict')
+        mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
     @mock.patch(_IO_OPEN if six.PY2 else _BUILTIN_OPEN)
     def test_file_errors(self, mock_smart_open):
@@ -392,7 +392,7 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open('/tmp/somefile', 'rb', buffering=0)
         smart_open_object.__iter__()
         # called with the correct expanded path?
-        mock_smart_open.assert_called_with('/tmp/somefile', 'rb', buffering=0, errors='strict')
+        mock_smart_open.assert_called_with('/tmp/somefile', 'rb', buffering=0)
 
     @unittest.skip('smart_open does not currently accept additional positional args')
     @mock.patch(_BUILTIN_OPEN)
@@ -400,7 +400,7 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open('/tmp/somefile', 'rb', 0)
         smart_open_object.__iter__()
         # called with the correct expanded path?
-        mock_smart_open.assert_called_with('/tmp/somefile', 'rb', buffering=0, errors='strict')
+        mock_smart_open.assert_called_with('/tmp/somefile', 'rb', buffering=0)
 
     # couldn't find any project for mocking up HDFS data
     # TODO: we want to test also a content of the files, not just fnc call params
@@ -626,14 +626,14 @@ class SmartOpenTest(unittest.TestCase):
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
             with smart_open.smart_open("blah", "rb") as fin:
                 self.assertEqual(fin.read(), self.as_bytes)
-                mock_open.assert_called_with("blah", "rb", buffering=-1, errors='strict')
+                mock_open.assert_called_with("blah", "rb", buffering=-1)
 
     def test_expanded_path(self):
         short_path = "~/blah"
         full_path = os.path.expanduser(short_path)
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open(short_path, "rb") as fin:
-                mock_open.assert_called_with(full_path, "rb", buffering=-1, errors='strict')
+                mock_open.assert_called_with(full_path, "rb", buffering=-1)
 
     def test_incorrect(self):
         # incorrect file mode
@@ -669,7 +669,7 @@ class SmartOpenTest(unittest.TestCase):
     def test_append_binary_absolute_path(self):
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
             with smart_open.smart_open("/some/file.txt", "wb+") as fout:
-                mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1, errors='strict')
+                mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1)
                 fout.write(self.as_bytes)
 
     @mock.patch('boto3.Session')
