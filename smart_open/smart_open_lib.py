@@ -334,7 +334,7 @@ def _open_binary_stream(uri, mode, **kw):
             # compression, if any, is determined by the filename extension (.gz, .bz2)
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
-        elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
+        elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
             return _s3_open_uri(parsed_uri, mode, **kw), filename
         elif parsed_uri.scheme in ("hdfs", ):
             if mode == 'rb':
@@ -404,10 +404,19 @@ def _parse_uri(uri_as_string):
     """
     Parse the given URI from a string.
 
-    Supported URI schemes are "file", "s3", "s3n", "s3u" and "hdfs".
+    Supported URI schemes are:
 
-      * s3 and s3n are treated the same way.
-      * s3u is s3 but without SSL.
+      * file
+      * hdfs
+      * http
+      * https
+      * s3
+      * s3a
+      * s3n
+      * s3u
+      * webhdfs
+
+    .s3, s3a and s3n are treated the same way.  s3u is s3 but without SSL.
 
     Valid URI examples::
 
@@ -435,7 +444,7 @@ def _parse_uri(uri_as_string):
         return _parse_uri_hdfs(parsed_uri)
     elif parsed_uri.scheme == "webhdfs":
         return _parse_uri_webhdfs(parsed_uri)
-    elif parsed_uri.scheme in ("s3", "s3n", "s3u"):
+    elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
         return _parse_uri_s3x(parsed_uri)
     elif parsed_uri.scheme in ('file', '', None):
         return _parse_uri_file(parsed_uri)
@@ -469,7 +478,7 @@ def _parse_uri_webhdfs(parsed_uri):
 
 
 def _parse_uri_s3x(parsed_uri):
-    assert parsed_uri.scheme in ("s3", "s3n", "s3u")
+    assert parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES
 
     port = 443
     host = boto.config.get('s3', 'host', 's3.amazonaws.com')
