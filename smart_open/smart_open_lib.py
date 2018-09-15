@@ -374,15 +374,28 @@ def _open_binary_stream(uri, mode, kwargs):
             return fobj, filename
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             endpoint_url = None if kwargs.host is None else 'http://' + kwargs.host
+
+            #
+            # TODO: this shouldn't be smart_open's responsibility.
+            #
+            if kwargs.s3_session is None:
+                import boto3
+                session = boto3.Session(
+                    profile_name=kwargs.profile_name,
+                    aws_access_key_id=parsed_uri.access_id,
+                    aws_secret_access_key=parsed_uri.access_secret,
+                )
+                resource = session.resource('s3', endpoint_url=endpoint_url)
+            else:
+                assert parsed_uri.access_id is None, 'aws_access_key_id conflicts with session'
+                assert parsed_uri.access_secret is None, 'aws_secret_access_key conflicts with session'
+                resource = kwargs.s3_session.resource('s3', endpoint_url=endpoint_url)
+
             fobj = smart_open_s3.open(
                 parsed_uri.bucket_id,
                 parsed_uri.key_id,
                 mode,
-                session=kwargs.s3_session,
-                profile_name=kwargs.profile_name,
-                aws_access_key_id=parsed_uri.access_id,
-                aws_secret_access_key=parsed_uri.access_secret,
-                endpoint_url=endpoint_url,
+                resource=resource,
                 min_part_size=kwargs.s3_min_part_size,
                 multipart_upload_kwargs=kwargs.s3_upload,
             )

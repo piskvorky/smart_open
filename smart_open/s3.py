@@ -56,26 +56,21 @@ def _clamp(value, minval, maxval):
 
 
 def open(bucket_id, key_id, mode,
+         resource=None,
          min_part_size=DEFAULT_MIN_PART_SIZE,
-         session=None,
-         profile_name=None,
-         endpoint_url=None,
-         aws_access_key_id=None,
-         aws_secret_access_key=None,
          multipart_upload_kwargs=None,
          ):
     """
     Open s3://{bucket_id}/{key_id}
 
+    Use the resource object to override the default session (e.g. profile name,
+    access keys, and endpoint URL).
+
     :param str bucket_id:
     :param str key_id:
     :param str mode: must be one of rb or wb
-    :param boto3.Session session:
-    :param str profile_name: The boto3 profile name to use when connecting to S3.
-    :param str endpoint_url:
-    :param str aws_access_key_id:
-    :param str aws_secret_access_key:
     :param int min_part_size: For writing only.
+    :param boto3.s3.ServiceResource resource: The resource for accessing S3.
     :param dict multipart_upload_kwargs: For writing only.
     """
     logger.debug('%r', locals())
@@ -86,22 +81,14 @@ def open(bucket_id, key_id, mode,
         fileobj = SeekableBufferedInputBase(
             bucket_id,
             key_id,
-            session=session,
-            profile_name=profile_name,
-            endpoint_url=endpoint_url,
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
+            resource=resource
         )
     elif mode == WRITE_BINARY:
         fileobj = BufferedOutputBase(
             bucket_id,
             key_id,
-            session=session,
-            profile_name=profile_name,
+            resource=resource,
             min_part_size=min_part_size,
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
-            endpoint_url=endpoint_url,
             multipart_upload_kwargs=multipart_upload_kwargs,
         )
     else:
@@ -323,20 +310,11 @@ class SeekableBufferedInputBase(BufferedInputBase):
                  key,
                  buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=BINARY_NEWLINE,
-                 session=None,
-                 profile_name=None,
-                 aws_access_key_id=None,
-                 aws_secret_access_key=None,
-                 endpoint_url=None,
+                 resource=None,
                  ):
-        if session is None:
-            session = boto3.Session(
-                profile_name=profile_name,
-                aws_access_key_id=aws_access_key_id,
-                aws_secret_access_key=aws_secret_access_key,
-            )
-        s3 = session.resource('s3', endpoint_url=endpoint_url)
-        self._object = s3.Object(bucket, key)
+        if resource is None:
+            resource = boto3.Session().resource('s3')
+        self._object = resource.Object(bucket, key)
         self._raw_reader = SeekableRawReader(self._object)
         self._content_length = self._object.content_length
         self._current_pos = 0
@@ -399,11 +377,7 @@ class BufferedOutputBase(io.BufferedIOBase):
     def __init__(self, 
                  bucket,
                  key,
-                 session=None,
-                 profile_name=None,
-                 aws_access_key_id=None,
-                 aws_secret_access_key=None,
-                 endpoint_url=None,
+                 resource=None,
                  min_part_size=DEFAULT_MIN_PART_SIZE,
                  multipart_upload_kwargs=None,
                  ):
@@ -411,22 +385,17 @@ class BufferedOutputBase(io.BufferedIOBase):
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
 
-        if session is None:
-            session = boto3.Session(
-                profile_name=profile_name,
-                aws_access_key_id=aws_access_key_id,
-                aws_secret_access_key=aws_secret_access_key,
-            )
-        s3 = session.resource('s3', endpoint_url=endpoint_url)
+        if resource is None:
+            resource = boto3.Session().resource('s3')
 
         #
         # https://stackoverflow.com/questions/26871884/how-can-i-easily-determine-if-a-boto-3-s3-bucket-resource-exists
         #
         try:
-            s3.meta.client.head_bucket(Bucket=bucket)
+            resource.meta.client.head_bucket(Bucket=bucket)
         except botocore.client.ClientError:
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
-        self._object = s3.Object(bucket, key)
+        self._object = resource.Object(bucket, key)
         self._min_part_size = min_part_size
 
         if multipart_upload_kwargs is None:

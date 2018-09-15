@@ -1029,15 +1029,14 @@ class S3OpenTest(unittest.TestCase):
         s3.create_bucket(Bucket='bucket')
         uri = smart_open_lib._parse_uri("s3://bucket/key.gz")
 
+        resource = mock.Mock()
+        session = mock.Mock(resource=mock.Mock(return_value=resource))
+
         with mock.patch('smart_open.smart_open_s3.open') as mock_open:
-            smart_open.smart_open("s3://bucket/key.gz", "wb")
+            smart_open.smart_open("s3://bucket/key.gz", "wb", s3_session=session)
             mock_open.assert_called_with(
                 'bucket', 'key.gz', 'wb',
-                aws_access_key_id=None,
-                aws_secret_access_key=None,
-                session=None,
-                profile_name=None,
-                endpoint_url=None,
+                resource=resource,
                 min_part_size=smart_open.smart_open_s3.DEFAULT_MIN_PART_SIZE,
                 multipart_upload_kwargs=None,
             )
@@ -1053,17 +1052,16 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.smart_open(key, "wb") as fout:
             fout.write(text.encode("utf-8"))
 
+        resource = mock.Mock()
+        session = mock.Mock(resource=mock.Mock(return_value=resource))
+
         with mock.patch('smart_open.smart_open_s3.open') as mock_open:
-            smart_open.smart_open(key, "r")
+            smart_open.smart_open(key, "r", s3_session=session)
             mock_open.assert_called_with(
                 'bucket', 'key.gz', 'rb',
-                aws_access_key_id=None,
-                aws_secret_access_key=None,
-                session=None,
-                profile_name=None,
-                endpoint_url=None,
-                multipart_upload_kwargs=None,
+                resource=resource,
                 min_part_size=smart_open.smart_open_s3.DEFAULT_MIN_PART_SIZE,
+                multipart_upload_kwargs=None,
             )
 
     @mock_s3
