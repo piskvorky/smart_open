@@ -111,7 +111,39 @@ bucket_id is only for S3.
 Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
 
 
-def smart_open(uri, mode="rb", **kw):
+Kwargs = collections.namedtuple(
+    'Kwargs',
+    (
+        'encoding',
+        'errors',
+        'ignore_extension',
+        'min_part_size',
+        'kerberos',
+        'user', 
+        'password',
+        'host',
+        's3_min_part_size',
+        'profile_name', 
+    )
+)
+"""Collects all the keyword arguments that we support.
+
+We pass these around often, so it's simpler to put them into a single namedtuple
+instead of listing them explicitly, or using the **kwargs catch-all.
+"""
+
+
+def _capture_kwargs(**kwargs):
+    filtered = {key: value for (key, value) in kwargs.items() if key in Kwargs._fields}
+    return Kwargs(**filtered)
+
+
+def smart_open(
+        uri, mode="rb", buffering=-1, encoding=None, errors=DEFAULT_ERRORS,
+        newline=None, closefd=True, opener=None,
+        ignore_extension=False, min_part_size=smart_open_webhdfs.WEBHDFS_MIN_PART_SIZE,
+        kerberos=False, user=None, password=None, profile_name=None,
+        host=None, s3_min_part_size=smart_open_s3.DEFAULT_MIN_PART_SIZE):
     """
     Open the given S3 / HDFS / filesystem file pointed to by `uri` for reading or writing.
 
@@ -129,6 +161,18 @@ def smart_open(uri, mode="rb", **kw):
        `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
     4. an instance of the boto.s3.key.Key class.
     5. an instance of the pathlib.Path class.
+
+    Keyword parameters include all those from io.open, as well as some specific to smart_open.
+
+    :param bool ignore_extension: If True, do not attempt to transparently compress/decompress.
+    :param int min_part_size:
+    :param bool kerberos: Whether to use Kerberos for authentication.
+    :param str user: The HTTP username.
+    :param str password: The HTTP password.
+    :param int s3_min_part_size:
+    :param str profile_name: The boto3 profile name to use when connecting to S3.
+
+    Some parameters affect certain modes only, e.g. kerberos only affects HTTP.
 
     Examples::
 
@@ -174,11 +218,12 @@ def smart_open(uri, mode="rb", **kw):
 
     """
     logger.debug('%r', locals())
+    kwargs = _capture_kwargs(**locals())
 
     if not isinstance(mode, six.string_types):
         raise TypeError('mode should be a string')
 
-    fobj = _shortcut_open(uri, mode, **kw)
+    fobj = _shortcut_open(uri, mode, kwargs)
     if fobj is not None:
         return fobj
 
@@ -190,25 +235,12 @@ def smart_open(uri, mode="rb", **kw):
     # If we change the default mode to be text, and match the normal behavior
     # of Py2 and 3, then the above assumption will be unnecessary.
     #
-    if kw.get('encoding') is not None and 'b' in mode:
+    if encoding is not None and 'b' in mode:
         mode = mode.replace('b', '')
 
     # Support opening ``pathlib.Path`` objects by casting them to strings.
     if PATHLIB_SUPPORT and isinstance(uri, pathlib.Path):
         uri = str(uri)
-
-    #
-    # Our API is very liberal with keyword arguments, making it a bit hard to
-    # manage them.  Capture the keyword arguments we'll be using in this
-    # function in advance to reduce the confusion in downstream functions.
-    #
-    # explicit_encoding is what we've been explicitly told to use.  encoding is
-    # what we'll actually end up using.  The two may be different if the user
-    # didn't actually specify the encoding.
-    #
-    ignore_extension = kw.pop('ignore_extension', False)
-    explicit_encoding = kw.get('encoding', None)
-    encoding = kw.pop('encoding', SYSTEM_ENCODING)
 
     #
     # This is how we get from the filename to the end result.  Decompression is
@@ -228,22 +260,22 @@ def smart_open(uri, mode="rb", **kw):
                        'a': 'ab', 'a+': 'ab+'}[mode]
     except KeyError:
         binary_mode = mode
-    binary, filename = _open_binary_stream(uri, binary_mode, **kw)
+    binary, filename = _open_binary_stream(uri, binary_mode, kwargs)
     if ignore_extension:
         decompressed = binary
     else:
         decompressed = _compression_wrapper(binary, filename, mode)
 
-    if 'b' not in mode or explicit_encoding is not None:
-        errors = kw.pop('errors', 'strict')
-        decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
+    actual_encoding = SYSTEM_ENCODING if kwargs.encoding is None else encoding
+    if 'b' not in mode or encoding is not None:
+        decoded = _encoding_wrapper(decompressed, mode, encoding=actual_encoding, errors=errors)
     else:
         decoded = decompressed
 
     return decoded
 
 
-def _shortcut_open(uri, mode, **kw):
+def _shortcut_open(uri, mode, kwargs):
     """Try to open the URI using the standard library io.open function.
 
     This can be much faster than the alternative of opening in binary mode and
@@ -258,7 +290,7 @@ def _shortcut_open(uri, mode, **kw):
 
     :param str uri: A string indicating what to open.
     :param str mode: The mode to pass to the open function.
-    :param dict kw:
+    :param Kwargs kwargs:
     :returns: The opened file
     :rtype: file
     """
@@ -270,8 +302,7 @@ def _shortcut_open(uri, mode, **kw):
         return None
 
     _, extension = P.splitext(parsed_uri.uri_path)
-    ignore_extension = kw.get('ignore_extension', False)
-    if extension in ('.gz', '.bz2') and not ignore_extension:
+    if extension in ('.gz', '.bz2') and not kwargs.ignore_extension:
         return None
 
     #
@@ -279,14 +310,14 @@ def _shortcut_open(uri, mode, **kw):
     #
     # buffering: 0: off; 1: on; negative number: use system default
     #
-    buffering = kw.get('buffering', -1)
+    buffering = kwargs.get('buffering', -1)
 
     open_kwargs = {}
-    errors = kw.get('errors')
+    errors = kwargs.get('errors')
     if errors is not None:
         open_kwargs['errors'] = errors
 
-    encoding = kw.get('encoding')
+    encoding = kwargs.get('encoding')
     if encoding is not None:
         open_kwargs['encoding'] = encoding
         mode = mode.replace('b', '')
@@ -304,14 +335,15 @@ def _shortcut_open(uri, mode, **kw):
     return io.open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
 
 
-def _open_binary_stream(uri, mode, **kw):
+def _open_binary_stream(uri, mode, kwargs):
     """Open an arbitrary URI in the specified binary mode.
 
     Not all modes are supported for all protocols.
 
     :arg uri: The URI to open.  May be a string, or something else.
     :arg str mode: The mode to open with.  Must be rb, wb or ab.
-    :arg kw: TODO: document this.
+    :param Kwargs kwargs:
+
     :returns: A file object and the filename
     :rtype: tuple
     """
@@ -335,7 +367,13 @@ def _open_binary_stream(uri, mode, **kw):
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
-            return _s3_open_uri(parsed_uri, mode, **kw), filename
+            endpoint_url = None if kwargs.host is None else 'http://' + kwargs.host
+            fobj = smart_open_s3.open(
+                parsed_uri.bucket_id, parsed_uri.key_id, mode, profile_name=kwargs.profile_name,
+                aws_access_key_id=parsed_uri.access_id, aws_secret_access_key=parsed_uri.access_secret,
+                endpoint_url=endpoint_url
+            )
+            return fobj, filename
         elif parsed_uri.scheme in ("hdfs", ):
             if mode == 'rb':
                 return smart_open_hdfs.CliRawInputBase(parsed_uri.uri_path), filename
@@ -345,9 +383,11 @@ def _open_binary_stream(uri, mode, **kw):
                 raise NotImplementedError(unsupported)
         elif parsed_uri.scheme in ("webhdfs", ):
             if mode == 'rb':
-                fobj = smart_open_webhdfs.BufferedInputBase(parsed_uri.uri_path, **kw)
+                fobj = smart_open_webhdfs.BufferedInputBase(parsed_uri.uri_path)
             elif mode == 'wb':
-                fobj = smart_open_webhdfs.BufferedOutputBase(parsed_uri.uri_path, **kw)
+                fobj = smart_open_webhdfs.BufferedOutputBase(
+                    parsed_uri.uri_path, min_part_size=kwargs.min_part_size
+                )
             else:
                 raise NotImplementedError(unsupported)
             return fobj, filename
@@ -358,46 +398,29 @@ def _open_binary_stream(uri, mode, **kw):
             #
             filename = P.basename(urlparse.urlparse(uri).path)
             if mode == 'rb':
-                return smart_open_http.BufferedInputBase(uri, **kw), filename
+                fobj = smart_open_http.BufferedInputBase(
+                    uri, kerberos=kwargs.kerberos,
+                    user=kwargs.user, password=kwargs.password
+                )
+                return fobj, filename
             else:
                 raise NotImplementedError(unsupported)
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif isinstance(uri, boto.s3.key.Key):
         logger.debug('%r', locals())
-        #
-        # TODO: handle boto3 keys as well
-        #
-        host = kw.pop('host', None)
-        if host is not None:
-            kw['endpoint_url'] = 'http://' + host
-        return smart_open_s3.open(uri.bucket.name, uri.name, mode, **kw), uri.name
+        endpoint_url = None if args.host is None else 'http://' + args.host
+        fobj = smart_open_s3.open(
+            uri.bucket.name, uri.name, mode, endpoint_url=endpoint_url,
+            min_part_size=kwargs.min_part_size, profile_name=kwargs.profile_name,
+        )
+        return fobj, uri.name
     elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
         filename = '/tmp/unknown'
         return uri, filename
     else:
         raise TypeError('don\'t know how to handle uri %s' % repr(uri))
-
-
-def _s3_open_uri(parsed_uri, mode, **kwargs):
-    logger.debug('s3_open_uri: %r', locals())
-    if mode in ('r', 'w'):
-        raise ValueError('this function can only open binary streams. '
-                         'Use smart_open.smart_open() to open text streams.')
-    elif mode not in ('rb', 'wb'):
-        raise NotImplementedError('unsupported mode: %r', mode)
-    if parsed_uri.access_id is not None:
-        kwargs['aws_access_key_id'] = parsed_uri.access_id
-    if parsed_uri.access_secret is not None:
-        kwargs['aws_secret_access_key'] = parsed_uri.access_secret
-
-    # Get an S3 host. It is required for sigv4 operations.
-    host = kwargs.pop('host', None)
-    if host is not None:
-        kwargs['endpoint_url'] = 'http://' + host
-
-    return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
 
 def _parse_uri(uri_as_string):
@@ -565,7 +588,7 @@ def _compression_wrapper(file_obj, filename, mode):
         return file_obj
 
 
-def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
+def _encoding_wrapper(fileobj, mode, encoding=SYSTEM_ENCODING, errors=DEFAULT_ERRORS):
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
@@ -590,10 +613,6 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     #
     if 'b' in mode and encoding is None:
         return fileobj
-
-    if encoding is None:
-        encoding = SYSTEM_ENCODING
-
     if mode[0] == 'r':
         decoder = codecs.getreader(encoding)
     else:
