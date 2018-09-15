@@ -16,26 +16,9 @@ the client (us) has to decompress them with the appropriate algorithm.
 
 
 class BufferedInputBase(io.BufferedIOBase):
-    """
-    Implement streamed reader from a web site.
-    Supports Kerberos and Basic HTTP authentication.
-    """
+    """Implement streamed reader from a web site."""
 
-    def __init__(self, url, mode='r', kerberos=False, user=None, password=None):
-        """
-        If Kerberos is True, will attempt to use the local Kerberos credentials.
-        Otherwise, will try to use "basic" HTTP authentication via username/password.
-
-        If none of those are set, will connect unauthenticated.
-        """
-        if kerberos:
-            import requests_kerberos
-            auth = requests_kerberos.HTTPKerberosAuth()
-        elif user is not None and password is not None:
-            auth = (user, password)
-        else:
-            auth = None
-
+    def __init__(self, url, mode='r', auth=None):
         self.response = requests.get(url, auth=auth, stream=True, headers=_HEADERS)
 
         if not self.response.ok:

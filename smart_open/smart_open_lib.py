@@ -432,11 +432,17 @@ def _open_binary_stream(uri, mode, kwargs):
             # with out compressed/uncompressed estimation.
             #
             filename = P.basename(urlparse.urlparse(uri).path)
+
+            if kwargs.kerberos:
+                import requests_kerberos
+                auth = requests_kerberos.HTTPKerberosAuth()
+            elif kwargs.user is not None and kwargs.password is not None:
+                auth = (kwargs.user, kwargs.password)
+            else:
+                auth = None
+
             if mode == 'rb':
-                fobj = smart_open_http.BufferedInputBase(
-                    uri, kerberos=kwargs.kerberos,
-                    user=kwargs.user, password=kwargs.password
-                )
+                fobj = smart_open_http.BufferedInputBase(uri, auth=auth)
                 return fobj, filename
             else:
                 raise NotImplementedError(unsupported)
