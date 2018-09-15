@@ -242,8 +242,8 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_shortcut(self):
         fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
         with mock.patch('smart_open.smart_open_lib.open') as mock_open:
-            smart_open.smart_open(fpath, 'r').read()
-        mock_open.assert_called_with(fpath, 'r', buffering=-1, errors='strict')
+            smart_open.smart_open(fpath, 'rb').read()
+        mock_open.assert_called_with(fpath, 'rb', buffering=-1)
 
     def test_open_with_keywords(self):
         """This test captures Issue #142."""
