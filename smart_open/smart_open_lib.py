@@ -114,6 +114,7 @@ Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
 Kwargs = collections.namedtuple(
     'Kwargs',
     (
+        'buffering',
         'encoding',
         'errors',
         'ignore_extension',
@@ -123,7 +124,9 @@ Kwargs = collections.namedtuple(
         'password',
         'host',
         's3_min_part_size',
-        'profile_name', 
+        's3_upload',
+        's3_session',
+        'profile_name',
     )
 )
 """Collects all the keyword arguments that we support.
@@ -141,9 +144,20 @@ def _capture_kwargs(**kwargs):
 def smart_open(
         uri, mode="rb", buffering=-1, encoding=None, errors=DEFAULT_ERRORS,
         newline=None, closefd=True, opener=None,
-        ignore_extension=False, min_part_size=smart_open_webhdfs.WEBHDFS_MIN_PART_SIZE,
-        kerberos=False, user=None, password=None, profile_name=None,
-        host=None, s3_min_part_size=smart_open_s3.DEFAULT_MIN_PART_SIZE):
+        #
+        # Parameters for built-in open function (Py3) above
+        #
+        ignore_extension=False,
+        min_part_size=smart_open_webhdfs.WEBHDFS_MIN_PART_SIZE,
+        kerberos=False,
+        user=None,
+        password=None,
+        profile_name=None,
+        host=None,
+        s3_min_part_size=smart_open_s3.DEFAULT_MIN_PART_SIZE,
+        s3_upload=None,
+        s3_session=None,
+        ):
     """
     Open the given S3 / HDFS / filesystem file pointed to by `uri` for reading or writing.
 
@@ -170,6 +184,8 @@ def smart_open(
     :param str user: The HTTP username.
     :param str password: The HTTP password.
     :param int s3_min_part_size:
+    :param dict s3_upload:
+    :param boto3.Session s3_session:
     :param str profile_name: The boto3 profile name to use when connecting to S3.
 
     Some parameters affect certain modes only, e.g. kerberos only affects HTTP.
@@ -305,21 +321,11 @@ def _shortcut_open(uri, mode, kwargs):
     if extension in ('.gz', '.bz2') and not kwargs.ignore_extension:
         return None
 
-    #
-    # https://docs.python.org/2/library/functions.html#open
-    #
-    # buffering: 0: off; 1: on; negative number: use system default
-    #
-    buffering = kwargs.get('buffering', -1)
-
     open_kwargs = {}
-    errors = kwargs.get('errors')
-    if errors is not None:
-        open_kwargs['errors'] = errors
-
-    encoding = kwargs.get('encoding')
-    if encoding is not None:
-        open_kwargs['encoding'] = encoding
+    if kwargs.errors is not None:
+        open_kwargs['errors'] = kwargs.errors
+    if kwargs.encoding is not None:
+        open_kwargs['encoding'] = kwargs.encoding
         mode = mode.replace('b', '')
 
     #
@@ -329,10 +335,10 @@ def _shortcut_open(uri, mode, kwargs):
     # kwargs, then we have no option other to use io.open.
     #
     if six.PY3:
-        return open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
+        return open(parsed_uri.uri_path, mode, buffering=kwargs.buffering, **open_kwargs)
     elif not open_kwargs:
-        return open(parsed_uri.uri_path, mode, buffering=buffering)
-    return io.open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
+        return open(parsed_uri.uri_path, mode, buffering=kwargs.buffering)
+    return io.open(parsed_uri.uri_path, mode, buffering=kwargs.buffering, **open_kwargs)
 
 
 def _open_binary_stream(uri, mode, kwargs):
@@ -369,9 +375,16 @@ def _open_binary_stream(uri, mode, kwargs):
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
             endpoint_url = None if kwargs.host is None else 'http://' + kwargs.host
             fobj = smart_open_s3.open(
-                parsed_uri.bucket_id, parsed_uri.key_id, mode, profile_name=kwargs.profile_name,
-                aws_access_key_id=parsed_uri.access_id, aws_secret_access_key=parsed_uri.access_secret,
-                endpoint_url=endpoint_url
+                parsed_uri.bucket_id,
+                parsed_uri.key_id,
+                mode,
+                session=kwargs.s3_session,
+                profile_name=kwargs.profile_name,
+                aws_access_key_id=parsed_uri.access_id,
+                aws_secret_access_key=parsed_uri.access_secret,
+                endpoint_url=endpoint_url,
+                min_part_size=kwargs.s3_min_part_size,
+                multipart_upload_kwargs=kwargs.s3_upload,
             )
             return fobj, filename
         elif parsed_uri.scheme in ("hdfs", ):

@@ -56,19 +56,27 @@ def _clamp(value, minval, maxval):
 
 
 def open(bucket_id, key_id, mode,
-         min_part_size=DEFAULT_MIN_PART_SIZE, profile_name=None,
-         endpoint_url=None, aws_access_key_id=None, aws_secret_access_key=None):
+         min_part_size=DEFAULT_MIN_PART_SIZE,
+         session=None,
+         profile_name=None,
+         endpoint_url=None,
+         aws_access_key_id=None,
+         aws_secret_access_key=None,
+         multipart_upload_kwargs=None,
+         ):
     """
     Open s3://{bucket_id}/{key_id}
 
     :param str bucket_id:
     :param str key_id:
     :param str mode: must be one of rb or wb
-    :param int min_part_size:
+    :param boto3.Session session:
     :param str profile_name: The boto3 profile name to use when connecting to S3.
     :param str endpoint_url:
     :param str aws_access_key_id:
     :param str aws_secret_access_key:
+    :param int min_part_size: For writing only.
+    :param dict multipart_upload_kwargs: For writing only.
     """
     logger.debug('%r', locals())
     if mode not in MODES:
@@ -76,14 +84,25 @@ def open(bucket_id, key_id, mode,
 
     if mode == READ_BINARY:
         fileobj = SeekableBufferedInputBase(
-            bucket_id, key_id, profile_name=profile_name, endpoint_url=endpoint_url,
-            aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key
+            bucket_id,
+            key_id,
+            session=session,
+            profile_name=profile_name,
+            endpoint_url=endpoint_url,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
         )
     elif mode == WRITE_BINARY:
         fileobj = BufferedOutputBase(
-            bucket_id, key_id, profile_name=profile_name, min_part_size=min_part_size,
-            aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key,
+            bucket_id,
+            key_id,
+            session=session,
+            profile_name=profile_name,
+            min_part_size=min_part_size,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
             endpoint_url=endpoint_url,
+            multipart_upload_kwargs=multipart_upload_kwargs,
         )
     else:
         assert False, 'unexpected mode: %r' % mode
@@ -151,11 +170,20 @@ class SeekableRawReader(object):
 
 
 class BufferedInputBase(io.BufferedIOBase):
-    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, profile_name=None,
-                 aws_access_key_id=None, aws_secret_access_key=None, endpoint_url=None):
-        session = kwargs.pop('s3_session', boto3.Session(profile_name=profile_name))
-        s3 = session.resource('s3', **kwargs)
+    def __init__(self,
+                 bucket,
+                 key,
+                 buffer_size=DEFAULT_BUFFER_SIZE,
+                 line_terminator=BINARY_NEWLINE,
+                 session=None,
+                 profile_name=None,
+                 aws_access_key_id=None,
+                 aws_secret_access_key=None,
+                 endpoint_url=None,
+                 ):
+        if session is None:
+            session = boto3.Session(profile_name=profile_name)
+        s3 = session.resource('s3', endpoint_url=endpoint_url)
         self._object = s3.Object(bucket, key)
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
@@ -290,18 +318,24 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, profile_name=None,
-                 aws_access_key_id=None, aws_secret_access_key=None, endpoint_url=None):
-        session = kwargs.pop(
-            's3_session',
-            boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        )
+    def __init__(self,
+                 bucket,
+                 key,
+                 buffer_size=DEFAULT_BUFFER_SIZE,
+                 line_terminator=BINARY_NEWLINE,
+                 session=None,
+                 profile_name=None,
+                 aws_access_key_id=None,
+                 aws_secret_access_key=None,
+                 endpoint_url=None,
+                 ):
+        if session is None:
+            session = boto3.Session(
+                profile_name=profile_name,
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+            )
         s3 = session.resource('s3', endpoint_url=endpoint_url)
-        session = boto3.Session(
-            profile_name=profile_name, aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key
-        )
         self._object = s3.Object(bucket, key)
         self._raw_reader = SeekableRawReader(self._object)
         self._content_length = self._object.content_length
@@ -362,15 +396,27 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key, min_part_size=DEFAULT_MIN_PART_SIZE, profile_name=None,
-                 aws_access_key_id=None, aws_secret_access_key=None, endpoint_url=None):
+    def __init__(self, 
+                 bucket,
+                 key,
+                 session=None,
+                 profile_name=None,
+                 aws_access_key_id=None,
+                 aws_secret_access_key=None,
+                 endpoint_url=None,
+                 min_part_size=DEFAULT_MIN_PART_SIZE,
+                 multipart_upload_kwargs=None,
+                 ):
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
-        session = boto3.Session(
-            profile_name=profile_name, aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key
-        )
+
+        if session is None:
+            session = boto3.Session(
+                profile_name=profile_name,
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+            )
         s3 = session.resource('s3', endpoint_url=endpoint_url)
 
         #
@@ -382,7 +428,10 @@ multipart upload may fail")
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
         self._object = s3.Object(bucket, key)
         self._min_part_size = min_part_size
-        self._mp = self._object.initiate_multipart_upload(**(s3_upload or {}))
+
+        if multipart_upload_kwargs is None:
+            multipart_upload_kwargs = {}
+        self._mp = self._object.initiate_multipart_upload(**multipart_upload_kwargs)
 
         self._buf = io.BytesIO()
         self._total_bytes = 0
