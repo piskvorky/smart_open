@@ -32,6 +32,8 @@ import importlib
 import io
 import warnings
 
+import boto3
+
 # Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
 # available. The builtin ``pathlib`` will be imported with higher precedence.
 for pathlib_module in ('pathlib', 'pathlib2'):
@@ -42,8 +44,8 @@ for pathlib_module in ('pathlib', 'pathlib2'):
     except ImportError:
         PATHLIB_SUPPORT = False
 
-from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
+from boto.compat import BytesIO, urlsplit, six
 import sys
 from ssl import SSLError
 from six.moves.urllib import parse as urlparse
@@ -114,19 +116,21 @@ Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
 Kwargs = collections.namedtuple(
     'Kwargs',
     (
+        'mode',
         'buffering',
         'encoding',
         'errors',
+        'newline',
+        'closefd',
+        'opener',
+        #
+        # Parameters for built-in open function above
+        #
         'ignore_extension',
+        'auth',
+        's3_resource',
+        's3_multipart_upload_kwargs',
         'min_part_size',
-        'kerberos',
-        'user', 
-        'password',
-        'host',
-        's3_min_part_size',
-        's3_upload',
-        's3_session',
-        'profile_name',
     )
 )
 """Collects all the keyword arguments that we support.
@@ -139,6 +143,55 @@ instead of listing them explicitly, or using the **kwargs catch-all.
 def _capture_kwargs(**kwargs):
     filtered = {key: value for (key, value) in kwargs.items() if key in Kwargs._fields}
     return Kwargs(**filtered)
+
+
+def _construct_auth(kerberos, user, password):
+    if kerberos:
+        import requests_kerberos
+        return requests_kerberos.HTTPKerberosAuth()
+    elif user is not None and password is not None:
+        return (user, password)
+    else:
+        return None
+
+
+def _construct_s3_resource(input_uri, session, profile_name, host):
+    logger.debug('locals: %r', locals())
+    if isinstance(input_uri, boto.s3.key.Key):
+        raise NotImplementedError('boto is no longer supported, please use boto3 instead')
+    elif not isinstance(input_uri, six.string_types):
+        return None
+
+    uri = _parse_uri(input_uri)
+    logger.debug('uri: %r', uri)
+
+    if host and uri.host:
+        warnings.warn('the host parameter conflicts with the URI')
+    elif uri.host:
+        host = uri.host
+
+    if host:
+        endpoint_url = 'http://' + host
+    else:
+        endpoint_url = None
+
+    logger.debug('endpoint_url: %r', endpoint_url)
+
+    if session is None:
+        session = boto3.Session(
+            profile_name=profile_name,
+            aws_access_key_id=uri.access_id,
+            aws_secret_access_key=uri.access_secret,
+        )
+        return session.resource('s3', endpoint_url=endpoint_url)
+
+    if uri.access_id:
+        warnings.warn('aws_access_key_id from URI conflicts with session, ignoring')
+
+    if uri.access_secret:
+        warnings.warn('aws_secret_access_key from URI conflicts with session, ignoring')
+
+    return session.resource('s3', endpoint_url=endpoint_url)
 
 
 def smart_open(
@@ -233,6 +286,42 @@ def smart_open(
       ...    print line
 
     """
+    warnings.warn('this function is deprecated, use smarter_open instead')
+
+    auth = _construct_auth(kerberos, user, password)
+    resource = _construct_s3_resource(uri, s3_session, profile_name, host)
+    if min_part_size is None:
+        min_part_size = s3_min_part_size
+
+    return smarter_open(
+        uri,
+        mode=mode,
+        buffering=buffering,
+        encoding=encoding,
+        errors=errors,
+        newline=newline,
+        closefd=closefd,
+        opener=opener,
+        ignore_extension=ignore_extension,
+        auth=auth,
+        s3_resource=resource,
+        s3_multipart_upload_kwargs=s3_upload,
+        min_part_size=min_part_size,
+    )
+
+
+def smarter_open(
+        uri, mode="r", buffering=-1, encoding=None, errors=DEFAULT_ERRORS,
+        newline=None, closefd=True, opener=None,
+        #
+        # Parameters for built-in open function (Py3) above
+        #
+        ignore_extension=False,
+        auth=None,
+        s3_resource=None,
+        s3_multipart_upload_kwargs=None,
+        min_part_size=None,
+        ):
     logger.debug('%r', locals())
     kwargs = _capture_kwargs(**locals())
 
@@ -382,31 +471,13 @@ def _open_binary_stream(uri, mode, kwargs):
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
-            endpoint_url = None if kwargs.host is None else 'http://' + kwargs.host
-
-            #
-            # TODO: this shouldn't be smart_open's responsibility.
-            #
-            if kwargs.s3_session is None:
-                import boto3
-                session = boto3.Session(
-                    profile_name=kwargs.profile_name,
-                    aws_access_key_id=parsed_uri.access_id,
-                    aws_secret_access_key=parsed_uri.access_secret,
-                )
-                resource = session.resource('s3', endpoint_url=endpoint_url)
-            else:
-                assert parsed_uri.access_id is None, 'aws_access_key_id conflicts with session'
-                assert parsed_uri.access_secret is None, 'aws_secret_access_key conflicts with session'
-                resource = kwargs.s3_session.resource('s3', endpoint_url=endpoint_url)
-
             fobj = smart_open_s3.open(
                 parsed_uri.bucket_id,
                 parsed_uri.key_id,
                 mode,
-                resource=resource,
-                min_part_size=kwargs.s3_min_part_size,
-                multipart_upload_kwargs=kwargs.s3_upload,
+                resource=kwargs.s3_resource,
+                min_part_size=kwargs.min_part_size,
+                multipart_upload_kwargs=kwargs.s3_multipart_upload_kwargs,
             )
             return fobj, filename
         elif parsed_uri.scheme in ("hdfs", ):
@@ -432,30 +503,13 @@ def _open_binary_stream(uri, mode, kwargs):
             # with out compressed/uncompressed estimation.
             #
             filename = P.basename(urlparse.urlparse(uri).path)
-
-            if kwargs.kerberos:
-                import requests_kerberos
-                auth = requests_kerberos.HTTPKerberosAuth()
-            elif kwargs.user is not None and kwargs.password is not None:
-                auth = (kwargs.user, kwargs.password)
-            else:
-                auth = None
-
             if mode == 'rb':
-                fobj = smart_open_http.BufferedInputBase(uri, auth=auth)
+                fobj = smart_open_http.BufferedInputBase(uri, auth=kwargs.auth)
                 return fobj, filename
             else:
                 raise NotImplementedError(unsupported)
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
-    elif isinstance(uri, boto.s3.key.Key):
-        logger.debug('%r', locals())
-        endpoint_url = None if args.host is None else 'http://' + args.host
-        fobj = smart_open_s3.open(
-            uri.bucket.name, uri.name, mode, endpoint_url=endpoint_url,
-            min_part_size=kwargs.min_part_size, profile_name=kwargs.profile_name,
-        )
-        return fobj, uri.name
     elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
         filename = '/tmp/unknown'
@@ -536,7 +590,7 @@ def _parse_uri_s3x(parsed_uri):
     assert parsed_uri.scheme in ("s3", "s3n", "s3u")
 
     port = 443
-    host = boto.config.get('s3', 'host', 's3.amazonaws.com')
+    host = boto.config.get('s3', 'host')
     ordinary_calling_format = False
 
     # Common URI template [secret:key@][host[:port]@]bucket/object

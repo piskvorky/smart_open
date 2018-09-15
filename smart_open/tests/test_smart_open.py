@@ -1149,22 +1149,22 @@ class S3OpenTest(unittest.TestCase):
 class ShortcutOpenTest(unittest.TestCase):
     def test_ignore_errors_when_reading_binary(self):
         kwargs = smart_open.smart_open_lib.Kwargs(
+            mode='rb',
             buffering=-1,
             encoding=None,
             errors='strict',
             ignore_extension=False,
+            newline='\n',
+            closefd=True,
+            opener=None,
             min_part_size=52428800,
-            kerberos=False, user=None,
-            password=None,
-            host=None,
-            s3_min_part_size=52428800,
-            s3_upload=None,
-            s3_session=None,
-            profile_name=None,
+            auth=(None, None),
+            s3_multipart_upload_kwargs=None,
+            s3_resource=None,
         )
 
         fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
-        with smart_open.smart_open_lib._shortcut_open(fpath, 'rb', kwargs) as infile:
+        with smart_open.smart_open_lib._shortcut_open(fpath, kwargs.mode, kwargs) as infile:
             data = infile.read()
         self.assertEqual(len(data), 3061)
         self.assertEqual(data[:10], b'\xd0\x92 \xd0\xbd\xd0\xb0\xd1\x87\xd0')
