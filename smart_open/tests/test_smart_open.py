@@ -1146,6 +1146,30 @@ class S3OpenTest(unittest.TestCase):
         self.assertEqual(text, actual)
 
 
+class ShortcutOpenTest(unittest.TestCase):
+    def test_ignore_errors_when_reading_binary(self):
+        kwargs = smart_open.smart_open_lib.Kwargs(
+            buffering=-1,
+            encoding=None,
+            errors='strict',
+            ignore_extension=False,
+            min_part_size=52428800,
+            kerberos=False, user=None,
+            password=None,
+            host=None,
+            s3_min_part_size=52428800,
+            s3_upload=None,
+            s3_session=None,
+            profile_name=None,
+        )
+
+        fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
+        with smart_open.smart_open_lib._shortcut_open(fpath, 'rb', kwargs) as infile:
+            data = infile.read()
+        self.assertEqual(len(data), 3061)
+        self.assertEqual(data[:10], b'\xd0\x92 \xd0\xbd\xd0\xb0\xd1\x87\xd0')
+
+
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
     unittest.main()

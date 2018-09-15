@@ -322,8 +322,17 @@ def _shortcut_open(uri, mode, kwargs):
         return None
 
     open_kwargs = {}
-    if kwargs.errors is not None:
+    if kwargs.errors is not None and 'b' not in mode:
+        #
+        # Ignore errors parameter if we're reading binary.  This logic is
+        # necessary because:
+        #
+        #   - open complains if you pass non-null errors in binary mode
+        #   - our default mode is rb (incompatible with default Python open)
+        #   - our default errors is non-null (to match default Python open)
+        #
         open_kwargs['errors'] = kwargs.errors
+
     if kwargs.encoding is not None:
         open_kwargs['encoding'] = kwargs.encoding
         mode = mode.replace('b', '')
