@@ -1,3 +1,14 @@
+* 1.7.0, 18th September 2018
+
+  - Drop support for `python3.3` and `python3.4` & workaround for broken `moto` (PR [#225](https://github.com/RaRe-Technologies/smart_open/pull/225), [@menshikh-iv](https://github.com/menshikh-iv))
+  - Add `s3a://` support for `S3`. Fix #210 (PR [#229](https://github.com/RaRe-Technologies/smart_open/pull/229), [@mpenkov](https://github.com/mpenkov))
+  - Allow use `@` in object (key) names for `S3`. Fix #94 (PRs [#204](https://github.com/RaRe-Technologies/smart_open/pull/204) & [#224](https://github.com/RaRe-Technologies/smart_open/pull/224), [@dkasyanov](https://github.com/dkasyanov) & [@mpenkov](https://github.com/mpenkov))
+  - Make `close` idempotent & add dummy `flush` for `S3` (PR [#212](https://github.com/RaRe-Technologies/smart_open/pull/212), [@mpenkov](https://github.com/mpenkov))
+  - Use built-in `open` whenever possible. Fix #207 (PR [#208](https://github.com/RaRe-Technologies/smart_open/pull/208), [@mpenkov](https://github.com/mpenkov))
+  - Fix undefined name `uri` in `smart_open_lib.py`. Fix #213 (PR [#214](https://github.com/RaRe-Technologies/smart_open/pull/214), [@cclauss](https://github.com/cclauss))
+  - Fix new unittests from [#212](https://github.com/RaRe-Technologies/smart_open/pull/212) (PR [#219](https://github.com/RaRe-Technologies/smart_open/pull/219), [@mpenkov](https://github.com/mpenkov))
+  - Reorganize README & make examples py2/py3 compatible (PR [#211](https://github.com/RaRe-Technologies/smart_open/pull/211), [@piskvorky](https://github.com/piskvorky))
+
 * 1.6.0, 29th June 2018
 
   - Migrate to `boto3`. Fix #43 (PR [#164](https://github.com/RaRe-Technologies/smart_open/pull/164), [@mpenkov](https://github.com/mpenkov))
