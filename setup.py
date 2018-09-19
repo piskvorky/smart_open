@@ -18,13 +18,13 @@ def read(fname):
 
 tests_require = [
     'mock',
-    'moto==0.4.31',
+    'moto==1.3.4',
     'pathlib2',
     'responses',
     # Temporary pin boto3 & botocore, because moto doesn't work with new version
     # See https://github.com/spulec/moto/issues/1793 and https://github.com/RaRe-Technologies/smart_open/issues/227
-    # 'boto3 < 1.8.0',
-    # 'botocore < 1.11.0'
+    'boto3 < 1.8.0',
+    'botocore < 1.11.0'
 ]
 
 setup(
