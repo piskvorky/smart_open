@@ -1,5 +1,9 @@
 * 1.7.0, 18th September 2018
 
+  - Unpin boto/botocore for regular installation. Fix #227 (PR [#232](https://github.com/RaRe-Technologies/smart_open/pull/232), [@menshikh-iv](https://github.com/menshikh-iv))
+
+* 1.7.0, 18th September 2018
+
   - Drop support for `python3.3` and `python3.4` & workaround for broken `moto` (PR [#225](https://github.com/RaRe-Technologies/smart_open/pull/225), [@menshikh-iv](https://github.com/menshikh-iv))
   - Add `s3a://` support for `S3`. Fix #210 (PR [#229](https://github.com/RaRe-Technologies/smart_open/pull/229), [@mpenkov](https://github.com/mpenkov))
   - Allow use `@` in object (key) names for `S3`. Fix #94 (PRs [#204](https://github.com/RaRe-Technologies/smart_open/pull/204) & [#224](https://github.com/RaRe-Technologies/smart_open/pull/224), [@dkasyanov](https://github.com/dkasyanov) & [@mpenkov](https://github.com/mpenkov))
