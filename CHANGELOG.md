@@ -1,4 +1,4 @@
-* 1.7.0, 18th September 2018
+* 1.7.1, 18th September 2018
 
   - Unpin boto/botocore for regular installation. Fix #227 (PR [#232](https://github.com/RaRe-Technologies/smart_open/pull/232), [@menshikh-iv](https://github.com/menshikh-iv))
 
