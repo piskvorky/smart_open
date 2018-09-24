@@ -128,6 +128,15 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, "")
         self.assertEqual(parsed_uri.access_secret, "")
 
+    def test_s3_uri_with_colon_in_key_name(self):
+        """ Correctly parse the s3 url if there is a colon in the key or dir """
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/my:key")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "mydir/my:key")
+        self.assertEqual(parsed_uri.access_id, None)
+        self.assertEqual(parsed_uri.access_secret, None)
+
 
 class SmartOpenHttpTest(unittest.TestCase):
     """

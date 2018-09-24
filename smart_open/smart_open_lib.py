@@ -84,7 +84,7 @@ DEFAULT_ERRORS = 'strict'
 
 
 Uri = collections.namedtuple(
-    'Uri', 
+    'Uri',
     (
         'scheme',
         'uri_path',
@@ -488,7 +488,7 @@ def _parse_uri_s3x(parsed_uri):
     try:
         uri = parsed_uri.netloc + parsed_uri.path
         # Separate authentication from URI if exist
-        if ':' in uri.split('@')[0]:
+        if ':' in uri.split('@')[0] and '@' in uri:
             auth, uri = uri.split('@', 1)
             access_id, access_secret = auth.split(':')
         else:
