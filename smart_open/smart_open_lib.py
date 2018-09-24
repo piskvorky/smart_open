@@ -26,8 +26,6 @@ import collections
 import logging
 import os
 import os.path as P
-import sys
-import requests
 import importlib
 import io
 import warnings
@@ -358,7 +356,7 @@ def _open_binary_stream(uri, mode, **kw):
             #
             filename = P.basename(urlparse.urlparse(uri).path)
             if mode == 'rb':
-                return smart_open_http.BufferedInputBase(uri, **kw), filename
+                return smart_open_http.SeekableBufferedInputBase(uri, **kw), filename
             else:
                 raise NotImplementedError(unsupported)
         else:

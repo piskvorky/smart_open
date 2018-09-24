@@ -10,6 +10,7 @@ import boto3
 import botocore.client
 import six
 
+from smart_open.util import START, CURRENT, END, WHENCE_CHOICES, DEFAULT_BUFFER_SIZE, _range_string, _clamp
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -24,10 +25,6 @@ try:
 except ImportError:
     logger.warning("multiprocessing could not be imported and won't be used")
 
-START = 0
-CURRENT = 1
-END = 2
-WHENCE_CHOICES = (START, CURRENT, END)
 
 DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 """Default minimum part size for S3 multipart uploads"""
@@ -39,22 +36,8 @@ MODES = (READ_BINARY, WRITE_BINARY)
 """Allowed I/O modes for working with S3."""
 
 BINARY_NEWLINE = b'\n'
-DEFAULT_BUFFER_SIZE = 128 * 1024
 
 SUPPORTED_SCHEMES = ("s3", "s3n", 's3u', "s3a")
-
-
-def _range_string(start, stop=None):
-    #
-    # https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.35
-    #
-    if stop is None:
-        return 'bytes=%d-' % start
-    return 'bytes=%d-%d' % (start, stop)
-
-
-def _clamp(value, minval, maxval):
-    return max(min(value, maxval), minval)
 
 
 def open(bucket_id, key_id, mode, **kwargs):
