@@ -509,7 +509,12 @@ def _parse_uri_s3x(parsed_uri):
                 host = host_port
         else:
             bucket_id = host_bucket
-    except Exception:
+    except ValueError:
+        raise
+    except Exception as e:
+        #
+        # TODO: what _specific_ exceptions do we intend to deal with here?
+        #
         # Bucket names must be at least 3 and no more than 63 characters long.
         # Bucket names must be a series of one or more labels.
         # Adjacent labels are separated by a single period (.).
