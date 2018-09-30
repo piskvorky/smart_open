@@ -152,6 +152,10 @@ class ParseUriTest(unittest.TestCase):
         as_string = 's3u://user:secret@host:port@mybucket/mykey.txt'
         self.assertRaises(ValueError, smart_open_lib._parse_uri, as_string)
 
+    def test_invalid_port2(self):
+        as_string = 's3u://user:secret@host:port:foo@mybucket/mykey.txt'
+        self.assertRaises(ValueError, smart_open_lib._parse_uri, as_string)
+
 
 class SmartOpenHttpTest(unittest.TestCase):
     """
