@@ -103,10 +103,10 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.port, 1234)
 
     def test_s3_invalid_url_atmark_in_bucket_name(self):
-        self.assertRaises(RuntimeError, smart_open_lib._parse_uri, "s3://access_id:access_secret@my@bucket@port/mykey")
+        self.assertRaises(ValueError, smart_open_lib._parse_uri, "s3://access_id:access_secret@my@bucket@port/mykey")
 
     def test_s3_invalid_uri_missing_colon(self):
-        self.assertRaises(RuntimeError, smart_open_lib._parse_uri, "s3://access_id@access_secret@mybucket@port/mykey")
+        self.assertRaises(ValueError, smart_open_lib._parse_uri, "s3://access_id@access_secret@mybucket@port/mykey")
 
     def test_webhdfs_uri(self):
         """Do webhdfs URIs parse correctly"""
@@ -136,6 +136,25 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.key_id, "mydir/my:key")
         self.assertEqual(parsed_uri.access_id, None)
         self.assertEqual(parsed_uri.access_secret, None)
+
+    def test_host_and_port(self):
+        as_string = 's3u://user:secret@host:1234@mybucket/mykey.txt'
+        uri = smart_open_lib._parse_uri(as_string)
+        self.assertEqual(uri.scheme, "s3u")
+        self.assertEqual(uri.bucket_id, "mybucket")
+        self.assertEqual(uri.key_id, "mykey.txt")
+        self.assertEqual(uri.access_id, "user")
+        self.assertEqual(uri.access_secret, "secret")
+        self.assertEqual(uri.host, "host")
+        self.assertEqual(uri.port, 1234)
+
+    def test_invalid_port(self):
+        as_string = 's3u://user:secret@host:port@mybucket/mykey.txt'
+        self.assertRaises(ValueError, smart_open_lib._parse_uri, as_string)
+
+    def test_invalid_port2(self):
+        as_string = 's3u://user:secret@host:port:foo@mybucket/mykey.txt'
+        self.assertRaises(ValueError, smart_open_lib._parse_uri, as_string)
 
 
 class SmartOpenHttpTest(unittest.TestCase):

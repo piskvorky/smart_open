@@ -478,44 +478,51 @@ def _parse_uri_webhdfs(parsed_uri):
 
 
 def _parse_uri_s3x(parsed_uri):
+    #
+    # Restrictions on bucket names and labels:
+    #
+    # - Bucket names must be at least 3 and no more than 63 characters long.
+    # - Bucket names must be a series of one or more labels.
+    # - Adjacent labels are separated by a single period (.).
+    # - Bucket names can contain lowercase letters, numbers, and hyphens.
+    # - Each label must start and end with a lowercase letter or a number.
+    #
+    # We use the above as a guide only, and do not perform any validation.  We
+    # let boto3 take care of that for us.
+    #
     assert parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES
 
     port = 443
     host = boto.config.get('s3', 'host', 's3.amazonaws.com')
     ordinary_calling_format = False
+    #
+    # These defaults tell boto3 to look for credentials elsewhere
+    #
+    access_id, access_secret = None, None
 
+    #
     # Common URI template [secret:key@][host[:port]@]bucket/object
-    try:
-        uri = parsed_uri.netloc + parsed_uri.path
-        # Separate authentication from URI if exist
-        if ':' in uri.split('@')[0] and '@' in uri:
-            auth, uri = uri.split('@', 1)
-            access_id, access_secret = auth.split(':')
-        else:
-            # "None" credentials are interpreted as "look for credentials in other locations" by boto
-            access_id, access_secret = None, None
+    #
+    # The urlparse function doesn't handle the above schema, so we have to do
+    # it ourselves.
+    #
+    uri = parsed_uri.netloc + parsed_uri.path
 
-        # Split [host[:port]@]bucket/path
-        host_bucket, key_id = uri.split('/', 1)
-        if '@' in host_bucket:
-            host_port, bucket_id = host_bucket.split('@')
-            ordinary_calling_format = True
-            if ':' in host_port:
-                server = host_port.split(':')
-                host = server[0]
-                if len(server) == 2:
-                    port = int(server[1])
-            else:
-                host = host_port
-        else:
-            bucket_id = host_bucket
-    except Exception:
-        # Bucket names must be at least 3 and no more than 63 characters long.
-        # Bucket names must be a series of one or more labels.
-        # Adjacent labels are separated by a single period (.).
-        # Bucket names can contain lowercase letters, numbers, and hyphens.
-        # Each label must start and end with a lowercase letter or a number.
-        raise RuntimeError("invalid S3 URI: %s" % str(parsed_uri))
+    if '@' in uri and ':' in uri.split('@')[0]:
+        auth, uri = uri.split('@', 1)
+        access_id, access_secret = auth.split(':')
+
+    head, key_id = uri.split('/', 1)
+    if '@' in head and ':' in head:
+        ordinary_calling_format = True
+        host_port, bucket_id = head.split('@')
+        host, port = host_port.split(':', 1)
+        port = int(port)
+    elif '@' in head:
+        ordinary_calling_format = True
+        host, bucket_id = head.split('@')
+    else:
+        bucket_id = head
 
     return Uri(
         scheme=parsed_uri.scheme, bucket_id=bucket_id, key_id=key_id,

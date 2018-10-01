@@ -47,7 +47,7 @@ What?
   ...     print(line)
 
   >>> # stream from WebHDFS
-  >>> for line in smart_open('webhdfs://host:port/user/hadoop/my_file.txt'):
+  >>> for line in smart_open('webhdfs://host:1234/user/hadoop/my_file.txt'):
   ...     print(line)
 
   >>> # stream content *into* S3 (write mode):
@@ -56,17 +56,17 @@ What?
   ...          fout.write(line)
 
   >>> # stream content *into* HDFS (write mode):
-  >>> with smart_open('hdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
+  >>> with smart_open('hdfs://host:1234/user/hadoop/my_file.txt', 'wb') as fout:
   ...     for line in [b'first line\n', b'second line\n', b'third line\n']:
   ...          fout.write(line)
 
   >>> # stream content *into* WebHDFS (write mode):
-  >>> with smart_open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
+  >>> with smart_open('webhdfs://host:1234/user/hadoop/my_file.txt', 'wb') as fout:
   ...     for line in [b'first line\n', b'second line\n', b'third line\n']:
   ...          fout.write(line)
 
   >>> # stream using a completely custom s3 server, like s3proxy:
-  >>> for line in smart_open('s3u://user:secret@host:port@mybucket/mykey.txt', 'rb'):
+  >>> for line in smart_open('s3u://user:secret@host:1234@mybucket/mykey.txt', 'rb'):
   ...    print(line.decode('utf8'))
 
   >>> # you can also use a boto.s3.key.Key instance directly:
