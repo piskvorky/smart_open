@@ -446,8 +446,10 @@ def _parse_uri(uri_as_string):
         return _parse_uri_webhdfs(parsed_uri)
     elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
         return _parse_uri_s3x(parsed_uri)
-    elif parsed_uri.scheme in ('file', '', None):
-        return _parse_uri_file(parsed_uri)
+    elif parsed_uri.scheme == 'file':
+        return _parse_uri_file(parsed_uri.netloc + parsed_uri.path)
+    elif parsed_uri.scheme in ('', None):
+        return _parse_uri_file(uri_as_string)
     elif parsed_uri.scheme.startswith('http'):
         return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
     else:
@@ -531,14 +533,12 @@ def _parse_uri_s3x(parsed_uri):
     )
 
 
-def _parse_uri_file(parsed_uri):
-    assert parsed_uri.scheme in (None, '', 'file')
-    uri_path = parsed_uri.netloc + parsed_uri.path
+def _parse_uri_file(input_path):
     # '~/tmp' may be expanded to '/Users/username/tmp'
-    uri_path = os.path.expanduser(uri_path)
+    uri_path = os.path.expanduser(input_path)
 
     if not uri_path:
-        raise RuntimeError("invalid file URI: %s" % str(parsed_uri))
+        raise RuntimeError("invalid file URI: %s" % input_path)
 
     return Uri(scheme='file', uri_path=uri_path)
 

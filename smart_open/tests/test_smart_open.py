@@ -156,6 +156,16 @@ class ParseUriTest(unittest.TestCase):
         as_string = 's3u://user:secret@host:port:foo@mybucket/mykey.txt'
         self.assertRaises(ValueError, smart_open_lib._parse_uri, as_string)
 
+    def test_leading_slash_local_file(self):
+        path = "/home/misha/hello.txt"
+        uri = smart_open_lib._parse_uri(path)
+        self.assertEqual(uri.scheme, "file")
+        self.assertEqual(uri.uri_path, path)
+
+        uri = smart_open_lib._parse_uri('//' + path)
+        self.assertEqual(uri.scheme, "file")
+        self.assertEqual(uri.uri_path, '//' + path)
+
 
 class SmartOpenHttpTest(unittest.TestCase):
     """
