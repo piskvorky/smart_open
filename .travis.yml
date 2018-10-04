@@ -29,7 +29,7 @@ matrix:
         - SO_DISABLE_MOCKS: "1"
         - SO_S3_URL: "s3://smart-open-py37-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
-        - BOTO_CONFIG="/dev/null"
+        - BOTO_CONFIG: "/dev/null"
       dist: xenial
       sudo: true
 
