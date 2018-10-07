@@ -86,7 +86,7 @@ DEFAULT_ERRORS = 'strict'
 
 
 Uri = collections.namedtuple(
-    'Uri', 
+    'Uri',
     (
         'scheme',
         'uri_path',
@@ -494,7 +494,7 @@ def _open_binary_stream(uri, mode, kwargs):
             # compression, if any, is determined by the filename extension (.gz, .bz2)
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
-        elif parsed_uri.scheme in ("s3", "s3n", 's3u'):
+        elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
             fobj = smart_open_s3.open(
                 parsed_uri.bucket_id,
                 parsed_uri.key_id,
@@ -546,10 +546,19 @@ def _parse_uri(uri_as_string):
     """
     Parse the given URI from a string.
 
-    Supported URI schemes are "file", "s3", "s3n", "s3u" and "hdfs".
+    Supported URI schemes are:
 
-      * s3 and s3n are treated the same way.
-      * s3u is s3 but without SSL.
+      * file
+      * hdfs
+      * http
+      * https
+      * s3
+      * s3a
+      * s3n
+      * s3u
+      * webhdfs
+
+    .s3, s3a and s3n are treated the same way.  s3u is s3 but without SSL.
 
     Valid URI examples::
 
@@ -577,10 +586,12 @@ def _parse_uri(uri_as_string):
         return _parse_uri_hdfs(parsed_uri)
     elif parsed_uri.scheme == "webhdfs":
         return _parse_uri_webhdfs(parsed_uri)
-    elif parsed_uri.scheme in ("s3", "s3n", "s3u"):
+    elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
         return _parse_uri_s3x(parsed_uri)
-    elif parsed_uri.scheme in ('file', '', None):
-        return _parse_uri_file(parsed_uri)
+    elif parsed_uri.scheme == 'file':
+        return _parse_uri_file(parsed_uri.netloc + parsed_uri.path)
+    elif parsed_uri.scheme in ('', None):
+        return _parse_uri_file(uri_as_string)
     elif parsed_uri.scheme.startswith('http'):
         return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
     else:
@@ -611,44 +622,51 @@ def _parse_uri_webhdfs(parsed_uri):
 
 
 def _parse_uri_s3x(parsed_uri):
-    assert parsed_uri.scheme in ("s3", "s3n", "s3u")
+    #
+    # Restrictions on bucket names and labels:
+    #
+    # - Bucket names must be at least 3 and no more than 63 characters long.
+    # - Bucket names must be a series of one or more labels.
+    # - Adjacent labels are separated by a single period (.).
+    # - Bucket names can contain lowercase letters, numbers, and hyphens.
+    # - Each label must start and end with a lowercase letter or a number.
+    #
+    # We use the above as a guide only, and do not perform any validation.  We
+    # let boto3 take care of that for us.
+    #
+    assert parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES
 
     port = 443
     host = boto.config.get('s3', 'host')
     ordinary_calling_format = False
+    #
+    # These defaults tell boto3 to look for credentials elsewhere
+    #
+    access_id, access_secret = None, None
 
+    #
     # Common URI template [secret:key@][host[:port]@]bucket/object
-    try:
-        uri = parsed_uri.netloc + parsed_uri.path
-        # Separate authentication from URI if exist
-        if ':' in uri.split('@')[0]:
-            auth, uri = uri.split('@', 1)
-            access_id, access_secret = auth.split(':')
-        else:
-            # "None" credentials are interpreted as "look for credentials in other locations" by boto
-            access_id, access_secret = None, None
+    #
+    # The urlparse function doesn't handle the above schema, so we have to do
+    # it ourselves.
+    #
+    uri = parsed_uri.netloc + parsed_uri.path
 
-        # Split [host[:port]@]bucket/path
-        host_bucket, key_id = uri.split('/', 1)
-        if '@' in host_bucket:
-            host_port, bucket_id = host_bucket.split('@')
-            ordinary_calling_format = True
-            if ':' in host_port:
-                server = host_port.split(':')
-                host = server[0]
-                if len(server) == 2:
-                    port = int(server[1])
-            else:
-                host = host_port
-        else:
-            bucket_id = host_bucket
-    except Exception:
-        # Bucket names must be at least 3 and no more than 63 characters long.
-        # Bucket names must be a series of one or more labels.
-        # Adjacent labels are separated by a single period (.).
-        # Bucket names can contain lowercase letters, numbers, and hyphens.
-        # Each label must start and end with a lowercase letter or a number.
-        raise RuntimeError("invalid S3 URI: %s" % str(parsed_uri))
+    if '@' in uri and ':' in uri.split('@')[0]:
+        auth, uri = uri.split('@', 1)
+        access_id, access_secret = auth.split(':')
+
+    head, key_id = uri.split('/', 1)
+    if '@' in head and ':' in head:
+        ordinary_calling_format = True
+        host_port, bucket_id = head.split('@')
+        host, port = host_port.split(':', 1)
+        port = int(port)
+    elif '@' in head:
+        ordinary_calling_format = True
+        host, bucket_id = head.split('@')
+    else:
+        bucket_id = head
 
     return Uri(
         scheme=parsed_uri.scheme, bucket_id=bucket_id, key_id=key_id,
@@ -657,14 +675,12 @@ def _parse_uri_s3x(parsed_uri):
     )
 
 
-def _parse_uri_file(parsed_uri):
-    assert parsed_uri.scheme in (None, '', 'file')
-    uri_path = parsed_uri.netloc + parsed_uri.path
+def _parse_uri_file(input_path):
     # '~/tmp' may be expanded to '/Users/username/tmp'
-    uri_path = os.path.expanduser(uri_path)
+    uri_path = os.path.expanduser(input_path)
 
     if not uri_path:
-        raise RuntimeError("invalid file URI: %s" % str(parsed_uri))
+        raise RuntimeError("invalid file URI: %s" % input_path)
 
     return Uri(scheme='file', uri_path=uri_path)
 

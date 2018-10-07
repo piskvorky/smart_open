@@ -41,6 +41,8 @@ MODES = (READ_BINARY, WRITE_BINARY)
 BINARY_NEWLINE = b'\n'
 DEFAULT_BUFFER_SIZE = 128 * 1024
 
+SUPPORTED_SCHEMES = ("s3", "s3n", 's3u', "s3a")
+
 
 def _range_string(start, stop=None):
     #
