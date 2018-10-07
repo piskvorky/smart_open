@@ -318,10 +318,34 @@ def smarter_open(
         #
         ignore_extension=False,
         auth=None,
+        min_part_size=None,
         s3_resource=None,
         s3_multipart_upload_kwargs=None,
-        min_part_size=None,
         ):
+    """Open `uri` for reading or writing.
+
+    Accepts the same parameters as the built-in open function from Python 3,
+    and a few extra parameters that enable you to customize smart_open
+    behavior.
+
+    Behaves mostly the same as the original smart_open function, with two major
+    differences:
+
+        1. Fewer parameters
+        2. Default mode is "r" (read text)
+
+    :param bool ignore_extension: Do not infer compression type from extension.
+    :param auth: The auth object to pass to the requests library when working
+        over HTTP.  May be a tuple containing the username and password,
+        a HTTPKerberosAuth, or anything else accepted by the requests library.
+    :param boto3.s3.ServiceResource s3_resource: The resource for accessing S3.
+    :param dict s3_multipart_upload_kwargs: Additional keyword parameters to
+        pass to the initiate_multipart_upload function when writing to S3.
+    :param int min_part_size: The minimum part size to use when working
+        with chunk-based storage systems e.g. S3.
+
+    :returns: A file-like object
+    """
     logger.debug('%r', locals())
     kwargs = _capture_kwargs(**locals())
 
