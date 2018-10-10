@@ -80,10 +80,13 @@ def open(bucket_id, key_id, mode, **kwargs):
 
 class RawReader(object):
     """Read an S3 object."""
-    def __init__(self, s3_object):
+    def __init__(self, s3_object, version_id=None):
         self.position = 0
         self._object = s3_object
-        self._body = s3_object.get()['Body']
+        if version_id:
+            self._body = s3_object.get(VersionId=version_id)['Body']
+        else:
+            self._body = s3_object.get()['Body']
 
     def read(self, size=-1):
         if size == -1:
