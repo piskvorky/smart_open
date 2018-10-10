@@ -94,9 +94,13 @@ class RawReader(object):
 class SeekableRawReader(object):
     """Read an S3 object."""
 
-    def __init__(self, s3_object):
+    def __init__(self, s3_object, version_id=None):
         self._object = s3_object
-        self._content_length = self._object.content_length
+        if version_id:
+            self._content_length = self._object.get(VersionId=version_id)['ContentLength']
+        else:
+            self._content_length = self._object.content_length
+        self._version_id = version_id
         self.seek(0)
 
     def seek(self, position):
@@ -124,7 +128,10 @@ class SeekableRawReader(object):
             #
             self._body = io.BytesIO()
         else:
-            self._body = self._object.get(Range=range_string)['Body']
+            getkwargs = dict(Range=range_string)
+            if self._version_id:
+                getkwargs['VersionId'] = self._version_id
+            self._body = self._object.get(**getkwargs)['Body']
 
     def read(self, size=-1):
         if self._position >= self._content_length:
@@ -139,15 +146,18 @@ class SeekableRawReader(object):
 
 class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, **kwargs):
+                 line_terminator=BINARY_NEWLINE, version_id=None, **kwargs):
         session = kwargs.pop(
             's3_session',
             boto3.Session(profile_name=kwargs.pop('profile_name', None))
         )
         s3 = session.resource('s3', **kwargs)
         self._object = s3.Object(bucket, key)
-        self._raw_reader = RawReader(self._object)
-        self._content_length = self._object.content_length
+        self._raw_reader = RawReader(self._object, version_id=version_id)
+        if version_id:
+            self._content_length = self._object.get(VersionId=self.version_id)['ContentLength']
+        else:
+            self._content_length = self._object.content_length
         self._current_pos = 0
         self._buffer = b''
         self._eof = False
@@ -280,15 +290,18 @@ class SeekableBufferedInputBase(BufferedInputBase):
     Implements the io.BufferedIOBase interface of the standard library."""
 
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, **kwargs):
+                 line_terminator=BINARY_NEWLINE, version_id=None, **kwargs):
         session = kwargs.pop(
             's3_session',
             boto3.Session(profile_name=kwargs.pop('profile_name', None))
         )
         s3 = session.resource('s3', **kwargs)
         self._object = s3.Object(bucket, key)
-        self._raw_reader = SeekableRawReader(self._object)
-        self._content_length = self._object.content_length
+        self._raw_reader = SeekableRawReader(self._object, version_id=version_id)
+        if version_id:
+            self._content_length = self._object.get(VersionId=version_id)['ContentLength']
+        else:
+            self._content_length = self._object.content_length
         self._current_pos = 0
         self._buffer = b''
         self._eof = False
@@ -346,7 +359,7 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key, min_part_size=DEFAULT_MIN_PART_SIZE, s3_upload=None, **kwargs):
+    def __init__(self, bucket, key, min_part_size=DEFAULT_MIN_PART_SIZE, s3_upload=None, version_id=None, **kwargs):
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
