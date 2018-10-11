@@ -617,6 +617,6 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     return decoder(fileobj, errors=errors)
 
 def _add_sheme_to_host(host):
-    if (host.startswith('http')):
+    if host.startswith('http://') or host.startswith('https://'):
         return host
     return 'http://' + host
