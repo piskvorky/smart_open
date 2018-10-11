@@ -1163,6 +1163,19 @@ class S3OpenTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(text, actual)
 
+class HostNameTest(unittest.TestCase):
+    def test_host_name(self):
+        host = 'http://a.com/b'
+        expected = 'http://a.com/b'
+        self.assertTrue(expected == smart_open_lib._add_sheme_to_host(host))
+        host = 'a.com/b'
+        self.assertTrue(expected == smart_open_lib._add_sheme_to_host(host))
+        host = 'https://a.com/b'
+        expected = 'https://a.com/b'
+        self.assertTrue(expected == smart_open_lib._add_sheme_to_host(host))
+        host = 'httpa.com/b'
+        expected = 'http://httpa.com/b'
+        self.assertTrue(expected == smart_open_lib._add_sheme_to_host(host))
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
