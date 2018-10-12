@@ -1164,18 +1164,30 @@ class S3OpenTest(unittest.TestCase):
         self.assertEqual(text, actual)
 
 class HostNameTest(unittest.TestCase):
-    def test_host_name(self):
+
+    def test_host_name_with_http(self):
         host = 'http://a.com/b'
         expected = 'http://a.com/b'
-        self.assertTrue(expected == smart_open_lib._add_sheme_to_host(host))
+        res = smart_open_lib._add_scheme_to_host(host)
+        self.assertEqual(expected, res)
+
+    def test_host_name_without_http(self):
         host = 'a.com/b'
-        self.assertTrue(expected == smart_open_lib._add_sheme_to_host(host))
+        expected = 'http://a.com/b'
+        res = smart_open_lib._add_scheme_to_host(host)
+        self.assertEqual(expected, res)
+
+    def test_host_name_with_https(self):
         host = 'https://a.com/b'
         expected = 'https://a.com/b'
-        self.assertTrue(expected == smart_open_lib._add_sheme_to_host(host))
+        res = smart_open_lib._add_scheme_to_host(host)
+        self.assertEqual(expected, res)
+
+    def test_host_name_without_http_prefix(self):
         host = 'httpa.com/b'
         expected = 'http://httpa.com/b'
-        self.assertTrue(expected == smart_open_lib._add_sheme_to_host(host))
+        res = smart_open_lib._add_scheme_to_host(host)
+        self.assertEqual(expected, res)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
