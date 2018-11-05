@@ -96,7 +96,10 @@ class SeekableRawReader(object):
 
     def __init__(self, s3_object):
         self._object = s3_object
-        self._content_length = self._object.content_length
+        try:
+            self._content_length = self._object.content_length
+        except botocore.client.ClientError:
+            raise ValueError('the s3 key %r does not exist, or is forbidden for access' % s3_object.key)
         self.seek(0)
 
     def seek(self, position):
