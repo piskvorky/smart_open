@@ -536,7 +536,7 @@ def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True):
 
     while True:
         # list_objects_v2 doesn't like a None value for ContinuationToken
-        # so we don't set if if we don't have one.
+        # so we don't set it if we don't have one.
         if ctoken:
             response = client.list_objects_v2(Bucket=bucket_name, Prefix=prefix, ContinuationToken=ctoken)
         else:
