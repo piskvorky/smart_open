@@ -74,7 +74,10 @@ What?
   >>> with smart_open(key, 'rb') as fin:
   ...     for line in fin:
   ...         print(line.decode('utf8'))
-
+ 
+  >>> # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
+  >>> with smart_open('s3://bucket-for-experiments/file.txt', 'wb', endpoint_url='https://ams3.digitaloceanspaces.com', profile_name='digitalocean') as fout:
+  ...     fout.write(b'here we stand')
 
 Why?
 ----
