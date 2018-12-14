@@ -431,7 +431,7 @@ multipart upload may fail")
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
-        if not isinstance(b, six.binary_type):
+        if not isinstance(b, six.binary_type) and not isinstance(b, bytearray):
             raise TypeError("input must be a binary string, got: %r", b)
 
         self._buf.write(b)
