@@ -1,6 +1,4 @@
 language: python
-dist: trusty
-sudo: false
 
 env:
   global:
@@ -31,7 +29,6 @@ matrix:
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
       dist: xenial
-      sudo: true
 
 
 install:
