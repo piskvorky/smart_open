@@ -396,7 +396,6 @@ class IterBucketTest(unittest.TestCase):
         expected = ['key_%d' % x for x in range(num_keys)]
         self.assertEqual(sorted(keys), sorted(expected))
 
-    @unittest.skip('this test takes too long for some unknown reason')
     def test_list_bucket_long(self):
         num_keys = 1010
         populate_bucket(num_keys=num_keys)
