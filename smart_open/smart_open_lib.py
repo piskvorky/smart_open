@@ -370,7 +370,7 @@ def _open_binary_stream(uri, mode, **kw):
         #
         host = kw.pop('host', None)
         if host is not None:
-            kw['endpoint_url'] = 'http://' + host
+            kw['endpoint_url'] = _add_scheme_to_host(host)
         return smart_open_s3.open(uri.bucket.name, uri.name, mode, **kw), uri.name
     elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
@@ -395,7 +395,7 @@ def _s3_open_uri(parsed_uri, mode, **kwargs):
     # Get an S3 host. It is required for sigv4 operations.
     host = kwargs.pop('host', None)
     if host is not None:
-        kwargs['endpoint_url'] = 'http://' + host
+        kwargs['endpoint_url'] = _add_scheme_to_host(host)
 
     return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
@@ -615,3 +615,8 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     else:
         decoder = codecs.getwriter(encoding)
     return decoder(fileobj, errors=errors)
+
+def _add_scheme_to_host(host):
+    if host.startswith('http://') or host.startswith('https://'):
+        return host
+    return 'http://' + host
