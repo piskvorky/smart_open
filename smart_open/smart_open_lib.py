@@ -59,6 +59,12 @@ else:
 
 import gzip
 
+COMPRESSED_EXT = ('.gz', '.bz2')  # supported compressed file extensions
+
+if not IS_PY2:
+    import lzma
+    COMPRESSED_EXT += '.xz',
+
 #
 # This module defines a function called smart_open so we cannot use
 # smart_open.submodule to reference to the submodules.
@@ -121,8 +127,8 @@ def smart_open(uri, mode="rb", **kw):
 
     The `uri` can be either:
 
-    1. a URI for the local filesystem (compressed ``.gz`` or ``.bz2`` files handled automatically):
-       `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
+    1. a URI for the local filesystem (compressed ``.gz``, ``.bz2`` or ``.xz`` files handled
+        automatically): `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
     2. a URI for HDFS: `hdfs:///some/path/lines.txt`
     3. a URI for Amazon's S3 (can also supply credentials inside the URI):
        `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
@@ -165,6 +171,8 @@ def smart_open(uri, mode="rb", **kw):
       ...    fout.write("hello world!\n")
       >>> with smart_open.smart_open('/home/radim/another.txt.bz2', 'wb') as fout:
       ...    fout.write("good bye!\n")
+      >>> with smart_open.smart_open('/home/radim/another.txt.xz', 'wb') as fout:
+      ...    fout.write("never say never!\n")
       >>> # stream from/to (compressed) local files with Expand ~ and ~user constructions:
       >>> for line in smart_open.smart_open('~/my_file.txt'):
       ...    print line
@@ -270,7 +278,7 @@ def _shortcut_open(uri, mode, **kw):
 
     _, extension = P.splitext(parsed_uri.uri_path)
     ignore_extension = kw.get('ignore_extension', False)
-    if extension in ('.gz', '.bz2') and not ignore_extension:
+    if extension in COMPRESSED_EXT and not ignore_extension:
         return None
 
     #
@@ -330,7 +338,7 @@ def _open_binary_stream(uri, mode, **kw):
 
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
-            # compression, if any, is determined by the filename extension (.gz, .bz2)
+            # compression, if any, is determined by the filename extension (.gz, .bz2, .xz)
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
@@ -431,6 +439,7 @@ def _parse_uri(uri_as_string):
       * ./local/path/file.gz
       * file:///home/user/file
       * file:///home/user/file.bz2
+      * file:///home/user/file.xz
     """
     if os.name == 'nt':
         # urlsplit doesn't work on Windows -- it parses the drive as the scheme...
@@ -552,7 +561,7 @@ def _need_to_buffer(file_obj, mode, ext):
         # .seekable, but have a .seek method instead.
         #
         is_seekable = hasattr(file_obj, 'seek')
-    return six.PY2 and mode.startswith('r') and ext in ('.gz', '.bz2') and not is_seekable
+    return six.PY2 and mode.startswith('r') and ext in COMPRESSED_EXT and not is_seekable
 
 
 def _compression_wrapper(file_obj, filename, mode):
@@ -576,6 +585,8 @@ def _compression_wrapper(file_obj, filename, mode):
         return BZ2File(file_obj, mode)
     elif ext == '.gz':
         return gzip.GzipFile(fileobj=file_obj, mode=mode)
+    elif ext == '.xz' and not IS_PY2:
+        return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
     else:
         return file_obj
 
