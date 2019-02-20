@@ -263,7 +263,6 @@ class SmartOpenHttpTest(unittest.TestCase):
         self.assertEqual(smart_open_object.read(), test_string)
 
     @responses.activate
-    @unittest.skipIf(six.PY2, 'Py2 does not have a built-in lzma codec')
     def test_http_xz(self):
         """Can open xz via http?"""
         test_string = b'Hello World Compressed.'
@@ -927,7 +926,6 @@ class CompressionFormatTest(unittest.TestCase):
         """Can write and read bz2?"""
         self._test_write_read('.bz2')
 
-    @unittest.skipIf(six.PY2, 'Py2 does not have a built-in lzma codec')
     def test_write_read_xz(self):
         """Can write and read xz2?"""
         self._test_write_read('.xz')

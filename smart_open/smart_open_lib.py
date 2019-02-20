@@ -59,12 +59,14 @@ else:
     from bz2 import BZ2File
 
 import gzip
-
-COMPRESSED_EXT = ('.gz', '.bz2')  # supported compressed file extensions
-
-if not IS_PY2:
+try:
     import lzma
-    COMPRESSED_EXT += '.xz',
+except ImportError:
+    # py<3.3
+    from backports import lzma
+
+
+COMPRESSED_EXT = ('.gz', '.bz2', '.xz')  # supported compressed file extensions
 
 #
 # This module defines a function called smart_open so we cannot use
@@ -586,7 +588,7 @@ def _compression_wrapper(file_obj, filename, mode):
         return BZ2File(file_obj, mode)
     elif ext == '.gz':
         return gzip.GzipFile(fileobj=file_obj, mode=mode)
-    elif ext == '.xz' and not IS_PY2:
+    elif ext == '.xz':
         return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
     else:
         return file_obj
