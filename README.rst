@@ -14,7 +14,7 @@ What?
 
 ``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS, WebHDFS, HTTP, or local (compressed) files. It's a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
-``smart_open`` is well-tested, well-documented and sports a simple, Pythonic API:
+``smart_open`` is well-tested, well-documented, and has a simple, Pythonic API:
 
 .. code-block:: python
 
@@ -99,6 +99,11 @@ Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pyp
     python setup.py install
 
 To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>`_ (``pip install mock moto responses``). The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
+
+Supported archive types
+-----------------------
+``smart_open`` allows reading and writing gzip, bzip2 and xz files. They are transparently handled
+over HTTP, too.
 
 S3-Specific Options
 -------------------
