@@ -103,7 +103,7 @@ To run the unit tests (optional), you'll also need to install `mock <https://pyp
 Supported archive types
 -----------------------
 ``smart_open`` allows reading and writing gzip, bzip2 and xz files. They are transparently handled
-over HTTP, too.
+over HTTP, S3, and other protocols, too.
 
 S3-Specific Options
 -------------------
