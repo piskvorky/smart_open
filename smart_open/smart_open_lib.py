@@ -45,7 +45,6 @@ for pathlib_module in ('pathlib', 'pathlib2'):
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
 import sys
-from ssl import SSLError
 from six.moves.urllib import parse as urlparse
 
 
