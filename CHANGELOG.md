@@ -1,3 +1,7 @@
+* Unreleased
+
+  - Add support for .xz / lzma (PR [#262](https://github.com/RaRe-Technologies/smart_open/pull/262), [@vmarkovtsev](https://github.com/vmarkovtsev))
+
 * 1.8.0, 17th January 2019
 
   - Add `python3.7` support (PR [#240](https://github.com/RaRe-Technologies/smart_open/pull/240), [@menshikh-iv](https://github.com/menshikh-iv))
