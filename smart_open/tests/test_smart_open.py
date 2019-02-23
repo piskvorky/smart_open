@@ -6,6 +6,7 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 
+from bz2 import compress as bzip2_compress, decompress as bzip2_decompress
 import io
 import unittest
 import logging
@@ -200,92 +201,173 @@ class SmartOpenHttpTest(unittest.TestCase):
         self.assertTrue(actual_request.headers['Authorization'].startswith('Basic '))
 
     @responses.activate
-    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
-    def test_http_gz(self):
-        """Can open gzip via http?"""
-        fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
-        with open(fpath, 'rb') as infile:
-            data = infile.read()
-
-        with gzip.GzipFile(fpath) as fin:
-            expected_hash = hashlib.md5(fin.read()).hexdigest()
-
-        responses.add(responses.GET, "http://127.0.0.1/data.gz", body=data, stream=True)
-        smart_open_object = smart_open.smart_open("http://127.0.0.1/data.gz?some_param=some_val")
-
-        m = hashlib.md5(smart_open_object.read())
-        # decompress the gzip and get the same md5 hash
-        self.assertEqual(m.hexdigest(), expected_hash)
-
-    @responses.activate
-    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
-    def test_http_gz_noquerystring(self):
-        """Can open gzip via http?"""
-        fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
-        with open(fpath, 'rb') as infile:
-            data = infile.read()
-
-        with gzip.GzipFile(fpath) as fin:
-            expected_hash = hashlib.md5(fin.read()).hexdigest()
-
-        responses.add(responses.GET, "http://127.0.0.1/data.gz", body=data, stream=True)
-        smart_open_object = smart_open.smart_open("http://127.0.0.1/data.gz")
-
-        m = hashlib.md5(smart_open_object.read())
-        # decompress the gzip and get the same md5 hash
-        self.assertEqual(m.hexdigest(), expected_hash)
-
-    @responses.activate
-    def test_http_bz2(self):
-        """Can open bz2 via http?"""
-        test_string = b'Hello World Compressed.'
-        #
-        # TODO: why are these tests writing to temporary files?  We can do the
-        # bz2 compression in memory.
-        #
-        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as infile:
-            test_file = infile.name
-
+    def _test_compressed_http(self, suffix, query):
+        """Can open <suffix> via http?"""
+        test_string = b'Hello World Compressed.' * 10000
+        test_file = six.BytesIO()
+        test_file.name = 'data' + suffix
         with smart_open.smart_open(test_file, 'wb') as outfile:
             outfile.write(test_string)
+        compressed_data = test_file.getvalue()
+        # check that the string was actually compressed
+        self.assertNotEqual(compressed_data, test_string)
 
-        with open(test_file, 'rb') as infile:
-            compressed_data = infile.read()
-
-        if os.path.isfile(test_file):
-            os.unlink(test_file)
-
-        responses.add(responses.GET, "http://127.0.0.1/data.bz2", body=compressed_data, stream=True)
-        smart_open_object = smart_open.smart_open("http://127.0.0.1/data.bz2")
-
-        # decompress the bzip2 and get the same md5 hash
-        self.assertEqual(smart_open_object.read(), test_string)
-
-    @responses.activate
-    def test_http_xz(self):
-        """Can open xz via http?"""
-        test_string = b'Hello World Compressed.'
-        #
-        # TODO: why are these tests writing to temporary files?  We can do the
-        # lzma compression in memory.
-        #
-        with tempfile.NamedTemporaryFile('wb', suffix='.xz', delete=False) as infile:
-            test_file = infile.name
-
-        with smart_open.smart_open(test_file, 'wb') as outfile:
-            outfile.write(test_string)
-
-        with open(test_file, 'rb') as infile:
-            compressed_data = infile.read()
-
-        if os.path.isfile(test_file):
-            os.unlink(test_file)
-
-        responses.add(responses.GET, "http://127.0.0.1/data.xz", body=compressed_data, stream=True)
-        smart_open_object = smart_open.smart_open("http://127.0.0.1/data.xz")
+        responses.add(responses.GET, 'http://127.0.0.1/data' + suffix, body=compressed_data, stream=True)
+        smart_open_object = smart_open.smart_open(
+            'http://127.0.0.1/data%s%s' % (suffix, '?some_param=some_val' if query else ''))
 
         # decompress the xz and get the same md5 hash
         self.assertEqual(smart_open_object.read(), test_string)
+
+    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
+    def test_http_gz(self):
+        """Can open gzip via http?"""
+        self._test_compressed_http(".gz", False)
+
+    def test_http_bz2(self):
+        """Can open bzip2 via http?"""
+        self._test_compressed_http(".bz2", False)
+
+    def test_http_xz(self):
+        """Can open xz via http?"""
+        self._test_compressed_http(".xz", False)
+
+    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
+    def test_http_gz_query(self):
+        """Can open gzip via http with a query appended to URI?"""
+        self._test_compressed_http(".gz", True)
+
+    def test_http_bz2_query(self):
+        """Can open bzip2 via http with a query appended to URI?"""
+        self._test_compressed_http(".bz2", True)
+
+    def test_http_xz_query(self):
+        """Can open xz via http with a query appended to URI?"""
+        self._test_compressed_http(".xz", True)
+
+
+class SmartOpenFileObjTest(unittest.TestCase):
+    """
+    Test passing raw file objects.
+    """
+
+    class IOReadWrapper(object):
+        def __init__(self):
+            self.fobj = six.BytesIO()
+
+        def read(self, size=-1):
+            return self.fobj.read(size)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            self.close()
+
+        def close(self):
+            self.fobj.close()
+
+    class IOWriteWrapper(object):
+        def __init__(self):
+            self.fobj = six.BytesIO()
+
+        def write(self, b):
+            return self.fobj.write(b)
+
+        def close(self):
+            self.fobj.close()
+
+    def test_read(self):
+        file = self.IOReadWrapper()
+        text = 'Hello, world!'
+        file.fobj.write(text.encode())
+        file.fobj.seek(0)
+        with smart_open.smart_open(file, 'r') as sf:
+            data = sf.read()
+        self.assertEqual(data, text)
+        file = self.IOWriteWrapper()  # no `read()`
+        file.fobj.write(text.encode())
+        file.fobj.seek(0)
+        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'r'))
+
+    def test_write(self):
+        file = self.IOWriteWrapper()
+        text = 'Hello, world!'
+        with smart_open.smart_open(file, 'w') as sf:
+            sf.write(text)
+            self.assertEqual(file.fobj.getvalue(), text.encode())
+        file = self.IOReadWrapper()  # no `write()`
+        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'w'))
+
+    def test_read_write(self):
+        file = six.BytesIO()
+        text = 'Hello, world!'
+        file.write(text.encode())
+        file.seek(0)
+        with smart_open.smart_open(file, 'r+') as sf:
+            data = sf.read()
+            sf.write("hello")
+        self.assertEqual(data, text)
+
+        file = six.BytesIO()
+        file.write(text.encode())
+        file.seek(0)
+        with smart_open.smart_open(file, 'w+') as sf:
+            data = sf.read()
+            sf.write("hello")
+        self.assertEqual(data, text)
+
+        file = six.BytesIO()
+        file.write(text.encode())
+        file.seek(0)
+        with smart_open.smart_open(file, 'a+') as sf:
+            data = sf.read()
+            sf.write("hello")
+        self.assertEqual(data, text)
+
+        file = self.IOReadWrapper()  # no `write()`
+        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'r+'))
+        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'w+'))
+        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'a+'))
+
+        file = self.IOWriteWrapper()  # no `read()`
+        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'r+'))
+        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'w+'))
+        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'a+'))
+
+    def test_append(self):
+        file = self.IOWriteWrapper()
+        text = 'Hello, world!'
+        with smart_open.smart_open(file, 'a') as sf:
+            sf.write(text)
+            self.assertEqual(file.fobj.getvalue(), text.encode())
+        file = self.IOReadWrapper()  # no `write()`
+        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'a'))
+
+    def test_name_read(self):
+        text = 'Hello, world!' * 1000
+        file = six.BytesIO()
+        file.write(bzip2_compress(text.encode()))
+        file.seek(0)
+        file.name = 'data.bz2'
+        with smart_open.smart_open(file, 'r') as sf:
+            data = sf.read()
+            self.assertEqual(data, text)
+
+    def test_name_write(self):
+        text = 'Hello, world!' * 1000
+        file = six.BytesIO()
+        file.name = 'data.bz2'
+        with smart_open.smart_open(file, 'w') as sf:
+            sf.write(text)
+        self.assertEqual(bzip2_decompress(file.getvalue()), text.encode())
+
+    def test_name_read_write(self):
+        file = six.BytesIO()
+        file.name = 'data.bz2'
+        self.assertRaises(ValueError, lambda: smart_open.smart_open(file, 'r+'))
+        self.assertRaises(ValueError, lambda: smart_open.smart_open(file, 'w+'))
+        self.assertRaises(ValueError, lambda: smart_open.smart_open(file, 'a+'))
 
 
 #

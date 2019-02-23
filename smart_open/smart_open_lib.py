@@ -381,12 +381,31 @@ def _open_binary_stream(uri, mode, **kw):
         if host is not None:
             kw['endpoint_url'] = _add_scheme_to_host(host)
         return smart_open_s3.open(uri.bucket.name, uri.name, mode, **kw), uri.name
-    elif hasattr(uri, 'read'):
+    elif _is_stream(uri, mode):
         # simply pass-through if already a file-like
-        filename = '/tmp/unknown'
+        filename = getattr(uri, 'name', 'unknown')
         return uri, filename
     else:
         raise TypeError('don\'t know how to handle uri %s' % repr(uri))
+
+
+def _is_stream(fileobj, mode):
+    """
+    Detect whether the specified object is a file object with required capabilities
+    implied by `mode`.
+    """
+    has_read = hasattr(fileobj, 'read')
+    has_write = hasattr(fileobj, 'write')
+    if not has_read and not has_write:
+        return False
+    if mode.endswith('+'):
+        return has_read and has_write
+    if mode[0] == 'r':
+        return has_read
+    if mode[0] in ('w', 'a'):
+        return has_write
+    # we should never get here
+    return False
 
 
 def _s3_open_uri(parsed_uri, mode, **kwargs):
@@ -582,6 +601,8 @@ def _compression_wrapper(file_obj, filename, mode):
     if _need_to_buffer(file_obj, mode, ext):
         warnings.warn('streaming gzip support unavailable, see %s' % _ISSUE_189_URL)
         file_obj = io.BytesIO(file_obj.read())
+    if ext in COMPRESSED_EXT and mode.endswith('+'):
+        raise ValueError('impossible to open in read+write+compressed mode')
 
     if ext == '.bz2':
         return BZ2File(file_obj, mode)
@@ -622,11 +643,11 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     if encoding is None:
         encoding = SYSTEM_ENCODING
 
-    if mode[0] == 'r':
-        decoder = codecs.getreader(encoding)
-    else:
-        decoder = codecs.getwriter(encoding)
-    return decoder(fileobj, errors=errors)
+    if mode[0] == 'r' or mode.endswith('+'):
+        fileobj = codecs.getreader(encoding)(fileobj, errors=errors)
+    if mode[0] in ('w', 'a') or mode.endswith('+'):
+        fileobj = codecs.getwriter(encoding)(fileobj, errors=errors)
+    return fileobj
 
 def _add_scheme_to_host(host):
     if host.startswith('http://') or host.startswith('https://'):
