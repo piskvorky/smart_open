@@ -255,11 +255,36 @@ class SmartOpenHttpTest(unittest.TestCase):
         if os.path.isfile(test_file):
             os.unlink(test_file)
 
-        responses.add(responses.GET, "http://127.0.0.1/data.bz2",
-                      body=compressed_data, stream=True)
+        responses.add(responses.GET, "http://127.0.0.1/data.bz2", body=compressed_data, stream=True)
         smart_open_object = smart_open.smart_open("http://127.0.0.1/data.bz2")
 
-        # decompress the gzip and get the same md5 hash
+        # decompress the bzip2 and get the same md5 hash
+        self.assertEqual(smart_open_object.read(), test_string)
+
+    @responses.activate
+    def test_http_xz(self):
+        """Can open xz via http?"""
+        test_string = b'Hello World Compressed.'
+        #
+        # TODO: why are these tests writing to temporary files?  We can do the
+        # lzma compression in memory.
+        #
+        with tempfile.NamedTemporaryFile('wb', suffix='.xz', delete=False) as infile:
+            test_file = infile.name
+
+        with smart_open.smart_open(test_file, 'wb') as outfile:
+            outfile.write(test_string)
+
+        with open(test_file, 'rb') as infile:
+            compressed_data = infile.read()
+
+        if os.path.isfile(test_file):
+            os.unlink(test_file)
+
+        responses.add(responses.GET, "http://127.0.0.1/data.xz", body=compressed_data, stream=True)
+        smart_open_object = smart_open.smart_open("http://127.0.0.1/data.xz")
+
+        # decompress the xz and get the same md5 hash
         self.assertEqual(smart_open_object.read(), test_string)
 
 
@@ -863,9 +888,16 @@ class CompressionFormatTest(unittest.TestCase):
 
     TEXT = 'Hello'
 
-    def write_read_assertion(self, test_file):
+    def write_read_assertion(self, suffix):
+        with tempfile.NamedTemporaryFile('wb', suffix=suffix, delete=False) as infile:
+            test_file = infile.name
+
+        text = self.TEXT.encode('utf8')
         with smart_open.smart_open(test_file, 'wb') as fout:  # 'b' for binary, needed on Windows
-            fout.write(self.TEXT.encode('utf8'))
+            fout.write(text)
+
+        with open(test_file, 'rb') as fin:
+            self.assertNotEqual(text, fin.read())
 
         with smart_open.smart_open(test_file, 'rb') as fin:
             self.assertEqual(fin.read().decode('utf8'), self.TEXT)
@@ -884,15 +916,25 @@ class CompressionFormatTest(unittest.TestCase):
 
     def test_write_read_gz(self):
         """Can write and read gzip?"""
-        with tempfile.NamedTemporaryFile('wb', suffix='.gz', delete=False) as infile:
-            test_file_name = infile.name
-        self.write_read_assertion(test_file_name)
+        self.write_read_assertion('.gz')
 
     def test_write_read_bz2(self):
         """Can write and read bz2?"""
-        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as infile:
-            test_file_name = infile.name
-        self.write_read_assertion(test_file_name)
+        self.write_read_assertion('.bz2')
+
+    def test_write_read_xz(self):
+        """Can write and read xz2?"""
+        self.write_read_assertion('.xz')
+
+    def test_read_real_xz(self):
+        """Can read a real xz file."""
+        base_path = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
+        head_path = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt.xz')
+        with smart_open.smart_open(head_path) as f:
+            smart_data = f.read()
+        with open(base_path, 'rb') as f:
+            orig_data = f.read()
+        self.assertEqual(smart_data, orig_data)
 
 
 class MultistreamsBZ2Test(unittest.TestCase):
