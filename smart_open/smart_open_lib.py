@@ -381,36 +381,16 @@ def _open_binary_stream(uri, mode, **kw):
         if host is not None:
             kw['endpoint_url'] = _add_scheme_to_host(host)
         return smart_open_s3.open(uri.bucket.name, uri.name, mode, **kw), uri.name
-    elif _is_stream(uri, mode):
+    elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
         # we need to return something as the file name, but we don't know what
-        # so we probe for uri.name (e.g., this works with tempfile.NamedTemporaryFile)
+        # so we probe for uri.name (e.g., this works with open() or tempfile.NamedTemporaryFile)
         # if the value ends with COMPRESSED_EXT, we will note it in _compression_wrapper()
-        # if there is no such an attribute, we return "unknown" - this effectively disables
-        # any compression (the actual string does not matter ofc)
+        # if there is no such an attribute, we return "unknown" - this effectively disables any compression
         filename = getattr(uri, 'name', 'unknown')
         return uri, filename
     else:
         raise TypeError("don't know how to handle uri %r in mode %r" % (uri, mode))
-
-
-def _is_stream(fileobj, mode):
-    """
-    Detect whether the specified object is a file object with required capabilities
-    implied by `mode`.
-    """
-    has_read = hasattr(fileobj, 'read')
-    has_write = hasattr(fileobj, 'write')
-    if not has_read and not has_write:
-        return False
-    if mode.endswith('+'):
-        return has_read and has_write
-    if mode[0] == 'r':
-        return has_read
-    if mode[0] in ('w', 'a'):
-        return has_write
-    # we should never get here
-    assert False
 
 
 def _s3_open_uri(parsed_uri, mode, **kwargs):

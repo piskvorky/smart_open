@@ -6,8 +6,9 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 
-from bz2 import compress as bzip2_compress, decompress as bzip2_decompress
+import bz2
 import io
+import functools
 import unittest
 import logging
 import tempfile
@@ -203,21 +204,21 @@ class SmartOpenHttpTest(unittest.TestCase):
     @responses.activate
     def _test_compressed_http(self, suffix, query):
         """Can open <suffix> via http?"""
-        test_string = b'Hello World Compressed.' * 10000
-        test_file = six.BytesIO()
-        test_file.name = 'data' + suffix
-        with smart_open.smart_open(test_file, 'wb') as outfile:
-            outfile.write(test_string)
-        compressed_data = test_file.getvalue()
+        raw_data = b'Hello World Compressed.' * 10000
+        buffer = six.BytesIO()
+        buffer.name = 'data' + suffix
+        with smart_open.smart_open(buffer, 'wb') as outfile:
+            outfile.write(raw_data)
+        compressed_data = buffer.getvalue()
         # check that the string was actually compressed
-        self.assertNotEqual(compressed_data, test_string)
+        self.assertNotEqual(compressed_data, raw_data)
 
         responses.add(responses.GET, 'http://127.0.0.1/data' + suffix, body=compressed_data, stream=True)
         smart_open_object = smart_open.smart_open(
             'http://127.0.0.1/data%s%s' % (suffix, '?some_param=some_val' if query else ''))
 
         # decompress the xz and get the same md5 hash
-        self.assertEqual(smart_open_object.read(), test_string)
+        self.assertEqual(smart_open_object.read(), raw_data)
 
     @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
     def test_http_gz(self):
@@ -250,125 +251,109 @@ class SmartOpenFileObjTest(unittest.TestCase):
     """
     Test passing raw file objects.
     """
+    text = 'Hello, world!'
 
-    class IOReadWrapper(object):
-        def __init__(self):
-            self.fobj = six.BytesIO()
+    def patch_string_io(func):
+        if not PY2:
+            # Python 3 has already got us covered
+            return func
 
-        def read(self, size=-1):
-            return self.fobj.read(size)
-
-        def __enter__(self):
+        def enter(self):
             return self
 
-        def __exit__(self, exc_type, exc_val, exc_tb):
+        def exit(self, exc_type, exc_val, exc_tb):
             self.close()
 
-        def close(self):
-            self.fobj.close()
+        @functools.wraps(func)
+        def wrapped_patch_string_io(self):
+            six.StringIO.__enter__ = enter
+            six.StringIO.__exit__ = exit
+            try:
+                return func(self)
+            finally:
+                del six.StringIO.__enter__
+                del six.StringIO.__exit__
 
-    class IOWriteWrapper(object):
-        def __init__(self):
-            self.fobj = six.BytesIO()
+        return wrapped_patch_string_io
 
-        def write(self, b):
-            return self.fobj.write(b)
-
-        def close(self):
-            self.fobj.close()
-
-    def test_read(self):
-        file = self.IOReadWrapper()
-        text = 'Hello, world!'
-        file.fobj.write(text.encode())
-        file.fobj.seek(0)
-        with smart_open.smart_open(file, 'r') as sf:
+    @patch_string_io
+    def test_read_bytes(self):
+        """Can we read bytes from a byte stream?"""
+        buffer = six.BytesIO(self.text.encode())
+        with smart_open.smart_open(buffer, 'rb') as sf:
             data = sf.read()
-        self.assertEqual(data, text)
-        file = self.IOWriteWrapper()  # no `read()`
-        file.fobj.write(text.encode())
-        file.fobj.seek(0)
-        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'r'))
+        self.assertEqual(data, self.text.encode())
 
-    def test_write(self):
-        file = self.IOWriteWrapper()
-        text = 'Hello, world!'
-        with smart_open.smart_open(file, 'w') as sf:
-            sf.write(text)
-            self.assertEqual(file.fobj.getvalue(), text.encode())
-        file = self.IOReadWrapper()  # no `write()`
-        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'w'))
+    @patch_string_io
+    def test_write_bytes(self):
+        """Can we write bytes to a byte stream?"""
+        buffer = six.BytesIO()
+        with smart_open.smart_open(buffer, 'wb') as sf:
+            sf.write(self.text.encode())
+            self.assertEqual(buffer.getvalue(), self.text.encode())
 
-    def test_read_write(self):
-        file = six.BytesIO()
-        text = 'Hello, world!'
-        file.write(text.encode())
-        file.seek(0)
-        with smart_open.smart_open(file, 'r+') as sf:
+    @unittest.skipIf(PY2, "Python 2 does not make a difference between str and bytes")
+    @patch_string_io
+    def test_read_str(self):
+        """Can we read strings from a text stream?"""
+        buffer = six.StringIO(self.text)
+        with smart_open.smart_open(buffer, 'r') as sf:
+            self.assertRaises(TypeError, sf.read)  # we expect binary mode
+
+    @unittest.skipIf(PY2, "Python 2 does not make a difference between str and bytes")
+    @patch_string_io
+    def test_write_str(self):
+        """Can we write strings to a text stream?"""
+        buffer = six.StringIO()
+        with smart_open.smart_open(buffer, 'w') as sf:
+            self.assertRaises(TypeError, sf.write, self.text)  # we expect binary mode
+
+    def test_read_str_from_bytes(self):
+        """Can we read strings from a byte stream?"""
+        buffer = six.BytesIO(self.text.encode())
+        with smart_open.smart_open(buffer, 'r') as sf:
             data = sf.read()
-            sf.write("hello")
-        self.assertEqual(data, text)
+        self.assertEqual(data, self.text)
 
-        file = six.BytesIO()
-        file.write(text.encode())
-        file.seek(0)
-        with smart_open.smart_open(file, 'w+') as sf:
-            data = sf.read()
-            sf.write("hello")
-        self.assertEqual(data, text)
-
-        file = six.BytesIO()
-        file.write(text.encode())
-        file.seek(0)
-        with smart_open.smart_open(file, 'a+') as sf:
-            data = sf.read()
-            sf.write("hello")
-        self.assertEqual(data, text)
-
-        file = self.IOReadWrapper()  # no `write()`
-        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'r+'))
-        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'w+'))
-        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'a+'))
-
-        file = self.IOWriteWrapper()  # no `read()`
-        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'r+'))
-        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'w+'))
-        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'a+'))
-
-    def test_append(self):
-        file = self.IOWriteWrapper()
-        text = 'Hello, world!'
-        with smart_open.smart_open(file, 'a') as sf:
-            sf.write(text)
-            self.assertEqual(file.fobj.getvalue(), text.encode())
-        file = self.IOReadWrapper()  # no `write()`
-        self.assertRaises(TypeError, lambda: smart_open.smart_open(file, 'a'))
+    def test_write_str_to_bytes(self):
+        """Can we write strings to a byte stream?"""
+        buffer = six.BytesIO()
+        with smart_open.smart_open(buffer, 'w') as sf:
+            sf.write(self.text)
+            self.assertEqual(buffer.getvalue(), self.text.encode())
 
     def test_name_read(self):
-        text = 'Hello, world!' * 1000
-        file = six.BytesIO()
-        file.write(bzip2_compress(text.encode()))
-        file.seek(0)
-        file.name = 'data.bz2'
-        with smart_open.smart_open(file, 'r') as sf:
+        """Can we use the "name" attribute to decompress on the fly?"""
+        data = b'Hello, world!' * 1000
+        buffer = six.BytesIO(bz2.compress(data))
+        buffer.name = 'data.bz2'
+        with smart_open.smart_open(buffer, 'rb') as sf:
             data = sf.read()
-            self.assertEqual(data, text)
+        self.assertEqual(data, data)
 
     def test_name_write(self):
-        text = 'Hello, world!' * 1000
-        file = six.BytesIO()
-        file.name = 'data.bz2'
-        with smart_open.smart_open(file, 'w') as sf:
-            sf.write(text)
-        self.assertEqual(bzip2_decompress(file.getvalue()), text.encode())
+        """Can we use the "name" attribute to compress on the fly?"""
+        data = b'Hello, world!' * 1000
+        buffer = six.BytesIO()
+        buffer.name = 'data.bz2'
+        with smart_open.smart_open(buffer, 'wb') as sf:
+            sf.write(data)
+        self.assertEqual(bz2.decompress(buffer.getvalue()), data)
 
-    def test_name_read_write(self):
-        file = six.BytesIO()
-        file.name = 'data.bz2'
-        self.assertRaises(ValueError, lambda: smart_open.smart_open(file, 'r+'))
-        self.assertRaises(ValueError, lambda: smart_open.smart_open(file, 'w+'))
-        self.assertRaises(ValueError, lambda: smart_open.smart_open(file, 'a+'))
+    def test_open_side_effect(self):
+        """Does our trick with "name" attribute work with open()?"""
+        data = b'Hello, world!' * 1000
+        with tempfile.NamedTemporaryFile(prefix='smart_open_tests_', delete=False) as tmpf:
+            tmpf.write(data)
+        try:
+            with open(tmpf.name, 'rb') as openf:
+                with smart_open.smart_open(openf) as smartf:
+                    smart_data = smartf.read()
+            self.assertEqual(data, smart_data)
+        finally:
+            os.unlink(tmpf.name)
 
+    patch_string_io = staticmethod(patch_string_io)
 
 #
 # What exactly to patch here differs on _how_ we're opening the file.
@@ -846,18 +831,18 @@ class SmartOpenTest(unittest.TestCase):
         # fake bucket and key
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
-        test_string = b"second test"
+        raw_data = b"second test"
 
         # correct write mode, correct s3 URI
         with smart_open.smart_open("s3://mybucket/newkey", "wb") as fout:
             logger.debug('fout: %r', fout)
-            fout.write(test_string)
+            fout.write(raw_data)
 
         logger.debug("write successfully completed")
 
         output = list(smart_open.smart_open("s3://mybucket/newkey", "rb"))
 
-        self.assertEqual(output, [test_string])
+        self.assertEqual(output, [raw_data])
 
     @mock_s3
     def test_s3_metadata_write(self):
