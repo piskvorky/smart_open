@@ -283,12 +283,13 @@ class SeekableBufferedInputBase(BufferedInputBase):
     Implements the io.BufferedIOBase interface of the standard library."""
 
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, **kwargs):
+                 line_terminator=BINARY_NEWLINE, acl=None, **kwargs):
         session = kwargs.pop(
             's3_session',
             boto3.Session(profile_name=kwargs.pop('profile_name', None))
         )
         s3 = session.resource('s3', **kwargs)
+        self.acl = acl
         self._object = s3.Object(bucket, key)
         self._raw_reader = SeekableRawReader(self._object)
         self._content_length = self._object.content_length
@@ -407,7 +408,7 @@ multipart upload may fail")
             assert self._mp, "no multipart upload in progress"
             self._mp.abort()
 
-            self._object.put(Body=b'')
+            self._object.put(Body=b'', ACL=self.acl)
         self._mp = None
         logger.debug("successfully closed")
 
