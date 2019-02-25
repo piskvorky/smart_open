@@ -77,6 +77,8 @@ import smart_open.hdfs as smart_open_hdfs
 import smart_open.webhdfs as smart_open_webhdfs
 import smart_open.http as smart_open_http
 
+from smart_open import doctools
+
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
@@ -116,6 +118,250 @@ bucket_id is only for S3.
 # https://stackoverflow.com/questions/11351032/namedtuple-and-default-values-for-optional-keyword-arguments
 #
 Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
+
+
+def _sniff_kwargs(kallable, kwargs):
+    """Check which keyword arguments the callable supports.
+
+    Parameters
+    ----------
+    kallable: callable
+        A function or method to test
+    kwargs: dict
+        The keyword arguments to check.  If the callable doesn't support any
+        of these, a warning message will get printed.
+
+    Returns
+    -------
+    dict
+        A dictionary of argument names and values supported by the callable.
+    """
+    import inspect
+    args, varargs, keywords, defaults = inspect.getargspec(kallable)
+
+    if not defaults:
+        unsupported_keywords = sorted(kwargs)
+        supported_kwargs = {}
+    else:
+        supported_keywords = args[:-len(defaults)]
+        unsupported_keywords = [k for k in sorted(kwargs) if k not in supported_keywords]
+        supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
+
+    if unsupported_keywords:
+        logger.warn('ignoring unsupported keyword arguments: %r', unsupported_keywords)
+
+    return supported_kwargs
+
+
+def smart_open2(
+        uri,
+        mode='r',
+        buffering=-1,
+        encoding=None,
+        errors='strict',
+        newline=None,
+        closefd=True,
+        opener=None,
+        ignore_extension=False,
+        tkwa=dict(),
+        ):
+    """Open the URI object, returning a file-like object.
+
+    The URI is usually a string in a variety of formats:
+
+    1. a URI for the local filesystem: `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
+    2. a URI for HDFS: `hdfs:///some/path/lines.txt`
+    3. a URI for Amazon's S3 (can also supply credentials inside the URI):
+       `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
+
+    The URI may also be one of:
+
+    - an instance of the boto.s3.key.Key class
+    - an instance of the pathlib.Path class
+    - a stream (anything that implements io.IOBase-like functionality)
+
+    This function supports transparent compression and decompression using the
+    following codec:
+
+    - ``.gz``
+    - ``.bz2``
+    - ``.xz``
+
+    The function depends on the file extension to determine the appropriate codec.
+
+    Parameters
+    ----------
+    opaque: object
+        The object to open.
+    mode: str, optional
+        Mimicks built-in open parameter of the same name.
+    buffering: int, optional
+        Mimicks built-in open parameter of the same name.
+    encoding: str, optional
+        Mimicks built-in open parameter of the same name.
+    errors: str, optional
+        Mimicks built-in open parameter of the same name.
+    newline: str, optional
+        Mimicks built-in open parameter of the same name.
+    closefd: boolean, optional
+        Mimicks built-in open parameter of the same name.  Ignored.
+    opener: object, optional
+        Mimicks built-in open parameter of the same name.  Ignored.
+    ignore_extension: boolean, optional
+        Disable transparent compression/decompression based on the file extension.
+    tkwa: dict
+        Keyword arguments for the transport layer (see notes below).
+
+    Returns
+    -------
+    A file-like object.
+
+    Notes
+    -----
+    smart_open has several implementations for its transport layer (e.g. S3, HTTP).
+    Each transport layer has a different set of keyword arguments for overriding
+    default behavior.  If you specify a keyword argument that is *not* supported
+    by the transport layer being used, smart_open will ignore that argument and
+    log a warning message.
+
+    S3:
+
+%(s3)s
+    HTTP:
+
+%(http)s
+    WebHDFS:
+
+%(webhdfs)s
+
+    Examples
+    --------
+    >>> # stream lines from http; you can use context managers too:
+    >>> with smart_open.smart_open2('http://www.google.com') as fin:
+    ...     for line in fin:
+    ...         print(line)
+
+    >>> # stream lines from S3; you can use context managers too:
+    >>> with smart_open.smart_open2('s3://mybucket/mykey.txt') as fin:
+    ...     for line in fin:
+    ...         print(line)
+
+    >>> # you can also use a boto.s3.key.Key instance directly:
+    >>> key = boto.connect_s3().get_bucket("my_bucket").get_key("my_key")
+    >>> with smart_open.smart_open2(key) as fin:
+    ...     for line in fin:
+    ...         print(line)
+
+    >>> # stream line-by-line from an HDFS file
+    >>> for line in smart_open.smart_open2('hdfs:///user/hadoop/my_file.txt'):
+    ...    print(line)
+
+    >>> # stream content *into* S3:
+    >>> with smart_open.smart_open2('s3://mybucket/mykey.txt', 'wb') as fout:
+    ...     for line in ['first line', 'second line', 'third line']:
+    ...          fout.write(line + '\n')
+
+    >>> # stream from/to (compressed) local files:
+    >>> for line in smart_open.smart_open2('/home/radim/my_file.txt'):
+    ...    print(line)
+    >>> for line in smart_open.smart_open2('/home/radim/my_file.txt.gz'):
+    ...    print(line)
+    >>> with smart_open.smart_open2('/home/radim/my_file.txt.gz', 'wb') as fout:
+    ...    fout.write("hello world!\n")
+    >>> with smart_open.smart_open2('/home/radim/another.txt.bz2', 'wb') as fout:
+    ...    fout.write("good bye!\n")
+    >>> with smart_open.smart_open2('/home/radim/another.txt.xz', 'wb') as fout:
+    ...    fout.write("never say never!\n")
+    >>> # stream from/to (compressed) local files with Expand ~ and ~user constructions:
+    >>> for line in smart_open.smart_open2('~/my_file.txt'):
+    ...    print(line)
+    >>> for line in smart_open.smart_open2('my_file.txt'):
+    ...    print(line)
+
+    """
+    logger.debug('%r', locals())
+
+    if not isinstance(mode, six.string_types):
+        raise TypeError('mode should be a string')
+
+    fobj = _shortcut_open(
+        uri,
+        mode,
+        ignore_extension=ignore_extension,
+        buffering=buffering,
+        encoding=encoding,
+        errors=errors,
+    )
+    if fobj is not None:
+        return fobj
+
+    #
+    # This is a work-around for the problem described in Issue #144.
+    # If the user has explicitly specified an encoding, then assume they want
+    # us to open the destination in text mode, instead of the default binary.
+    #
+    # If we change the default mode to be text, and match the normal behavior
+    # of Py2 and 3, then the above assumption will be unnecessary.
+    #
+    if encoding is not None and 'b' in mode:
+        mode = mode.replace('b', '')
+
+    # Support opening ``pathlib.Path`` objects by casting them to strings.
+    if PATHLIB_SUPPORT and isinstance(uri, pathlib.Path):
+        uri = str(uri)
+
+    explicit_encoding = encoding
+    encoding = explicit_encoding if explicit_encoding else SYSTEM_ENCODING
+
+    #
+    # This is how we get from the filename to the end result.  Decompression is
+    # optional, but it always accepts bytes and returns bytes.
+    #
+    # Decoding is also optional, accepts bytes and returns text.  The diagram
+    # below is for reading, for writing, the flow is from right to left, but
+    # the code is identical.
+    #
+    #           open as binary         decompress?          decode?
+    # filename ---------------> bytes -------------> bytes ---------> text
+    #                          binary             decompressed       decode
+    #
+    try:
+        binary_mode = {'r': 'rb', 'r+': 'rb+',
+                       'w': 'wb', 'w+': 'wb+',
+                       'a': 'ab', 'a+': 'ab+'}[mode]
+    except KeyError:
+        binary_mode = mode
+    binary, filename = _open_binary_stream(uri, binary_mode, tkwa)
+    if ignore_extension:
+        decompressed = binary
+    else:
+        decompressed = _compression_wrapper(binary, filename, mode)
+
+    if 'b' not in mode or explicit_encoding is not None:
+        decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
+    else:
+        decoded = decompressed
+
+    return decoded
+
+
+#
+# Inject transport keyword argument documentation into the docstring.
+#
+smart_open2.__doc__ = smart_open2.__doc__ % {
+    's3': doctools.to_docstring(
+        doctools.extract_kwargs(smart_open_s3.open.__doc__),
+        lpad='    ',
+    ),
+    'http': doctools.to_docstring(
+        doctools.extract_kwargs(smart_open_http.BufferedInputBase.__init__.__doc__),
+        lpad='    ',
+    ),
+    'webhdfs': doctools.to_docstring(
+        doctools.extract_kwargs(smart_open_webhdfs.BufferedOutputBase.__init__.__doc__),
+        lpad='    ',
+    ),
+}
 
 
 def smart_open(uri, mode="rb", **kw):
@@ -237,7 +483,7 @@ def smart_open(uri, mode="rb", **kw):
                        'a': 'ab', 'a+': 'ab+'}[mode]
     except KeyError:
         binary_mode = mode
-    binary, filename = _open_binary_stream(uri, binary_mode, **kw)
+    binary, filename = _open_binary_stream(uri, binary_mode, kw)
     if ignore_extension:
         decompressed = binary
     else:
@@ -252,7 +498,15 @@ def smart_open(uri, mode="rb", **kw):
     return decoded
 
 
-def _shortcut_open(uri, mode, **kw):
+def _shortcut_open(
+        uri,
+        mode,
+        ignore_extension=False,
+        buffering=-1,
+        encoding=None,
+        errors=None,
+        **kw,  # TODO: remove this catch-all
+        ):
     """Try to open the URI using the standard library io.open function.
 
     This can be much faster than the alternative of opening in binary mode and
@@ -279,23 +533,13 @@ def _shortcut_open(uri, mode, **kw):
         return None
 
     _, extension = P.splitext(parsed_uri.uri_path)
-    ignore_extension = kw.get('ignore_extension', False)
     if extension in COMPRESSED_EXT and not ignore_extension:
         return None
 
-    #
-    # https://docs.python.org/2/library/functions.html#open
-    #
-    # buffering: 0: off; 1: on; negative number: use system default
-    #
-    buffering = kw.get('buffering', -1)
-
     open_kwargs = {}
-    errors = kw.get('errors')
     if errors is not None:
         open_kwargs['errors'] = errors
 
-    encoding = kw.get('encoding')
     if encoding is not None:
         open_kwargs['encoding'] = encoding
         mode = mode.replace('b', '')
@@ -313,14 +557,14 @@ def _shortcut_open(uri, mode, **kw):
     return io.open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
 
 
-def _open_binary_stream(uri, mode, **kw):
+def _open_binary_stream(uri, mode, tkwa):
     """Open an arbitrary URI in the specified binary mode.
 
     Not all modes are supported for all protocols.
 
     :arg uri: The URI to open.  May be a string, or something else.
     :arg str mode: The mode to open with.  Must be rb, wb or ab.
-    :arg kw: TODO: document this.
+    :arg tkwa: TODO: document this.
     :returns: A file object and the filename
     :rtype: tuple
     """
@@ -344,6 +588,7 @@ def _open_binary_stream(uri, mode, **kw):
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
+            kw = _sniff_kwargs(_s3_open_uri, tkwa)
             return _s3_open_uri(parsed_uri, mode, **kw), filename
         elif parsed_uri.scheme in ("hdfs", ):
             if mode == 'rb':
@@ -354,8 +599,10 @@ def _open_binary_stream(uri, mode, **kw):
                 raise NotImplementedError(unsupported)
         elif parsed_uri.scheme in ("webhdfs", ):
             if mode == 'rb':
+                kw = _sniff_kwargs(smart_open_webhdfs.BufferedInputBase.__init__, tkwa)
                 fobj = smart_open_webhdfs.BufferedInputBase(parsed_uri.uri_path, **kw)
             elif mode == 'wb':
+                kw = _sniff_kwargs(smart_open_webhdfs.BufferedOutputBase.__init__, tkwa)
                 fobj = smart_open_webhdfs.BufferedOutputBase(parsed_uri.uri_path, **kw)
             else:
                 raise NotImplementedError(unsupported)
@@ -367,6 +614,7 @@ def _open_binary_stream(uri, mode, **kw):
             #
             filename = P.basename(urlparse.urlparse(uri).path)
             if mode == 'rb':
+                kw = _sniff_kwargs(smart_open_http.BufferedInputBase.__init__, tkwa)
                 return smart_open_http.BufferedInputBase(uri, **kw), filename
             else:
                 raise NotImplementedError(unsupported)
@@ -375,6 +623,7 @@ def _open_binary_stream(uri, mode, **kw):
     elif isinstance(uri, boto.s3.key.Key):
         logger.debug('%r', locals())
         #
+        # TODO: drop boto support
         # TODO: handle boto3 keys as well
         #
         host = kw.pop('host', None)

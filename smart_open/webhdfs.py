@@ -14,6 +14,10 @@ logger.addHandler(logging.NullHandler())
 
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
+KWARGS = (
+    ('min_part_size', 'int', 'For writing only'),
+)
+
 
 class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, uri):
@@ -84,6 +88,13 @@ class BufferedInputBase(io.BufferedIOBase):
 
 class BufferedOutputBase(io.BufferedIOBase):
     def __init__(self, uri_path, min_part_size=WEBHDFS_MIN_PART_SIZE):
+        """
+        Parameters
+        ----------
+        min_part_size: int, optional
+            For writing only.
+
+        """
         self.uri_path = uri_path
         self._closed = False
         self.min_part_size = min_part_size

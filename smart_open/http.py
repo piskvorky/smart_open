@@ -14,7 +14,6 @@ Sometimes, servers compress the file for more efficient transfer, in which case
 the client (us) has to decompress them with the appropriate algorithm.
 """
 
-
 class BufferedInputBase(io.BufferedIOBase):
     """
     Implement streamed reader from a web site.
@@ -23,10 +22,23 @@ class BufferedInputBase(io.BufferedIOBase):
 
     def __init__(self, url, mode='r', kerberos=False, user=None, password=None):
         """
-        If Kerberos is True, will attempt to use the local Kerberos credentials.
-        Otherwise, will try to use "basic" HTTP authentication via username/password.
+        Parameters
+        ----------
+        url: str
+            The URL to open.
+        mode: str
+            The mode to open using.
+        kerberos: boolean, optional
+            If True, will attempt to use the local Kerberos credentials
+        user: str, optional
+            The username for authenticating over HTTP
+        password: str, optional
+            The password for authenticating over HTTP
 
-        If none of those are set, will connect unauthenticated.
+        Note
+        ----
+        If neither kerberos or (user, password) are set, will connect unauthenticated.
+
         """
         if kerberos:
             import requests_kerberos

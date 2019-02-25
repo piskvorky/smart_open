@@ -57,21 +57,59 @@ def _clamp(value, minval, maxval):
     return max(min(value, maxval), minval)
 
 
-def open(bucket_id, key_id, mode, **kwargs):
+def open(
+        bucket_id,
+        key_id,
+        mode,
+        buffer_size=DEFAULT_BUFFER_SIZE,
+        min_part_size=DEFAULT_MIN_PART_SIZE,
+        session=None,
+        resource_kwargs=dict(),
+        multipart_upload_kwargs=dict(),
+        ):
+    """Open an S3 object for reading or writing.
+
+    Parameters
+    ----------
+    bucket_id: str
+        The name of the bucket this object resides in.
+    key_id: str
+        The name of the key within the bucket.
+    mode: str
+        The mode with which to open the object.  Must be either rb or wb.
+    buffer_size: int, optional
+        The buffer size to use when performing I/O.
+    min_part_size: int
+        For writing only.
+    session: object, optional
+        The S3 session to use when working with boto3.
+    resource_kwargs: dict, optional
+        Keyword arguments to use when creating a new resource.
+    multipart_upload_kwargs: dict, optional
+        For writing only.
+
+    """
     logger.debug('%r', locals())
     if mode not in MODES:
         raise NotImplementedError('bad mode: %r expected one of %r' % (mode, MODES))
 
-    encoding = kwargs.pop("encoding", "utf-8")
-    errors = kwargs.pop("errors", None)
-    newline = kwargs.pop("newline", None)
-    line_buffering = kwargs.pop("line_buffering", False)
-    s3_min_part_size = kwargs.pop("s3_min_part_size", DEFAULT_MIN_PART_SIZE)
-
     if mode == READ_BINARY:
-        fileobj = SeekableBufferedInputBase(bucket_id, key_id, **kwargs)
+        fileobj = SeekableBufferedInputBase(
+            bucket_id,
+            key_id,
+            buffer_size=buffer_size,
+            session=session,
+            resource_kwargs=resource_kwargs,
+        )
     elif mode == WRITE_BINARY:
-        fileobj = BufferedOutputBase(bucket_id, key_id, min_part_size=s3_min_part_size, **kwargs)
+        fileobj = BufferedOutputBase(
+            bucket_id,
+            key_id,
+            min_part_size=min_part_size,
+            session=session,
+            multipart_upload_kwargs=multipart_upload_kwargs,
+            resource_kwargs=resource_kwargs,
+        )
     else:
         assert False, 'unexpected mode: %r' % mode
 
@@ -142,11 +180,9 @@ class SeekableRawReader(object):
 
 class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, **kwargs):
-        session = kwargs.pop(
-            's3_session',
-            boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        )
+                 line_terminator=BINARY_NEWLINE, session=None, **kwargs):
+        if session is None:
+            session = boto3.Session()
         s3 = session.resource('s3', **kwargs)
         self._object = s3.Object(bucket, key)
         self._raw_reader = RawReader(self._object)
@@ -283,12 +319,10 @@ class SeekableBufferedInputBase(BufferedInputBase):
     Implements the io.BufferedIOBase interface of the standard library."""
 
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, **kwargs):
-        session = kwargs.pop(
-            's3_session',
-            boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        )
-        s3 = session.resource('s3', **kwargs)
+                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=dict()):
+        if session is None:
+            session = boto3.Session()
+        s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
         self._raw_reader = SeekableRawReader(self._object)
         self._content_length = self._object.content_length
@@ -349,16 +383,16 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key, min_part_size=DEFAULT_MIN_PART_SIZE, s3_upload=None, **kwargs):
+    def __init__(self, bucket, key, min_part_size=DEFAULT_MIN_PART_SIZE,
+                 s3_upload=None, session=None, resource_kwargs=dict()):
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
 
-        session = kwargs.pop(
-            's3_session',
-            boto3.Session(profile_name=kwargs.pop('profile_name', None))
-        )
-        s3 = session.resource('s3', **kwargs)
+        if session is None:
+            session = boto3.Session()
+
+        s3 = session.resource('s3', **resource_kwargs)
 
         #
         # https://stackoverflow.com/questions/26871884/how-can-i-easily-determine-if-a-boto-3-s3-bucket-resource-exists
