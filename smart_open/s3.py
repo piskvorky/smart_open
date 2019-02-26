@@ -180,10 +180,10 @@ class SeekableRawReader(object):
 
 class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, session=None, **kwargs):
+                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=dict()):
         if session is None:
             session = boto3.Session()
-        s3 = session.resource('s3', **kwargs)
+        s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
