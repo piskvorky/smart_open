@@ -29,7 +29,7 @@ class BufferedInputBase(io.BufferedIOBase):
     Supports Kerberos and Basic HTTP authentication.
     """
 
-    def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE, 
+    def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
                  kerberos=False, user=None, password=None):
         """
         If Kerberos is True, will attempt to use the local Kerberos credentials.
@@ -245,7 +245,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         headers = _HEADERS.copy()
 
         if start_pos is not None:
-            headers.update({"range": make_range_string(start_pos)})
+            headers.update({"range": s3.make_range_string(start_pos)})
 
         response = requests.get(self.url, auth=self.auth, stream=True, headers=headers)
 
