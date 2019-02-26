@@ -24,6 +24,7 @@ The main methods are:
 import codecs
 import collections
 import logging
+import inspect
 import os
 import os.path as P
 import sys
@@ -42,6 +43,7 @@ for pathlib_module in ('pathlib', 'pathlib2'):
     except ImportError:
         PATHLIB_SUPPORT = False
 
+import boto3
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
 import sys
@@ -120,7 +122,15 @@ bucket_id is only for S3.
 Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
 
 
-def _sniff_kwargs(kallable, kwargs):
+def _inspect_kwargs(kallable):
+    args, varargs, keywords, defaults = inspect.getargspec(kallable)
+    if not defaults:
+        return {}
+    supported_keywords = args[-len(defaults):]
+    return dict(zip(supported_keywords, defaults))
+
+
+def _check_kwargs(kallable, kwargs):
     """Check which keyword arguments the callable supports.
 
     Parameters
@@ -136,16 +146,9 @@ def _sniff_kwargs(kallable, kwargs):
     dict
         A dictionary of argument names and values supported by the callable.
     """
-    import inspect
-    args, varargs, keywords, defaults = inspect.getargspec(kallable)
-
-    if not defaults:
-        unsupported_keywords = sorted(kwargs)
-        supported_kwargs = {}
-    else:
-        supported_keywords = args[:-len(defaults)]
-        unsupported_keywords = [k for k in sorted(kwargs) if k not in supported_keywords]
-        supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
+    supported_keywords = sorted(_inspect_kwargs(kallable))
+    unsupported_keywords = [k for k in sorted(kwargs) if k not in supported_keywords]
+    supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
 
     if unsupported_keywords:
         logger.warn('ignoring unsupported keyword arguments: %r', unsupported_keywords)
@@ -191,7 +194,7 @@ def smart_open2(
 
     Parameters
     ----------
-    opaque: object
+    uri: str or object
         The object to open.
     mode: str, optional
         Mimicks built-in open parameter of the same name.
@@ -224,13 +227,13 @@ def smart_open2(
     by the transport layer being used, smart_open will ignore that argument and
     log a warning message.
 
-    S3:
+    S3 (for details, see :mod:`smart_open.s3` and :func:`smart_open.s3.open`):
 
 %(s3)s
-    HTTP:
+    HTTP (for details, see :mod:`smart_open.http` and :func:`smart_open.http.open`):
 
 %(http)s
-    WebHDFS:
+    WebHDFS (for details, see :mod:`smart_open.webhdfs` and :func:`smart_open.webhdfs.open`):
 
 %(webhdfs)s
 
@@ -354,11 +357,11 @@ smart_open2.__doc__ = smart_open2.__doc__ % {
         lpad='    ',
     ),
     'http': doctools.to_docstring(
-        doctools.extract_kwargs(smart_open_http.BufferedInputBase.__init__.__doc__),
+        doctools.extract_kwargs(smart_open_http.open.__doc__),
         lpad='    ',
     ),
     'webhdfs': doctools.to_docstring(
-        doctools.extract_kwargs(smart_open_webhdfs.BufferedOutputBase.__init__.__doc__),
+        doctools.extract_kwargs(smart_open_webhdfs.open.__doc__),
         lpad='    ',
     ),
 }
@@ -428,6 +431,7 @@ def smart_open(uri, mode="rb", **kw):
       ...    print line
 
     """
+
     logger.debug('%r', locals())
 
     if not isinstance(mode, six.string_types):
@@ -582,54 +586,27 @@ def _open_binary_stream(uri, mode, tkwa):
         parsed_uri = _parse_uri(uri)
         unsupported = "%r mode not supported for %r scheme" % (mode, parsed_uri.scheme)
 
-        if parsed_uri.scheme in ("file", ):
-            # local files -- both read & write supported
-            # compression, if any, is determined by the filename extension (.gz, .bz2, .xz)
+        if parsed_uri.scheme == "file":
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
-            kw = _sniff_kwargs(_s3_open_uri, tkwa)
-            return _s3_open_uri(parsed_uri, mode, **kw), filename
-        elif parsed_uri.scheme in ("hdfs", ):
-            if mode == 'rb':
-                return smart_open_hdfs.CliRawInputBase(parsed_uri.uri_path), filename
-            elif mode == 'wb':
-                return smart_open_hdfs.CliRawOutputBase(parsed_uri.uri_path), filename
-            else:
-                raise NotImplementedError(unsupported)
-        elif parsed_uri.scheme in ("webhdfs", ):
-            if mode == 'rb':
-                kw = _sniff_kwargs(smart_open_webhdfs.BufferedInputBase.__init__, tkwa)
-                fobj = smart_open_webhdfs.BufferedInputBase(parsed_uri.uri_path, **kw)
-            elif mode == 'wb':
-                kw = _sniff_kwargs(smart_open_webhdfs.BufferedOutputBase.__init__, tkwa)
-                fobj = smart_open_webhdfs.BufferedOutputBase(parsed_uri.uri_path, **kw)
-            else:
-                raise NotImplementedError(unsupported)
-            return fobj, filename
+            return _s3_open_uri(parsed_uri, mode, tkwa), filename
+        elif parsed_uri.scheme == "hdfs":
+            _check_kwargs(smart_open_hdfs.open, tkwa)
+            return smart_open_hdfs.open(parsed_uri.uri_path, mode), filename
+        elif parsed_uri.scheme == "webhdfs":
+            kw = _check_kwargs(smart_open_webhdfs.open, tkwa)
+            return smart_open_webhdfs.open(parsed_uri.uri_path, mode, **kw), filename
         elif parsed_uri.scheme.startswith('http'):
             #
             # The URI may contain a query string and fragments, which interfere
-            # with out compressed/uncompressed estimation.
+            # with our compressed/uncompressed estimation, so we strip them.
             #
             filename = P.basename(urlparse.urlparse(uri).path)
-            if mode == 'rb':
-                kw = _sniff_kwargs(smart_open_http.BufferedInputBase.__init__, tkwa)
-                return smart_open_http.BufferedInputBase(uri, **kw), filename
-            else:
-                raise NotImplementedError(unsupported)
+            kw = _check_kwargs(smart_open_http.open, tkwa)
+            return smart_open_http.open(uri, mode, **kw), filename
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
-    elif isinstance(uri, boto.s3.key.Key):
-        logger.debug('%r', locals())
-        #
-        # TODO: drop boto support
-        # TODO: handle boto3 keys as well
-        #
-        host = kw.pop('host', None)
-        if host is not None:
-            kw['endpoint_url'] = _add_scheme_to_host(host)
-        return smart_open_s3.open(uri.bucket.name, uri.name, mode, **kw), uri.name
     elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
         filename = '/tmp/unknown'
@@ -638,23 +615,36 @@ def _open_binary_stream(uri, mode, tkwa):
         raise TypeError('don\'t know how to handle uri %s' % repr(uri))
 
 
-def _s3_open_uri(parsed_uri, mode, **kwargs):
+def _s3_open_uri(parsed_uri, mode, tkwa):
     logger.debug('s3_open_uri: %r', locals())
     if mode in ('r', 'w'):
         raise ValueError('this function can only open binary streams. '
                          'Use smart_open.smart_open() to open text streams.')
     elif mode not in ('rb', 'wb'):
         raise NotImplementedError('unsupported mode: %r', mode)
-    if parsed_uri.access_id is not None:
-        kwargs['aws_access_key_id'] = parsed_uri.access_id
-    if parsed_uri.access_secret is not None:
-        kwargs['aws_secret_access_key'] = parsed_uri.access_secret
 
-    # Get an S3 host. It is required for sigv4 operations.
-    host = kwargs.pop('host', None)
-    if host is not None:
-        kwargs['endpoint_url'] = _add_scheme_to_host(host)
+    #
+    # There are two explicit ways we can receive session parameters from the user.
+    #
+    # 1. Via the session keyword argument (tkwa)
+    # 2. Via the URI itself
+    #
+    # They are not mutually exclusive, but we have to pick one of the two.
+    # Go with 1).
+    #
+    if tkwa.get('session') is not None and (parsed_uri.access_id or parsed_uri.access_secret):
+        logger.warning(
+            'ignoring credentials parsed from URL because '
+            'they conflict with tkwa.session.  Set tkwa.session to None to '
+            'suppress this warning.'
+        )
+    elif (parsed_uri.access_id and parsed_uri.access_secret):
+        tkwa['session'] = boto3.Session(
+            aws_access_key_id=parsed_uri.access_id,
+            aws_secret_access_key=parsed_uri.access_secret,
+        )
 
+    kwargs = _check_kwargs(smart_open_s3.open, tkwa)
     return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
 
@@ -876,8 +866,3 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     else:
         decoder = codecs.getwriter(encoding)
     return decoder(fileobj, errors=errors)
-
-def _add_scheme_to_host(host):
-    if host.startswith('http://') or host.startswith('https://'):
-        return host
-    return 'http://' + host

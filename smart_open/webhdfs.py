@@ -14,9 +14,21 @@ logger.addHandler(logging.NullHandler())
 
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
-KWARGS = (
-    ('min_part_size', 'int', 'For writing only'),
-)
+
+def open(uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
+    """
+    Parameters
+    ----------
+    min_part_size: int
+        For writing only.
+
+    """
+    if mode == 'rb':
+        return BufferedInputBase(uri)
+    elif mode == 'wb':
+        return BufferedOutputBase(uri, min_part_size=min_part_size)
+    else:
+        raise NotImplementedError('webhdfs support for mode %r not implemented' % mode)
 
 
 class BufferedInputBase(io.BufferedIOBase):

@@ -6,6 +6,15 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+def open(uri, mode):
+    if mode == 'rb':
+        return CliRawInputBase(uri)
+    elif mode == 'wb':
+        return CliRawOutputBase(uri)
+    else:
+        raise NotImplementedError('hdfs support for mode %r not implemented' % mode)
+
+
 class CliRawInputBase(io.RawIOBase):
     """Reads bytes from HDFS via the "hdfs dfs" command-line interface.
 
