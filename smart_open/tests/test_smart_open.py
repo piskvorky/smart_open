@@ -1102,6 +1102,7 @@ class S3OpenTest(unittest.TestCase):
             self.assertEqual(fin.read().decode("utf-8"), text)
 
     @mock_s3
+    @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_write_mode(self):
         """Should always open in binary mode when writing through a codec."""
         s3 = boto3.resource('s3')
@@ -1113,6 +1114,7 @@ class S3OpenTest(unittest.TestCase):
             mock_open.assert_called_with('bucket', 'key.gz', 'wb')
 
     @mock_s3
+    @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_read_mode(self):
         """Should always open in binary mode when reading through a codec."""
         s3 = boto3.resource('s3')
