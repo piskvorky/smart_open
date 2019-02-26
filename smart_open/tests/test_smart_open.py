@@ -8,7 +8,6 @@
 
 import bz2
 import io
-import functools
 import unittest
 import logging
 import tempfile
@@ -29,7 +28,6 @@ from smart_open import smart_open_lib
 
 logger = logging.getLogger(__name__)
 
-PY2 = sys.version_info[0] == 2
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 SAMPLE_TEXT = 'Hello, world!'
 SAMPLE_BYTES = SAMPLE_TEXT.encode('utf-8')
@@ -207,8 +205,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     def _test_compressed_http(self, suffix, query):
         """Can open <suffix> via http?"""
         raw_data = b'Hello World Compressed.' * 10000
-        buffer = six.BytesIO()
-        buffer.name = 'data' + suffix
+        buffer = make_buffer(name='data' + suffix)
         with smart_open.smart_open(buffer, 'wb') as outfile:
             outfile.write(raw_data)
         compressed_data = buffer.getvalue()
@@ -261,7 +258,7 @@ def make_buffer(cls=six.BytesIO, initial_value=None, name=None):
     buf = cls(initial_value) if initial_value else cls()
     if name is not None:
         buf.name = name
-    if PY2:
+    if six.PY2:
         buf.__enter__ = lambda: buf
         buf.__exit__ = lambda exc_type, exc_val, exc_tb: None
     return buf
@@ -286,14 +283,14 @@ class SmartOpenFileObjTest(unittest.TestCase):
             sf.write(SAMPLE_BYTES)
             self.assertEqual(buffer.getvalue(), SAMPLE_BYTES)
 
-    @unittest.skipIf(PY2, "Python 2 does not differentiate between str and bytes")
+    @unittest.skipIf(six.PY2, "Python 2 does not differentiate between str and bytes")
     def test_read_text_stream_fails(self):
         """Attempts to read directly from a text stream should fail."""
-        buffer = make_buffer(six.StringIO, SAMPLE_TEXT)
+        buffer = make_buffer(six.StringIO, initial_value=SAMPLE_TEXT)
         with smart_open.smart_open(buffer, 'r') as sf:
             self.assertRaises(TypeError, sf.read)  # we expect binary mode
 
-    @unittest.skipIf(PY2, "Python 2 does not differentiate between str and bytes")
+    @unittest.skipIf(six.PY2, "Python 2 does not differentiate between str and bytes")
     def test_write_text_stream_fails(self):
         """Attempts to write directly to a text stream should fail."""
         buffer = make_buffer(six.StringIO)
@@ -948,20 +945,14 @@ class CompressionFormatTest(unittest.TestCase):
     """
 
     def write_read_assertion(self, suffix):
-        with tempfile.NamedTemporaryFile('wb', suffix=suffix, delete=False) as infile:
-            test_file = infile.name
-
-        with smart_open.smart_open(test_file, 'wb') as fout:  # 'b' for binary, needed on Windows
+        test_file = make_buffer(name='file' + suffix)
+        with smart_open.smart_open(test_file, 'wb') as fout:
             fout.write(SAMPLE_BYTES)
-
-        with open(test_file, 'rb') as fin:
-            self.assertNotEqual(SAMPLE_BYTES, fin.read())
-
+        self.assertNotEqual(SAMPLE_BYTES, test_file.getvalue())
+        # we have to recreate the buffer because it is closed
+        test_file = make_buffer(initial_value=test_file.getvalue(), name=test_file.name)
         with smart_open.smart_open(test_file, 'rb') as fin:
-            self.assertEqual(fin.read().decode('utf8'), SAMPLE_TEXT)
-
-        if os.path.isfile(test_file):
-            os.unlink(test_file)
+            self.assertEqual(fin.read(), SAMPLE_BYTES)
 
     def test_open_gz(self):
         """Can open gzip?"""
@@ -1055,7 +1046,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
             os.unlink(test_file)
 
     def test_can_read_multistream_bz2(self):
-        if PY2:
+        if six.PY2:
             # this is a backport from Python 3
             from bz2file import BZ2File
         else:
@@ -1068,7 +1059,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
 
     def test_python2_stdlib_bz2_cannot_read_multistream(self):
         # Multistream bzip is included in Python 3
-        if not PY2:
+        if not six.PY2:
             return
         import bz2
 
