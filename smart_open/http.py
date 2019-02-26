@@ -1,10 +1,18 @@
+# -*- coding: utf-8 -*-
+"""Implements file-like objects for reading from http."""
+
 import io
 import logging
 
 import requests
 
+from smart_open import s3
+
+DEFAULT_BUFFER_SIZE = 128 * 1024
+
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
 
 _HEADERS = {'Accept-Encoding': 'identity'}
 """The headers we send to the server with every HTTP request.
@@ -21,7 +29,8 @@ class BufferedInputBase(io.BufferedIOBase):
     Supports Kerberos and Basic HTTP authentication.
     """
 
-    def __init__(self, url, mode='r', kerberos=False, user=None, password=None):
+    def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
+                 kerberos=False, user=None, password=None):
         """
         If Kerberos is True, will attempt to use the local Kerberos credentials.
         Otherwise, will try to use "basic" HTTP authentication via username/password.
@@ -36,17 +45,17 @@ class BufferedInputBase(io.BufferedIOBase):
         else:
             auth = None
 
+        self.buffer_size = buffer_size
+        self.mode = mode
+
         self.response = requests.get(url, auth=auth, stream=True, headers=_HEADERS)
 
         if not self.response.ok:
             self.response.raise_for_status()
 
-        logger.debug('self.response: %r, raw: %r', self.response, self.response.raw)
-
-        self.mode = mode
-        self._read_buffer = None
-        self._read_iter = None
-        self._readline_iter = None
+        self._read_iter = self.response.iter_content(self.buffer_size)
+        self._read_buffer = b''
+        self._current_pos = 0
 
         #
         # This member is part of the io.BufferedIOBase interface.
@@ -60,6 +69,7 @@ class BufferedInputBase(io.BufferedIOBase):
         """Flush and close this stream."""
         logger.debug("close: called")
         self.response = None
+        self._read_iter = None
 
     def readable(self):
         """Return True if the stream can be read from."""
@@ -75,32 +85,41 @@ class BufferedInputBase(io.BufferedIOBase):
         """Unsupported."""
         raise io.UnsupportedOperation
 
-    def read(self, size=None):
+    def read(self, size=-1):
         """
         Mimics the read call to a filehandle object.
         """
-        logger.debug('read: %r', locals())
-        if size is None:
-            return self.response.raw.read()
-        else:
-            if self._read_iter is None:
-                self._read_iter = self.response.iter_content(size)
-                self._read_buffer = next(self._read_iter)
+        logger.debug("reading with size: %d", size)
+        if self.response is None:
+            return b''
 
+        if size == 0:
+            return b''
+        elif size < 0 and not self._read_buffer:
+            retval = self.response.raw.read()
+        elif size < 0:
+            retval = self._read_buffer + self.response.raw.read()
+            self._read_buffer = b''
+        else:
             while len(self._read_buffer) < size:
+                logger.debug("http reading more content at current_pos: %d with size: %d", self._current_pos, size)
                 try:
                     self._read_buffer += next(self._read_iter)
                 except StopIteration:
                     # Oops, ran out of data early.
                     retval = self._read_buffer
+                    self._current_pos += len(retval)
                     self._read_buffer = b''
+
                     return retval
 
             # If we got here, it means we have enough data in the buffer
             # to return to the caller.
             retval = self._read_buffer[:size]
             self._read_buffer = self._read_buffer[size:]
-            return retval
+
+        self._current_pos += len(retval)
+        return retval
 
     def read1(self, size=-1):
         """This is the same as read()."""
@@ -114,3 +133,118 @@ class BufferedInputBase(io.BufferedIOBase):
             return 0
         b[:len(data)] = data
         return len(data)
+
+
+class SeekableBufferedInputBase(BufferedInputBase):
+    """
+    Implement seekable streamed reader from a web site.
+    Supports Kerberos and Basic HTTP authentication.
+    """
+
+    def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
+                 kerberos=False, user=None, password=None):
+        """
+        If Kerberos is True, will attempt to use the local Kerberos credentials.
+        Otherwise, will try to use "basic" HTTP authentication via username/password.
+
+        If none of those are set, will connect unauthenticated.
+        """
+        self.url = url
+
+        if kerberos:
+            import requests_kerberos
+            self.auth = requests_kerberos.HTTPKerberosAuth()
+        elif user is not None and password is not None:
+            self.auth = (user, password)
+        else:
+            self.auth = None
+
+        self.buffer_size = buffer_size
+        self.mode = mode
+        self.response = self._partial_request()
+
+        if not self.response.ok:
+            self.response.raise_for_status()
+
+        logger.debug('self.response: %r, raw: %r', self.response, self.response.raw)
+
+        self._seekable = True
+
+        self.content_length = int(self.response.headers.get("Content-Length", -1))
+        if self.content_length < 0:
+            self._seekable = False
+        if self.response.headers.get("Accept-Ranges", "none").lower() != "bytes":
+            self._seekable = False
+
+        self._read_iter = self.response.iter_content(self.buffer_size)
+        self._read_buffer = b''
+        self._current_pos = 0
+
+        #
+        # This member is part of the io.BufferedIOBase interface.
+        #
+        self.raw = None
+
+    def seek(self, offset, whence=0):
+        """Seek to the specified position.
+
+        :param int offset: The offset in bytes.
+        :param int whence: Where the offset is from.
+
+        Returns the position after seeking."""
+        logger.debug('seeking to offset: %r whence: %r', offset, whence)
+        if whence not in s3.WHENCE_CHOICES:
+            raise ValueError('invalid whence, expected one of %r' % s3.WHENCE_CHOICES)
+
+        if not self.seekable():
+            raise OSError
+
+        if whence == s3.START:
+            new_pos = offset
+        elif whence == s3.CURRENT:
+            new_pos = self._current_pos + offset
+        elif whence == s3.END:
+            new_pos = self.content_length + offset
+
+        new_pos = s3.clamp(new_pos, 0, self.content_length)
+
+        if self._current_pos == new_pos:
+            return self._current_pos
+
+        logger.debug("http seeking from current_pos: %d to new_pos: %d", self._current_pos, new_pos)
+
+        self._current_pos = new_pos
+
+        if new_pos == self.content_length:
+            self.response = None
+            self._read_iter = None
+            self._read_buffer = b''
+        else:
+            response = self._partial_request(new_pos)
+            if response.ok:
+                self.response = response
+                self._read_iter = self.response.iter_content(self.buffer_size)
+                self._read_buffer = b''
+            else:
+                self.response = None
+
+        return self._current_pos
+
+    def tell(self):
+        return self._current_pos
+
+    def seekable(self, *args, **kwargs):
+        return self._seekable
+
+    def truncate(self, size=None):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def _partial_request(self, start_pos=None):
+        headers = _HEADERS.copy()
+
+        if start_pos is not None:
+            headers.update({"range": s3.make_range_string(start_pos)})
+
+        response = requests.get(self.url, auth=self.auth, stream=True, headers=headers)
+        return response

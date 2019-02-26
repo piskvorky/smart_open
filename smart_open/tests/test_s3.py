@@ -359,9 +359,9 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
 class ClampTest(unittest.TestCase):
     def test(self):
-        self.assertEqual(smart_open.s3._clamp(5, 0, 10), 5)
-        self.assertEqual(smart_open.s3._clamp(11, 0, 10), 10)
-        self.assertEqual(smart_open.s3._clamp(-1, 0, 10), 0)
+        self.assertEqual(smart_open.s3.clamp(5, 0, 10), 5)
+        self.assertEqual(smart_open.s3.clamp(11, 0, 10), 10)
+        self.assertEqual(smart_open.s3.clamp(-1, 0, 10), 0)
 
 
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
