@@ -53,7 +53,7 @@ def open(uri, mode, kerberos=False, user=None, password=None):
 
 
 class BufferedInputBase(io.BufferedIOBase):
-    def __init__(self, url, mode='r', kerberos=False, user=None, password=None):
+    def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE, kerberos=False, user=None, password=None):
         if kerberos:
             import requests_kerberos
             auth = requests_kerberos.HTTPKerberosAuth()
