@@ -485,7 +485,7 @@ def _parse_uri(uri_as_string):
         return _parse_uri_file(uri_as_string)
     elif parsed_uri.scheme.startswith('http'):
         return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
-    elif self.scheme in _SSH_SCHEMES:
+    elif parsed_uri.scheme in _SSH_SCHEMES:
         user, host = parsed_uri.netloc.split('@')
         return Uri(scheme=parsed_uri.scheme, uri_path=parsed_uri.path, user=user, host=host)
     else:
