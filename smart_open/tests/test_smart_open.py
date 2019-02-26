@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 
 PY2 = sys.version_info[0] == 2
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
+SAMPLE_TEXT = 'Hello, world!'
+SAMPLE_BYTES = SAMPLE_TEXT.encode('utf-8')
 
 
 class ParseUriTest(unittest.TestCase):
@@ -247,104 +249,98 @@ class SmartOpenHttpTest(unittest.TestCase):
         self._test_compressed_http(".xz", True)
 
 
+def make_buffer(cls=six.BytesIO, initial_value=None, name=None):
+    """
+    Construct a new in-memory file object aka "buffer".
+
+    :param cls: Class of the file object. Meaningful values are BytesIO and StringIO.
+    :param initial_value: Passed directly to the constructor, this is the content of the returned buffer.
+    :param name: Associated file path. Not assigned if is None (default).
+    :return: Instance of `cls`.
+    """
+    buf = cls(initial_value) if initial_value else cls()
+    if name is not None:
+        buf.name = name
+    if PY2:
+        buf.__enter__ = lambda: buf
+        buf.__exit__ = lambda exc_type, exc_val, exc_tb: None
+    return buf
+
+
 class SmartOpenFileObjTest(unittest.TestCase):
     """
     Test passing raw file objects.
     """
-    text = 'Hello, world!'
 
-    def patch_string_io(func):
-        if not PY2:
-            # Python 3 has already got us covered
-            return func
-
-        def enter(self):
-            return self
-
-        def exit(self, exc_type, exc_val, exc_tb):
-            self.close()
-
-        @functools.wraps(func)
-        def wrapped_patch_string_io(self):
-            six.StringIO.__enter__ = enter
-            six.StringIO.__exit__ = exit
-            try:
-                return func(self)
-            finally:
-                del six.StringIO.__enter__
-                del six.StringIO.__exit__
-
-        return wrapped_patch_string_io
-
-    @patch_string_io
     def test_read_bytes(self):
         """Can we read bytes from a byte stream?"""
-        buffer = six.BytesIO(self.text.encode())
+        buffer = make_buffer(initial_value=SAMPLE_BYTES)
         with smart_open.smart_open(buffer, 'rb') as sf:
             data = sf.read()
-        self.assertEqual(data, self.text.encode())
+        self.assertEqual(data, SAMPLE_BYTES)
 
-    @patch_string_io
     def test_write_bytes(self):
         """Can we write bytes to a byte stream?"""
-        buffer = six.BytesIO()
+        buffer = make_buffer()
         with smart_open.smart_open(buffer, 'wb') as sf:
-            sf.write(self.text.encode())
-            self.assertEqual(buffer.getvalue(), self.text.encode())
+            sf.write(SAMPLE_BYTES)
+            self.assertEqual(buffer.getvalue(), SAMPLE_BYTES)
 
-    @unittest.skipIf(PY2, "Python 2 does not make a difference between str and bytes")
-    @patch_string_io
-    def test_read_str(self):
-        """Can we read strings from a text stream?"""
-        buffer = six.StringIO(self.text)
+    @unittest.skipIf(PY2, "Python 2 does not differentiate between str and bytes")
+    def test_read_text_stream_fails(self):
+        """Attempts to read directly from a text stream should fail."""
+        buffer = make_buffer(six.StringIO, SAMPLE_TEXT)
         with smart_open.smart_open(buffer, 'r') as sf:
             self.assertRaises(TypeError, sf.read)  # we expect binary mode
 
-    @unittest.skipIf(PY2, "Python 2 does not make a difference between str and bytes")
-    @patch_string_io
-    def test_write_str(self):
-        """Can we write strings to a text stream?"""
-        buffer = six.StringIO()
+    @unittest.skipIf(PY2, "Python 2 does not differentiate between str and bytes")
+    def test_write_text_stream_fails(self):
+        """Attempts to write directly to a text stream should fail."""
+        buffer = make_buffer(six.StringIO)
         with smart_open.smart_open(buffer, 'w') as sf:
-            self.assertRaises(TypeError, sf.write, self.text)  # we expect binary mode
+            self.assertRaises(TypeError, sf.write, SAMPLE_TEXT)  # we expect binary mode
 
     def test_read_str_from_bytes(self):
         """Can we read strings from a byte stream?"""
-        buffer = six.BytesIO(self.text.encode())
+        buffer = make_buffer(initial_value=SAMPLE_BYTES)
         with smart_open.smart_open(buffer, 'r') as sf:
             data = sf.read()
-        self.assertEqual(data, self.text)
+        self.assertEqual(data, SAMPLE_TEXT)
 
     def test_write_str_to_bytes(self):
         """Can we write strings to a byte stream?"""
-        buffer = six.BytesIO()
+        buffer = make_buffer()
         with smart_open.smart_open(buffer, 'w') as sf:
-            sf.write(self.text)
-            self.assertEqual(buffer.getvalue(), self.text.encode())
+            sf.write(SAMPLE_TEXT)
+            self.assertEqual(buffer.getvalue(), SAMPLE_BYTES)
 
     def test_name_read(self):
         """Can we use the "name" attribute to decompress on the fly?"""
-        data = b'Hello, world!' * 1000
-        buffer = six.BytesIO(bz2.compress(data))
-        buffer.name = 'data.bz2'
+        data = SAMPLE_BYTES * 1000
+        buffer = make_buffer(initial_value=bz2.compress(data), name='data.bz2')
         with smart_open.smart_open(buffer, 'rb') as sf:
             data = sf.read()
         self.assertEqual(data, data)
 
     def test_name_write(self):
         """Can we use the "name" attribute to compress on the fly?"""
-        data = b'Hello, world!' * 1000
-        buffer = six.BytesIO()
-        buffer.name = 'data.bz2'
+        data = SAMPLE_BYTES * 1000
+        buffer = make_buffer(name='data.bz2')
         with smart_open.smart_open(buffer, 'wb') as sf:
             sf.write(data)
         self.assertEqual(bz2.decompress(buffer.getvalue()), data)
 
     def test_open_side_effect(self):
-        """Does our trick with "name" attribute work with open()?"""
-        data = b'Hello, world!' * 1000
-        with tempfile.NamedTemporaryFile(prefix='smart_open_tests_', delete=False) as tmpf:
-            tmpf.write(data)
+        """
+        Does our detection of the `name` attribute work with wrapped open()-ed streams?
+
+        We `open()` a file with ".bz2" extension, pass the file object to `smart_open()` and check that
+        we read decompressed data. This behavior is driven by detecting the `name` attribute in
+        `_open_binary_stream()`.
+        """
+        data = SAMPLE_BYTES * 1000
+        with tempfile.NamedTemporaryFile(prefix='smart_open_tests_', suffix=".bz2", delete=False) as tmpf:
+            tmpf.write(bz2.compress(data))
         try:
             with open(tmpf.name, 'rb') as openf:
                 with smart_open.smart_open(openf) as smartf:
@@ -352,8 +348,6 @@ class SmartOpenFileObjTest(unittest.TestCase):
             self.assertEqual(data, smart_data)
         finally:
             os.unlink(tmpf.name)
-
-    patch_string_io = staticmethod(patch_string_io)
 
 #
 # What exactly to patch here differs on _how_ we're opening the file.
@@ -953,21 +947,18 @@ class CompressionFormatTest(unittest.TestCase):
     Test that compression
     """
 
-    TEXT = 'Hello'
-
     def write_read_assertion(self, suffix):
         with tempfile.NamedTemporaryFile('wb', suffix=suffix, delete=False) as infile:
             test_file = infile.name
 
-        text = self.TEXT.encode('utf8')
         with smart_open.smart_open(test_file, 'wb') as fout:  # 'b' for binary, needed on Windows
-            fout.write(text)
+            fout.write(SAMPLE_BYTES)
 
         with open(test_file, 'rb') as fin:
-            self.assertNotEqual(text, fin.read())
+            self.assertNotEqual(SAMPLE_BYTES, fin.read())
 
         with smart_open.smart_open(test_file, 'rb') as fin:
-            self.assertEqual(fin.read().decode('utf8'), self.TEXT)
+            self.assertEqual(fin.read().decode('utf8'), SAMPLE_TEXT)
 
         if os.path.isfile(test_file):
             os.unlink(test_file)

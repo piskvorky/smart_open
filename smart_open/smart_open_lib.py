@@ -390,7 +390,7 @@ def _open_binary_stream(uri, mode, **kw):
         filename = getattr(uri, 'name', 'unknown')
         return uri, filename
     else:
-        raise TypeError("don't know how to handle uri %r in mode %r" % (uri, mode))
+        raise TypeError("don't know how to handle uri %r" % uri)
 
 
 def _s3_open_uri(parsed_uri, mode, **kwargs):
@@ -587,7 +587,7 @@ def _compression_wrapper(file_obj, filename, mode):
         warnings.warn('streaming gzip support unavailable, see %s' % _ISSUE_189_URL)
         file_obj = io.BytesIO(file_obj.read())
     if ext in COMPRESSED_EXT and mode.endswith('+'):
-        raise ValueError('impossible to open in read+write+compressed mode')
+        raise ValueError('transparent (de)compression unsupported for mode %r' % mode)
 
     if ext == '.bz2':
         return BZ2File(file_obj, mode)
