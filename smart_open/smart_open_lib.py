@@ -432,12 +432,16 @@ def _shortcut_open(
         return None
 
     open_kwargs = {}
-    if errors is not None:
-        open_kwargs['errors'] = errors
 
     if encoding is not None:
         open_kwargs['encoding'] = encoding
         mode = mode.replace('b', '')
+
+    #
+    # binary mode of the builtin/stdlib open function doesn't take an errors argument
+    #
+    if errors and 'b' not in mode:
+        open_kwargs['errors'] = errors
 
     #
     # Under Py3, the built-in open accepts kwargs, and it's OK to use that.
