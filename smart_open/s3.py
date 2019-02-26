@@ -10,8 +10,6 @@ import boto3
 import botocore.client
 import six
 
-from smart_open.util import START, CURRENT, END, WHENCE_CHOICES, DEFAULT_BUFFER_SIZE, _range_string, _clamp
-
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
@@ -38,6 +36,26 @@ MODES = (READ_BINARY, WRITE_BINARY)
 BINARY_NEWLINE = b'\n'
 
 SUPPORTED_SCHEMES = ("s3", "s3n", 's3u', "s3a")
+
+DEFAULT_BUFFER_SIZE = 128 * 1024
+
+START = 0
+CURRENT = 1
+END = 2
+WHENCE_CHOICES = [START, CURRENT, END]
+
+
+def clamp(value, minval, maxval):
+    return max(min(value, maxval), minval)
+
+
+def make_range_string(start, stop=None):
+    #
+    # https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.35
+    #
+    if stop is None:
+        return 'bytes=%d-' % start
+    return 'bytes=%d-%d' % (start, stop)
 
 
 def open(bucket_id, key_id, mode, **kwargs):
@@ -91,7 +109,7 @@ class SeekableRawReader(object):
         :param int position: The byte offset from the beginning of the key.
         """
         self._position = position
-        range_string = _range_string(self._position)
+        range_string = make_range_string(self._position)
         logger.debug('content_length: %r range_string: %r', self._content_length, range_string)
 
         #
@@ -309,7 +327,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             new_position = self._current_pos + offset
         else:
             new_position = self._content_length + offset
-        new_position = _clamp(new_position, 0, self._content_length)
+        new_position = clamp(new_position, 0, self._content_length)
         self._current_pos = new_position
         self._raw_reader.seek(new_position)
         logger.debug('new_position: %r', self._current_pos)

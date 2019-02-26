@@ -6,8 +6,9 @@ import logging
 
 import requests
 
-from smart_open.util import START, CURRENT, END, WHENCE_CHOICES, DEFAULT_BUFFER_SIZE, _range_string, _clamp
+from smart_open import s3
 
+DEFAULT_BUFFER_SIZE = 128 * 1024
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -193,20 +194,20 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
-        if whence not in WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % WHENCE_CHOICES)
+        if whence not in s3.WHENCE_CHOICES:
+            raise ValueError('invalid whence, expected one of %r' % s3.WHENCE_CHOICES)
 
         if not self.seekable():
             raise OSError
 
-        if whence == START:
+        if whence == s3.START:
             new_pos = offset
-        elif whence == CURRENT:
+        elif whence == s3.CURRENT:
             new_pos = self._current_pos + offset
         elif whence == 2:
             new_pos = self.content_length + offset
 
-        new_pos = _clamp(new_pos, 0, self.content_length)
+        new_pos = s3.clamp(new_pos, 0, self.content_length)
 
         if self._current_pos != new_pos:
             logger.debug("http seeking from current_pos: %d to new_pos: %d", self._current_pos, new_pos)
@@ -243,7 +244,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         headers = _HEADERS.copy()
 
         if start_pos is not None:
-            headers.update({"range": _range_string(start_pos)})
+            headers.update({"range": make_range_string(start_pos)})
 
         response = requests.get(self.url, auth=self.auth, stream=True, headers=headers)
 
