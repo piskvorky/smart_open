@@ -118,9 +118,6 @@ bucket_id is only for S3.
 #
 Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
 
-_SSH={} # place to put ssh connections, if necessary.
-_SSH_SCHEMES = ("ssh", "scp", "sftp")
-
 
 def smart_open(uri, mode="rb", **kw):
     """
@@ -347,22 +344,8 @@ def _open_binary_stream(uri, mode, **kw):
             # compression, if any, is determined by the filename extension (.gz, .bz2, .xz)
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
-        elif parsed_uri.scheme in ("ssh", "scp", "sftp"):
-            def SSH(hostname, username):
-                import paramiko
-                ssh = _SSH.get( (hostname,username) )
-                if ssh is None:
-                    ssh = _SSH[ (hostname,username) ] = paramiko.client.SSHClient()
-                    ssh.load_system_host_keys()
-                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    ssh.connect(hostname, 22, username)
-                    pass
-                return ssh
-            def SFTP(): return SSH(parsed_uri.host,
-                                   parsed_uri.user).get_transport().open_sftp_client()
-            def sopen(filename, mode): return SFTP().open(filename, mode)
-
-            return sopen(parsed_uri.uri_path[1:], mode)
+        elif parsed_uri.scheme in ssh.SCHEMES:
+            return ssh.open(parsed_uri.uri_path[1:], mode, parsed_uri.host, parsed_uri.user)
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
             return _s3_open_uri(parsed_uri, mode, **kw), filename
         elif parsed_uri.scheme in ("hdfs", ):
