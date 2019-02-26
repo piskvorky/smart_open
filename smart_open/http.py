@@ -203,7 +203,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             new_pos = offset
         elif whence == s3.CURRENT:
             new_pos = self._current_pos + offset
-        elif whence == 2:
+        elif whence == s3.END:
             new_pos = self.content_length + offset
 
         new_pos = s3.clamp(new_pos, 0, self.content_length)
@@ -241,12 +241,10 @@ class SeekableBufferedInputBase(BufferedInputBase):
         raise io.UnsupportedOperation
 
     def _partial_request(self, start_pos=None):
-
         headers = _HEADERS.copy()
 
         if start_pos is not None:
             headers.update({"range": s3.make_range_string(start_pos)})
 
         response = requests.get(self.url, auth=self.auth, stream=True, headers=headers)
-
         return response
