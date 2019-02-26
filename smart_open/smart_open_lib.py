@@ -91,8 +91,6 @@ _ISSUE_146_FSTR = (
 )
 _ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
 
-DEFAULT_ERRORS = 'strict'
-
 
 Uri = collections.namedtuple(
     'Uri',
@@ -784,7 +782,7 @@ def _compression_wrapper(file_obj, filename, mode):
         return file_obj
 
 
-def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
+def _encoding_wrapper(fileobj, mode, encoding=None, errors='strict'):
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
