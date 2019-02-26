@@ -14,9 +14,9 @@ filesystem / compressed files..., using a single, Pythonic API.
 The streaming makes heavy use of generators and pipes, to avoid loading
 full file contents into memory, allowing work with arbitrarily large files.
 
-The main methods are:
+The main functions are:
 
-* `smart_open()`, which opens the given file for reading/writing
+* `open()`, which opens the given file for reading/writing
 * `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
 
 """
@@ -156,7 +156,10 @@ def _check_kwargs(kallable, kwargs):
     return supported_kwargs
 
 
-def smart_open2(
+_builtin_open = open
+
+
+def open(
         uri,
         mode='r',
         buffering=-1,
@@ -239,46 +242,47 @@ def smart_open2(
 
     Examples
     --------
+    >>> from smart_open import open
     >>> # stream lines from http; you can use context managers too:
-    >>> with smart_open.smart_open2('http://www.google.com') as fin:
+    >>> with open('http://www.google.com') as fin:
     ...     for line in fin:
     ...         print(line)
 
     >>> # stream lines from S3; you can use context managers too:
-    >>> with smart_open.smart_open2('s3://mybucket/mykey.txt') as fin:
+    >>> with open('s3://mybucket/mykey.txt') as fin:
     ...     for line in fin:
     ...         print(line)
 
     >>> # you can also use a boto.s3.key.Key instance directly:
     >>> key = boto.connect_s3().get_bucket("my_bucket").get_key("my_key")
-    >>> with smart_open.smart_open2(key) as fin:
+    >>> with open(key) as fin:
     ...     for line in fin:
     ...         print(line)
 
     >>> # stream line-by-line from an HDFS file
-    >>> for line in smart_open.smart_open2('hdfs:///user/hadoop/my_file.txt'):
+    >>> for line in open('hdfs:///user/hadoop/my_file.txt'):
     ...    print(line)
 
     >>> # stream content *into* S3:
-    >>> with smart_open.smart_open2('s3://mybucket/mykey.txt', 'wb') as fout:
+    >>> with open('s3://mybucket/mykey.txt', 'wb') as fout:
     ...     for line in ['first line', 'second line', 'third line']:
     ...          fout.write(line + '\n')
 
     >>> # stream from/to (compressed) local files:
-    >>> for line in smart_open.smart_open2('/home/radim/my_file.txt'):
+    >>> for line in open('/home/radim/my_file.txt'):
     ...    print(line)
-    >>> for line in smart_open.smart_open2('/home/radim/my_file.txt.gz'):
+    >>> for line in open('/home/radim/my_file.txt.gz'):
     ...    print(line)
-    >>> with smart_open.smart_open2('/home/radim/my_file.txt.gz', 'wb') as fout:
+    >>> with open('/home/radim/my_file.txt.gz', 'wb') as fout:
     ...    fout.write("hello world!\n")
-    >>> with smart_open.smart_open2('/home/radim/another.txt.bz2', 'wb') as fout:
+    >>> with open('/home/radim/another.txt.bz2', 'wb') as fout:
     ...    fout.write("good bye!\n")
-    >>> with smart_open.smart_open2('/home/radim/another.txt.xz', 'wb') as fout:
+    >>> with open('/home/radim/another.txt.xz', 'wb') as fout:
     ...    fout.write("never say never!\n")
     >>> # stream from/to (compressed) local files with Expand ~ and ~user constructions:
-    >>> for line in smart_open.smart_open2('~/my_file.txt'):
+    >>> for line in open('~/my_file.txt'):
     ...    print(line)
-    >>> for line in smart_open.smart_open2('my_file.txt'):
+    >>> for line in open('my_file.txt'):
     ...    print(line)
 
     """
@@ -351,7 +355,7 @@ def smart_open2(
 #
 # Inject transport keyword argument documentation into the docstring.
 #
-smart_open2.__doc__ = smart_open2.__doc__ % {
+open.__doc__ = open.__doc__ % {
     's3': doctools.to_docstring(
         doctools.extract_kwargs(smart_open_s3.open.__doc__),
         lpad='    ',
@@ -431,9 +435,9 @@ def smart_open(uri, mode="rb", **kw):
       ...    print line
 
     """
-    logger.warning('this function is deprecated, use smart_open2 instead')
+    logger.warning('this function is deprecated, use smart_open.open instead')
 
-    expected_kwargs = _inspect_kwargs(smart_open2)
+    expected_kwargs = _inspect_kwargs(open)
     scrubbed_kwargs = {}
     tkwa = {}
     for key, value in kw.items():
@@ -448,7 +452,7 @@ def smart_open(uri, mode="rb", **kw):
             #
             tkwa[key] = value
 
-    return smart_open2(uri, mode, tkwa=tkwa, **scrubbed_kwargs)
+    return open(uri, mode, tkwa=tkwa, **scrubbed_kwargs)
 
 
 def _shortcut_open(
@@ -503,9 +507,9 @@ def _shortcut_open(
     # kwargs, then we have no option other to use io.open.
     #
     if six.PY3:
-        return open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
+        return _builtin_open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
     elif not open_kwargs:
-        return open(parsed_uri.uri_path, mode, buffering=buffering)
+        return _builtin_open(parsed_uri.uri_path, mode, buffering=buffering)
     return io.open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
 
 
