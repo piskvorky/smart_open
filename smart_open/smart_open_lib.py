@@ -458,7 +458,6 @@ def _shortcut_open(
         buffering=-1,
         encoding=None,
         errors=None,
-        **kw,  # TODO: remove this catch-all
         ):
     """Try to open the URI using the standard library io.open function.
 
@@ -517,7 +516,7 @@ def _open_binary_stream(uri, mode, tkwa):
 
     :arg uri: The URI to open.  May be a string, or something else.
     :arg str mode: The mode to open with.  Must be rb, wb or ab.
-    :arg tkwa: TODO: document this.
+    :arg tkwa: Keyword argumens for the transport layer.
     :returns: A file object and the filename
     :rtype: tuple
     """
