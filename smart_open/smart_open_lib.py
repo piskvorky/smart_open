@@ -431,75 +431,24 @@ def smart_open(uri, mode="rb", **kw):
       ...    print line
 
     """
+    logger.warning('this function is deprecated, use smart_open2 instead')
 
-    logger.debug('%r', locals())
+    expected_kwargs = _inspect_kwargs(smart_open2)
+    scrubbed_kwargs = {}
+    tkwa = {}
+    for key, value in kw.items():
+        if key in expected_kwargs:
+            scrubbed_kwargs[key] = value
+        else:
+            #
+            # Assume that anything not explicitly supported by the new function
+            # is a transport layer keyword argument.  This is safe, because if
+            # the argument ends up being unsupported in the transport layer,
+            # it will only cause a logging warning, not a crash.
+            #
+            tkwa[key] = value
 
-    if not isinstance(mode, six.string_types):
-        raise TypeError('mode should be a string')
-
-    fobj = _shortcut_open(uri, mode, **kw)
-    if fobj is not None:
-        return fobj
-
-    #
-    # This is a work-around for the problem described in Issue #144.
-    # If the user has explicitly specified an encoding, then assume they want
-    # us to open the destination in text mode, instead of the default binary.
-    #
-    # If we change the default mode to be text, and match the normal behavior
-    # of Py2 and 3, then the above assumption will be unnecessary.
-    #
-    if kw.get('encoding') is not None and 'b' in mode:
-        mode = mode.replace('b', '')
-
-    # Support opening ``pathlib.Path`` objects by casting them to strings.
-    if PATHLIB_SUPPORT and isinstance(uri, pathlib.Path):
-        uri = str(uri)
-
-    #
-    # Our API is very liberal with keyword arguments, making it a bit hard to
-    # manage them.  Capture the keyword arguments we'll be using in this
-    # function in advance to reduce the confusion in downstream functions.
-    #
-    # explicit_encoding is what we've been explicitly told to use.  encoding is
-    # what we'll actually end up using.  The two may be different if the user
-    # didn't actually specify the encoding.
-    #
-    ignore_extension = kw.pop('ignore_extension', False)
-    explicit_encoding = kw.get('encoding', None)
-    encoding = kw.pop('encoding', SYSTEM_ENCODING)
-
-    #
-    # This is how we get from the filename to the end result.  Decompression is
-    # optional, but it always accepts bytes and returns bytes.
-    #
-    # Decoding is also optional, accepts bytes and returns text.  The diagram
-    # below is for reading, for writing, the flow is from right to left, but
-    # the code is identical.
-    #
-    #           open as binary         decompress?          decode?
-    # filename ---------------> bytes -------------> bytes ---------> text
-    #                          binary             decompressed       decode
-    #
-    try:
-        binary_mode = {'r': 'rb', 'r+': 'rb+',
-                       'w': 'wb', 'w+': 'wb+',
-                       'a': 'ab', 'a+': 'ab+'}[mode]
-    except KeyError:
-        binary_mode = mode
-    binary, filename = _open_binary_stream(uri, binary_mode, kw)
-    if ignore_extension:
-        decompressed = binary
-    else:
-        decompressed = _compression_wrapper(binary, filename, mode)
-
-    if 'b' not in mode or explicit_encoding is not None:
-        errors = kw.pop('errors', 'strict')
-        decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
-    else:
-        decoded = decompressed
-
-    return decoded
+    return smart_open2(uri, mode, tkwa=tkwa, **scrubbed_kwargs)
 
 
 def _shortcut_open(
