@@ -27,8 +27,6 @@ import logging
 import inspect
 import os
 import os.path as P
-import sys
-import requests
 import importlib
 import io
 import warnings
