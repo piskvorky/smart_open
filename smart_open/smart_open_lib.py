@@ -160,7 +160,7 @@ def open(
         mode='r',
         buffering=-1,
         encoding=None,
-        errors='strict',
+        errors=None,
         newline=None,
         closefd=True,
         opener=None,
@@ -727,7 +727,7 @@ def _compression_wrapper(file_obj, filename, mode):
         return file_obj
 
 
-def _encoding_wrapper(fileobj, mode, encoding=None, errors='strict'):
+def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
@@ -760,4 +760,8 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors='strict'):
         decoder = codecs.getreader(encoding)
     else:
         decoder = codecs.getwriter(encoding)
-    return decoder(fileobj, errors=errors)
+
+    if errors:
+        return decoder(fileobj, errors=errors)
+    else:
+        return decoder(fileobj)

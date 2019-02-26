@@ -306,7 +306,7 @@ class SmartOpenReadTest(unittest.TestCase):
         fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
         with mock.patch('smart_open.smart_open_lib._builtin_open') as mock_open:
             smart_open.smart_open(fpath, 'r').read()
-        mock_open.assert_called_with(fpath, 'r', buffering=-1, errors='strict')
+        mock_open.assert_called_with(fpath, 'r', buffering=-1)
 
     def test_open_with_keywords(self):
         """This test captures Issue #142."""
@@ -679,7 +679,7 @@ class SmartOpenTest(unittest.TestCase):
         with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("blah", "r", encoding='utf-8') as fin:
                 self.assertEqual(fin.read(), self.as_text)
-                mock_open.assert_called_with("blah", "r", buffering=-1, encoding='utf-8', errors='strict')
+                mock_open.assert_called_with("blah", "r", buffering=-1, encoding='utf-8')
 
     def test_binary(self):
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
@@ -708,21 +708,21 @@ class SmartOpenTest(unittest.TestCase):
         patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
         with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("blah", "w", encoding='utf-8') as fout:
-                mock_open.assert_called_with("blah", "w", buffering=-1, encoding='utf-8', errors='strict')
+                mock_open.assert_called_with("blah", "w", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
 
     def test_write_utf8_absolute_path(self):
         patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
         with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("/some/file.txt", "w", encoding='utf-8') as fout:
-                mock_open.assert_called_with("/some/file.txt", "w", buffering=-1, encoding='utf-8', errors='strict')
+                mock_open.assert_called_with("/some/file.txt", "w", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
 
     def test_append_utf8(self):
         patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
         with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("/some/file.txt", "w+", encoding='utf-8') as fout:
-                mock_open.assert_called_with("/some/file.txt", "w+", buffering=-1, encoding='utf-8', errors='strict')
+                mock_open.assert_called_with("/some/file.txt", "w+", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
 
     def test_append_binary_absolute_path(self):
