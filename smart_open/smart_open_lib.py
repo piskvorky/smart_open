@@ -354,15 +354,15 @@ def open(
 open.__doc__ = open.__doc__ % {
     's3': doctools.to_docstring(
         doctools.extract_kwargs(smart_open_s3.open.__doc__),
-        lpad='    ',
+        lpad=u'    ',
     ),
     'http': doctools.to_docstring(
         doctools.extract_kwargs(smart_open_http.open.__doc__),
-        lpad='    ',
+        lpad=u'    ',
     ),
     'webhdfs': doctools.to_docstring(
         doctools.extract_kwargs(smart_open_webhdfs.open.__doc__),
-        lpad='    ',
+        lpad=u'    ',
     ),
 }
 
