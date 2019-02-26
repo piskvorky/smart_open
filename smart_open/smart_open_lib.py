@@ -370,69 +370,7 @@ open.__doc__ = open.__doc__ % {
 
 
 def smart_open(uri, mode="rb", **kw):
-    """
-    Open the given S3 / HDFS / filesystem file pointed to by `uri` for reading or writing.
-
-    The only supported modes for now are 'rb' (read, default) and 'wb' (replace & write).
-
-    The reads/writes are memory efficient (streamed) and therefore suitable for
-    arbitrarily large files.
-
-    The `uri` can be either:
-
-    1. a URI for the local filesystem (compressed ``.gz``, ``.bz2`` or ``.xz`` files handled
-        automatically): `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
-    2. a URI for HDFS: `hdfs:///some/path/lines.txt`
-    3. a URI for Amazon's S3 (can also supply credentials inside the URI):
-       `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
-    4. an instance of the boto.s3.key.Key class.
-    5. an instance of the pathlib.Path class.
-
-    Examples::
-
-      >>> # stream lines from http; you can use context managers too:
-      >>> with smart_open.smart_open('http://www.google.com') as fin:
-      ...     for line in fin:
-      ...         print line
-
-      >>> # stream lines from S3; you can use context managers too:
-      >>> with smart_open.smart_open('s3://mybucket/mykey.txt') as fin:
-      ...     for line in fin:
-      ...         print line
-
-      >>> # you can also use a boto.s3.key.Key instance directly:
-      >>> key = boto.connect_s3().get_bucket("my_bucket").get_key("my_key")
-      >>> with smart_open.smart_open(key) as fin:
-      ...     for line in fin:
-      ...         print line
-
-      >>> # stream line-by-line from an HDFS file
-      >>> for line in smart_open.smart_open('hdfs:///user/hadoop/my_file.txt'):
-      ...    print line
-
-      >>> # stream content *into* S3:
-      >>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'wb') as fout:
-      ...     for line in ['first line', 'second line', 'third line']:
-      ...          fout.write(line + '\n')
-
-      >>> # stream from/to (compressed) local files:
-      >>> for line in smart_open.smart_open('/home/radim/my_file.txt'):
-      ...    print line
-      >>> for line in smart_open.smart_open('/home/radim/my_file.txt.gz'):
-      ...    print line
-      >>> with smart_open.smart_open('/home/radim/my_file.txt.gz', 'wb') as fout:
-      ...    fout.write("hello world!\n")
-      >>> with smart_open.smart_open('/home/radim/another.txt.bz2', 'wb') as fout:
-      ...    fout.write("good bye!\n")
-      >>> with smart_open.smart_open('/home/radim/another.txt.xz', 'wb') as fout:
-      ...    fout.write("never say never!\n")
-      >>> # stream from/to (compressed) local files with Expand ~ and ~user constructions:
-      >>> for line in smart_open.smart_open('~/my_file.txt'):
-      ...    print line
-      >>> for line in smart_open.smart_open('my_file.txt'):
-      ...    print line
-
-    """
+    """Deprecated, use smart_open.open instead."""
     logger.warning('this function is deprecated, use smart_open.open instead')
 
     expected_kwargs = _inspect_kwargs(open)
