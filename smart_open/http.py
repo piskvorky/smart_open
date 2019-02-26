@@ -91,16 +91,15 @@ class BufferedInputBase(io.BufferedIOBase):
         """
         logger.debug("reading with size: %d", size)
         if self.response is None:
-            return ''
+            return b''
 
         if size == 0:
-            return ''
+            return b''
+        elif size < 0 and not self._read_buffer:
+            retval = self.response.raw.read()
         elif size < 0:
-            if len(self._read_buffer):
-                retval = self._read_buffer + self.response.raw.read()
-                self._read_buffer = b''
-            else:
-                retval = self.response.raw.read()
+            retval = self._read_buffer + self.response.raw.read()
+            self._read_buffer = b''
         else:
             while len(self._read_buffer) < size:
                 logger.debug("http reading more content at current_pos: %d with size: %d", self._current_pos, size)
@@ -209,23 +208,25 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         new_pos = s3.clamp(new_pos, 0, self.content_length)
 
-        if self._current_pos != new_pos:
-            logger.debug("http seeking from current_pos: %d to new_pos: %d", self._current_pos, new_pos)
+        if self._current_pos == new_pos:
+            return self._current_pos
 
-            self._current_pos = new_pos
+        logger.debug("http seeking from current_pos: %d to new_pos: %d", self._current_pos, new_pos)
 
-            if new_pos == self.content_length:
-                self.response = None
-                self._read_iter = None
+        self._current_pos = new_pos
+
+        if new_pos == self.content_length:
+            self.response = None
+            self._read_iter = None
+            self._read_buffer = b''
+        else:
+            response = self._partial_request(new_pos)
+            if response.ok:
+                self.response = response
+                self._read_iter = self.response.iter_content(self.buffer_size)
                 self._read_buffer = b''
             else:
-                response = self._partial_request(new_pos)
-                if response.ok:
-                    self.response = response
-                    self._read_iter = self.response.iter_content(self.buffer_size)
-                    self._read_buffer = b''
-                else:
-                    self.response = None
+                self.response = None
 
         return self._current_pos
 
