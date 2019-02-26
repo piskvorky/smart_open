@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 try:
     import paramiko
 except ImportError:
-    logger.warning('paramiko missing, SSH will be disabled.  `pip install paramiko` to suppress')
+    logger.warning('paramiko missing, opening SSH/SCP/SFTP paths will be disabled.  `pip install paramiko` to suppress')
 
 #
 # Global storage for SSH connections.
