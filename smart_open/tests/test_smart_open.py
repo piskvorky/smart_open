@@ -166,12 +166,52 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(uri.scheme, "file")
         self.assertEqual(uri.uri_path, '//' + path)
 
+    def test_ssh(self):
+        as_string = 'ssh://user@host:1234/path/to/file'
+        uri = smart_open_lib._parse_uri(as_string)
+        self.assertEqual(uri.scheme, 'ssh')
+        self.assertEqual(uri.uri_path, '/path/to/file')
+        self.assertEqual(uri.user, 'user')
+        self.assertEqual(uri.host, 'host')
+        self.assertEqual(uri.port, 1234)
+
+    def test_scp(self):
+        as_string = 'scp://user@host:/path/to/file'
+        uri = smart_open_lib._parse_uri(as_string)
+        self.assertEqual(uri.scheme, 'scp')
+        self.assertEqual(uri.uri_path, '/path/to/file')
+        self.assertEqual(uri.user, 'user')
+        self.assertEqual(uri.host, 'host')
+        self.assertEqual(uri.port, 22)
+
+    def test_sftp(self):
+        as_string = 'sftp://host/path/to/file'
+        uri = smart_open_lib._parse_uri(as_string)
+        self.assertEqual(uri.scheme, 'sftp')
+        self.assertEqual(uri.uri_path, '/path/to/file')
+        self.assertEqual(uri.user, None)
+        self.assertEqual(uri.host, 'host')
+        self.assertEqual(uri.port, 22)
+
 
 class SmartOpenHttpTest(unittest.TestCase):
     """
     Test reading from HTTP connections in various ways.
 
     """
+    @mock.patch('smart_open.ssh.open')
+    def test_read_ssh(self, mock_open):
+        """Is SSH line iterator called correctly?"""
+        obj = smart_open.smart_open("ssh://ubuntu@ip_address:1022/some/path/lines.txt")
+        obj.__iter__()
+        mock_open.assert_called_with(
+            '/some/path/lines.txt',
+            'rb',
+            host='ip_address',
+            user='ubuntu',
+            port=1022
+        )
+
     @responses.activate
     def test_http_read(self):
         """Does http read method work correctly"""

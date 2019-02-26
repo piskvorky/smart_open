@@ -346,7 +346,13 @@ def _open_binary_stream(uri, mode, **kw):
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in smart_open_ssh.SCHEMES:
-            fobj = smart_open_ssh.open(parsed_uri.uri_path[1:], mode, parsed_uri.host, parsed_uri.user)
+            fobj = smart_open_ssh.open(
+                parsed_uri.uri_path,
+                mode,
+                host=parsed_uri.host,
+                user=parsed_uri.user,
+                port=parsed_uri.port,
+            )
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
             return _s3_open_uri(parsed_uri, mode, **kw), filename
@@ -471,8 +477,7 @@ def _parse_uri(uri_as_string):
     elif parsed_uri.scheme.startswith('http'):
         return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
     elif parsed_uri.scheme in smart_open_ssh.SCHEMES:
-        user, host = parsed_uri.netloc.split('@')
-        return Uri(scheme=parsed_uri.scheme, uri_path=parsed_uri.path, user=user, host=host)
+        return _parse_uri_ssh(parsed_uri)
     else:
         raise NotImplementedError(
             "unknown URI scheme %r in %r" % (parsed_uri.scheme, uri_as_string)
@@ -562,6 +567,28 @@ def _parse_uri_file(input_path):
         raise RuntimeError("invalid file URI: %s" % input_path)
 
     return Uri(scheme='file', uri_path=uri_path)
+
+
+def _parse_uri_ssh(unt):
+    """Parse a Uri from a urllib namedtuple."""
+    if '@' in unt.netloc:
+        user, host_port = unt.netloc.split('@', 1)
+    else:
+        user, host_port = None, unt.netloc
+
+    if ':' in host_port:
+        host, port = host_port.split(':', 1)
+    else:
+        host, port = host_port, None
+
+    if not user:
+        user = None
+    if not port:
+        port = smart_open_ssh.DEFAULT_PORT
+    else:
+        port = int(port)
+
+    return Uri(scheme=unt.scheme, uri_path=unt.path, user=user, host=host, port=port)
 
 
 def _need_to_buffer(file_obj, mode, ext):

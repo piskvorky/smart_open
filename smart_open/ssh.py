@@ -31,6 +31,8 @@ _SSH = {}
 SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""
 
+DEFAULT_PORT = 22
+
 
 def _connect(hostname, username, port):
     key = (hostname, username)
@@ -43,7 +45,7 @@ def _connect(hostname, username, port):
     return ssh
 
 
-def open(path, mode='r', host=None, user=None, port=22):
+def open(path, mode='r', host=None, user=None, port=DEFAULT_PORT):
     """Open a file on a remote machine over SSH.
 
     Expects authentication to be already set up via existing keys on the local machine.
