@@ -79,7 +79,10 @@ class SeekableRawReader(object):
 
     def __init__(self, s3_object):
         self._object = s3_object
-        self._content_length = self._object.content_length
+        try:
+            self._content_length = self._object.content_length
+        except botocore.client.ClientError:
+            raise ValueError('the s3 key %r does not exist, or is forbidden for access' % s3_object.key)
         self.seek(0)
 
     def seek(self, position):
@@ -518,7 +521,12 @@ def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True):
     ctoken = None
 
     while True:
-        response = client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+        # list_objects_v2 doesn't like a None value for ContinuationToken
+        # so we don't set it if we don't have one.
+        if ctoken:
+            response = client.list_objects_v2(Bucket=bucket_name, Prefix=prefix, ContinuationToken=ctoken)
+        else:
+            response = client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
         try:
             content = response['Contents']
         except KeyError:

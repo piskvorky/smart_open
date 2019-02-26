@@ -43,7 +43,6 @@ for pathlib_module in ('pathlib', 'pathlib2'):
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
 import sys
-from ssl import SSLError
 from six.moves.urllib import parse as urlparse
 
 
@@ -57,6 +56,14 @@ else:
     from bz2 import BZ2File
 
 import gzip
+try:
+    import lzma
+except ImportError:
+    # py<3.3
+    from backports import lzma
+
+
+COMPRESSED_EXT = ('.gz', '.bz2', '.xz')  # supported compressed file extensions
 
 #
 # This module defines a function called smart_open so we cannot use
@@ -82,7 +89,7 @@ DEFAULT_ERRORS = 'strict'
 
 
 Uri = collections.namedtuple(
-    'Uri', 
+    'Uri',
     (
         'scheme',
         'uri_path',
@@ -120,8 +127,8 @@ def smart_open(uri, mode="rb", **kw):
 
     The `uri` can be either:
 
-    1. a URI for the local filesystem (compressed ``.gz`` or ``.bz2`` files handled automatically):
-       `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
+    1. a URI for the local filesystem (compressed ``.gz``, ``.bz2`` or ``.xz`` files handled
+        automatically): `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
     2. a URI for HDFS: `hdfs:///some/path/lines.txt`
     3. a URI for Amazon's S3 (can also supply credentials inside the URI):
        `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
@@ -164,6 +171,8 @@ def smart_open(uri, mode="rb", **kw):
       ...    fout.write("hello world!\n")
       >>> with smart_open.smart_open('/home/radim/another.txt.bz2', 'wb') as fout:
       ...    fout.write("good bye!\n")
+      >>> with smart_open.smart_open('/home/radim/another.txt.xz', 'wb') as fout:
+      ...    fout.write("never say never!\n")
       >>> # stream from/to (compressed) local files with Expand ~ and ~user constructions:
       >>> for line in smart_open.smart_open('~/my_file.txt'):
       ...    print line
@@ -269,7 +278,7 @@ def _shortcut_open(uri, mode, **kw):
 
     _, extension = P.splitext(parsed_uri.uri_path)
     ignore_extension = kw.get('ignore_extension', False)
-    if extension in ('.gz', '.bz2') and not ignore_extension:
+    if extension in COMPRESSED_EXT and not ignore_extension:
         return None
 
     #
@@ -329,7 +338,7 @@ def _open_binary_stream(uri, mode, **kw):
 
         if parsed_uri.scheme in ("file", ):
             # local files -- both read & write supported
-            # compression, if any, is determined by the filename extension (.gz, .bz2)
+            # compression, if any, is determined by the filename extension (.gz, .bz2, .xz)
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
@@ -368,7 +377,7 @@ def _open_binary_stream(uri, mode, **kw):
         #
         host = kw.pop('host', None)
         if host is not None:
-            kw['endpoint_url'] = 'http://' + host
+            kw['endpoint_url'] = _add_scheme_to_host(host)
         return smart_open_s3.open(uri.bucket.name, uri.name, mode, **kw), uri.name
     elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
@@ -393,7 +402,7 @@ def _s3_open_uri(parsed_uri, mode, **kwargs):
     # Get an S3 host. It is required for sigv4 operations.
     host = kwargs.pop('host', None)
     if host is not None:
-        kwargs['endpoint_url'] = 'http://' + host
+        kwargs['endpoint_url'] = _add_scheme_to_host(host)
 
     return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
@@ -430,6 +439,7 @@ def _parse_uri(uri_as_string):
       * ./local/path/file.gz
       * file:///home/user/file
       * file:///home/user/file.bz2
+      * file:///home/user/file.xz
     """
     if os.name == 'nt':
         # urlsplit doesn't work on Windows -- it parses the drive as the scheme...
@@ -444,8 +454,10 @@ def _parse_uri(uri_as_string):
         return _parse_uri_webhdfs(parsed_uri)
     elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
         return _parse_uri_s3x(parsed_uri)
-    elif parsed_uri.scheme in ('file', '', None):
-        return _parse_uri_file(parsed_uri)
+    elif parsed_uri.scheme == 'file':
+        return _parse_uri_file(parsed_uri.netloc + parsed_uri.path)
+    elif parsed_uri.scheme in ('', None):
+        return _parse_uri_file(uri_as_string)
     elif parsed_uri.scheme.startswith('http'):
         return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
     else:
@@ -476,44 +488,51 @@ def _parse_uri_webhdfs(parsed_uri):
 
 
 def _parse_uri_s3x(parsed_uri):
+    #
+    # Restrictions on bucket names and labels:
+    #
+    # - Bucket names must be at least 3 and no more than 63 characters long.
+    # - Bucket names must be a series of one or more labels.
+    # - Adjacent labels are separated by a single period (.).
+    # - Bucket names can contain lowercase letters, numbers, and hyphens.
+    # - Each label must start and end with a lowercase letter or a number.
+    #
+    # We use the above as a guide only, and do not perform any validation.  We
+    # let boto3 take care of that for us.
+    #
     assert parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES
 
     port = 443
     host = boto.config.get('s3', 'host', 's3.amazonaws.com')
     ordinary_calling_format = False
+    #
+    # These defaults tell boto3 to look for credentials elsewhere
+    #
+    access_id, access_secret = None, None
 
+    #
     # Common URI template [secret:key@][host[:port]@]bucket/object
-    try:
-        uri = parsed_uri.netloc + parsed_uri.path
-        # Separate authentication from URI if exist
-        if ':' in uri.split('@')[0]:
-            auth, uri = uri.split('@', 1)
-            access_id, access_secret = auth.split(':')
-        else:
-            # "None" credentials are interpreted as "look for credentials in other locations" by boto
-            access_id, access_secret = None, None
+    #
+    # The urlparse function doesn't handle the above schema, so we have to do
+    # it ourselves.
+    #
+    uri = parsed_uri.netloc + parsed_uri.path
 
-        # Split [host[:port]@]bucket/path
-        host_bucket, key_id = uri.split('/', 1)
-        if '@' in host_bucket:
-            host_port, bucket_id = host_bucket.split('@')
-            ordinary_calling_format = True
-            if ':' in host_port:
-                server = host_port.split(':')
-                host = server[0]
-                if len(server) == 2:
-                    port = int(server[1])
-            else:
-                host = host_port
-        else:
-            bucket_id = host_bucket
-    except Exception:
-        # Bucket names must be at least 3 and no more than 63 characters long.
-        # Bucket names must be a series of one or more labels.
-        # Adjacent labels are separated by a single period (.).
-        # Bucket names can contain lowercase letters, numbers, and hyphens.
-        # Each label must start and end with a lowercase letter or a number.
-        raise RuntimeError("invalid S3 URI: %s" % str(parsed_uri))
+    if '@' in uri and ':' in uri.split('@')[0]:
+        auth, uri = uri.split('@', 1)
+        access_id, access_secret = auth.split(':')
+
+    head, key_id = uri.split('/', 1)
+    if '@' in head and ':' in head:
+        ordinary_calling_format = True
+        host_port, bucket_id = head.split('@')
+        host, port = host_port.split(':', 1)
+        port = int(port)
+    elif '@' in head:
+        ordinary_calling_format = True
+        host, bucket_id = head.split('@')
+    else:
+        bucket_id = head
 
     return Uri(
         scheme=parsed_uri.scheme, bucket_id=bucket_id, key_id=key_id,
@@ -522,14 +541,12 @@ def _parse_uri_s3x(parsed_uri):
     )
 
 
-def _parse_uri_file(parsed_uri):
-    assert parsed_uri.scheme in (None, '', 'file')
-    uri_path = parsed_uri.netloc + parsed_uri.path
+def _parse_uri_file(input_path):
     # '~/tmp' may be expanded to '/Users/username/tmp'
-    uri_path = os.path.expanduser(uri_path)
+    uri_path = os.path.expanduser(input_path)
 
     if not uri_path:
-        raise RuntimeError("invalid file URI: %s" % str(parsed_uri))
+        raise RuntimeError("invalid file URI: %s" % input_path)
 
     return Uri(scheme='file', uri_path=uri_path)
 
@@ -544,7 +561,7 @@ def _need_to_buffer(file_obj, mode, ext):
         # .seekable, but have a .seek method instead.
         #
         is_seekable = hasattr(file_obj, 'seek')
-    return six.PY2 and mode.startswith('r') and ext in ('.gz', '.bz2') and not is_seekable
+    return six.PY2 and mode.startswith('r') and ext in COMPRESSED_EXT and not is_seekable
 
 
 def _compression_wrapper(file_obj, filename, mode):
@@ -568,6 +585,8 @@ def _compression_wrapper(file_obj, filename, mode):
         return BZ2File(file_obj, mode)
     elif ext == '.gz':
         return gzip.GzipFile(fileobj=file_obj, mode=mode)
+    elif ext == '.xz':
+        return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
     else:
         return file_obj
 
@@ -606,3 +625,8 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     else:
         decoder = codecs.getwriter(encoding)
     return decoder(fileobj, errors=errors)
+
+def _add_scheme_to_host(host):
+    if host.startswith('http://') or host.startswith('https://'):
+        return host
+    return 'http://' + host

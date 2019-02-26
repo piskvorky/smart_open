@@ -25,11 +25,14 @@ tests_require = [
     # See https://github.com/spulec/moto/issues/1793 and https://github.com/RaRe-Technologies/smart_open/issues/227
     'boto3 < 1.8.0',
     # 'botocore < 1.11.0'
+    # Not used directly but allows boto GCE plugins to load.
+    # https://github.com/GoogleCloudPlatform/compute-image-packages/issues/262
+    'google-compute-engine==2.8.12'
 ]
 
 setup(
     name='smart_open',
-    version='1.7.1',
+    version='1.8.0',
     description='Utils for streaming large files (S3, HDFS, gzip, bz2...)',
     long_description=read('README.rst'),
 
@@ -53,7 +56,8 @@ setup(
         'boto >= 2.32',
         'bz2file',
         'requests',
-        'boto3'
+        'boto3',
+        'backports.lzma;python_version<"3.3"',
     ],
     tests_require=tests_require,
     extras_require={
@@ -71,6 +75,7 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Topic :: System :: Distributed Computing',
         'Topic :: Database :: Front-Ends',
     ],

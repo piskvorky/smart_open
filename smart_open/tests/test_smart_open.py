@@ -103,10 +103,10 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.port, 1234)
 
     def test_s3_invalid_url_atmark_in_bucket_name(self):
-        self.assertRaises(RuntimeError, smart_open_lib._parse_uri, "s3://access_id:access_secret@my@bucket@port/mykey")
+        self.assertRaises(ValueError, smart_open_lib._parse_uri, "s3://access_id:access_secret@my@bucket@port/mykey")
 
     def test_s3_invalid_uri_missing_colon(self):
-        self.assertRaises(RuntimeError, smart_open_lib._parse_uri, "s3://access_id@access_secret@mybucket@port/mykey")
+        self.assertRaises(ValueError, smart_open_lib._parse_uri, "s3://access_id@access_secret@mybucket@port/mykey")
 
     def test_webhdfs_uri(self):
         """Do webhdfs URIs parse correctly"""
@@ -127,6 +127,44 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.key_id, "twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6")
         self.assertEqual(parsed_uri.access_id, "")
         self.assertEqual(parsed_uri.access_secret, "")
+
+    def test_s3_uri_with_colon_in_key_name(self):
+        """ Correctly parse the s3 url if there is a colon in the key or dir """
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/my:key")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "mydir/my:key")
+        self.assertEqual(parsed_uri.access_id, None)
+        self.assertEqual(parsed_uri.access_secret, None)
+
+    def test_host_and_port(self):
+        as_string = 's3u://user:secret@host:1234@mybucket/mykey.txt'
+        uri = smart_open_lib._parse_uri(as_string)
+        self.assertEqual(uri.scheme, "s3u")
+        self.assertEqual(uri.bucket_id, "mybucket")
+        self.assertEqual(uri.key_id, "mykey.txt")
+        self.assertEqual(uri.access_id, "user")
+        self.assertEqual(uri.access_secret, "secret")
+        self.assertEqual(uri.host, "host")
+        self.assertEqual(uri.port, 1234)
+
+    def test_invalid_port(self):
+        as_string = 's3u://user:secret@host:port@mybucket/mykey.txt'
+        self.assertRaises(ValueError, smart_open_lib._parse_uri, as_string)
+
+    def test_invalid_port2(self):
+        as_string = 's3u://user:secret@host:port:foo@mybucket/mykey.txt'
+        self.assertRaises(ValueError, smart_open_lib._parse_uri, as_string)
+
+    def test_leading_slash_local_file(self):
+        path = "/home/misha/hello.txt"
+        uri = smart_open_lib._parse_uri(path)
+        self.assertEqual(uri.scheme, "file")
+        self.assertEqual(uri.uri_path, path)
+
+        uri = smart_open_lib._parse_uri('//' + path)
+        self.assertEqual(uri.scheme, "file")
+        self.assertEqual(uri.uri_path, '//' + path)
 
 
 class SmartOpenHttpTest(unittest.TestCase):
@@ -217,11 +255,36 @@ class SmartOpenHttpTest(unittest.TestCase):
         if os.path.isfile(test_file):
             os.unlink(test_file)
 
-        responses.add(responses.GET, "http://127.0.0.1/data.bz2",
-                      body=compressed_data, stream=True)
+        responses.add(responses.GET, "http://127.0.0.1/data.bz2", body=compressed_data, stream=True)
         smart_open_object = smart_open.smart_open("http://127.0.0.1/data.bz2")
 
-        # decompress the gzip and get the same md5 hash
+        # decompress the bzip2 and get the same md5 hash
+        self.assertEqual(smart_open_object.read(), test_string)
+
+    @responses.activate
+    def test_http_xz(self):
+        """Can open xz via http?"""
+        test_string = b'Hello World Compressed.'
+        #
+        # TODO: why are these tests writing to temporary files?  We can do the
+        # lzma compression in memory.
+        #
+        with tempfile.NamedTemporaryFile('wb', suffix='.xz', delete=False) as infile:
+            test_file = infile.name
+
+        with smart_open.smart_open(test_file, 'wb') as outfile:
+            outfile.write(test_string)
+
+        with open(test_file, 'rb') as infile:
+            compressed_data = infile.read()
+
+        if os.path.isfile(test_file):
+            os.unlink(test_file)
+
+        responses.add(responses.GET, "http://127.0.0.1/data.xz", body=compressed_data, stream=True)
+        smart_open_object = smart_open.smart_open("http://127.0.0.1/data.xz")
+
+        # decompress the xz and get the same md5 hash
         self.assertEqual(smart_open_object.read(), test_string)
 
 
@@ -825,9 +888,16 @@ class CompressionFormatTest(unittest.TestCase):
 
     TEXT = 'Hello'
 
-    def write_read_assertion(self, test_file):
+    def write_read_assertion(self, suffix):
+        with tempfile.NamedTemporaryFile('wb', suffix=suffix, delete=False) as infile:
+            test_file = infile.name
+
+        text = self.TEXT.encode('utf8')
         with smart_open.smart_open(test_file, 'wb') as fout:  # 'b' for binary, needed on Windows
-            fout.write(self.TEXT.encode('utf8'))
+            fout.write(text)
+
+        with open(test_file, 'rb') as fin:
+            self.assertNotEqual(text, fin.read())
 
         with smart_open.smart_open(test_file, 'rb') as fin:
             self.assertEqual(fin.read().decode('utf8'), self.TEXT)
@@ -846,15 +916,25 @@ class CompressionFormatTest(unittest.TestCase):
 
     def test_write_read_gz(self):
         """Can write and read gzip?"""
-        with tempfile.NamedTemporaryFile('wb', suffix='.gz', delete=False) as infile:
-            test_file_name = infile.name
-        self.write_read_assertion(test_file_name)
+        self.write_read_assertion('.gz')
 
     def test_write_read_bz2(self):
         """Can write and read bz2?"""
-        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as infile:
-            test_file_name = infile.name
-        self.write_read_assertion(test_file_name)
+        self.write_read_assertion('.bz2')
+
+    def test_write_read_xz(self):
+        """Can write and read xz2?"""
+        self.write_read_assertion('.xz')
+
+    def test_read_real_xz(self):
+        """Can read a real xz file."""
+        base_path = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
+        head_path = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt.xz')
+        with smart_open.smart_open(head_path) as f:
+            smart_data = f.read()
+        with open(base_path, 'rb') as f:
+            orig_data = f.read()
+        self.assertEqual(smart_data, orig_data)
 
 
 class MultistreamsBZ2Test(unittest.TestCase):
@@ -1125,6 +1205,31 @@ class S3OpenTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(text, actual)
 
+class HostNameTest(unittest.TestCase):
+
+    def test_host_name_with_http(self):
+        host = 'http://a.com/b'
+        expected = 'http://a.com/b'
+        res = smart_open_lib._add_scheme_to_host(host)
+        self.assertEqual(expected, res)
+
+    def test_host_name_without_http(self):
+        host = 'a.com/b'
+        expected = 'http://a.com/b'
+        res = smart_open_lib._add_scheme_to_host(host)
+        self.assertEqual(expected, res)
+
+    def test_host_name_with_https(self):
+        host = 'https://a.com/b'
+        expected = 'https://a.com/b'
+        res = smart_open_lib._add_scheme_to_host(host)
+        self.assertEqual(expected, res)
+
+    def test_host_name_without_http_prefix(self):
+        host = 'httpa.com/b'
+        expected = 'http://httpa.com/b'
+        res = smart_open_lib._add_scheme_to_host(host)
+        self.assertEqual(expected, res)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)

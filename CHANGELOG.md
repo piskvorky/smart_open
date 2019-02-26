@@ -1,4 +1,22 @@
-* 1.7.0, 18th September 2018
+* Unreleased
+
+  - Add support for .xz / lzma (PR [#262](https://github.com/RaRe-Technologies/smart_open/pull/262), [@vmarkovtsev](https://github.com/vmarkovtsev))
+
+* 1.8.0, 17th January 2019
+
+  - Add `python3.7` support (PR [#240](https://github.com/RaRe-Technologies/smart_open/pull/240), [@menshikh-iv](https://github.com/menshikh-iv))
+  - Add `http/https` schema correctly (PR [#242](https://github.com/RaRe-Technologies/smart_open/pull/242), [@gliv](https://github.com/gliv))
+  - Fix url parsing for `S3` (PR [#235](https://github.com/RaRe-Technologies/smart_open/pull/235), [@rileypeterson](https://github.com/rileypeterson))
+  - Clean up `_parse_uri_s3x`, resolve edge cases (PR [#237](https://github.com/RaRe-Technologies/smart_open/pull/237), [@mpenkov](https://github.com/mpenkov))
+  - Handle leading slash in local path edge case (PR [#238](https://github.com/RaRe-Technologies/smart_open/pull/238), [@mpenkov](https://github.com/mpenkov))
+  - Roll back README changes (PR [#239](https://github.com/RaRe-Technologies/smart_open/pull/239), [@mpenkov](https://github.com/mpenkov))
+  - Add example how to work with Digital Ocean spaces and boto profile (PR [#248](https://github.com/RaRe-Technologies/smart_open/pull/248), [@navado](https://github.com/@navado) & [@mpenkov](https://github.com/mpenkov))
+  - Fix boto fail to load gce plugin (PR [#255](https://github.com/RaRe-Technologies/smart_open/pull/255), [@menshikh-iv](https://github.com/menshikh-iv))
+  - Drop deprecated `sudo` from travis config (PR [#256](https://github.com/RaRe-Technologies/smart_open/pull/256), [@cclauss](https://github.com/cclauss))
+  - Raise `ValueError` if s3 key does not exist (PR [#245](https://github.com/RaRe-Technologies/smart_open/pull/245), [@adrpar](https://github.com/adrpar))
+  - Ensure `_list_bucket` uses continuation token for subsequent pages (PR [#246](https://github.com/RaRe-Technologies/smart_open/pull/246), [@tcsavage](https://github.com/tcsavage))
+
+* 1.7.1, 18th September 2018
 
   - Unpin boto/botocore for regular installation. Fix #227 (PR [#232](https://github.com/RaRe-Technologies/smart_open/pull/232), [@menshikh-iv](https://github.com/menshikh-iv))
 
