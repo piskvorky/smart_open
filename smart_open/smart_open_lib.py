@@ -166,7 +166,7 @@ def open(
         newline=None,
         closefd=True,
         opener=None,
-        ignore_extension=False,
+        ignore_ext=False,
         tkwa=dict(),
         ):
     """Open the URI object, returning a file-like object.
@@ -211,7 +211,7 @@ def open(
         Mimicks built-in open parameter of the same name.  Ignored.
     opener: object, optional
         Mimicks built-in open parameter of the same name.  Ignored.
-    ignore_extension: boolean, optional
+    ignore_ext: boolean, optional
         Disable transparent compression/decompression based on the file extension.
     tkwa: dict
         Keyword arguments for the transport layer (see notes below).
@@ -292,7 +292,7 @@ def open(
     fobj = _shortcut_open(
         uri,
         mode,
-        ignore_extension=ignore_extension,
+        ignore_ext=ignore_ext,
         buffering=buffering,
         encoding=encoding,
         errors=errors,
@@ -337,7 +337,7 @@ def open(
     except KeyError:
         binary_mode = mode
     binary, filename = _open_binary_stream(uri, binary_mode, tkwa)
-    if ignore_extension:
+    if ignore_ext:
         decompressed = binary
     else:
         decompressed = _compression_wrapper(binary, filename, mode)
@@ -373,6 +373,11 @@ def smart_open(uri, mode="rb", **kw):
     """Deprecated, use smart_open.open instead."""
     logger.warning('this function is deprecated, use smart_open.open instead')
 
+    #
+    # The new function uses a shorter name for this parameter, handle it separately.
+    #
+    ignore_extension = kw.pop('ignore_extension', False)
+
     expected_kwargs = _inspect_kwargs(open)
     scrubbed_kwargs = {}
     tkwa = {}
@@ -388,13 +393,13 @@ def smart_open(uri, mode="rb", **kw):
             #
             tkwa[key] = value
 
-    return open(uri, mode, tkwa=tkwa, **scrubbed_kwargs)
+    return open(uri, mode, ignore_ext=ignore_extension, tkwa=tkwa, **scrubbed_kwargs)
 
 
 def _shortcut_open(
         uri,
         mode,
-        ignore_extension=False,
+        ignore_ext=False,
         buffering=-1,
         encoding=None,
         errors=None,
@@ -425,7 +430,7 @@ def _shortcut_open(
         return None
 
     _, extension = P.splitext(parsed_uri.uri_path)
-    if extension in COMPRESSED_EXT and not ignore_extension:
+    if extension in COMPRESSED_EXT and not ignore_ext:
         return None
 
     open_kwargs = {}
