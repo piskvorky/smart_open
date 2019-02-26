@@ -76,6 +76,7 @@ from smart_open.s3 import iter_bucket as s3_iter_bucket
 import smart_open.hdfs as smart_open_hdfs
 import smart_open.webhdfs as smart_open_webhdfs
 import smart_open.http as smart_open_http
+import smart_open.ssh as smart_open_ssh
 
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
@@ -344,8 +345,9 @@ def _open_binary_stream(uri, mode, **kw):
             # compression, if any, is determined by the filename extension (.gz, .bz2, .xz)
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
-        elif parsed_uri.scheme in ssh.SCHEMES:
-            return ssh.open(parsed_uri.uri_path[1:], mode, parsed_uri.host, parsed_uri.user)
+        elif parsed_uri.scheme in smart_open_ssh.SCHEMES:
+            fobj = smart_open_ssh.open(parsed_uri.uri_path[1:], mode, parsed_uri.host, parsed_uri.user)
+            return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
             return _s3_open_uri(parsed_uri, mode, **kw), filename
         elif parsed_uri.scheme in ("hdfs", ):
@@ -468,7 +470,7 @@ def _parse_uri(uri_as_string):
         return _parse_uri_file(uri_as_string)
     elif parsed_uri.scheme.startswith('http'):
         return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
-    elif parsed_uri.scheme in _SSH_SCHEMES:
+    elif parsed_uri.scheme in smart_open_ssh.SCHEMES:
         user, host = parsed_uri.netloc.split('@')
         return Uri(scheme=parsed_uri.scheme, uri_path=parsed_uri.path, user=user, host=host)
     else:
