@@ -2,7 +2,7 @@
 
   - Added support for .xz / lzma (PR [#262](https://github.com/RaRe-Technologies/smart_open/pull/262), [@vmarkovtsev](https://github.com/vmarkovtsev))
   - Added streaming HTTP support (PR [#236](https://github.com/RaRe-Technologies/smart_open/pull/236), [@handsomezebra](https://github.com/handsomezebra))
-  - Fix handling of "+" mode, refactor tests (PR[263](https://github.com/RaRe-Technologies/smart_open/pull/263), [@vmarkovtsev](https://github.com/vmarkovtsev))
+  - Fix handling of "+" mode, refactor tests (PR [#263](https://github.com/RaRe-Technologies/smart_open/pull/263), [@vmarkovtsev](https://github.com/vmarkovtsev))
 
 * 1.8.0, 17th January 2019
 
