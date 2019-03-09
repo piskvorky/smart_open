@@ -668,7 +668,7 @@ def _compression_wrapper(file_obj, filename, mode):
     if _need_to_buffer(file_obj, mode, ext):
         warnings.warn('streaming gzip support unavailable, see %s' % _ISSUE_189_URL)
         file_obj = io.BytesIO(file_obj.read())
-    if ext in COMPRESSED_EXT and mode.endswith('+'):
+    if ext in _COMPRESSOR_REGISTRY and mode.endswith('+'):
         raise ValueError('transparent (de)compression unsupported for mode %r' % mode)
 
     try:
