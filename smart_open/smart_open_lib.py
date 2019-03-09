@@ -74,6 +74,7 @@ from smart_open.s3 import iter_bucket as s3_iter_bucket
 import smart_open.hdfs as smart_open_hdfs
 import smart_open.webhdfs as smart_open_webhdfs
 import smart_open.http as smart_open_http
+import smart_open.ssh as smart_open_ssh
 
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
@@ -100,6 +101,7 @@ Uri = collections.namedtuple(
         'ordinary_calling_format',
         'access_id',
         'access_secret',
+        'user',
     )
 )
 """Represents all the options that we parse from user input.
@@ -341,6 +343,15 @@ def _open_binary_stream(uri, mode, **kw):
             # compression, if any, is determined by the filename extension (.gz, .bz2, .xz)
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
+        elif parsed_uri.scheme in smart_open_ssh.SCHEMES:
+            fobj = smart_open_ssh.open(
+                parsed_uri.uri_path,
+                mode,
+                host=parsed_uri.host,
+                user=parsed_uri.user,
+                port=parsed_uri.port,
+            )
+            return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
             return _s3_open_uri(parsed_uri, mode, **kw), filename
         elif parsed_uri.scheme in ("hdfs", ):
@@ -443,7 +454,10 @@ def _parse_uri(uri_as_string):
       * ./local/path/file.gz
       * file:///home/user/file
       * file:///home/user/file.bz2
+      * [ssh|scp|sftp]://username@host//path/file
+      * [ssh|scp|sftp]://username@host/path/file
       * file:///home/user/file.xz
+
     """
     if os.name == 'nt':
         # urlsplit doesn't work on Windows -- it parses the drive as the scheme...
@@ -464,6 +478,8 @@ def _parse_uri(uri_as_string):
         return _parse_uri_file(uri_as_string)
     elif parsed_uri.scheme.startswith('http'):
         return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
+    elif parsed_uri.scheme in smart_open_ssh.SCHEMES:
+        return _parse_uri_ssh(parsed_uri)
     else:
         raise NotImplementedError(
             "unknown URI scheme %r in %r" % (parsed_uri.scheme, uri_as_string)
@@ -553,6 +569,28 @@ def _parse_uri_file(input_path):
         raise RuntimeError("invalid file URI: %s" % input_path)
 
     return Uri(scheme='file', uri_path=uri_path)
+
+
+def _parse_uri_ssh(unt):
+    """Parse a Uri from a urllib namedtuple."""
+    if '@' in unt.netloc:
+        user, host_port = unt.netloc.split('@', 1)
+    else:
+        user, host_port = None, unt.netloc
+
+    if ':' in host_port:
+        host, port = host_port.split(':', 1)
+    else:
+        host, port = host_port, None
+
+    if not user:
+        user = None
+    if not port:
+        port = smart_open_ssh.DEFAULT_PORT
+    else:
+        port = int(port)
+
+    return Uri(scheme=unt.scheme, uri_path=unt.path, user=user, host=host, port=port)
 
 
 def _need_to_buffer(file_obj, mode, ext):
