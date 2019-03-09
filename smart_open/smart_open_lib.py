@@ -18,6 +18,7 @@ The main methods are:
 
 * `smart_open()`, which opens the given file for reading/writing
 * `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
+* `register_compressor()`, which registers callbacks for transparent compressor handling
 
 """
 
@@ -42,28 +43,10 @@ for pathlib_module in ('pathlib', 'pathlib2'):
 
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
-import sys
+import six
 from six.moves.urllib import parse as urlparse
+import sys
 
-
-IS_PY2 = (sys.version_info[0] == 2)
-
-logger = logging.getLogger(__name__)
-
-if IS_PY2:
-    from bz2file import BZ2File
-else:
-    from bz2 import BZ2File
-
-import gzip
-try:
-    import lzma
-except ImportError:
-    # py<3.3
-    from backports import lzma
-
-
-COMPRESSED_EXT = ('.gz', '.bz2', '.xz')  # supported compressed file extensions
 
 #
 # This module defines a function called smart_open so we cannot use
@@ -77,6 +60,8 @@ import smart_open.http as smart_open_http
 import smart_open.ssh as smart_open_ssh
 
 
+logger = logging.getLogger(__name__)
+
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
 _ISSUE_146_FSTR = (
@@ -87,6 +72,67 @@ _ISSUE_146_FSTR = (
 _ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
 
 DEFAULT_ERRORS = 'strict'
+
+
+_COMPRESSOR_REGISTRY = {}
+
+
+def register_compressor(ext, callback):
+    """Register a callback for transparently decompressing files with a specific extension.
+
+    Parameters
+    ----------
+    ext: str
+        The extension.
+    callback: callable
+        The callback.  It must accept two position arguments, file_obj and mode.
+
+    Examples
+    --------
+
+    >>> def identity(file_obj, mode):
+    ...     return file_obj
+    >>> register_compressor('.foo', identity)
+
+    """
+    if not (ext and ext[0] == '.'):
+        raise ValueError('ext must be a string starting with ., not %r' % ext)
+    if ext in _COMPRESSOR_REGISTRY:
+        logger.warning('overriding existing compression handler for %r', ext)
+    _COMPRESSOR_REGISTRY[ext] = callback
+
+
+def _handle_bz2(file_obj, mode):
+    if six.PY2:
+        from bz2file import BZ2File
+    else:
+        from bz2 import BZ2File
+    return BZ2File(file_obj, mode)
+
+
+def _handle_gzip(file_obj, mode):
+    import gzip
+    return gzip.GzipFile(fileobj=file_obj, mode=mode)
+
+
+def _handle_xz(file_obj, mode):
+    #
+    # Delay import of compressor library until we actually need it
+    #
+    try:
+        import lzma
+    except ImportError:
+        # py<3.3
+        from backports import lzma
+    return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+
+
+#
+# NB. avoid using lambda here to make stack traces more readable.
+#
+register_compressor('.bz2', _handle_bz2)
+register_compressor('.gz', _handle_gzip)
+register_compressor('.xz', _handle_xz)
 
 
 Uri = collections.namedtuple(
@@ -280,7 +326,7 @@ def _shortcut_open(uri, mode, **kw):
 
     _, extension = P.splitext(parsed_uri.uri_path)
     ignore_extension = kw.get('ignore_extension', False)
-    if extension in COMPRESSED_EXT and not ignore_extension:
+    if extension in _COMPRESSOR_REGISTRY and not ignore_extension:
         return None
 
     #
@@ -603,7 +649,7 @@ def _need_to_buffer(file_obj, mode, ext):
         # .seekable, but have a .seek method instead.
         #
         is_seekable = hasattr(file_obj, 'seek')
-    return six.PY2 and mode.startswith('r') and ext in COMPRESSED_EXT and not is_seekable
+    return six.PY2 and mode.startswith('r') and ext in _COMPRESSOR_REGISTRY and not is_seekable
 
 
 def _compression_wrapper(file_obj, filename, mode):
@@ -625,14 +671,12 @@ def _compression_wrapper(file_obj, filename, mode):
     if ext in COMPRESSED_EXT and mode.endswith('+'):
         raise ValueError('transparent (de)compression unsupported for mode %r' % mode)
 
-    if ext == '.bz2':
-        return BZ2File(file_obj, mode)
-    elif ext == '.gz':
-        return gzip.GzipFile(fileobj=file_obj, mode=mode)
-    elif ext == '.xz':
-        return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
-    else:
+    try:
+        callback = _COMPRESSOR_REGISTRY[ext]
+    except KeyError:
         return file_obj
+    else:
+        return callback(file_obj, mode)
 
 
 def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
