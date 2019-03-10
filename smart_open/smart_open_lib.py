@@ -42,6 +42,7 @@ for pathlib_module in ('pathlib', 'pathlib2'):
     except ImportError:
         PATHLIB_SUPPORT = False
 
+import boto
 import boto3
 from boto.compat import BytesIO, urlsplit, six
 import six
