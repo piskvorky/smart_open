@@ -67,11 +67,6 @@ logger = logging.getLogger(__name__)
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
-_ISSUE_146_FSTR = (
-    "You have explicitly specified encoding=%(encoding)s, but smart_open does "
-    "not currently support decoding text via the %(scheme)s scheme. "
-    "Re-open the file without specifying an encoding to suppress this warning."
-)
 _ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
 
 
