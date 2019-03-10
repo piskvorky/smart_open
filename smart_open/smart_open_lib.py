@@ -8,8 +8,8 @@
 
 
 """
-Utilities for streaming from several file-like data storages: S3 / HDFS / standard
-filesystem / compressed files..., using a single, Pythonic API.
+Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
+filesystem / compressed files, and many more, using a simple, Pythonic API.
 
 The streaming makes heavy use of generators and pipes, to avoid loading
 full file contents into memory, allowing work with arbitrarily large files.
