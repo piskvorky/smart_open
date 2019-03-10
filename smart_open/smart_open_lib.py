@@ -475,7 +475,7 @@ def _shortcut_open(
         return None
 
     _, extension = P.splitext(parsed_uri.uri_path)
-    if extension in _COMPRESSOR_REGISTRY and not ignore_extension:
+    if extension in _COMPRESSOR_REGISTRY and not ignore_ext:
         return None
 
     open_kwargs = {}
@@ -843,8 +843,9 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
     if encoding is None:
         encoding = SYSTEM_ENCODING
 
+    kw = {'errors': errors} if errors else {}
     if mode[0] == 'r' or mode.endswith('+'):
-        fileobj = codecs.getreader(encoding)(fileobj, errors=errors)
+        fileobj = codecs.getreader(encoding)(fileobj, **kw)
     if mode[0] in ('w', 'a') or mode.endswith('+'):
-        fileobj = codecs.getwriter(encoding)(fileobj, errors=errors)
+        fileobj = codecs.getwriter(encoding)(fileobj, **kw)
     return fileobj
