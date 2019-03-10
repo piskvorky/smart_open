@@ -44,7 +44,6 @@ for pathlib_module in ('pathlib', 'pathlib2'):
 
 import boto3
 from boto.compat import BytesIO, urlsplit, six
-import boto.s3.key
 import six
 from six.moves.urllib import parse as urlparse
 import sys
@@ -225,7 +224,6 @@ def open(
 
     The URI may also be one of:
 
-    - an instance of the boto.s3.key.Key class
     - an instance of the pathlib.Path class
     - a stream (anything that implements io.IOBase-like functionality)
 
@@ -293,12 +291,6 @@ def open(
 
     >>> # stream lines from S3; you can use context managers too:
     >>> with open('s3://mybucket/mykey.txt') as fin:
-    ...     for line in fin:
-    ...         print(line)
-
-    >>> # you can also use a boto.s3.key.Key instance directly:
-    >>> key = boto.connect_s3().get_bucket("my_bucket").get_key("my_key")
-    >>> with open(key) as fin:
     ...     for line in fin:
     ...         print(line)
 
