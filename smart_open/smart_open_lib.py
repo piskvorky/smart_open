@@ -18,6 +18,7 @@ The main functions are:
 
 * `open()`, which opens the given file for reading/writing
 * `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
+* `register_compressor()`, which registers callbacks for transparent compressor handling
 
 """
 
@@ -44,28 +45,10 @@ for pathlib_module in ('pathlib', 'pathlib2'):
 import boto3
 from boto.compat import BytesIO, urlsplit, six
 import boto.s3.key
-import sys
+import six
 from six.moves.urllib import parse as urlparse
+import sys
 
-
-IS_PY2 = (sys.version_info[0] == 2)
-
-logger = logging.getLogger(__name__)
-
-if IS_PY2:
-    from bz2file import BZ2File
-else:
-    from bz2 import BZ2File
-
-import gzip
-try:
-    import lzma
-except ImportError:
-    # py<3.3
-    from backports import lzma
-
-
-COMPRESSED_EXT = ('.gz', '.bz2', '.xz')  # supported compressed file extensions
 
 #
 # This module defines a function called smart_open so we cannot use
@@ -76,9 +59,11 @@ from smart_open.s3 import iter_bucket as s3_iter_bucket
 import smart_open.hdfs as smart_open_hdfs
 import smart_open.webhdfs as smart_open_webhdfs
 import smart_open.http as smart_open_http
+import smart_open.ssh as smart_open_ssh
 
 from smart_open import doctools
 
+logger = logging.getLogger(__name__)
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
@@ -88,6 +73,67 @@ _ISSUE_146_FSTR = (
     "Re-open the file without specifying an encoding to suppress this warning."
 )
 _ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
+
+
+_COMPRESSOR_REGISTRY = {}
+
+
+def register_compressor(ext, callback):
+    """Register a callback for transparently decompressing files with a specific extension.
+
+    Parameters
+    ----------
+    ext: str
+        The extension.
+    callback: callable
+        The callback.  It must accept two position arguments, file_obj and mode.
+
+    Examples
+    --------
+
+    >>> def identity(file_obj, mode):
+    ...     return file_obj
+    >>> register_compressor('.foo', identity)
+
+    """
+    if not (ext and ext[0] == '.'):
+        raise ValueError('ext must be a string starting with ., not %r' % ext)
+    if ext in _COMPRESSOR_REGISTRY:
+        logger.warning('overriding existing compression handler for %r', ext)
+    _COMPRESSOR_REGISTRY[ext] = callback
+
+
+def _handle_bz2(file_obj, mode):
+    if six.PY2:
+        from bz2file import BZ2File
+    else:
+        from bz2 import BZ2File
+    return BZ2File(file_obj, mode)
+
+
+def _handle_gzip(file_obj, mode):
+    import gzip
+    return gzip.GzipFile(fileobj=file_obj, mode=mode)
+
+
+def _handle_xz(file_obj, mode):
+    #
+    # Delay import of compressor library until we actually need it
+    #
+    try:
+        import lzma
+    except ImportError:
+        # py<3.3
+        from backports import lzma
+    return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+
+
+#
+# NB. avoid using lambda here to make stack traces more readable.
+#
+register_compressor('.bz2', _handle_bz2)
+register_compressor('.gz', _handle_gzip)
+register_compressor('.xz', _handle_xz)
 
 
 Uri = collections.namedtuple(
@@ -102,6 +148,7 @@ Uri = collections.namedtuple(
         'ordinary_calling_format',
         'access_id',
         'access_secret',
+        'user',
     )
 )
 """Represents all the options that we parse from user input.
@@ -428,7 +475,7 @@ def _shortcut_open(
         return None
 
     _, extension = P.splitext(parsed_uri.uri_path)
-    if extension in COMPRESSED_EXT and not ignore_ext:
+    if extension in _COMPRESSOR_REGISTRY and not ignore_extension:
         return None
 
     open_kwargs = {}
@@ -484,6 +531,15 @@ def _open_binary_stream(uri, mode, tkwa):
         if parsed_uri.scheme == "file":
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
+        elif parsed_uri.scheme in smart_open_ssh.SCHEMES:
+            fobj = smart_open_ssh.open(
+                parsed_uri.uri_path,
+                mode,
+                host=parsed_uri.host,
+                user=parsed_uri.user,
+                port=parsed_uri.port,
+            )
+            return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
             return _s3_open_uri(parsed_uri, mode, tkwa), filename
         elif parsed_uri.scheme == "hdfs":
@@ -504,10 +560,14 @@ def _open_binary_stream(uri, mode, tkwa):
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
-        filename = '/tmp/unknown'
+        # we need to return something as the file name, but we don't know what
+        # so we probe for uri.name (e.g., this works with open() or tempfile.NamedTemporaryFile)
+        # if the value ends with COMPRESSED_EXT, we will note it in _compression_wrapper()
+        # if there is no such an attribute, we return "unknown" - this effectively disables any compression
+        filename = getattr(uri, 'name', 'unknown')
         return uri, filename
     else:
-        raise TypeError('don\'t know how to handle uri %s' % repr(uri))
+        raise TypeError("don't know how to handle uri %r" % uri)
 
 
 def _s3_open_uri(parsed_uri, mode, tkwa):
@@ -575,7 +635,10 @@ def _parse_uri(uri_as_string):
       * ./local/path/file.gz
       * file:///home/user/file
       * file:///home/user/file.bz2
+      * [ssh|scp|sftp]://username@host//path/file
+      * [ssh|scp|sftp]://username@host/path/file
       * file:///home/user/file.xz
+
     """
     if os.name == 'nt':
         # urlsplit doesn't work on Windows -- it parses the drive as the scheme...
@@ -596,6 +659,8 @@ def _parse_uri(uri_as_string):
         return _parse_uri_file(uri_as_string)
     elif parsed_uri.scheme.startswith('http'):
         return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
+    elif parsed_uri.scheme in smart_open_ssh.SCHEMES:
+        return _parse_uri_ssh(parsed_uri)
     else:
         raise NotImplementedError(
             "unknown URI scheme %r in %r" % (parsed_uri.scheme, uri_as_string)
@@ -687,6 +752,28 @@ def _parse_uri_file(input_path):
     return Uri(scheme='file', uri_path=uri_path)
 
 
+def _parse_uri_ssh(unt):
+    """Parse a Uri from a urllib namedtuple."""
+    if '@' in unt.netloc:
+        user, host_port = unt.netloc.split('@', 1)
+    else:
+        user, host_port = None, unt.netloc
+
+    if ':' in host_port:
+        host, port = host_port.split(':', 1)
+    else:
+        host, port = host_port, None
+
+    if not user:
+        user = None
+    if not port:
+        port = smart_open_ssh.DEFAULT_PORT
+    else:
+        port = int(port)
+
+    return Uri(scheme=unt.scheme, uri_path=unt.path, user=user, host=host, port=port)
+
+
 def _need_to_buffer(file_obj, mode, ext):
     """Returns True if we need to buffer the whole file in memory in order to proceed."""
     try:
@@ -697,7 +784,7 @@ def _need_to_buffer(file_obj, mode, ext):
         # .seekable, but have a .seek method instead.
         #
         is_seekable = hasattr(file_obj, 'seek')
-    return six.PY2 and mode.startswith('r') and ext in COMPRESSED_EXT and not is_seekable
+    return six.PY2 and mode.startswith('r') and ext in _COMPRESSOR_REGISTRY and not is_seekable
 
 
 def _compression_wrapper(file_obj, filename, mode):
@@ -716,15 +803,15 @@ def _compression_wrapper(file_obj, filename, mode):
     if _need_to_buffer(file_obj, mode, ext):
         warnings.warn('streaming gzip support unavailable, see %s' % _ISSUE_189_URL)
         file_obj = io.BytesIO(file_obj.read())
+    if ext in _COMPRESSOR_REGISTRY and mode.endswith('+'):
+        raise ValueError('transparent (de)compression unsupported for mode %r' % mode)
 
-    if ext == '.bz2':
-        return BZ2File(file_obj, mode)
-    elif ext == '.gz':
-        return gzip.GzipFile(fileobj=file_obj, mode=mode)
-    elif ext == '.xz':
-        return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
-    else:
+    try:
+        callback = _COMPRESSOR_REGISTRY[ext]
+    except KeyError:
         return file_obj
+    else:
+        return callback(file_obj, mode)
 
 
 def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
@@ -756,12 +843,8 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
     if encoding is None:
         encoding = SYSTEM_ENCODING
 
-    if mode[0] == 'r':
-        decoder = codecs.getreader(encoding)
-    else:
-        decoder = codecs.getwriter(encoding)
-
-    if errors:
-        return decoder(fileobj, errors=errors)
-    else:
-        return decoder(fileobj)
+    if mode[0] == 'r' or mode.endswith('+'):
+        fileobj = codecs.getreader(encoding)(fileobj, errors=errors)
+    if mode[0] in ('w', 'a') or mode.endswith('+'):
+        fileobj = codecs.getwriter(encoding)(fileobj, errors=errors)
+    return fileobj
