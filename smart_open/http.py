@@ -30,7 +30,7 @@ class BufferedInputBase(io.BufferedIOBase):
     """
 
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, user=None, password=None, headers={}):
+                 kerberos=False, user=None, password=None, headers=None):
         """
         If Kerberos is True, will attempt to use the local Kerberos credentials.
         Otherwise, will try to use "basic" HTTP authentication via username/password.
@@ -48,8 +48,12 @@ class BufferedInputBase(io.BufferedIOBase):
         self.buffer_size = buffer_size
         self.mode = mode
 
-        headers.update(_HEADERS)
-        self.response = requests.get(url, auth=auth, stream=True, headers=headers)
+        if headers:
+            self.headers = headers
+        else:
+            self.headers = _HEADERS
+
+        self.response = requests.get(url, auth=auth, stream=True, headers=self.headers)
 
         if not self.response.ok:
             self.response.raise_for_status()
