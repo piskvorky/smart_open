@@ -48,8 +48,8 @@ class BufferedInputBase(io.BufferedIOBase):
         self.buffer_size = buffer_size
         self.mode = mode
 
-        _HEADERS.update(headers)
-        self.response = requests.get(url, auth=auth, stream=True, headers=_HEADERS)
+        headers.update(_HEADERS)
+        self.response = requests.get(url, auth=auth, stream=True, headers=headers)
 
         if not self.response.ok:
             self.response.raise_for_status()
