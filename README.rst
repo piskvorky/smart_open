@@ -12,77 +12,90 @@ smart_open — utils for streaming large files in Python
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS, WebHDFS, HTTP, or local (compressed) files. It's a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
+``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS, WebHDFS, HTTP, or local (compressed) files.
+It's a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
 ``smart_open`` is well-tested, well-documented, and has a simple, Pythonic API:
 
 .. code-block:: python
 
-  >>> from smart_open import smart_open
-
+  >>> from smart_open import open
+  >>>
   >>> # stream lines from an S3 object
-  >>> for line in smart_open('s3://mybucket/mykey.txt', 'rb'):
-  ...    print(line.decode('utf8'))
+  >>> for line in open('s3://commoncrawl/robots.txt'):
+  ...    print(line, end='')
+  ...    break
+  User-Agent: *
 
+  >>> gz_path = 'smart_open/tests/test_data/crime-and-punishment.txt.gz'
+  >>>
   >>> # stream from/to compressed files, with transparent (de)compression:
-  >>> for line in smart_open('./foo.txt.gz', encoding='utf8'):
-  ...    print(line)
+  >>> for line in open(gz_path, encoding='utf-8'):
+  ...    print(line[:50])
+  ...    break
+  В начале июля, в чрезвычайно жаркое время, под веч
 
   >>> # can use context managers too:
-  >>> with smart_open('/home/radim/foo.txt.bz2', 'wb') as fout:
-  ...    fout.write(u"some content\n".encode('utf8'))
+  >>> bz2_path = gz_path.replace('.gz', '.bz2')
+  >>> with open(gz_path) as fin:
+  ...    with open(bz2_path, 'w') as fout:
+  ...        for line in fin:
+  ...           fout.write(line)
 
-  >>> with smart_open('s3://mybucket/mykey.txt', 'rb') as fin:
+  >>> # can use any IOBase operations, like seek
+  >>> with open('s3://commoncrawl/robots.txt', 'rb') as fin:
   ...     for line in fin:
-  ...         print(line.decode('utf8'))
+  ...         print(line.decode('utf-8'), end='')
+  ...         break
   ...     fin.seek(0)  # seek to the beginning
-  ...     b1000 = fin.read(1000)  # read 1000 bytes
-
-  >>> # stream from HDFS
-  >>> for line in smart_open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):
-  ...     print(line)
+  ...     print(fin.read(4))
+  User-Agent: *
+  0
+  b'User'
 
   >>> # stream from HTTP
-  >>> for line in smart_open('http://example.com/index.html'):
-  ...     print(line)
+  >>> for line in open('http://example.com/index.html'):
+  ...     print(line, end='')
+  ...     break
+  <!doctype html>
+
+  >>> # stream from HDFS
+  >>> for line in open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):  # doctest: +SKIP
+  ...     print(line)                                                       # doctest: +SKIP
 
   >>> # stream from WebHDFS
-  >>> for line in smart_open('webhdfs://host:port/user/hadoop/my_file.txt'):
-  ...     print(line)
+  >>> for line in open('webhdfs://host:port/user/hadoop/my_file.txt'):  # doctest: +SKIP
+  ...     print(line)                                                   # doctest: +SKIP
 
   >>> # stream content *into* S3 (write mode):
-  >>> with smart_open('s3://mybucket/mykey.txt', 'wb') as fout:
-  ...     for line in [b'first line\n', b'second line\n', b'third line\n']:
-  ...          fout.write(line)
+  >>> with open('s3://mybucket/mykey.txt', 'wb') as fout:                    # doctest: +SKIP
+  ...     for line in [b'first line\n', b'second line\n', b'third line\n']:  # doctest: +SKIP
+  ...          fout.write(line)                                              # doctest: +SKIP
 
   >>> # stream content *into* HDFS (write mode):
-  >>> with smart_open('hdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
-  ...     for line in [b'first line\n', b'second line\n', b'third line\n']:
-  ...          fout.write(line)
+  >>> with open('hdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:   # doctest: +SKIP
+  ...     for line in [b'first line\n', b'second line\n', b'third line\n']:  # doctest: +SKIP
+  ...          fout.write(line)                                              # doctest: +SKIP
 
   >>> # stream content *into* WebHDFS (write mode):
-  >>> with smart_open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
-  ...     for line in [b'first line\n', b'second line\n', b'third line\n']:
-  ...          fout.write(line)
+  >>> with open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:  # doctest: +SKIP
+  ...     for line in [b'first line\n', b'second line\n', b'third line\n']:    # doctest: +SKIP
+  ...          fout.write(line)                                                # doctest: +SKIP
 
   >>> # stream using a completely custom s3 server, like s3proxy:
-  >>> for line in smart_open('s3u://user:secret@host:port@mybucket/mykey.txt', 'rb'):
-  ...    print(line.decode('utf8'))
-
-  >>> # you can also use a boto.s3.key.Key instance directly:
-  >>> key = boto.connect_s3().get_bucket("my_bucket").get_key("my_key")
-  >>> with smart_open(key, 'rb') as fin:
-  ...     for line in fin:
-  ...         print(line.decode('utf8'))
+  >>> for line in open('s3u://user:secret@host:port@mybucket/mykey.txt'):  # doctest: +SKIP
+  ...    print(line)
  
   >>> # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
-  >>> with smart_open('s3://bucket-for-experiments/file.txt', 'wb', endpoint_url='https://ams3.digitaloceanspaces.com', profile_name='digitalocean') as fout:
-  ...     fout.write(b'here we stand')
+  >>> tkwa = dict(endpoint_url='https://ams3.digitaloceanspaces.com', profile_name='digitalocean')
+  >>> with open('s3://bucket/key.txt', 'wb', tkwa=twka) as fout:  # doctest: +SKIP
+  ...     fout.write(b'here we stand')                            # doctest: +SKIP
 
 Why?
 ----
 
-Working with large S3 files using Amazon's default Python library, `boto <http://docs.pythonboto.org/en/latest/>`_ and `boto3 <https://boto3.readthedocs.io/en/latest/>`_, is a pain. Its ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` methods only work for small files (loaded in RAM, no streaming).
+Working with large S3 files using Amazon's default Python library, `boto <http://docs.pythonboto.org/en/latest/>`_ and `boto3 <https://boto3.readthedocs.io/en/latest/>`_, is a pain.
+Its ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` methods only work for small files (loaded in RAM, no streaming).
 There are nasty hidden gotchas when using ``boto``'s multipart upload functionality that is needed for large files, and a lot of boilerplate.
 
 ``smart_open`` shields you from that. It builds on boto3 but offers a cleaner, Pythonic API. The result is less code for you to write and fewer bugs to make.
@@ -102,8 +115,9 @@ To run the unit tests (optional), you'll also need to install `mock <https://pyp
 
 Supported archive types
 -----------------------
-``smart_open`` allows reading and writing gzip, bzip2 and xz files. They are transparently handled
-over HTTP, S3, and other protocols, too.
+
+``smart_open`` allows reading and writing gzip, bzip2 and xz files.
+They are transparently handled over HTTP, S3, and other protocols, too.
 
 S3-Specific Options
 -------------------
@@ -116,40 +130,50 @@ The **host** and **profile** arguments are both passed to `boto.s3_connect()` as
 
 .. code-block:: python
 
-  >>> smart_open('s3://', host='s3.amazonaws.com')
-  >>> smart_open('s3://', profile_name='my-profile')
+  >>> fin = open('s3://commoncrawl/robots.txt', tkwa=dict(host='s3.amazonaws.com'))
+  >>> fin = open('s3://commoncrawl/robots.txt', tkwa=dict(profile_name='my-profile'))
 
-The **s3_session** argument allows you to provide a custom `boto3.Session` instance for connecting to S3:
+The **session** argument allows you to provide a custom `boto3.Session` instance for connecting to S3:
 
 .. code-block:: python
 
-  >>> smart_open('s3://', s3_session=boto3.Session())
+  >>> import boto3
+  >>> fin = open('s3://commoncrawl/robots.txt', tkwa=dict(session=boto3.Session()))
 
 
 The **s3_upload** argument accepts a dict of any parameters accepted by `initiate_multipart_upload <https://boto3.readthedocs.io/en/latest/reference/services/s3.html#S3.ObjectSummary.initiate_multipart_upload/>`_:
 
 .. code-block:: python
 
-  >>> smart_open('s3://', s3_upload={ 'ServerSideEncryption': 'AES256' })
+  >>> open('s3://', tkwa=dict(s3_upload={'ServerSideEncryption': 'AES256'}))  # doctest: +SKIP
 
-Since going over all (or select) keys in an S3 bucket is a very common operation,
-there's also an extra method ``smart_open.s3_iter_bucket()`` that does this efficiently,
-**processing the bucket keys in parallel** (using multiprocessing):
+Since going over all (or select) keys in an S3 bucket is a very common operation, there's also an extra method ``smart_open.s3_iter_bucket()`` that does this efficiently, **processing the bucket keys in parallel** (using multiprocessing):
 
 .. code-block:: python
 
-  >>> from smart_open import smart_open, s3_iter_bucket
-  >>> # get all JSON files under "mybucket/foo/"
-  >>> bucket = boto.connect_s3().get_bucket('mybucket')
-  >>> for key, content in s3_iter_bucket(bucket, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
-  ...     print(key, len(content))
+  >>> from smart_open import s3_iter_bucket
+  >>> # get data corresponding to 2010 and later under "silo-open-data/annual/monthly_rain"
+  >>> # we use workers=1 for reproducibility, use as many workers as you have cores
+  >>> bucket = 'silo-open-data'
+  >>> prefix = 'annual/monthly_rain/'
+  >>> for key, content in s3_iter_bucket(bucket, prefix=prefix, accept_key=lambda key: '/201' in key, workers=1):
+  ...     print(key, round(len(content) / 1024768))
+  annual/monthly_rain/2010.monthly_rain.nc 14
+  annual/monthly_rain/2011.monthly_rain.nc 14
+  annual/monthly_rain/2012.monthly_rain.nc 14
+  annual/monthly_rain/2013.monthly_rain.nc 14
+  annual/monthly_rain/2014.monthly_rain.nc 14
+  annual/monthly_rain/2015.monthly_rain.nc 14
+  annual/monthly_rain/2016.monthly_rain.nc 14
+  annual/monthly_rain/2017.monthly_rain.nc 14
+  annual/monthly_rain/2018.monthly_rain.nc 14
+  annual/monthly_rain/2019.monthly_rain.nc 14
 
 For more info (S3 credentials in URI, minimum S3 part size...) and full method signatures, check out the API docs:
 
 .. code-block:: python
 
-  >>> import smart_open
-  >>> help(smart_open.smart_open_lib)
+  >>> help(smart_open.smart_open_lib)  # doctest: +SKIP
 
 
 Comments, bug reports
