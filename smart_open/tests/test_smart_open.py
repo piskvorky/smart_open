@@ -391,7 +391,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
 # See the _shortcut_open function for details.
 #
 _IO_OPEN = 'io.open'
-_BUILTIN_OPEN = 'smart_open.smart_open_lib.open'
+_BUILTIN_OPEN = 'smart_open.smart_open_lib._builtin_open'
 
 
 class SmartOpenReadTest(unittest.TestCase):
@@ -402,7 +402,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     def test_shortcut(self):
         fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
-        with mock.patch('smart_open.smart_open_lib.open') as mock_open:
+        with mock.patch('smart_open.smart_open_lib._builtin_open') as mock_open:
             smart_open.smart_open(fpath, 'r').read()
         mock_open.assert_called_with(fpath, 'r', buffering=-1)
 
@@ -510,7 +510,7 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(b''.join(output), test_string)
 
     # TODO: add more complex test for file://
-    @mock.patch('smart_open.smart_open_lib.open')
+    @mock.patch('smart_open.smart_open_lib._builtin_open')
     def test_file(self, mock_smart_open):
         """Is file:// line iterator called correctly?"""
         prefix = "file://"
@@ -687,37 +687,37 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.Session')
     def test_no_kwargs(self, mock_session):
         smart_open.smart_open('s3://mybucket/mykey')
-        mock_session.assert_called_with(profile_name=None)
         mock_session.return_value.resource.assert_called_with('s3')
 
     @mock.patch('boto3.Session')
     def test_credentials(self, mock_session):
         smart_open.smart_open('s3://access_id:access_secret@mybucket/mykey')
-        mock_session.assert_called_with(profile_name=None)
-        mock_session.return_value.resource.assert_called_with(
-            's3', aws_access_key_id='access_id', aws_secret_access_key='access_secret'
-        )
-
-    @mock.patch('boto3.Session')
-    def test_profile(self, mock_session):
-        smart_open.smart_open('s3://mybucket/mykey', profile_name='my_credentials')
-        mock_session.assert_called_with(profile_name='my_credentials')
+        mock_session.assert_called_with(aws_access_key_id='access_id', aws_secret_access_key='access_secret')
         mock_session.return_value.resource.assert_called_with('s3')
 
     @mock.patch('boto3.Session')
     def test_host(self, mock_session):
-        smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey", host='aa.domain.com')
+        tkwa = {'resource_kwargs': {'endpoint_url': 'http://aa.domain.com'}}
+        smart_open.open("s3://access_id:access_secret@mybucket/mykey", tkwa=tkwa)
+        mock_session.assert_called_with(
+            aws_access_key_id='access_id',
+            aws_secret_access_key='access_secret',
+        )
         mock_session.return_value.resource.assert_called_with(
-            's3', aws_access_key_id='access_id', aws_secret_access_key='access_secret',
-            endpoint_url='http://aa.domain.com'
+            's3',
+            endpoint_url='http://aa.domain.com',
         )
 
     @mock.patch('boto3.Session')
     def test_s3_upload(self, mock_session):
-        smart_open.smart_open("s3://bucket/key", 'wb', s3_upload={
-            'ServerSideEncryption': 'AES256',
-            'ContentType': 'application/json'
-        })
+        smart_open.open(
+            "s3://bucket/key", 'wb', tkwa={
+                'multipart_upload_kwargs': {
+                    'ServerSideEncryption': 'AES256',
+                    'ContentType': 'application/json',
+                }
+            }
+        )
 
         # Locate the s3.Object instance (mock)
         s3_resource = mock_session.return_value.resource.return_value
@@ -737,7 +737,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         session = boto3.Session()
         session.resource = mock.MagicMock()
 
-        smart_open.smart_open('s3://bucket/key', s3_session=session)
+        smart_open.open('s3://bucket/key', tkwa={'session': session})
         session.resource.assert_called_with('s3')
 
     def test_session_write_mode(self):
@@ -747,7 +747,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         session = boto3.Session()
         session.resource = mock.MagicMock()
 
-        smart_open.smart_open('s3://bucket/key', 'wb', s3_session=session)
+        smart_open.open('s3://bucket/key', 'wb', tkwa={'session': session})
         session.resource.assert_called_with('s3')
 
 
@@ -834,7 +834,8 @@ class SmartOpenTest(unittest.TestCase):
         """Are s3:// open modes passed correctly?"""
 
         # correct write mode, correct s3 URI
-        smart_open.smart_open("s3://mybucket/mykey", "w", host='s3.amazonaws.com')
+        tkwa = {'resource_kwargs': {'endpoint_url': 'http://s3.amazonaws.com'}}
+        smart_open.open("s3://mybucket/mykey", "w", tkwa=tkwa)
         mock_session.return_value.resource.assert_called_with(
             's3', endpoint_url='http://s3.amazonaws.com'
         )
@@ -888,11 +889,13 @@ class SmartOpenTest(unittest.TestCase):
         s3.create_bucket(Bucket='mybucket')
 
         # Write data, with multipart_upload options
-        write_stream = smart_open.smart_open(
+        write_stream = smart_open.open(
             's3://mybucket/crime-and-punishment.txt.gz', 'wb',
-            s3_upload={
-                'ContentType': 'text/plain',
-                'ContentEncoding': 'gzip'
+            tkwa={
+                'multipart_upload_kwargs': {
+                    'ContentType': 'text/plain',
+                    'ContentEncoding': 'gzip',
+                }
             }
         )
         with write_stream as fout:
@@ -1188,6 +1191,7 @@ class S3OpenTest(unittest.TestCase):
             self.assertEqual(fin.read().decode("utf-8"), text)
 
     @mock_s3
+    @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_write_mode(self):
         """Should always open in binary mode when writing through a codec."""
         s3 = boto3.resource('s3')
@@ -1199,6 +1203,7 @@ class S3OpenTest(unittest.TestCase):
             mock_open.assert_called_with('bucket', 'key.gz', 'wb')
 
     @mock_s3
+    @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_read_mode(self):
         """Should always open in binary mode when reading through a codec."""
         s3 = boto3.resource('s3')
@@ -1294,31 +1299,6 @@ class S3OpenTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(text, actual)
 
-class HostNameTest(unittest.TestCase):
-
-    def test_host_name_with_http(self):
-        host = 'http://a.com/b'
-        expected = 'http://a.com/b'
-        res = smart_open_lib._add_scheme_to_host(host)
-        self.assertEqual(expected, res)
-
-    def test_host_name_without_http(self):
-        host = 'a.com/b'
-        expected = 'http://a.com/b'
-        res = smart_open_lib._add_scheme_to_host(host)
-        self.assertEqual(expected, res)
-
-    def test_host_name_with_https(self):
-        host = 'https://a.com/b'
-        expected = 'https://a.com/b'
-        res = smart_open_lib._add_scheme_to_host(host)
-        self.assertEqual(expected, res)
-
-    def test_host_name_without_http_prefix(self):
-        host = 'httpa.com/b'
-        expected = 'http://httpa.com/b'
-        res = smart_open_lib._add_scheme_to_host(host)
-        self.assertEqual(expected, res)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
