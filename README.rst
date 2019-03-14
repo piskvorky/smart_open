@@ -60,36 +60,36 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
   <!doctype html>
 
   >>> # stream from HDFS
-  >>> for line in open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):  # doctest: +SKIP
-  ...     print(line)                                                       # doctest: +SKIP
+  >> for line in open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):
+  ..     print(line)
 
   >>> # stream from WebHDFS
-  >>> for line in open('webhdfs://host:port/user/hadoop/my_file.txt'):  # doctest: +SKIP
-  ...     print(line)                                                   # doctest: +SKIP
+  >> for line in open('webhdfs://host:port/user/hadoop/my_file.txt'):
+  ..     print(line)
 
   >>> # stream content *into* S3 (write mode):
-  >>> with open('s3://mybucket/mykey.txt', 'wb') as fout:                    # doctest: +SKIP
-  ...     for line in [b'first line\n', b'second line\n', b'third line\n']:  # doctest: +SKIP
-  ...          fout.write(line)                                              # doctest: +SKIP
+  >> with open('s3://mybucket/mykey.txt', 'wb') as fout:
+  ..     for line in [b'first line\n', b'second line\n', b'third line\n']:
+  ..          fout.write(line)
 
   >>> # stream content *into* HDFS (write mode):
-  >>> with open('hdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:   # doctest: +SKIP
-  ...     for line in [b'first line\n', b'second line\n', b'third line\n']:  # doctest: +SKIP
-  ...          fout.write(line)                                              # doctest: +SKIP
+  >> with open('hdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
+  ..     for line in [b'first line\n', b'second line\n', b'third line\n']:
+  ..          fout.write(line)
 
   >>> # stream content *into* WebHDFS (write mode):
-  >>> with open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:  # doctest: +SKIP
-  ...     for line in [b'first line\n', b'second line\n', b'third line\n']:    # doctest: +SKIP
-  ...          fout.write(line)                                                # doctest: +SKIP
+  >> with open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
+  ..     for line in [b'first line\n', b'second line\n', b'third line\n']:
+  ..          fout.write(line)
 
   >>> # stream using a completely custom s3 server, like s3proxy:
-  >>> for line in open('s3u://user:secret@host:port@mybucket/mykey.txt'):  # doctest: +SKIP
-  ...    print(line)
+  >> for line in open('s3u://user:secret@host:port@mybucket/mykey.txt'):
+  ..    print(line)
  
   >>> # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
-  >>> tkwa = dict(endpoint_url='https://ams3.digitaloceanspaces.com', profile_name='digitalocean')
-  >>> with open('s3://bucket/key.txt', 'wb', tkwa=twka) as fout:  # doctest: +SKIP
-  ...     fout.write(b'here we stand')                            # doctest: +SKIP
+  >> tkwa = dict(endpoint_url='https://ams3.digitaloceanspaces.com', profile_name='digitalocean')
+  >> with open('s3://bucket/key.txt', 'wb', tkwa=twka) as fout:
+  ..     fout.write(b'here we stand')
 
 Why?
 ----
@@ -145,7 +145,7 @@ The **s3_upload** argument accepts a dict of any parameters accepted by `initiat
 
 .. code-block:: python
 
-  >>> open('s3://', tkwa=dict(s3_upload={'ServerSideEncryption': 'AES256'}))  # doctest: +SKIP
+  >> fin = open('s3://', tkwa=dict(s3_upload={'ServerSideEncryption': 'AES256'}))  # doctest: +SKIP
 
 Since going over all (or select) keys in an S3 bucket is a very common operation, there's also an extra method ``smart_open.s3_iter_bucket()`` that does this efficiently, **processing the bucket keys in parallel** (using multiprocessing):
 
@@ -156,24 +156,17 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
   >>> # we use workers=1 for reproducibility, use as many workers as you have cores
   >>> bucket = 'silo-open-data'
   >>> prefix = 'annual/monthly_rain/'
-  >>> for key, content in s3_iter_bucket(bucket, prefix=prefix, accept_key=lambda key: '/201' in key, workers=1):
+  >>> for key, content in s3_iter_bucket(bucket, prefix=prefix, accept_key=lambda key: '/201' in key, workers=1, key_limit=3):
   ...     print(key, round(len(content) / 1024768))
   annual/monthly_rain/2010.monthly_rain.nc 14
   annual/monthly_rain/2011.monthly_rain.nc 14
   annual/monthly_rain/2012.monthly_rain.nc 14
-  annual/monthly_rain/2013.monthly_rain.nc 14
-  annual/monthly_rain/2014.monthly_rain.nc 14
-  annual/monthly_rain/2015.monthly_rain.nc 14
-  annual/monthly_rain/2016.monthly_rain.nc 14
-  annual/monthly_rain/2017.monthly_rain.nc 14
-  annual/monthly_rain/2018.monthly_rain.nc 14
-  annual/monthly_rain/2019.monthly_rain.nc 14
 
 For more info (S3 credentials in URI, minimum S3 part size...) and full method signatures, check out the API docs:
 
 .. code-block:: python
 
-  >>> help(smart_open.smart_open_lib)  # doctest: +SKIP
+  >> help(smart_open.smart_open_lib)
 
 
 Comments, bug reports
