@@ -5,10 +5,12 @@
 #
 # This code is distributed under the terms and conditions from the MIT License (MIT).
 #
+
 """Common functions for working with docstrings.
 
 For internal use only.
 """
+
 import inspect
 import io
 

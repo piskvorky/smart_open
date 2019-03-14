@@ -1,3 +1,19 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
+#
+# This code is distributed under the terms and conditions from the MIT License (MIT).
+#
+
+"""Implements reading and writing to/from HDFS.
+
+The main entry point is the :func:`~smart_open.hdfs.open` function.
+
+Uses the command-line hdfs utility under the covers.
+
+"""
+
 import io
 import logging
 import subprocess
