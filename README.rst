@@ -67,28 +67,43 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
   >> for line in open('webhdfs://host:port/user/hadoop/my_file.txt'):
   ..     print(line)
 
-  >>> # stream content *into* S3 (write mode):
-  >> with open('s3://mybucket/mykey.txt', 'wb') as fout:
-  ..     for line in [b'first line\n', b'second line\n', b'third line\n']:
-  ..          fout.write(line)
+  >>> # stream content *into* S3 (write mode), using a custom Session for authentication:
+  >>> import boto3
+  >>> tkwa = dict(session=boto3.Session(profile_name='smart_open'))
+  >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
+  >>> lines = [b'first line\n', b'second line\n', b'third line\n']
+  >>> [len(l) for l in lines]
+  [11, 12, 11]
+  >>>
+  >>> with open(url, 'wb', tkwa=tkwa) as fout:
+  ...    for line in lines:
+  ...         fout.write(line)
+  11
+  12
+  11
+  >>>
+  >>> with open(url, tkwa=tkwa) as fin:
+  ...    print(fin.read(), end='')
+  first line
+  second line
+  third line
 
   >>> # stream content *into* HDFS (write mode):
   >> with open('hdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
-  ..     for line in [b'first line\n', b'second line\n', b'third line\n']:
-  ..          fout.write(line)
+  ..     fout.write(b'hello world')
 
   >>> # stream content *into* WebHDFS (write mode):
   >> with open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
-  ..     for line in [b'first line\n', b'second line\n', b'third line\n']:
-  ..          fout.write(line)
+  ..     fout.write(b'hello world')
 
   >>> # stream using a completely custom s3 server, like s3proxy:
   >> for line in open('s3u://user:secret@host:port@mybucket/mykey.txt'):
   ..    print(line)
  
   >>> # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
-  >> tkwa = dict(endpoint_url='https://ams3.digitaloceanspaces.com', profile_name='digitalocean')
-  >> with open('s3://bucket/key.txt', 'wb', tkwa=twka) as fout:
+  >> session = boto3.Session(profile_name='digitalocean')
+  >> kw = dict(endpoint_url='https://ams3.digitaloceanspaces.com')
+  >> with open('s3://bucket/key.txt', 'wb', tkwa=dict(session=session, resource_kwargs=kw)) as fout:
   ..     fout.write(b'here we stand')
 
 Why?
@@ -119,35 +134,35 @@ Supported archive types
 ``smart_open`` allows reading and writing gzip, bzip2 and xz files.
 They are transparently handled over HTTP, S3, and other protocols, too.
 
-S3-Specific Options
--------------------
+Transport-specific Options
+--------------------------
 
-The S3 reader supports gzipped content transparently, as long as the key is obviously a gzipped file (e.g. ends with ".gz").
+smart_open supports a wide range of transport options out of the box, including:
 
-There are a few optional keyword arguments that are useful only for S3 access.
+- S3
+- HTTP, HTTPS (read-only)
+- SSH, SCP and SFTP
+- WebHDFS
 
-The **host** and **profile** arguments are both passed to `boto.s3_connect()` as keyword arguments:
-
-.. code-block:: python
-
-  >>> fin = open('s3://commoncrawl/robots.txt', tkwa=dict(host='s3.amazonaws.com'))
-  >>> fin = open('s3://commoncrawl/robots.txt', tkwa=dict(profile_name='my-profile'))
-
-The **session** argument allows you to provide a custom `boto3.Session` instance for connecting to S3:
+Each option involves setting up its own set of parameters.
+For example, for accessing S3, you often need to set up authentication, like API keys or a profile name.
+smart_open's `open` function accepts a keyword argument `tkwa` which accepts transport keyword arguments.
+Here are some examples of using this parameter:
 
 .. code-block:: python
 
   >>> import boto3
   >>> fin = open('s3://commoncrawl/robots.txt', tkwa=dict(session=boto3.Session()))
+  >>> fin = open('s3://commoncrawl/robots.txt', tkwa=dict(buffer_size=1024))
 
-
-The **s3_upload** argument accepts a dict of any parameters accepted by `initiate_multipart_upload <https://boto3.readthedocs.io/en/latest/reference/services/s3.html#S3.ObjectSummary.initiate_multipart_upload/>`_:
+For the full list of keyword arguments supported by each option, see the documentation:
 
 .. code-block:: python
 
-  >> fin = open('s3://', tkwa=dict(s3_upload={'ServerSideEncryption': 'AES256'}))  # doctest: +SKIP
+  >> import smart_open
+  >> help(smart_open.open)
 
-Since going over all (or select) keys in an S3 bucket is a very common operation, there's also an extra method ``smart_open.s3_iter_bucket()`` that does this efficiently, **processing the bucket keys in parallel** (using multiprocessing):
+Since going over all (or select) keys in an S3 bucket is a very common operation, there's also an extra function ``smart_open.s3_iter_bucket()`` that does this efficiently, **processing the bucket keys in parallel** (using multiprocessing):
 
 .. code-block:: python
 
@@ -166,6 +181,7 @@ For more info (S3 credentials in URI, minimum S3 part size...) and full method s
 
 .. code-block:: python
 
+  >> import smart_open
   >> help(smart_open.smart_open_lib)
 
 
