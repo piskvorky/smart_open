@@ -11,6 +11,7 @@
 The main entry point is the :func:`~smart_open.webhdfs.open` function.
 
 """
+
 import io
 import logging
 
