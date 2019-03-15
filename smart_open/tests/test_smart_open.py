@@ -1198,7 +1198,7 @@ class S3OpenTest(unittest.TestCase):
         s3.create_bucket(Bucket='bucket')
         uri = smart_open_lib._parse_uri("s3://bucket/key.gz")
 
-        with mock.patch('smart_open.smart_open_s3.open') as mock_open:
+        with mock.patch('smart_open.s3.open') as mock_open:
             smart_open.smart_open("s3://bucket/key.gz", "wb")
             mock_open.assert_called_with('bucket', 'key.gz', 'wb')
 
@@ -1214,7 +1214,7 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.smart_open(key, "wb") as fout:
             fout.write(text.encode("utf-8"))
 
-        with mock.patch('smart_open.smart_open_s3.open') as mock_open:
+        with mock.patch('smart_open.s3.open') as mock_open:
             smart_open.smart_open(key, "r")
             mock_open.assert_called_with('bucket', 'key.gz', 'rb')
 
