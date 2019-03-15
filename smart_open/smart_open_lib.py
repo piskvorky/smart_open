@@ -248,8 +248,8 @@ def open(
         Mimicks built-in open parameter of the same name.  Ignored.
     ignore_ext: boolean, optional
         Disable transparent compression/decompression based on the file extension.
-    t_params: dict
-        Keyword arguments for the transport layer (see notes below).
+    t_params: dict, optional
+        Additional parameters for the transport layer (see notes below).
 
     Returns
     -------
@@ -311,6 +311,11 @@ def open(
     ...    print(line)
     >>> for line in open('my_file.txt'):
     ...    print(line)
+
+    See Also
+    --------
+
+    - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
 
     """
     logger.debug('%r', locals())
