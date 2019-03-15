@@ -80,8 +80,7 @@ For detailed API info, see the online help:
 
 .. code-block:: python
 
-    import smart_open
-    help(smart_open.smart_open_lib)
+    help('smart_open')
 
 For more example usage, see :ref:`other_examples`_.
 

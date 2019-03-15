@@ -1,24 +1,18 @@
-#!/usr/bin/env python
+#
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2015 Radim Rehurek <me@radimrehurek.com>
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
+#
 
-
-"""
-Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
-filesystem / compressed files, and many more, using a simple, Pythonic API.
-
-The streaming makes heavy use of generators and pipes, to avoid loading
-full file contents into memory, allowing work with arbitrarily large files.
+"""Implements the majority of smart_open's top-level API.
 
 The main functions are:
 
-* `open()`, which opens the given file for reading/writing
-* `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
-* `register_compressor()`, which registers callbacks for transparent compressor handling
+  * `open()`
+  * `register_compressor()`
 
 """
 
@@ -55,7 +49,6 @@ import sys
 # smart_open.submodule to reference to the submodules.
 #
 import smart_open.s3 as smart_open_s3
-from smart_open.s3 import iter_bucket as s3_iter_bucket
 import smart_open.hdfs as smart_open_hdfs
 import smart_open.webhdfs as smart_open_webhdfs
 import smart_open.http as smart_open_http
