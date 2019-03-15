@@ -58,7 +58,7 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
   ...     break
   <!doctype html>
 
-Other examples of URLs that smart_open accepts::
+Other examples of URLs that ``smart_open`` accepts::
 
     s3://my_bucket/my_key
     s3://my_key:my_secret@my_bucket/my_key
@@ -107,12 +107,12 @@ Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pyp
 To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>`_ (``pip install mock moto responses``).
 The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
 
-Supported archive types
------------------------
+Supported Compression Formats
+-----------------------------
 
 ``smart_open`` allows reading and writing gzip, bzip2 and xz files.
-They are transparently handled over HTTP, S3, and other protocols, too.
-You can easily add support for other file extensions:
+They are transparently handled over HTTP, S3, and other protocols, too, based on the extension of the file being opened.
+You can easily add support for other file extensions and compression formats:
 
 .. code-block:: python
 
@@ -128,7 +128,7 @@ You can easily add support for other file extensions:
 Transport-specific Options
 --------------------------
 
-smart_open supports a wide range of transport options out of the box, including:
+``smart_open`` supports a wide range of transport options out of the box, including:
 
 - S3
 - HTTP, HTTPS (read-only)
@@ -137,7 +137,7 @@ smart_open supports a wide range of transport options out of the box, including:
 
 Each option involves setting up its own set of parameters.
 For example, for accessing S3, you often need to set up authentication, like API keys or a profile name.
-smart_open's `open` function accepts a keyword argument `transport_params` which accepts additional parameters for the transport layer.
+``smart_open``'s ``open`` function accepts a keyword argument ``transport_params`` which accepts additional parameters for the transport layer.
 Here are some examples of using this parameter:
 
 .. code-block:: python
