@@ -79,6 +79,9 @@ def register_compressor(ext, callback):
     Examples
     --------
 
+    Instruct smart_open to use the identity function whenever opening a file
+    with a .foo extension:
+
     >>> def identity(file_obj, mode):
     ...     return file_obj
     >>> register_compressor('.foo', identity)

@@ -24,4 +24,4 @@ The main functions are:
 
 from .smart_open_lib import open, register_compressor
 from .s3 import iter_bucket as s3_iter_bucket
-__all__ = ['open', 's3_iter_bucket']
+__all__ = ['open', 's3_iter_bucket', 'register_compressor']
