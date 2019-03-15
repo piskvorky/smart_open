@@ -12,7 +12,8 @@ smart_open — utils for streaming large files in Python
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS, WebHDFS, HTTP, or local (compressed) files.
+``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS, WebHDFS, HTTP, or local storage.
+It supports transparent, on-the-fly (de-)compression for a variety of different formats.
 It's a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
 ``smart_open`` is well-tested, well-documented, and has a simple, Pythonic API:
@@ -60,21 +61,21 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
 
 Other examples of URLs that smart_open accepts:
 
-  * s3://my_bucket/my_key
-  * s3://my_key:my_secret@my_bucket/my_key
-  * s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
-  * hdfs:///path/file
-  * hdfs://path/file
-  * webhdfs://host:port/path/file
-  * ./local/path/file
-  * ~/local/path/file
-  * local/path/file
-  * ./local/path/file.gz
-  * file:///home/user/file
-  * file:///home/user/file.bz2
-  * [ssh|scp|sftp]://username@host//path/file
-  * [ssh|scp|sftp]://username@host/path/file
-  * file:///home/user/file.xz
+* s3://my_bucket/my_key
+* s3://my_key:my_secret@my_bucket/my_key
+* s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
+* hdfs:///path/file
+* hdfs://path/file
+* webhdfs://host:port/path/file
+* ./local/path/file
+* ~/local/path/file
+* local/path/file
+* ./local/path/file.gz
+* file:///home/user/file
+* file:///home/user/file.bz2
+* [ssh|scp|sftp]://username@host//path/file
+* [ssh|scp|sftp]://username@host/path/file
+* file:///home/user/file.xz
 
 For detailed API info, see the online help:
 
