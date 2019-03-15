@@ -157,7 +157,7 @@ S3 Credentials
 --------------
 
 `smart_open` uses the `boto3` library to talk to S3.
-`boto3` has several `mechanisms <https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html>` for determining the credentials to use.
+`boto3` has several `mechanisms <https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html>`__ for determining the credentials to use.
 By default, `smart_open` will defer to `boto3` and let the latter take care of the credentials.
 There are several ways to override this behavior.
 
