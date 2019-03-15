@@ -105,13 +105,26 @@ Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pyp
     python setup.py test  # run unit tests
     python setup.py install
 
-To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>`_ (``pip install mock moto responses``). The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
+To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>`_ (``pip install mock moto responses``).
+The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
 
 Supported archive types
 -----------------------
 
 ``smart_open`` allows reading and writing gzip, bzip2 and xz files.
 They are transparently handled over HTTP, S3, and other protocols, too.
+You can easily add support for other file extensions:
+
+.. code-block:: python
+
+	def _handle_lzma(file_obj, mode):
+		import lzma
+		return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_ALONE)
+
+	from smart_open import open, register_compressor
+	register_compressor('.lzma', _handle_lzma)
+	with open('file.lzma', ...) as fin:
+		pass
 
 Transport-specific Options
 --------------------------
