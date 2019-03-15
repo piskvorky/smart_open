@@ -697,8 +697,8 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
 
     @mock.patch('boto3.Session')
     def test_host(self, mock_session):
-        tkwa = {'resource_kwargs': {'endpoint_url': 'http://aa.domain.com'}}
-        smart_open.open("s3://access_id:access_secret@mybucket/mykey", tkwa=tkwa)
+        t_params = {'resource_kwargs': {'endpoint_url': 'http://aa.domain.com'}}
+        smart_open.open("s3://access_id:access_secret@mybucket/mykey", t_params=t_params)
         mock_session.assert_called_with(
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret',
@@ -711,7 +711,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.Session')
     def test_s3_upload(self, mock_session):
         smart_open.open(
-            "s3://bucket/key", 'wb', tkwa={
+            "s3://bucket/key", 'wb', t_params={
                 'multipart_upload_kwargs': {
                     'ServerSideEncryption': 'AES256',
                     'ContentType': 'application/json',
@@ -737,7 +737,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         session = boto3.Session()
         session.resource = mock.MagicMock()
 
-        smart_open.open('s3://bucket/key', tkwa={'session': session})
+        smart_open.open('s3://bucket/key', t_params={'session': session})
         session.resource.assert_called_with('s3')
 
     def test_session_write_mode(self):
@@ -747,7 +747,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         session = boto3.Session()
         session.resource = mock.MagicMock()
 
-        smart_open.open('s3://bucket/key', 'wb', tkwa={'session': session})
+        smart_open.open('s3://bucket/key', 'wb', t_params={'session': session})
         session.resource.assert_called_with('s3')
 
 
@@ -834,8 +834,8 @@ class SmartOpenTest(unittest.TestCase):
         """Are s3:// open modes passed correctly?"""
 
         # correct write mode, correct s3 URI
-        tkwa = {'resource_kwargs': {'endpoint_url': 'http://s3.amazonaws.com'}}
-        smart_open.open("s3://mybucket/mykey", "w", tkwa=tkwa)
+        t_params = {'resource_kwargs': {'endpoint_url': 'http://s3.amazonaws.com'}}
+        smart_open.open("s3://mybucket/mykey", "w", t_params=t_params)
         mock_session.return_value.resource.assert_called_with(
             's3', endpoint_url='http://s3.amazonaws.com'
         )
@@ -891,7 +891,7 @@ class SmartOpenTest(unittest.TestCase):
         # Write data, with multipart_upload options
         write_stream = smart_open.open(
             's3://mybucket/crime-and-punishment.txt.gz', 'wb',
-            tkwa={
+            t_params={
                 'multipart_upload_kwargs': {
                     'ContentType': 'text/plain',
                     'ContentEncoding': 'gzip',

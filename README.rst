@@ -66,22 +66,20 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
   >> for line in open('webhdfs://host:port/user/hadoop/my_file.txt'):
   ..     print(line)
 
-  >>> # stream content *into* S3 (write mode), using a custom Session for authentication:
-  >>> import boto3
-  >>> tkwa = dict(session=boto3.Session(profile_name='smart_open'))
+  >>> # stream content *into* S3 (write mode)
   >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
   >>> lines = [b'first line\n', b'second line\n', b'third line\n']
   >>> [len(l) for l in lines]
   [11, 12, 11]
   >>>
-  >>> with open(url, 'wb', tkwa=tkwa) as fout:
+  >>> with open(url, 'wb') as fout:
   ...    for line in lines:
   ...         fout.write(line)
   11
   12
   11
   >>>
-  >>> with open(url, tkwa=tkwa) as fin:
+  >>> with open(url, encoding='utf-8') as fin:
   ...    print(fin.read(), end='')
   first line
   second line
@@ -102,7 +100,7 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
   >>> # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
   >> session = boto3.Session(profile_name='digitalocean')
   >> kw = dict(endpoint_url='https://ams3.digitaloceanspaces.com')
-  >> with open('s3://bucket/key.txt', 'wb', tkwa=dict(session=session, resource_kwargs=kw)) as fout:
+  >> with open('s3://bucket/key.txt', 'wb', t_params=dict(session=session, resource_kwargs=kw)) as fout:
   ..     fout.write(b'here we stand')
 
 Why?
@@ -145,14 +143,14 @@ smart_open supports a wide range of transport options out of the box, including:
 
 Each option involves setting up its own set of parameters.
 For example, for accessing S3, you often need to set up authentication, like API keys or a profile name.
-smart_open's `open` function accepts a keyword argument `tkwa` which accepts transport keyword arguments.
+smart_open's `open` function accepts a keyword argument `t_params` which accepts additional parameters for the transport layer.
 Here are some examples of using this parameter:
 
 .. code-block:: python
 
   >>> import boto3
-  >>> fin = open('s3://commoncrawl/robots.txt', tkwa=dict(session=boto3.Session()))
-  >>> fin = open('s3://commoncrawl/robots.txt', tkwa=dict(buffer_size=1024))
+  >>> fin = open('s3://commoncrawl/robots.txt', t_params=dict(session=boto3.Session()))
+  >>> fin = open('s3://commoncrawl/robots.txt', t_params=dict(buffer_size=1024))
 
 For the full list of keyword arguments supported by each option, see the documentation:
 
