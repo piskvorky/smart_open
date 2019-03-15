@@ -47,10 +47,9 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
   ...     for line in fin:
   ...         print(line.decode('utf-8'), end='')
   ...         break
-  ...     fin.seek(0)  # seek to the beginning
+  ...     offset = fin.seek(0)  # seek to the beginning
   ...     print(fin.read(4))
   User-Agent: *
-  0
   b'User'
 
   >>> # stream from HTTP
@@ -212,9 +211,9 @@ Other Examples
     >>> # stream content *into* S3 (write mode) using a custom session
     >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
     >>> lines = [b'first line\n', b'second line\n', b'third line\n']
-    >>> with open(url, 'wb', t_params=dict(session=boto3.Session(profile_name='smart_open')) as fout:
+    >>> with open(url, 'wb', t_params=dict(session=boto3.Session(profile_name='smart_open'))) as fout:
     ...     for line in lines:
-    ...         fout.write(line)
+    ...         bytes_written = fout.write(line)
 
 .. code-block:: python
 
