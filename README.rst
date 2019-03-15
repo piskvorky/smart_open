@@ -27,13 +27,12 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
   ...    break
   User-Agent: *
 
-  >>> gz_path = 'smart_open/tests/test_data/crime-and-punishment.txt.gz'
+  >>> gz_path = 'smart_open/tests/test_data/1984.txt.gz'
   >>>
   >>> # stream from/to compressed files, with transparent (de)compression:
   >>> for line in open(gz_path, encoding='utf-8'):
-  ...    print(line[:50])
-  ...    break
-  В начале июля, в чрезвычайно жаркое время, под веч
+  ...    print(line, end='')
+  It was a bright cold day in April, and the clocks were striking thirteen.
 
   >>> # can use context managers too:
   >>> bz2_path = gz_path.replace('.gz', '.bz2')
