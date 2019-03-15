@@ -156,14 +156,14 @@ For the full list of keyword arguments supported by each transport option, see t
 S3 Credentials
 --------------
 
-`smart_open` uses the `boto3` library to talk to S3.
-`boto3` has several `mechanisms <https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html>`__ for determining the credentials to use.
-By default, `smart_open` will defer to `boto3` and let the latter take care of the credentials.
+``smart_open`` uses the ``boto3`` library to talk to S3.
+``boto3`` has several `mechanisms <https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html>`__ for determining the credentials to use.
+By default, ``smart_open`` will defer to ``boto3`` and let the latter take care of the credentials.
 There are several ways to override this behavior.
 
-The first is to pass a `boto3.Session` object as a transport parameter to the `open` function.
+The first is to pass a ``boto3.Session`` object as a transport parameter to the ``open`` function.
 You can customize the credentials when constructing the session.
-`smart_open` will then use the session when talking to S3.
+``smart_open`` will then use the session when talking to S3.
 
 .. code-block:: python
 
@@ -182,7 +182,7 @@ Your second option is to specify the credentials within the S3 URL itself:
 
 .. important::
     The two methods above are **mutually exclusive**.
-    If you pass a session *and* the URL contains credentials, `smart_open` will ignore the latter.
+    If you pass a session *and* the URL contains credentials, ``smart_open`` will ignore the latter.
 
 Iterating Over an S3 Bucket's Contents
 --------------------------------------
