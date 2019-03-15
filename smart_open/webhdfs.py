@@ -33,7 +33,7 @@ def open(uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
     """
     Parameters
     ----------
-    min_part_size: int
+    min_part_size: int, optional
         For writing only.
 
     """
