@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 # Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
-# The only method currently relying on it is s3_iter_bucket, which is instructed
+# The only method currently relying on it is iter_bucket, which is instructed
 # whether to use it by the MULTIPROCESSING flag.
 _MULTIPROCESSING = False
 try:
@@ -520,23 +520,43 @@ multipart upload may fail")
             self.close()
 
 
-def iter_bucket(bucket_name, prefix='', accept_key=lambda key: True,
+def iter_bucket(bucket_name, prefix='', accept_key=None,
                 key_limit=None, workers=16, retries=3):
     """
-    Iterate and download all S3 files under `bucket/prefix`, yielding out
-    `(key, key content)` 2-tuples (generator).
+    Iterate and download all S3 objects under `s3://bucket_name/prefix`.
 
-    `accept_key` is a function that accepts a key name (unicode string) and
-    returns True/False, signalling whether the given key should be downloaded out or
-    not (default: accept all keys).
+    Parameters
+    ----------
+    bucket_name: str
+        The name of the bucket.
+    prefix: str, optional
+        Limits the iteration to keys starting wit the prefix.
+    accept_key: callable, optional
+        This is a function that accepts a key name (unicode string) and
+        returns True/False, signalling whether the given key should be downloaded.
+        The default behavior is to accept all keys.
+    key_limit: int, optional
+        If specified, the iterator will stop after yielding this many results.
+    workers: int, optional
+        The number of subprocesses to use.
+    retries: int, optional
+        The number of time to retry a failed download.
 
-    If `key_limit` is given, stop after yielding out that many results.
+    Yields
+    ------
+    str
+        The full key name (does not include the bucket name).
+    bytes
+        The full contents of the key.
 
+    Notes
+    -----
     The keys are processed in parallel, using `workers` processes (default: 16),
     to speed up downloads greatly. If multiprocessing is not available, thus
     _MULTIPROCESSING is False, this parameter will be ignored.
 
-    Example::
+    Examples
+    --------
 
       >>> # get all JSON files under "mybucket/foo/"
       >>> for key, content in iter_bucket(bucket_name, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
@@ -546,6 +566,9 @@ def iter_bucket(bucket_name, prefix='', accept_key=lambda key: True,
       >>> for key, content in iter_bucket(bucket_name, key_limit=10000, workers=32):
       ...     print key, len(content)
     """
+    if accept_key is None:
+        accept_key = lambda key: True
+
     #
     # If people insist on giving us bucket instances, silently extract the name
     # before moving on.  Works for boto3 as well as boto.
