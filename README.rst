@@ -182,7 +182,7 @@ Your second option is to specify the credentials within the S3 URL itself:
 
 .. important::
     The two methods above are **mutually exclusive**.
-    If you pass a session _and_ the URL contains credentials, `smart_open` will ignore the latter.
+    If you pass a session *and* the URL contains credentials, `smart_open` will ignore the latter.
 
 Iterating Over an S3 Bucket's Contents
 --------------------------------------
