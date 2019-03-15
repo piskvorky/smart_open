@@ -59,23 +59,23 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
   ...     break
   <!doctype html>
 
-Other examples of URLs that smart_open accepts:
+Other examples of URLs that smart_open accepts::
 
-* s3://my_bucket/my_key
-* s3://my_key:my_secret@my_bucket/my_key
-* s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
-* hdfs:///path/file
-* hdfs://path/file
-* webhdfs://host:port/path/file
-* ./local/path/file
-* ~/local/path/file
-* local/path/file
-* ./local/path/file.gz
-* file:///home/user/file
-* file:///home/user/file.bz2
-* [ssh|scp|sftp]://username@host//path/file
-* [ssh|scp|sftp]://username@host/path/file
-* file:///home/user/file.xz
+    s3://my_bucket/my_key
+    s3://my_key:my_secret@my_bucket/my_key
+    s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
+    hdfs:///path/file
+    hdfs://path/file
+    webhdfs://host:port/path/file
+    ./local/path/file
+    ~/local/path/file
+    local/path/file
+    ./local/path/file.gz
+    file:///home/user/file
+    file:///home/user/file.bz2
+    [ssh|scp|sftp]://username@host//path/file
+    [ssh|scp|sftp]://username@host/path/file
+    file:///home/user/file.xz
 
 For detailed API info, see the online help:
 
@@ -83,7 +83,7 @@ For detailed API info, see the online help:
 
     help('smart_open')
 
-For more example usage, see :ref:`other_examples`_.
+For more example usage, see other_examples_.
 
 Why?
 ----
@@ -117,14 +117,14 @@ You can easily add support for other file extensions:
 
 .. code-block:: python
 
-	def _handle_lzma(file_obj, mode):
-		import lzma
-		return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_ALONE)
+    def _handle_lzma(file_obj, mode):
+        import lzma
+        return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_ALONE)
 
-	from smart_open import open, register_compressor
-	register_compressor('.lzma', _handle_lzma)
-	with open('file.lzma', ...) as fin:
-		pass
+    from smart_open import open, register_compressor
+    register_compressor('.lzma', _handle_lzma)
+    with open('file.lzma', ...) as fin:
+        pass
 
 Transport-specific Options
 --------------------------
@@ -151,8 +151,7 @@ For the full list of keyword arguments supported by each transport option, see t
 
 .. code-block:: python
 
-  >> import smart_open
-  >> help(smart_open.open)
+  help('smart_open.open')
 
 Since going over all (or select) keys in an S3 bucket is a very common operation, there's also an extra function ``smart_open.s3_iter_bucket()`` that does this efficiently, **processing the bucket keys in parallel** (using multiprocessing):
 
