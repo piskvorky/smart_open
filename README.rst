@@ -153,6 +153,40 @@ For the full list of keyword arguments supported by each transport option, see t
 
   help('smart_open.open')
 
+S3 Credentials
+--------------
+
+`smart_open` uses the `boto3` library to talk to S3.
+`boto3` has several `mechanisms <https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html>` for determining the credentials to use.
+By default, `smart_open` will defer to `boto3` and let the latter take care of the credentials.
+There are several ways to override this behavior.
+
+The first is to pass a `boto3.Session` object as a transport parameter to the `open` function.
+You can customize the credentials when constructing the session.
+`smart_open` will then use the session when talking to S3.
+
+.. code-block:: python
+
+    session = boto3.Session(
+        aws_access_key_id=ACCESS_KEY,
+        aws_secret_access_key=SECRET_KEY,
+        aws_session_token=SESSION_TOKEN,
+    )
+    fin = open('s3://bucket/key', t_params=dict(session=session), ...)
+
+Your second option is to specify the credentials within the S3 URL itself:
+
+.. code-block:: python
+
+    fin = open('s3://aws_access_key_id:aws_secret_access_key@bucket/key', ...)
+
+.. important::
+    The two methods above are **mutually exclusive**.
+    If you pass a session _and_ the URL contains credentials, `smart_open` will ignore the latter.
+
+Iterating Over an S3 Bucket's Contents
+--------------------------------------
+
 Since going over all (or select) keys in an S3 bucket is a very common operation, there's also an extra function ``smart_open.s3_iter_bucket()`` that does this efficiently, **processing the bucket keys in parallel** (using multiprocessing):
 
 .. code-block:: python
