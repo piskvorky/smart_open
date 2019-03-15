@@ -137,14 +137,14 @@ smart_open supports a wide range of transport options out of the box, including:
 
 Each option involves setting up its own set of parameters.
 For example, for accessing S3, you often need to set up authentication, like API keys or a profile name.
-smart_open's `open` function accepts a keyword argument `t_params` which accepts additional parameters for the transport layer.
+smart_open's `open` function accepts a keyword argument `transport_params` which accepts additional parameters for the transport layer.
 Here are some examples of using this parameter:
 
 .. code-block:: python
 
   >>> import boto3
-  >>> fin = open('s3://commoncrawl/robots.txt', t_params=dict(session=boto3.Session()))
-  >>> fin = open('s3://commoncrawl/robots.txt', t_params=dict(buffer_size=1024))
+  >>> fin = open('s3://commoncrawl/robots.txt', transport_params=dict(session=boto3.Session()))
+  >>> fin = open('s3://commoncrawl/robots.txt', transport_params=dict(buffer_size=1024))
 
 For the full list of keyword arguments supported by each transport option, see the documentation:
 
@@ -171,7 +171,7 @@ You can customize the credentials when constructing the session.
         aws_secret_access_key=SECRET_KEY,
         aws_session_token=SESSION_TOKEN,
     )
-    fin = open('s3://bucket/key', t_params=dict(session=session), ...)
+    fin = open('s3://bucket/key', transport_params=dict(session=session), ...)
 
 Your second option is to specify the credentials within the S3 URL itself:
 
@@ -211,7 +211,7 @@ Other Examples
     >>> # stream content *into* S3 (write mode) using a custom session
     >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
     >>> lines = [b'first line\n', b'second line\n', b'third line\n']
-    >>> with open(url, 'wb', t_params=dict(session=boto3.Session(profile_name='smart_open'))) as fout:
+    >>> with open(url, 'wb', transport_params=dict(session=boto3.Session(profile_name='smart_open'))) as fout:
     ...     for line in lines:
     ...         bytes_written = fout.write(line)
 
@@ -240,7 +240,7 @@ Other Examples
     # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
     session = boto3.Session(profile_name='digitalocean')
     kw = dict(endpoint_url='https://ams3.digitaloceanspaces.com')
-    with open('s3://bucket/key.txt', 'wb', t_params=dict(session=session, resource_kwargs=kw)) as fout:
+    with open('s3://bucket/key.txt', 'wb', transport_params=dict(session=session, resource_kwargs=kw)) as fout:
         fout.write(b'here we stand')
 
 
