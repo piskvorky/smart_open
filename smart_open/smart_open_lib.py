@@ -8,15 +8,15 @@
 
 
 """
-Utilities for streaming from several file-like data storages: S3 / HDFS / standard
-filesystem / compressed files..., using a single, Pythonic API.
+Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
+filesystem / compressed files, and many more, using a simple, Pythonic API.
 
 The streaming makes heavy use of generators and pipes, to avoid loading
 full file contents into memory, allowing work with arbitrarily large files.
 
-The main methods are:
+The main functions are:
 
-* `smart_open()`, which opens the given file for reading/writing
+* `open()`, which opens the given file for reading/writing
 * `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
 * `register_compressor()`, which registers callbacks for transparent compressor handling
 
@@ -25,6 +25,7 @@ The main methods are:
 import codecs
 import collections
 import logging
+import inspect
 import os
 import os.path as P
 import importlib
@@ -41,8 +42,9 @@ for pathlib_module in ('pathlib', 'pathlib2'):
     except ImportError:
         PATHLIB_SUPPORT = False
 
+import boto
+import boto3
 from boto.compat import BytesIO, urlsplit, six
-import boto.s3.key
 import six
 from six.moves.urllib import parse as urlparse
 import sys
@@ -59,19 +61,13 @@ import smart_open.webhdfs as smart_open_webhdfs
 import smart_open.http as smart_open_http
 import smart_open.ssh as smart_open_ssh
 
+from smart_open import doctools
 
 logger = logging.getLogger(__name__)
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
-_ISSUE_146_FSTR = (
-    "You have explicitly specified encoding=%(encoding)s, but smart_open does "
-    "not currently support decoding text via the %(scheme)s scheme. "
-    "Re-open the file without specifying an encoding to suppress this warning."
-)
 _ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
-
-DEFAULT_ERRORS = 'strict'
 
 
 _COMPRESSOR_REGISTRY = {}
@@ -164,68 +160,161 @@ bucket_id is only for S3.
 Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
 
 
-def smart_open(uri, mode="rb", **kw):
+def _inspect_kwargs(kallable):
+    args, varargs, keywords, defaults = inspect.getargspec(kallable)
+    if not defaults:
+        return {}
+    supported_keywords = args[-len(defaults):]
+    return dict(zip(supported_keywords, defaults))
+
+
+def _check_kwargs(kallable, kwargs):
+    """Check which keyword arguments the callable supports.
+
+    Parameters
+    ----------
+    kallable: callable
+        A function or method to test
+    kwargs: dict
+        The keyword arguments to check.  If the callable doesn't support any
+        of these, a warning message will get printed.
+
+    Returns
+    -------
+    dict
+        A dictionary of argument names and values supported by the callable.
     """
-    Open the given S3 / HDFS / filesystem file pointed to by `uri` for reading or writing.
+    supported_keywords = sorted(_inspect_kwargs(kallable))
+    unsupported_keywords = [k for k in sorted(kwargs) if k not in supported_keywords]
+    supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
 
-    The only supported modes for now are 'rb' (read, default) and 'wb' (replace & write).
+    if unsupported_keywords:
+        logger.warn('ignoring unsupported keyword arguments: %r', unsupported_keywords)
 
-    The reads/writes are memory efficient (streamed) and therefore suitable for
-    arbitrarily large files.
+    return supported_kwargs
 
-    The `uri` can be either:
 
-    1. a URI for the local filesystem (compressed ``.gz``, ``.bz2`` or ``.xz`` files handled
-        automatically): `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
+_builtin_open = open
+
+
+def open(
+        uri,
+        mode='r',
+        buffering=-1,
+        encoding=None,
+        errors=None,
+        newline=None,
+        closefd=True,
+        opener=None,
+        ignore_ext=False,
+        tkwa=dict(),
+        ):
+    """Open the URI object, returning a file-like object.
+
+    The URI is usually a string in a variety of formats:
+
+    1. a URI for the local filesystem: `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
     2. a URI for HDFS: `hdfs:///some/path/lines.txt`
     3. a URI for Amazon's S3 (can also supply credentials inside the URI):
        `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
-    4. an instance of the boto.s3.key.Key class.
-    5. an instance of the pathlib.Path class.
 
-    Examples::
+    The URI may also be one of:
 
-      >>> # stream lines from http; you can use context managers too:
-      >>> with smart_open.smart_open('http://www.google.com') as fin:
-      ...     for line in fin:
-      ...         print line
+    - an instance of the pathlib.Path class
+    - a stream (anything that implements io.IOBase-like functionality)
 
-      >>> # stream lines from S3; you can use context managers too:
-      >>> with smart_open.smart_open('s3://mybucket/mykey.txt') as fin:
-      ...     for line in fin:
-      ...         print line
+    This function supports transparent compression and decompression using the
+    following codec:
 
-      >>> # you can also use a boto.s3.key.Key instance directly:
-      >>> key = boto.connect_s3().get_bucket("my_bucket").get_key("my_key")
-      >>> with smart_open.smart_open(key) as fin:
-      ...     for line in fin:
-      ...         print line
+    - ``.gz``
+    - ``.bz2``
+    - ``.xz``
 
-      >>> # stream line-by-line from an HDFS file
-      >>> for line in smart_open.smart_open('hdfs:///user/hadoop/my_file.txt'):
-      ...    print line
+    The function depends on the file extension to determine the appropriate codec.
 
-      >>> # stream content *into* S3:
-      >>> with smart_open.smart_open('s3://mybucket/mykey.txt', 'wb') as fout:
-      ...     for line in ['first line', 'second line', 'third line']:
-      ...          fout.write(line + '\n')
+    Parameters
+    ----------
+    uri: str or object
+        The object to open.
+    mode: str, optional
+        Mimicks built-in open parameter of the same name.
+    buffering: int, optional
+        Mimicks built-in open parameter of the same name.
+    encoding: str, optional
+        Mimicks built-in open parameter of the same name.
+    errors: str, optional
+        Mimicks built-in open parameter of the same name.
+    newline: str, optional
+        Mimicks built-in open parameter of the same name.
+    closefd: boolean, optional
+        Mimicks built-in open parameter of the same name.  Ignored.
+    opener: object, optional
+        Mimicks built-in open parameter of the same name.  Ignored.
+    ignore_ext: boolean, optional
+        Disable transparent compression/decompression based on the file extension.
+    tkwa: dict
+        Keyword arguments for the transport layer (see notes below).
 
-      >>> # stream from/to (compressed) local files:
-      >>> for line in smart_open.smart_open('/home/radim/my_file.txt'):
-      ...    print line
-      >>> for line in smart_open.smart_open('/home/radim/my_file.txt.gz'):
-      ...    print line
-      >>> with smart_open.smart_open('/home/radim/my_file.txt.gz', 'wb') as fout:
-      ...    fout.write("hello world!\n")
-      >>> with smart_open.smart_open('/home/radim/another.txt.bz2', 'wb') as fout:
-      ...    fout.write("good bye!\n")
-      >>> with smart_open.smart_open('/home/radim/another.txt.xz', 'wb') as fout:
-      ...    fout.write("never say never!\n")
-      >>> # stream from/to (compressed) local files with Expand ~ and ~user constructions:
-      >>> for line in smart_open.smart_open('~/my_file.txt'):
-      ...    print line
-      >>> for line in smart_open.smart_open('my_file.txt'):
-      ...    print line
+    Returns
+    -------
+    A file-like object.
+
+    Notes
+    -----
+    smart_open has several implementations for its transport layer (e.g. S3, HTTP).
+    Each transport layer has a different set of keyword arguments for overriding
+    default behavior.  If you specify a keyword argument that is *not* supported
+    by the transport layer being used, smart_open will ignore that argument and
+    log a warning message.
+
+    S3 (for details, see :mod:`smart_open.s3` and :func:`smart_open.s3.open`):
+
+%(s3)s
+    HTTP (for details, see :mod:`smart_open.http` and :func:`smart_open.http.open`):
+
+%(http)s
+    WebHDFS (for details, see :mod:`smart_open.webhdfs` and :func:`smart_open.webhdfs.open`):
+
+%(webhdfs)s
+
+    Examples
+    --------
+    >>> from smart_open import open
+    >>> # stream lines from http; you can use context managers too:
+    >>> with open('http://www.google.com') as fin:
+    ...     for line in fin:
+    ...         print(line)
+
+    >>> # stream lines from S3; you can use context managers too:
+    >>> with open('s3://mybucket/mykey.txt') as fin:
+    ...     for line in fin:
+    ...         print(line)
+
+    >>> # stream line-by-line from an HDFS file
+    >>> for line in open('hdfs:///user/hadoop/my_file.txt'):
+    ...    print(line)
+
+    >>> # stream content *into* S3:
+    >>> with open('s3://mybucket/mykey.txt', 'wb') as fout:
+    ...     for line in ['first line', 'second line', 'third line']:
+    ...          fout.write(line + '\n')
+
+    >>> # stream from/to (compressed) local files:
+    >>> for line in open('/home/radim/my_file.txt'):
+    ...    print(line)
+    >>> for line in open('/home/radim/my_file.txt.gz'):
+    ...    print(line)
+    >>> with open('/home/radim/my_file.txt.gz', 'wb') as fout:
+    ...    fout.write("hello world!\n")
+    >>> with open('/home/radim/another.txt.bz2', 'wb') as fout:
+    ...    fout.write("good bye!\n")
+    >>> with open('/home/radim/another.txt.xz', 'wb') as fout:
+    ...    fout.write("never say never!\n")
+    >>> # stream from/to (compressed) local files with Expand ~ and ~user constructions:
+    >>> for line in open('~/my_file.txt'):
+    ...    print(line)
+    >>> for line in open('my_file.txt'):
+    ...    print(line)
 
     """
     logger.debug('%r', locals())
@@ -233,7 +322,14 @@ def smart_open(uri, mode="rb", **kw):
     if not isinstance(mode, six.string_types):
         raise TypeError('mode should be a string')
 
-    fobj = _shortcut_open(uri, mode, **kw)
+    fobj = _shortcut_open(
+        uri,
+        mode,
+        ignore_ext=ignore_ext,
+        buffering=buffering,
+        encoding=encoding,
+        errors=errors,
+    )
     if fobj is not None:
         return fobj
 
@@ -245,25 +341,15 @@ def smart_open(uri, mode="rb", **kw):
     # If we change the default mode to be text, and match the normal behavior
     # of Py2 and 3, then the above assumption will be unnecessary.
     #
-    if kw.get('encoding') is not None and 'b' in mode:
+    if encoding is not None and 'b' in mode:
         mode = mode.replace('b', '')
 
     # Support opening ``pathlib.Path`` objects by casting them to strings.
     if PATHLIB_SUPPORT and isinstance(uri, pathlib.Path):
         uri = str(uri)
 
-    #
-    # Our API is very liberal with keyword arguments, making it a bit hard to
-    # manage them.  Capture the keyword arguments we'll be using in this
-    # function in advance to reduce the confusion in downstream functions.
-    #
-    # explicit_encoding is what we've been explicitly told to use.  encoding is
-    # what we'll actually end up using.  The two may be different if the user
-    # didn't actually specify the encoding.
-    #
-    ignore_extension = kw.pop('ignore_extension', False)
-    explicit_encoding = kw.get('encoding', None)
-    encoding = kw.pop('encoding', SYSTEM_ENCODING)
+    explicit_encoding = encoding
+    encoding = explicit_encoding if explicit_encoding else SYSTEM_ENCODING
 
     #
     # This is how we get from the filename to the end result.  Decompression is
@@ -283,14 +369,13 @@ def smart_open(uri, mode="rb", **kw):
                        'a': 'ab', 'a+': 'ab+'}[mode]
     except KeyError:
         binary_mode = mode
-    binary, filename = _open_binary_stream(uri, binary_mode, **kw)
-    if ignore_extension:
+    binary, filename = _open_binary_stream(uri, binary_mode, tkwa)
+    if ignore_ext:
         decompressed = binary
     else:
         decompressed = _compression_wrapper(binary, filename, mode)
 
     if 'b' not in mode or explicit_encoding is not None:
-        errors = kw.pop('errors', 'strict')
         decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
     else:
         decoded = decompressed
@@ -298,7 +383,60 @@ def smart_open(uri, mode="rb", **kw):
     return decoded
 
 
-def _shortcut_open(uri, mode, **kw):
+#
+# Inject transport keyword argument documentation into the docstring.
+#
+open.__doc__ = open.__doc__ % {
+    's3': doctools.to_docstring(
+        doctools.extract_kwargs(smart_open_s3.open.__doc__),
+        lpad=u'    ',
+    ),
+    'http': doctools.to_docstring(
+        doctools.extract_kwargs(smart_open_http.open.__doc__),
+        lpad=u'    ',
+    ),
+    'webhdfs': doctools.to_docstring(
+        doctools.extract_kwargs(smart_open_webhdfs.open.__doc__),
+        lpad=u'    ',
+    ),
+}
+
+
+def smart_open(uri, mode="rb", **kw):
+    """Deprecated, use smart_open.open instead."""
+    logger.warning('this function is deprecated, use smart_open.open instead')
+
+    #
+    # The new function uses a shorter name for this parameter, handle it separately.
+    #
+    ignore_extension = kw.pop('ignore_extension', False)
+
+    expected_kwargs = _inspect_kwargs(open)
+    scrubbed_kwargs = {}
+    tkwa = {}
+    for key, value in kw.items():
+        if key in expected_kwargs:
+            scrubbed_kwargs[key] = value
+        else:
+            #
+            # Assume that anything not explicitly supported by the new function
+            # is a transport layer keyword argument.  This is safe, because if
+            # the argument ends up being unsupported in the transport layer,
+            # it will only cause a logging warning, not a crash.
+            #
+            tkwa[key] = value
+
+    return open(uri, mode, ignore_ext=ignore_extension, tkwa=tkwa, **scrubbed_kwargs)
+
+
+def _shortcut_open(
+        uri,
+        mode,
+        ignore_ext=False,
+        buffering=-1,
+        encoding=None,
+        errors=None,
+        ):
     """Try to open the URI using the standard library io.open function.
 
     This can be much faster than the alternative of opening in binary mode and
@@ -325,26 +463,20 @@ def _shortcut_open(uri, mode, **kw):
         return None
 
     _, extension = P.splitext(parsed_uri.uri_path)
-    ignore_extension = kw.get('ignore_extension', False)
-    if extension in _COMPRESSOR_REGISTRY and not ignore_extension:
+    if extension in _COMPRESSOR_REGISTRY and not ignore_ext:
         return None
 
-    #
-    # https://docs.python.org/2/library/functions.html#open
-    #
-    # buffering: 0: off; 1: on; negative number: use system default
-    #
-    buffering = kw.get('buffering', -1)
-
     open_kwargs = {}
-    errors = kw.get('errors')
-    if errors is not None:
-        open_kwargs['errors'] = errors
 
-    encoding = kw.get('encoding')
     if encoding is not None:
         open_kwargs['encoding'] = encoding
         mode = mode.replace('b', '')
+
+    #
+    # binary mode of the builtin/stdlib open function doesn't take an errors argument
+    #
+    if errors and 'b' not in mode:
+        open_kwargs['errors'] = errors
 
     #
     # Under Py3, the built-in open accepts kwargs, and it's OK to use that.
@@ -353,20 +485,20 @@ def _shortcut_open(uri, mode, **kw):
     # kwargs, then we have no option other to use io.open.
     #
     if six.PY3:
-        return open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
+        return _builtin_open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
     elif not open_kwargs:
-        return open(parsed_uri.uri_path, mode, buffering=buffering)
+        return _builtin_open(parsed_uri.uri_path, mode, buffering=buffering)
     return io.open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
 
 
-def _open_binary_stream(uri, mode, **kw):
+def _open_binary_stream(uri, mode, tkwa):
     """Open an arbitrary URI in the specified binary mode.
 
     Not all modes are supported for all protocols.
 
     :arg uri: The URI to open.  May be a string, or something else.
     :arg str mode: The mode to open with.  Must be rb, wb or ab.
-    :arg kw: TODO: document this.
+    :arg tkwa: Keyword argumens for the transport layer.
     :returns: A file object and the filename
     :rtype: tuple
     """
@@ -384,9 +516,7 @@ def _open_binary_stream(uri, mode, **kw):
         parsed_uri = _parse_uri(uri)
         unsupported = "%r mode not supported for %r scheme" % (mode, parsed_uri.scheme)
 
-        if parsed_uri.scheme in ("file", ):
-            # local files -- both read & write supported
-            # compression, if any, is determined by the filename extension (.gz, .bz2, .xz)
+        if parsed_uri.scheme == "file":
             fobj = io.open(parsed_uri.uri_path, mode)
             return fobj, filename
         elif parsed_uri.scheme in smart_open_ssh.SCHEMES:
@@ -399,43 +529,23 @@ def _open_binary_stream(uri, mode, **kw):
             )
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
-            return _s3_open_uri(parsed_uri, mode, **kw), filename
-        elif parsed_uri.scheme in ("hdfs", ):
-            if mode == 'rb':
-                return smart_open_hdfs.CliRawInputBase(parsed_uri.uri_path), filename
-            elif mode == 'wb':
-                return smart_open_hdfs.CliRawOutputBase(parsed_uri.uri_path), filename
-            else:
-                raise NotImplementedError(unsupported)
-        elif parsed_uri.scheme in ("webhdfs", ):
-            if mode == 'rb':
-                fobj = smart_open_webhdfs.BufferedInputBase(parsed_uri.uri_path, **kw)
-            elif mode == 'wb':
-                fobj = smart_open_webhdfs.BufferedOutputBase(parsed_uri.uri_path, **kw)
-            else:
-                raise NotImplementedError(unsupported)
-            return fobj, filename
+            return _s3_open_uri(parsed_uri, mode, tkwa), filename
+        elif parsed_uri.scheme == "hdfs":
+            _check_kwargs(smart_open_hdfs.open, tkwa)
+            return smart_open_hdfs.open(parsed_uri.uri_path, mode), filename
+        elif parsed_uri.scheme == "webhdfs":
+            kw = _check_kwargs(smart_open_webhdfs.open, tkwa)
+            return smart_open_webhdfs.open(parsed_uri.uri_path, mode, **kw), filename
         elif parsed_uri.scheme.startswith('http'):
             #
             # The URI may contain a query string and fragments, which interfere
-            # with out compressed/uncompressed estimation.
+            # with our compressed/uncompressed estimation, so we strip them.
             #
             filename = P.basename(urlparse.urlparse(uri).path)
-            if mode == 'rb':
-                return smart_open_http.SeekableBufferedInputBase(uri, **kw), filename
-            else:
-                raise NotImplementedError(unsupported)
+            kw = _check_kwargs(smart_open_http.open, tkwa)
+            return smart_open_http.open(uri, mode, **kw), filename
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
-    elif isinstance(uri, boto.s3.key.Key):
-        logger.debug('%r', locals())
-        #
-        # TODO: handle boto3 keys as well
-        #
-        host = kw.pop('host', None)
-        if host is not None:
-            kw['endpoint_url'] = _add_scheme_to_host(host)
-        return smart_open_s3.open(uri.bucket.name, uri.name, mode, **kw), uri.name
     elif hasattr(uri, 'read'):
         # simply pass-through if already a file-like
         # we need to return something as the file name, but we don't know what
@@ -448,23 +558,36 @@ def _open_binary_stream(uri, mode, **kw):
         raise TypeError("don't know how to handle uri %r" % uri)
 
 
-def _s3_open_uri(parsed_uri, mode, **kwargs):
+def _s3_open_uri(parsed_uri, mode, tkwa):
     logger.debug('s3_open_uri: %r', locals())
     if mode in ('r', 'w'):
         raise ValueError('this function can only open binary streams. '
                          'Use smart_open.smart_open() to open text streams.')
     elif mode not in ('rb', 'wb'):
         raise NotImplementedError('unsupported mode: %r', mode)
-    if parsed_uri.access_id is not None:
-        kwargs['aws_access_key_id'] = parsed_uri.access_id
-    if parsed_uri.access_secret is not None:
-        kwargs['aws_secret_access_key'] = parsed_uri.access_secret
 
-    # Get an S3 host. It is required for sigv4 operations.
-    host = kwargs.pop('host', None)
-    if host is not None:
-        kwargs['endpoint_url'] = _add_scheme_to_host(host)
+    #
+    # There are two explicit ways we can receive session parameters from the user.
+    #
+    # 1. Via the session keyword argument (tkwa)
+    # 2. Via the URI itself
+    #
+    # They are not mutually exclusive, but we have to pick one of the two.
+    # Go with 1).
+    #
+    if tkwa.get('session') is not None and (parsed_uri.access_id or parsed_uri.access_secret):
+        logger.warning(
+            'ignoring credentials parsed from URL because '
+            'they conflict with tkwa.session.  Set tkwa.session to None to '
+            'suppress this warning.'
+        )
+    elif (parsed_uri.access_id and parsed_uri.access_secret):
+        tkwa['session'] = boto3.Session(
+            aws_access_key_id=parsed_uri.access_id,
+            aws_secret_access_key=parsed_uri.access_secret,
+        )
 
+    kwargs = _check_kwargs(smart_open_s3.open, tkwa)
     return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
 
@@ -679,7 +802,7 @@ def _compression_wrapper(file_obj, filename, mode):
         return callback(file_obj, mode)
 
 
-def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
+def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
@@ -708,13 +831,9 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=DEFAULT_ERRORS):
     if encoding is None:
         encoding = SYSTEM_ENCODING
 
+    kw = {'errors': errors} if errors else {}
     if mode[0] == 'r' or mode.endswith('+'):
-        fileobj = codecs.getreader(encoding)(fileobj, errors=errors)
+        fileobj = codecs.getreader(encoding)(fileobj, **kw)
     if mode[0] in ('w', 'a') or mode.endswith('+'):
-        fileobj = codecs.getwriter(encoding)(fileobj, errors=errors)
+        fileobj = codecs.getwriter(encoding)(fileobj, **kw)
     return fileobj
-
-def _add_scheme_to_host(host):
-    if host.startswith('http://') or host.startswith('https://'):
-        return host
-    return 'http://' + host
