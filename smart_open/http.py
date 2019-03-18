@@ -23,7 +23,7 @@ the client (us) has to decompress them with the appropriate algorithm.
 """
 
 
-def open(uri, mode, kerberos=False, user=None, password=None):
+def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
     """Implement streamed reader from a web site.
 
     Supports Kerberos and Basic HTTP authentication.
@@ -40,14 +40,17 @@ def open(uri, mode, kerberos=False, user=None, password=None):
         The username for authenticating over HTTP
     password: str, optional
         The password for authenticating over HTTP
+    headers: dict, optional
+        Any headers to send in the request. If none, default headers sent are: {'Accept-Encoding': 'identity'}
+        To not use default headers or any other headers, set this variable to an empty dict, {}
 
     Note
     ----
-    If neither kerberos or (user, password) are set, will connect unauthenticated.
+    If neither kerberos or (user, password) are set, will connect unauthenticated, unless set separately in headers.
 
     """
     if mode == 'rb':
-        return BufferedInputBase(uri, mode, kerberos=kerberos, user=user, password=password)
+        return BufferedInputBase(uri, mode, kerberos=kerberos, user=user, password=password, headers=headers)
     else:
         raise NotImplementedError('http support for mode %r not implemented' % mode)
         
