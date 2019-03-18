@@ -168,7 +168,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
     """
 
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, user=None, password=None):
+                 kerberos=False, user=None, password=None, headers=None):
         """
         If Kerberos is True, will attempt to use the local Kerberos credentials.
         Otherwise, will try to use "basic" HTTP authentication via username/password.
@@ -184,6 +184,11 @@ class SeekableBufferedInputBase(BufferedInputBase):
             self.auth = (user, password)
         else:
             self.auth = None
+
+        if headers is None:
+            self.headers = _HEADERS.copy()
+        else:
+            self.headers = headers
 
         self.buffer_size = buffer_size
         self.mode = mode
@@ -267,10 +272,8 @@ class SeekableBufferedInputBase(BufferedInputBase):
         raise io.UnsupportedOperation
 
     def _partial_request(self, start_pos=None):
-        headers = _HEADERS.copy()
-
         if start_pos is not None:
-            headers.update({"range": s3.make_range_string(start_pos)})
+            self.headers.update({"range": s3.make_range_string(start_pos)})
 
-        response = requests.get(self.url, auth=self.auth, stream=True, headers=headers)
+        response = requests.get(self.url, auth=self.auth, stream=True, headers=self.headers)
         return response
