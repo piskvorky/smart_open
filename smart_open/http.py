@@ -48,10 +48,10 @@ class BufferedInputBase(io.BufferedIOBase):
         self.buffer_size = buffer_size
         self.mode = mode
 
-        if headers:
+        if headers is None:
             self.headers = headers
         else:
-            self.headers = _HEADERS
+            self.headers = _HEADERS.copy()
 
         self.response = requests.get(url, auth=auth, stream=True, headers=self.headers)
 
