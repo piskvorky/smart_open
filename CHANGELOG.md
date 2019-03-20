@@ -13,7 +13,7 @@ This new function replaces `smart_open.smart_open`, which is now deprecated.
 Main differences:
 
 - ignore_extension → ignore_ext
-- new `t_params` dict parameter to contain keyword parameters for the transport layer (S3, HTTPS, HDFS, etc).
+- new `transport_params` dict parameter to contain keyword parameters for the transport layer (S3, HTTPS, HDFS, etc).
 
 Main advantages of the new function:
 
