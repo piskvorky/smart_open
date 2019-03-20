@@ -31,7 +31,7 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
   >>> gz_path = 'smart_open/tests/test_data/1984.txt.gz'
   >>>
   >>> # stream from/to compressed files, with transparent (de)compression:
-  >>> for line in open(gz_path, encoding='utf-8'):
+  >>> for line in open('smart_open/tests/test_data/1984.txt.gz', encoding='utf-8'):
   ...    print(line, end='')
   It was a bright cold day in April, and the clocks were striking thirteen.
 
