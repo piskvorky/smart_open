@@ -37,7 +37,7 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
 
   >>> # can use context managers too:
   >>> bz2_path = gz_path.replace('.gz', '.bz2')
-  >>> with open(gz_path) as fin:
+  >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
   ...    with open(bz2_path, 'w') as fout:
   ...        for line in fin:
   ...           fout.write(line)
