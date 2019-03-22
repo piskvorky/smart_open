@@ -92,7 +92,8 @@ More examples:
     >>> # stream content *into* S3 (write mode) using a custom session
     >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
     >>> lines = [b'first line\n', b'second line\n', b'third line\n']
-    >>> with open(url, 'wb', transport_params=dict(session=boto3.Session(profile_name='smart_open'))) as fout:
+    >>> transport_params = {'session': boto3.Session(profile_name='smart_open')}
+    >>> with open(url, 'wb', transport_params=transport_params) as fout:
     ...     for line in lines:
     ...         bytes_written = fout.write(line)
 
@@ -119,9 +120,13 @@ More examples:
         print(line)
 
     # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
-    session = boto3.Session(profile_name='digitalocean')
-    kw = dict(endpoint_url='https://ams3.digitaloceanspaces.com')
-    with open('s3://bucket/key.txt', 'wb', transport_params=dict(session=session, resource_kwargs=kw)) as fout:
+    transport_params = {
+        'session': boto3.Session(profile_name='digitalocean'),
+        'resource_kwargs': {
+            'endpoint_url': 'https://ams3.digitaloceanspaces.com',
+        }
+    }
+    with open('s3://bucket/key.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'here we stand')
 
 Why?
