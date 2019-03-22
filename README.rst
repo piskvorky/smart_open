@@ -12,8 +12,8 @@ smart_open — utils for streaming large files in Python
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS, WebHDFS, HTTP, or local storage.
-It supports transparent, on-the-fly (de-)compression for a variety of different formats.
+``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS, WebHDFS, HTTP, or local storage. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
+
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
 ``smart_open`` is well-tested, well-documented, and has a simple, Pythonic API:
@@ -224,9 +224,7 @@ Your second option is to specify the credentials within the S3 URL itself:
 
     fin = open('s3://aws_access_key_id:aws_secret_access_key@bucket/key', ...)
 
-.. important::
-    The two methods above are **mutually exclusive**.
-    If you pass a session *and* the URL contains credentials, ``smart_open`` will ignore the latter.
+*Important*: The two methods above are **mutually exclusive**. If you pass an AWS session *and* the URL contains credentials, ``smart_open`` will ignore the latter.
 
 Iterating Over an S3 Bucket's Contents
 --------------------------------------
@@ -237,11 +235,11 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
 
   >>> from smart_open import s3_iter_bucket
   >>> # get data corresponding to 2010 and later under "silo-open-data/annual/monthly_rain"
-  >>> # we use workers=1 for reproducibility, use as many workers as you have cores
+  >>> # we use workers=1 for reproducibility; you should use as many workers as you have cores
   >>> bucket = 'silo-open-data'
   >>> prefix = 'annual/monthly_rain/'
   >>> for key, content in s3_iter_bucket(bucket, prefix=prefix, accept_key=lambda key: '/201' in key, workers=1, key_limit=3):
-  ...     print(key, round(len(content) / 1024768))
+  ...     print(key, round(len(content) / 2**20))
   annual/monthly_rain/2010.monthly_rain.nc 14
   annual/monthly_rain/2011.monthly_rain.nc 14
   annual/monthly_rain/2012.monthly_rain.nc 14
