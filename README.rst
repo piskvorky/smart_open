@@ -24,19 +24,19 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
   >>>
   >>> # stream lines from an S3 object
   >>> for line in open('s3://commoncrawl/robots.txt'):
-  ...    print(line, end='')
+  ...    print(repr(line))
   ...    break
-  User-Agent: *
+  'User-Agent: *\n'
 
-  >>> gz_path = 'smart_open/tests/test_data/1984.txt.gz'
-  >>>
   >>> # stream from/to compressed files, with transparent (de)compression:
   >>> for line in open('smart_open/tests/test_data/1984.txt.gz', encoding='utf-8'):
-  ...    print(line, end='')
-  It was a bright cold day in April, and the clocks were striking thirteen.
+  ...    print(repr(line))
+  'It was a bright cold day in April, and the clocks were striking thirteen.\n'
+  'Winston Smith, his chin nuzzled into his breast in an effort to escape the vile\n'
+  'wind, slipped quickly through the glass doors of Victory Mansions, though not\n'
+  'quickly enough to prevent a swirl of gritty dust from entering along with him.\n'
 
   >>> # can use context managers too:
-  >>> bz2_path = gz_path.replace('.gz', '.bz2')
   >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
   ...    with open('smart_open/tests/test_data/1984.txt.bz2', 'w') as fout:
   ...        for line in fin:
@@ -45,18 +45,18 @@ It's a drop-in replacement for Python's built-in ``open()``: it can do anything 
   >>> # can use any IOBase operations, like seek
   >>> with open('s3://commoncrawl/robots.txt', 'rb') as fin:
   ...     for line in fin:
-  ...         print(line.decode('utf-8'), end='')
+  ...         print(repr(line.decode('utf-8')))
   ...         break
   ...     offset = fin.seek(0)  # seek to the beginning
   ...     print(fin.read(4))
-  User-Agent: *
+  'User-Agent: *\n'
   b'User'
 
   >>> # stream from HTTP
   >>> for line in open('http://example.com/index.html'):
-  ...     print(line, end='')
+  ...     print(repr(line))
   ...     break
-  <!doctype html>
+  '<!doctype html>\n'
 
 Other examples of URLs that ``smart_open`` accepts::
 
@@ -82,7 +82,46 @@ For detailed API info, see the online help:
 
     help('smart_open')
 
-For more example usage, see other_examples_.
+More examples:
+
+.. code-block:: python
+
+    >>> import boto3
+    >>>
+    >>> # stream content *into* S3 (write mode) using a custom session
+    >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
+    >>> lines = [b'first line\n', b'second line\n', b'third line\n']
+    >>> with open(url, 'wb', transport_params=dict(session=boto3.Session(profile_name='smart_open'))) as fout:
+    ...     for line in lines:
+    ...         bytes_written = fout.write(line)
+
+.. code-block:: python
+
+    # stream from HDFS
+    for line in open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):
+        print(line)
+
+    # stream from WebHDFS
+    for line in open('webhdfs://host:port/user/hadoop/my_file.txt'):
+        print(line)
+
+    # stream content *into* HDFS (write mode):
+    with open('hdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
+        fout.write(b'hello world')
+
+    # stream content *into* WebHDFS (write mode):
+    with open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
+        fout.write(b'hello world')
+
+    # stream from a completely custom s3 server, like s3proxy:
+    for line in open('s3u://user:secret@host:port@mybucket/mykey.txt'):
+        print(line)
+
+    # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
+    session = boto3.Session(profile_name='digitalocean')
+    kw = dict(endpoint_url='https://ams3.digitaloceanspaces.com')
+    with open('s3://bucket/key.txt', 'wb', transport_params=dict(session=session, resource_kwargs=kw)) as fout:
+        fout.write(b'here we stand')
 
 Why?
 ----
@@ -200,49 +239,6 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
   annual/monthly_rain/2010.monthly_rain.nc 14
   annual/monthly_rain/2011.monthly_rain.nc 14
   annual/monthly_rain/2012.monthly_rain.nc 14
-
-.. _other_examples:
-
-Other Examples
---------------
-
-.. code-block:: python
-
-    >>> # stream content *into* S3 (write mode) using a custom session
-    >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-    >>> lines = [b'first line\n', b'second line\n', b'third line\n']
-    >>> with open(url, 'wb', transport_params=dict(session=boto3.Session(profile_name='smart_open'))) as fout:
-    ...     for line in lines:
-    ...         bytes_written = fout.write(line)
-
-.. code-block:: python
-
-    # stream from HDFS
-    for line in open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):
-        print(line)
-
-    # stream from WebHDFS
-    for line in open('webhdfs://host:port/user/hadoop/my_file.txt'):
-        print(line)
-
-    # stream content *into* HDFS (write mode):
-    with open('hdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
-        fout.write(b'hello world')
-
-    # stream content *into* WebHDFS (write mode):
-    with open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
-        fout.write(b'hello world')
-
-    # stream from a completely custom s3 server, like s3proxy:
-    for line in open('s3u://user:secret@host:port@mybucket/mykey.txt'):
-        print(line)
-
-    # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
-    session = boto3.Session(profile_name='digitalocean')
-    kw = dict(endpoint_url='https://ams3.digitaloceanspaces.com')
-    with open('s3://bucket/key.txt', 'wb', transport_params=dict(session=session, resource_kwargs=kw)) as fout:
-        fout.write(b'here we stand')
-
 
 Comments, bug reports
 ---------------------
