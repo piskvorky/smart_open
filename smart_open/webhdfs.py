@@ -1,3 +1,17 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
+#
+# This code is distributed under the terms and conditions from the MIT License (MIT).
+#
+
+"""Implements reading and writing to/from WebHDFS.
+
+The main entry point is the :func:`~smart_open.webhdfs.open` function.
+
+"""
+
 import io
 import logging
 
@@ -19,7 +33,7 @@ def open(uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
     """
     Parameters
     ----------
-    min_part_size: int
+    min_part_size: int, optional
         For writing only.
 
     """

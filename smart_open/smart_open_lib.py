@@ -1,24 +1,18 @@
-#!/usr/bin/env python
+#
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2015 Radim Rehurek <me@radimrehurek.com>
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
+#
 
-
-"""
-Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
-filesystem / compressed files, and many more, using a simple, Pythonic API.
-
-The streaming makes heavy use of generators and pipes, to avoid loading
-full file contents into memory, allowing work with arbitrarily large files.
+"""Implements the majority of smart_open's top-level API.
 
 The main functions are:
 
-* `open()`, which opens the given file for reading/writing
-* `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
-* `register_compressor()`, which registers callbacks for transparent compressor handling
+  * `open()`
+  * `register_compressor()`
 
 """
 
@@ -55,7 +49,6 @@ import sys
 # smart_open.submodule to reference to the submodules.
 #
 import smart_open.s3 as smart_open_s3
-from smart_open.s3 import iter_bucket as s3_iter_bucket
 import smart_open.hdfs as smart_open_hdfs
 import smart_open.webhdfs as smart_open_webhdfs
 import smart_open.http as smart_open_http
@@ -85,6 +78,9 @@ def register_compressor(ext, callback):
 
     Examples
     --------
+
+    Instruct smart_open to use the identity function whenever opening a file
+    with a .foo extension:
 
     >>> def identity(file_obj, mode):
     ...     return file_obj
@@ -207,7 +203,7 @@ def open(
         closefd=True,
         opener=None,
         ignore_ext=False,
-        tkwa=dict(),
+        transport_params=dict(),
         ):
     """Open the URI object, returning a file-like object.
 
@@ -252,8 +248,8 @@ def open(
         Mimicks built-in open parameter of the same name.  Ignored.
     ignore_ext: boolean, optional
         Disable transparent compression/decompression based on the file extension.
-    tkwa: dict
-        Keyword arguments for the transport layer (see notes below).
+    transport_params: dict, optional
+        Additional parameters for the transport layer (see notes below).
 
     Returns
     -------
@@ -316,6 +312,11 @@ def open(
     >>> for line in open('my_file.txt'):
     ...    print(line)
 
+    See Also
+    --------
+
+    - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
+
     """
     logger.debug('%r', locals())
 
@@ -369,7 +370,7 @@ def open(
                        'a': 'ab', 'a+': 'ab+'}[mode]
     except KeyError:
         binary_mode = mode
-    binary, filename = _open_binary_stream(uri, binary_mode, tkwa)
+    binary, filename = _open_binary_stream(uri, binary_mode, transport_params)
     if ignore_ext:
         decompressed = binary
     else:
@@ -413,7 +414,7 @@ def smart_open(uri, mode="rb", **kw):
 
     expected_kwargs = _inspect_kwargs(open)
     scrubbed_kwargs = {}
-    tkwa = {}
+    transport_params = {}
     for key, value in kw.items():
         if key in expected_kwargs:
             scrubbed_kwargs[key] = value
@@ -424,9 +425,9 @@ def smart_open(uri, mode="rb", **kw):
             # the argument ends up being unsupported in the transport layer,
             # it will only cause a logging warning, not a crash.
             #
-            tkwa[key] = value
+            transport_params[key] = value
 
-    return open(uri, mode, ignore_ext=ignore_extension, tkwa=tkwa, **scrubbed_kwargs)
+    return open(uri, mode, ignore_ext=ignore_extension, transport_params=transport_params, **scrubbed_kwargs)
 
 
 def _shortcut_open(
@@ -491,14 +492,14 @@ def _shortcut_open(
     return io.open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
 
 
-def _open_binary_stream(uri, mode, tkwa):
+def _open_binary_stream(uri, mode, transport_params):
     """Open an arbitrary URI in the specified binary mode.
 
     Not all modes are supported for all protocols.
 
     :arg uri: The URI to open.  May be a string, or something else.
     :arg str mode: The mode to open with.  Must be rb, wb or ab.
-    :arg tkwa: Keyword argumens for the transport layer.
+    :arg transport_params: Keyword argumens for the transport layer.
     :returns: A file object and the filename
     :rtype: tuple
     """
@@ -529,12 +530,12 @@ def _open_binary_stream(uri, mode, tkwa):
             )
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
-            return _s3_open_uri(parsed_uri, mode, tkwa), filename
+            return _s3_open_uri(parsed_uri, mode, transport_params), filename
         elif parsed_uri.scheme == "hdfs":
-            _check_kwargs(smart_open_hdfs.open, tkwa)
+            _check_kwargs(smart_open_hdfs.open, transport_params)
             return smart_open_hdfs.open(parsed_uri.uri_path, mode), filename
         elif parsed_uri.scheme == "webhdfs":
-            kw = _check_kwargs(smart_open_webhdfs.open, tkwa)
+            kw = _check_kwargs(smart_open_webhdfs.open, transport_params)
             return smart_open_webhdfs.open(parsed_uri.uri_path, mode, **kw), filename
         elif parsed_uri.scheme.startswith('http'):
             #
@@ -542,7 +543,7 @@ def _open_binary_stream(uri, mode, tkwa):
             # with our compressed/uncompressed estimation, so we strip them.
             #
             filename = P.basename(urlparse.urlparse(uri).path)
-            kw = _check_kwargs(smart_open_http.open, tkwa)
+            kw = _check_kwargs(smart_open_http.open, transport_params)
             return smart_open_http.open(uri, mode, **kw), filename
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
@@ -558,7 +559,7 @@ def _open_binary_stream(uri, mode, tkwa):
         raise TypeError("don't know how to handle uri %r" % uri)
 
 
-def _s3_open_uri(parsed_uri, mode, tkwa):
+def _s3_open_uri(parsed_uri, mode, transport_params):
     logger.debug('s3_open_uri: %r', locals())
     if mode in ('r', 'w'):
         raise ValueError('this function can only open binary streams. '
@@ -569,25 +570,25 @@ def _s3_open_uri(parsed_uri, mode, tkwa):
     #
     # There are two explicit ways we can receive session parameters from the user.
     #
-    # 1. Via the session keyword argument (tkwa)
+    # 1. Via the session keyword argument (transport_params)
     # 2. Via the URI itself
     #
     # They are not mutually exclusive, but we have to pick one of the two.
     # Go with 1).
     #
-    if tkwa.get('session') is not None and (parsed_uri.access_id or parsed_uri.access_secret):
+    if transport_params.get('session') is not None and (parsed_uri.access_id or parsed_uri.access_secret):
         logger.warning(
-            'ignoring credentials parsed from URL because '
-            'they conflict with tkwa.session.  Set tkwa.session to None to '
-            'suppress this warning.'
+            'ignoring credentials parsed from URL because they conflict with '
+            'transport_params.session. Set transport_params.session to None '
+            'to suppress this warning.'
         )
     elif (parsed_uri.access_id and parsed_uri.access_secret):
-        tkwa['session'] = boto3.Session(
+        transport_params['session'] = boto3.Session(
             aws_access_key_id=parsed_uri.access_id,
             aws_secret_access_key=parsed_uri.access_secret,
         )
 
-    kwargs = _check_kwargs(smart_open_s3.open, tkwa)
+    kwargs = _check_kwargs(smart_open_s3.open, transport_params)
     return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
 
