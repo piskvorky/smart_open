@@ -77,16 +77,17 @@ def open(
     key_id: str
         The name of the key within the bucket.
     mode: str
-        The mode with which to open the object.  Must be either rb or wb.
+        The mode for opening the object.  Must be either rb or wb.
     buffer_size: int, optional
         The buffer size to use when performing I/O.
-    min_part_size: int
-        For writing only.
+    min_part_size: int, optional
+        The minimum part size for multipart uploads.  For writing only.
     session: object, optional
         The S3 session to use when working with boto3.
     resource_kwargs: dict, optional
-        Keyword arguments to use when creating a new resource.
+        Keyword arguments to use when creating a new resource.  For writing only.
     multipart_upload_kwargs: dict, optional
+        Additional parameters to pass to boto3's initiate_multipart_upload function.
         For writing only.
 
     """
