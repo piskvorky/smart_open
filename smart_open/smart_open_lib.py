@@ -57,6 +57,7 @@ import smart_open.ssh as smart_open_ssh
 from smart_open import doctools
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
