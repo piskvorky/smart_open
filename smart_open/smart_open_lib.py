@@ -272,6 +272,9 @@ def open(
     WebHDFS (for details, see :mod:`smart_open.webhdfs` and :func:`smart_open.webhdfs.open`):
 
 %(webhdfs)s
+    SSH (for details, see :mod:`smart_open.ssh` and :func:`smart_open.ssh.open`):
+
+%(ssh)s
 
     Examples
     --------
@@ -360,6 +363,10 @@ open.__doc__ = open.__doc__ % {
     ),
     'webhdfs': doctools.to_docstring(
         doctools.extract_kwargs(smart_open_webhdfs.open.__doc__),
+        lpad=u'    ',
+    ),
+    'ssh': doctools.to_docstring(
+        doctools.extract_kwargs(smart_open_ssh.open.__doc__),
         lpad=u'    ',
     ),
     'examples': doctools.extract_examples_from_readme_rst(),

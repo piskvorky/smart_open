@@ -117,6 +117,18 @@ FUNCTIONS
         min_part_size: int, optional
             For writing only.
         
+        SSH (for details, see :mod:`smart_open.ssh` and :func:`smart_open.ssh.open`):
+        
+        mode: str, optional
+            The mode to use for opening the file.
+        host: str, optional
+            The hostname of the remote machine.  May not be None.
+        user: str, optional
+            The username to use to login to the remote machine.
+            If None, defaults to the name of the current user.
+        port: int, optional
+            The port to connect to.
+        
         
         Examples
         --------
