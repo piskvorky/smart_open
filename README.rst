@@ -19,6 +19,8 @@ What?
 ``smart_open`` is well-tested, well-documented, and has a simple, Pythonic API:
 
 
+.. _doctools_before_examples:
+
 .. code-block:: python
 
   >>> from smart_open import open
@@ -77,11 +79,15 @@ Other examples of URLs that ``smart_open`` accepts::
     [ssh|scp|sftp]://username@host/path/file
     file:///home/user/file.xz
 
+.. _doctools_after_examples:
+
 For detailed API info, see the online help:
 
 .. code-block:: python
 
     help('smart_open')
+
+or click `here <https://github.com/RaRe-Technologies/smart_open/blob/master/help.txt>`__ to view the help in your browser.
 
 More examples:
 
