@@ -13,7 +13,7 @@ For internal use only.
 
 import inspect
 import io
-import os.path as P
+import os.path
 import re
 
 
@@ -142,8 +142,8 @@ def extract_examples_from_readme_rst(indent='    '):
     -----
     Quite fragile, depends on named labels inside the README.rst file.
     """
-    curr_dir = P.dirname(P.abspath(__file__))
-    readme_path = P.join(curr_dir, '../README.rst')
+    curr_dir = os.path.dirname(os.path.abspath(__file__))
+    readme_path = os.path.join(curr_dir, '..', 'README.rst')
     try:
         with open(readme_path) as fin:
             lines = list(fin)
