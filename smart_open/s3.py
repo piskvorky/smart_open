@@ -11,7 +11,6 @@ import botocore.client
 import six
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
 
 # Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
 # The only method currently relying on it is iter_bucket, which is instructed

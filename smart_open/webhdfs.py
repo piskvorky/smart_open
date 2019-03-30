@@ -24,7 +24,6 @@ else:
     import http.client as httplib
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
 
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 

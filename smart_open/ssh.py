@@ -26,7 +26,6 @@ import getpass
 import logging
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
 
 try:
     import paramiko

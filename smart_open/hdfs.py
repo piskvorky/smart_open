@@ -19,7 +19,6 @@ import logging
 import subprocess
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
 
 
 def open(uri, mode):
