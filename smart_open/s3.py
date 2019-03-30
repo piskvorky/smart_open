@@ -77,7 +77,7 @@ def open(
     key_id: str
         The name of the key within the bucket.
     mode: str
-        The mode for opening the object.  Must be either rb or wb.
+        The mode for opening the object.  Must be either "rb" or "wb".
     buffer_size: int, optional
         The buffer size to use when performing I/O.
     min_part_size: int, optional
