@@ -205,7 +205,7 @@ def open(
         ignore_ext=False,
         transport_params=dict(),
         ):
-    """Open the URI object, returning a file-like object.
+    r"""Open the URI object, returning a file-like object.
 
     The URI is usually a string in a variety of formats:
 
@@ -272,50 +272,18 @@ def open(
     WebHDFS (for details, see :mod:`smart_open.webhdfs` and :func:`smart_open.webhdfs.open`):
 
 %(webhdfs)s
+    SSH (for details, see :mod:`smart_open.ssh` and :func:`smart_open.ssh.open`):
+
+%(ssh)s
 
     Examples
     --------
-    >>> from smart_open import open
-    >>> # stream lines from http; you can use context managers too:
-    >>> with open('http://www.google.com') as fin:
-    ...     for line in fin:
-    ...         print(line)
-
-    >>> # stream lines from S3; you can use context managers too:
-    >>> with open('s3://mybucket/mykey.txt') as fin:
-    ...     for line in fin:
-    ...         print(line)
-
-    >>> # stream line-by-line from an HDFS file
-    >>> for line in open('hdfs:///user/hadoop/my_file.txt'):
-    ...    print(line)
-
-    >>> # stream content *into* S3:
-    >>> with open('s3://mybucket/mykey.txt', 'wb') as fout:
-    ...     for line in ['first line', 'second line', 'third line']:
-    ...          fout.write(line + '\n')
-
-    >>> # stream from/to (compressed) local files:
-    >>> for line in open('/home/radim/my_file.txt'):
-    ...    print(line)
-    >>> for line in open('/home/radim/my_file.txt.gz'):
-    ...    print(line)
-    >>> with open('/home/radim/my_file.txt.gz', 'wb') as fout:
-    ...    fout.write("hello world!\n")
-    >>> with open('/home/radim/another.txt.bz2', 'wb') as fout:
-    ...    fout.write("good bye!\n")
-    >>> with open('/home/radim/another.txt.xz', 'wb') as fout:
-    ...    fout.write("never say never!\n")
-    >>> # stream from/to (compressed) local files with Expand ~ and ~user constructions:
-    >>> for line in open('~/my_file.txt'):
-    ...    print(line)
-    >>> for line in open('my_file.txt'):
-    ...    print(line)
+%(examples)s
 
     See Also
     --------
-
     - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
+    - `smart_open README.rst <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
 
     """
     logger.debug('%r', locals())
@@ -384,9 +352,6 @@ def open(
     return decoded
 
 
-#
-# Inject transport keyword argument documentation into the docstring.
-#
 open.__doc__ = open.__doc__ % {
     's3': doctools.to_docstring(
         doctools.extract_kwargs(smart_open_s3.open.__doc__),
@@ -400,6 +365,11 @@ open.__doc__ = open.__doc__ % {
         doctools.extract_kwargs(smart_open_webhdfs.open.__doc__),
         lpad=u'    ',
     ),
+    'ssh': doctools.to_docstring(
+        doctools.extract_kwargs(smart_open_ssh.open.__doc__),
+        lpad=u'    ',
+    ),
+    'examples': doctools.extract_examples_from_readme_rst(),
 }
 
 

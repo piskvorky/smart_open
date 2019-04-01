@@ -11,7 +11,6 @@ from smart_open import s3
 DEFAULT_BUFFER_SIZE = 128 * 1024
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
 
 
 _HEADERS = {'Accept-Encoding': 'identity'}

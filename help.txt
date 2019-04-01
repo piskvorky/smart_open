@@ -1,0 +1,266 @@
+Help on package smart_open:
+
+NAME
+    smart_open
+
+FILE
+    /home/misha/git/smart_open/smart_open/__init__.py
+
+DESCRIPTION
+    Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
+    filesystem / compressed files, and many more, using a simple, Pythonic API.
+    
+    The streaming makes heavy use of generators and pipes, to avoid loading
+    full file contents into memory, allowing work with arbitrarily large files.
+    
+    The main functions are:
+    
+    * `open()`, which opens the given file for reading/writing
+    * `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
+    * `register_compressor()`, which registers callbacks for transparent compressor handling
+
+PACKAGE CONTENTS
+    doctools
+    hdfs
+    http
+    s3
+    smart_open_lib
+    ssh
+    tests (package)
+    webhdfs
+
+FUNCTIONS
+    open(uri, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, ignore_ext=False, transport_params={})
+        Open the URI object, returning a file-like object.
+        
+        The URI is usually a string in a variety of formats:
+        
+        1. a URI for the local filesystem: `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
+        2. a URI for HDFS: `hdfs:///some/path/lines.txt`
+        3. a URI for Amazon's S3 (can also supply credentials inside the URI):
+           `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
+        
+        The URI may also be one of:
+        
+        - an instance of the pathlib.Path class
+        - a stream (anything that implements io.IOBase-like functionality)
+        
+        This function supports transparent compression and decompression using the
+        following codec:
+        
+        - ``.gz``
+        - ``.bz2``
+        - ``.xz``
+        
+        The function depends on the file extension to determine the appropriate codec.
+        
+        Parameters
+        ----------
+        uri: str or object
+            The object to open.
+        mode: str, optional
+            Mimicks built-in open parameter of the same name.
+        buffering: int, optional
+            Mimicks built-in open parameter of the same name.
+        encoding: str, optional
+            Mimicks built-in open parameter of the same name.
+        errors: str, optional
+            Mimicks built-in open parameter of the same name.
+        newline: str, optional
+            Mimicks built-in open parameter of the same name.
+        closefd: boolean, optional
+            Mimicks built-in open parameter of the same name.  Ignored.
+        opener: object, optional
+            Mimicks built-in open parameter of the same name.  Ignored.
+        ignore_ext: boolean, optional
+            Disable transparent compression/decompression based on the file extension.
+        transport_params: dict, optional
+            Additional parameters for the transport layer (see notes below).
+        
+        Returns
+        -------
+        A file-like object.
+        
+        Notes
+        -----
+        smart_open has several implementations for its transport layer (e.g. S3, HTTP).
+        Each transport layer has a different set of keyword arguments for overriding
+        default behavior.  If you specify a keyword argument that is *not* supported
+        by the transport layer being used, smart_open will ignore that argument and
+        log a warning message.
+        
+        S3 (for details, see :mod:`smart_open.s3` and :func:`smart_open.s3.open`):
+        
+        buffer_size: int, optional
+            The buffer size to use when performing I/O.
+        min_part_size: int, optional
+            The minimum part size for multipart uploads.  For writing only.
+        session: object, optional
+            The S3 session to use when working with boto3.
+        resource_kwargs: dict, optional
+            Keyword arguments to use when creating a new resource.  For writing only.
+        multipart_upload_kwargs: dict, optional
+            Additional parameters to pass to boto3's initiate_multipart_upload function.
+            For writing only.
+        
+        HTTP (for details, see :mod:`smart_open.http` and :func:`smart_open.http.open`):
+        
+        kerberos: boolean, optional
+            If True, will attempt to use the local Kerberos credentials
+        user: str, optional
+            The username for authenticating over HTTP
+        password: str, optional
+            The password for authenticating over HTTP
+        
+        WebHDFS (for details, see :mod:`smart_open.webhdfs` and :func:`smart_open.webhdfs.open`):
+        
+        min_part_size: int, optional
+            For writing only.
+        
+        SSH (for details, see :mod:`smart_open.ssh` and :func:`smart_open.ssh.open`):
+        
+        mode: str, optional
+            The mode to use for opening the file.
+        host: str, optional
+            The hostname of the remote machine.  May not be None.
+        user: str, optional
+            The username to use to login to the remote machine.
+            If None, defaults to the name of the current user.
+        port: int, optional
+            The port to connect to.
+        
+        
+        Examples
+        --------
+        >>> from smart_open import open
+        >>>
+        >>> # stream lines from an S3 object
+        >>> for line in open('s3://commoncrawl/robots.txt'):
+        ...    print(repr(line))
+        ...    break
+        'User-Agent: *\n'
+        
+        >>> # stream from/to compressed files, with transparent (de)compression:
+        >>> for line in open('smart_open/tests/test_data/1984.txt.gz', encoding='utf-8'):
+        ...    print(repr(line))
+        'It was a bright cold day in April, and the clocks were striking thirteen.\n'
+        'Winston Smith, his chin nuzzled into his breast in an effort to escape the vile\n'
+        'wind, slipped quickly through the glass doors of Victory Mansions, though not\n'
+        'quickly enough to prevent a swirl of gritty dust from entering along with him.\n'
+        
+        >>> # can use context managers too:
+        >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
+        ...    with open('smart_open/tests/test_data/1984.txt.bz2', 'w') as fout:
+        ...        for line in fin:
+        ...           fout.write(line)
+        
+        >>> # can use any IOBase operations, like seek
+        >>> with open('s3://commoncrawl/robots.txt', 'rb') as fin:
+        ...     for line in fin:
+        ...         print(repr(line.decode('utf-8')))
+        ...         break
+        ...     offset = fin.seek(0)  # seek to the beginning
+        ...     print(fin.read(4))
+        'User-Agent: *\n'
+        b'User'
+        
+        >>> # stream from HTTP
+        >>> for line in open('http://example.com/index.html'):
+        ...     print(repr(line))
+        ...     break
+        '<!doctype html>\n'
+        
+        Other examples of URLs that ``smart_open`` accepts::
+        
+          s3://my_bucket/my_key
+          s3://my_key:my_secret@my_bucket/my_key
+          s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
+          hdfs:///path/file
+          hdfs://path/file
+          webhdfs://host:port/path/file
+          ./local/path/file
+          ~/local/path/file
+          local/path/file
+          ./local/path/file.gz
+          file:///home/user/file
+          file:///home/user/file.bz2
+          [ssh|scp|sftp]://username@host//path/file
+          [ssh|scp|sftp]://username@host/path/file
+        
+        
+        See Also
+        --------
+        - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
+        - `smart_open README.rst <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
+    
+    register_compressor(ext, callback)
+        Register a callback for transparently decompressing files with a specific extension.
+        
+        Parameters
+        ----------
+        ext: str
+            The extension.
+        callback: callable
+            The callback.  It must accept two position arguments, file_obj and mode.
+        
+        Examples
+        --------
+        
+        Instruct smart_open to use the identity function whenever opening a file
+        with a .foo extension:
+        
+        >>> def identity(file_obj, mode):
+        ...     return file_obj
+        >>> register_compressor('.foo', identity)
+    
+    s3_iter_bucket = iter_bucket(bucket_name, prefix='', accept_key=None, key_limit=None, workers=16, retries=3)
+        Iterate and download all S3 objects under `s3://bucket_name/prefix`.
+        
+        Parameters
+        ----------
+        bucket_name: str
+            The name of the bucket.
+        prefix: str, optional
+            Limits the iteration to keys starting wit the prefix.
+        accept_key: callable, optional
+            This is a function that accepts a key name (unicode string) and
+            returns True/False, signalling whether the given key should be downloaded.
+            The default behavior is to accept all keys.
+        key_limit: int, optional
+            If specified, the iterator will stop after yielding this many results.
+        workers: int, optional
+            The number of subprocesses to use.
+        retries: int, optional
+            The number of time to retry a failed download.
+        
+        Yields
+        ------
+        str
+            The full key name (does not include the bucket name).
+        bytes
+            The full contents of the key.
+        
+        Notes
+        -----
+        The keys are processed in parallel, using `workers` processes (default: 16),
+        to speed up downloads greatly. If multiprocessing is not available, thus
+        _MULTIPROCESSING is False, this parameter will be ignored.
+        
+        Examples
+        --------
+        
+          >>> # get all JSON files under "mybucket/foo/"
+          >>> for key, content in iter_bucket(bucket_name, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
+          ...     print key, len(content)
+        
+          >>> # limit to 10k files, using 32 parallel workers (default is 16)
+          >>> for key, content in iter_bucket(bucket_name, key_limit=10000, workers=32):
+          ...     print key, len(content)
+    
+    smart_open(uri, mode='rb', **kw)
+        Deprecated, use smart_open.open instead.
+
+DATA
+    __all__ = ['open', 'smart_open', 's3_iter_bucket', 'register_compresso...
+
+
