@@ -23,10 +23,10 @@ What?
 
 .. code-block:: python
 
-  >>> from smart_open import open
+  >>> from smart_open import smart_open
   >>>
   >>> # stream lines from an S3 object
-  >>> for line in open('s3://commoncrawl/robots.txt'):
+  >>> for line in smart_open('s3://commoncrawl/robots.txt'):
   ...    print(repr(line))
   ...    break
   'User-Agent: *\n'
@@ -40,13 +40,13 @@ What?
   'quickly enough to prevent a swirl of gritty dust from entering along with him.\n'
 
   >>> # can use context managers too:
-  >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
-  ...    with open('smart_open/tests/test_data/1984.txt.bz2', 'w') as fout:
+  >>> with smart_open('smart_open/tests/test_data/1984.txt.gz') as fin:
+  ...    with smart_open('smart_open/tests/test_data/1984.txt.bz2', 'w') as fout:
   ...        for line in fin:
   ...           fout.write(line)
 
   >>> # can use any IOBase operations, like seek
-  >>> with open('s3://commoncrawl/robots.txt', 'rb') as fin:
+  >>> with smart_open('s3://commoncrawl/robots.txt', 'rb') as fin:
   ...     for line in fin:
   ...         print(repr(line.decode('utf-8')))
   ...         break
@@ -56,7 +56,7 @@ What?
   b'User'
 
   >>> # stream from HTTP
-  >>> for line in open('http://example.com/index.html'):
+  >>> for line in smart_open('http://example.com/index.html'):
   ...     print(repr(line))
   ...     break
   '<!doctype html>\n'
@@ -99,30 +99,30 @@ More examples:
     >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
     >>> lines = [b'first line\n', b'second line\n', b'third line\n']
     >>> transport_params = {'session': boto3.Session(profile_name='smart_open')}
-    >>> with open(url, 'wb', transport_params=transport_params) as fout:
+    >>> with smart_open(url, 'wb', transport_params=transport_params) as fout:
     ...     for line in lines:
     ...         bytes_written = fout.write(line)
 
 .. code-block:: python
 
     # stream from HDFS
-    for line in open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):
+    for line in smart_open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):
         print(line)
 
     # stream from WebHDFS
-    for line in open('webhdfs://host:port/user/hadoop/my_file.txt'):
+    for line in smart_open('webhdfs://host:port/user/hadoop/my_file.txt'):
         print(line)
 
     # stream content *into* HDFS (write mode):
-    with open('hdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
+    with smart_open('hdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
         fout.write(b'hello world')
 
     # stream content *into* WebHDFS (write mode):
-    with open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
+    with smart_open('webhdfs://host:port/user/hadoop/my_file.txt', 'wb') as fout:
         fout.write(b'hello world')
 
     # stream from a completely custom s3 server, like s3proxy:
-    for line in open('s3u://user:secret@host:port@mybucket/mykey.txt'):
+    for line in smart_open('s3u://user:secret@host:port@mybucket/mykey.txt'):
         print(line)
 
     # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
@@ -132,7 +132,7 @@ More examples:
             'endpoint_url': 'https://ams3.digitaloceanspaces.com',
         }
     }
-    with open('s3://bucket/key.txt', 'wb', transport_params=transport_params) as fout:
+    with smart_open('s3://bucket/key.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'here we stand')
 
 Why?
@@ -173,7 +173,7 @@ You can easily add support for other file extensions and compression formats:
 
     from smart_open import open, register_compressor
     register_compressor('.lzma', _handle_lzma)
-    with open('file.lzma', ...) as fin:
+    with smart_open('file.lzma', ...) as fin:
         pass
 
 Transport-specific Options
@@ -194,8 +194,8 @@ Here are some examples of using this parameter:
 .. code-block:: python
 
   >>> import boto3
-  >>> fin = open('s3://commoncrawl/robots.txt', transport_params=dict(session=boto3.Session()))
-  >>> fin = open('s3://commoncrawl/robots.txt', transport_params=dict(buffer_size=1024))
+  >>> fin = smart_open('s3://commoncrawl/robots.txt', transport_params=dict(session=boto3.Session()))
+  >>> fin = smart_open('s3://commoncrawl/robots.txt', transport_params=dict(buffer_size=1024))
 
 For the full list of keyword arguments supported by each transport option, see the documentation:
 
@@ -222,13 +222,13 @@ You can customize the credentials when constructing the session.
         aws_secret_access_key=SECRET_KEY,
         aws_session_token=SESSION_TOKEN,
     )
-    fin = open('s3://bucket/key', transport_params=dict(session=session), ...)
+    fin = smart_open('s3://bucket/key', transport_params=dict(session=session), ...)
 
 Your second option is to specify the credentials within the S3 URL itself:
 
 .. code-block:: python
 
-    fin = open('s3://aws_access_key_id:aws_secret_access_key@bucket/key', ...)
+    fin = smart_open('s3://aws_access_key_id:aws_secret_access_key@bucket/key', ...)
 
 *Important*: The two methods above are **mutually exclusive**. If you pass an AWS session *and* the URL contains credentials, ``smart_open`` will ignore the latter.
 
