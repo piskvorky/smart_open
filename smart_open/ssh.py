@@ -24,6 +24,7 @@ Similarly, from a command line::
 
 import getpass
 import logging
+from io import StringIO
 
 logger = logging.getLogger(__name__)
 
@@ -43,18 +44,22 @@ SCHEMES = ("ssh", "scp", "sftp")
 DEFAULT_PORT = 22
 
 
-def _connect(hostname, username, port):
+def _connect(hostname, username, port, rsakey = None):
     key = (hostname, username)
     ssh = _SSH.get(key)
     if ssh is None:
         ssh = _SSH[key] = paramiko.client.SSHClient()
         ssh.load_system_host_keys()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(hostname, port, username)
+        if rsakey:
+            sshkey = paramiko.RSAKey.from_private_key(StringIO(rsakey))
+            ssh.connect(hostname, port, username, pkey = sshkey)
+        else:
+            ssh.connect(hostname, port, username)
     return ssh
 
 
-def open(path, mode='r', host=None, user=None, port=DEFAULT_PORT):
+def open(path, mode='r', host=None, user=None, port=DEFAULT_PORT, transport_params={}):
     """Open a file on a remote machine over SSH.
 
     Expects authentication to be already set up via existing keys on the local machine.
@@ -72,6 +77,8 @@ def open(path, mode='r', host=None, user=None, port=DEFAULT_PORT):
         If None, defaults to the name of the current user.
     port: int, optional
         The port to connect to.
+    transport_params: dict, optional
+        The only item detected in here is rsakey which is a PEM format private key
 
     Returns
     -------
@@ -87,6 +94,6 @@ def open(path, mode='r', host=None, user=None, port=DEFAULT_PORT):
         raise ValueError('you must specify the host to connect to')
     if not user:
         user = getpass.getuser()
-    conn = _connect(host, user, port)
+    conn = _connect(host, user, port, transport_params.get('rsakey', None))
     sftp_client = conn.get_transport().open_sftp_client()
     return sftp_client.open(path, mode)
