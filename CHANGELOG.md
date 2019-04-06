@@ -1,4 +1,4 @@
-# Unreleased
+# 1.8.1, 6 April 2019
 
   - Added support for .xz / lzma (PR [#262](https://github.com/RaRe-Technologies/smart_open/pull/262), [@vmarkovtsev](https://github.com/vmarkovtsev))
   - Added streaming HTTP support (PR [#236](https://github.com/RaRe-Technologies/smart_open/pull/236), [@handsomezebra](https://github.com/handsomezebra))
