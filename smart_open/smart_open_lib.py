@@ -112,10 +112,16 @@ def _handle_xz(file_obj, mode):
     # Delay import of compressor library until we actually need it
     #
     try:
-        import lzma
+        if sys.version_info >= (3, 3):
+            import lzma
+        else:
+            # py<3.3
+            from backports import lzma
     except ImportError:
-        # py<3.3
-        from backports import lzma
+        logger.error("Optional xz decompression library not installed. "
+                     "Install with `pip install smart_open[xz].")
+        raise
+
     return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
 
 

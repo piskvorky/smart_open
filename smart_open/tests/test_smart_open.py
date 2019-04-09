@@ -33,6 +33,16 @@ SAMPLE_TEXT = 'Hello, world!'
 SAMPLE_BYTES = SAMPLE_TEXT.encode('utf-8')
 
 
+try:
+    if sys.version_info >= (3, 3):
+        import lzma
+    else:
+        from backports import lzma
+    XZ_SUPPORTED = True
+except ImportError:
+    XZ_SUPPORTED = False
+
+
 class ParseUriTest(unittest.TestCase):
     """
     Test ParseUri class.
@@ -268,6 +278,9 @@ class SmartOpenHttpTest(unittest.TestCase):
         """Can open bzip2 via http?"""
         self._test_compressed_http(".bz2", False)
 
+    @unittest.skipUnless(
+        XZ_SUPPORTED,
+        "do not test if backports.lzma not installed for python<3.3")
     def test_http_xz(self):
         """Can open xz via http?"""
         self._test_compressed_http(".xz", False)
@@ -281,6 +294,9 @@ class SmartOpenHttpTest(unittest.TestCase):
         """Can open bzip2 via http with a query appended to URI?"""
         self._test_compressed_http(".bz2", True)
 
+    @unittest.skipUnless(
+        XZ_SUPPORTED,
+        "do not test if backports.lzma not installed for python<3.3")
     def test_http_xz_query(self):
         """Can open xz via http with a query appended to URI?"""
         self._test_compressed_http(".xz", True)
@@ -1014,10 +1030,16 @@ class CompressionFormatTest(unittest.TestCase):
         """Can write and read bz2?"""
         self.write_read_assertion('.bz2')
 
+    @unittest.skipUnless(
+        XZ_SUPPORTED,
+        "do not test if backports.lzma not installed for python<3.3")
     def test_write_read_xz(self):
         """Can write and read xz2?"""
         self.write_read_assertion('.xz')
 
+    @unittest.skipUnless(
+        XZ_SUPPORTED,
+        "do not test if backports.lzma not installed for python<3.3")
     def test_read_real_xz(self):
         """Can read a real xz file."""
         base_path = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')

@@ -161,7 +161,7 @@ The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe
 Supported Compression Formats
 -----------------------------
 
-``smart_open`` allows reading and writing gzip, bzip2 and xz files.
+``smart_open`` allows reading and writing gzip, bzip2 and xz files. (For python<3.3, use `pip install smart_open[xz]` for xz support.)
 They are transparently handled over HTTP, S3, and other protocols, too, based on the extension of the file being opened.
 You can easily add support for other file extensions and compression formats:
 
