@@ -190,6 +190,7 @@ class BufferedInputBase(io.BufferedIOBase):
         self._content_length = self._object.content_length
         self._current_pos = 0
         self._buffer = b''
+        self._buffer_pos = 0
         self._eof = False
         self._buffer_size = buffer_size
         self._line_terminator = line_terminator
@@ -226,8 +227,8 @@ class BufferedInputBase(io.BufferedIOBase):
         if size == 0:
             return b''
         elif size < 0:
-            if len(self._buffer):
-                from_buf = self._read_from_buffer(len(self._buffer))
+            if self._len_remaining_buffer():
+                from_buf = self._read_from_buffer(self._len_remaining_buffer())
             else:
                 from_buf = b''
             self._current_pos = self._content_length
@@ -236,14 +237,14 @@ class BufferedInputBase(io.BufferedIOBase):
         #
         # Return unused data first
         #
-        if len(self._buffer) >= size:
+        if self._len_remaining_buffer() >= size:
             return self._read_from_buffer(size)
 
         #
         # If the stream is finished, return what we have.
         #
         if self._eof:
-            return self._read_from_buffer(len(self._buffer))
+            return self._read_from_buffer(self._len_remaining_buffer())
 
         #
         # Fill our buffer to the required size.
@@ -270,20 +271,21 @@ class BufferedInputBase(io.BufferedIOBase):
         if limit != -1:
             raise NotImplementedError('limits other than -1 not implemented yet')
         the_line = io.BytesIO()
-        while not (self._eof and len(self._buffer) == 0):
+        while not (self._eof and self._len_remaining_buffer() == 0):
             #
-            # In the worst case, we're reading self._buffer twice here, once in
-            # the if condition, and once when calling index.
+            # In the worst case, we're reading the unread part of self._buffer
+            # twice here, once in the if condition, and once when calling index.
             #
             # This is sub-optimal, but better than the alternative: wrapping
             # .index in a try..except, because that is slower.
             #
-            if self._line_terminator in self._buffer:
-                next_newline = self._buffer.index(self._line_terminator)
+            remaining_buffer = self._remaining_buffer()
+            if self._line_terminator in remaining_buffer:
+                next_newline = remaining_buffer.index(self._line_terminator)
                 the_line.write(self._read_from_buffer(next_newline + 1))
                 break
             else:
-                the_line.write(self._read_from_buffer(len(self._buffer)))
+                the_line.write(self._read_from_buffer(self._len_remaining_buffer()))
                 self._fill_buffer(self._buffer_size)
         return the_line.getvalue()
 
@@ -298,20 +300,28 @@ class BufferedInputBase(io.BufferedIOBase):
         """Remove at most size bytes from our buffer and return them."""
         # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
         assert size >= 0
-        part = self._buffer[:size]
-        self._buffer = self._buffer[size:]
+        part = self._buffer[self._buffer_pos : self._buffer_pos + size]
         self._current_pos += len(part)
+        self._buffer_pos += len(part)
         # logger.debug('part: %r', part)
         return part
 
     def _fill_buffer(self, size):
-        while len(self._buffer) < size and not self._eof:
+        while self._len_remaining_buffer() < size and not self._eof:
             raw = self._raw_reader.read(size=self._buffer_size)
             if len(raw):
+                self._buffer = self._buffer[self._buffer_pos:]
+                self._buffer_pos = 0
                 self._buffer += raw
             else:
                 logger.debug('reached EOF while filling buffer')
                 self._eof = True
+
+    def _len_remaining_buffer(self):
+        return len(self._buffer) - self._buffer_pos
+
+    def _remaining_buffer(self):
+        return self._buffer[self._buffer_pos:]
 
 
 class SeekableBufferedInputBase(BufferedInputBase):
@@ -329,6 +339,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         self._content_length = self._object.content_length
         self._current_pos = 0
         self._buffer = b''
+        self._buffer_pos = 0
         self._eof = False
         self._buffer_size = buffer_size
         self._line_terminator = line_terminator
@@ -367,6 +378,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         logger.debug('new_position: %r', self._current_pos)
 
         self._buffer = b""
+        self._buffer_pos = 0
         self._eof = self._current_pos == self._content_length
         return self._current_pos
 
