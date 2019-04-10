@@ -50,8 +50,7 @@ FUNCTIONS
         
         - ``.gz``
         - ``.bz2``
-        - ``.xz``
-        
+
         The function depends on the file extension to determine the appropriate codec.
         
         Parameters

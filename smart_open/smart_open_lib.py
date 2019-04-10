@@ -107,30 +107,11 @@ def _handle_gzip(file_obj, mode):
     return gzip.GzipFile(fileobj=file_obj, mode=mode)
 
 
-def _handle_xz(file_obj, mode):
-    #
-    # Delay import of compressor library until we actually need it
-    #
-    try:
-        if sys.version_info >= (3, 3):
-            import lzma
-        else:
-            # py<3.3
-            from backports import lzma
-    except ImportError:
-        logger.error("Optional xz decompression library not installed. "
-                     "Install with `pip install smart_open[xz].")
-        raise
-
-    return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
-
-
 #
 # NB. avoid using lambda here to make stack traces more readable.
 #
 register_compressor('.bz2', _handle_bz2)
 register_compressor('.gz', _handle_gzip)
-register_compressor('.xz', _handle_xz)
 
 
 Uri = collections.namedtuple(
@@ -230,7 +211,6 @@ def open(
 
     - ``.gz``
     - ``.bz2``
-    - ``.xz``
 
     The function depends on the file extension to determine the appropriate codec.
 
@@ -602,7 +582,6 @@ def _parse_uri(uri_as_string):
       * file:///home/user/file.bz2
       * [ssh|scp|sftp]://username@host//path/file
       * [ssh|scp|sftp]://username@host/path/file
-      * file:///home/user/file.xz
 
     """
     if os.name == 'nt':

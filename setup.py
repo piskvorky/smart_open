@@ -61,9 +61,6 @@ setup(
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
-        'xz': [
-            'backports.lzma;python_version<"3.3"',
-        ]
     },
 
     test_suite="smart_open.tests",

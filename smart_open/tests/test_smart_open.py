@@ -33,16 +33,6 @@ SAMPLE_TEXT = 'Hello, world!'
 SAMPLE_BYTES = SAMPLE_TEXT.encode('utf-8')
 
 
-try:
-    if sys.version_info >= (3, 3):
-        import lzma
-    else:
-        from backports import lzma
-    XZ_SUPPORTED = True
-except ImportError:
-    XZ_SUPPORTED = False
-
-
 class ParseUriTest(unittest.TestCase):
     """
     Test ParseUri class.
@@ -266,7 +256,7 @@ class SmartOpenHttpTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open(
             'http://127.0.0.1/data%s%s' % (suffix, '?some_param=some_val' if query else ''))
 
-        # decompress the xz and get the same md5 hash
+        # decompress the file and get the same md5 hash
         self.assertEqual(smart_open_object.read(), raw_data)
 
     @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
@@ -278,13 +268,6 @@ class SmartOpenHttpTest(unittest.TestCase):
         """Can open bzip2 via http?"""
         self._test_compressed_http(".bz2", False)
 
-    @unittest.skipUnless(
-        XZ_SUPPORTED,
-        "do not test if backports.lzma not installed for python<3.3")
-    def test_http_xz(self):
-        """Can open xz via http?"""
-        self._test_compressed_http(".xz", False)
-
     @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
     def test_http_gz_query(self):
         """Can open gzip via http with a query appended to URI?"""
@@ -293,13 +276,6 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_http_bz2_query(self):
         """Can open bzip2 via http with a query appended to URI?"""
         self._test_compressed_http(".bz2", True)
-
-    @unittest.skipUnless(
-        XZ_SUPPORTED,
-        "do not test if backports.lzma not installed for python<3.3")
-    def test_http_xz_query(self):
-        """Can open xz via http with a query appended to URI?"""
-        self._test_compressed_http(".xz", True)
 
 
 def make_buffer(cls=six.BytesIO, initial_value=None, name=None):
@@ -1029,26 +1005,6 @@ class CompressionFormatTest(unittest.TestCase):
     def test_write_read_bz2(self):
         """Can write and read bz2?"""
         self.write_read_assertion('.bz2')
-
-    @unittest.skipUnless(
-        XZ_SUPPORTED,
-        "do not test if backports.lzma not installed for python<3.3")
-    def test_write_read_xz(self):
-        """Can write and read xz2?"""
-        self.write_read_assertion('.xz')
-
-    @unittest.skipUnless(
-        XZ_SUPPORTED,
-        "do not test if backports.lzma not installed for python<3.3")
-    def test_read_real_xz(self):
-        """Can read a real xz file."""
-        base_path = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
-        head_path = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt.xz')
-        with smart_open.smart_open(head_path) as f:
-            smart_data = f.read()
-        with open(base_path, 'rb') as f:
-            orig_data = f.read()
-        self.assertEqual(smart_data, orig_data)
 
 
 class MultistreamsBZ2Test(unittest.TestCase):

@@ -77,7 +77,6 @@ Other examples of URLs that ``smart_open`` accepts::
     file:///home/user/file.bz2
     [ssh|scp|sftp]://username@host//path/file
     [ssh|scp|sftp]://username@host/path/file
-    file:///home/user/file.xz
 
 .. _doctools_after_examples:
 
@@ -161,20 +160,31 @@ The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe
 Supported Compression Formats
 -----------------------------
 
-``smart_open`` allows reading and writing gzip, bzip2 and xz files. (For python<3.3, use `pip install smart_open[xz]` for xz support.)
+``smart_open`` allows reading and writing gzip and bzip2 files.
 They are transparently handled over HTTP, S3, and other protocols, too, based on the extension of the file being opened.
-You can easily add support for other file extensions and compression formats:
+You can easily add support for other file extensions and compression formats.
+For example, to open xz-compressed files:
 
 .. code-block:: python
 
-    def _handle_lzma(file_obj, mode):
-        import lzma
-        return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_ALONE)
-
+    import lzma, os
     from smart_open import open, register_compressor
-    register_compressor('.lzma', _handle_lzma)
-    with open('file.lzma', ...) as fin:
-        pass
+
+    def _handle_xz(file_obj, mode):
+        return lzma.LZMAFile(filename=file_obj,
+                                mode=mode,
+                                format=lzma.FORMAT_XZ)
+
+    register_compressor('.xz', _handle_xz)
+
+    data_path = './smart_open/tests/test_data/crime-and-punishment.txt.xz'
+    with open(data_path) as f:
+        crime_and_punishment = f.read()
+
+``lzma`` is in the standard library in Python 3.3 and greater.
+For 2.7, use `backports.lzma`_.
+
+.. _backports.lzma: https://pypi.org/project/backports.lzma/
 
 Transport-specific Options
 --------------------------
