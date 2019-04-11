@@ -175,12 +175,11 @@ For example, to open xz-compressed files:
 
     >>> register_compressor('.xz', _handle_xz)
 
-    >>> with open('./smart_open/tests/test_data/crime-and-punishment.txt.xz') as f:
-    ...     crime_and_punishment = f.read()
-
-    >>> print(len(crime_and_punishment))
+    >>> with open('smart_open/tests/test_data/crime-and-punishment.txt.xz') as fin:
+    ...     text = fin.read()
+    >>> print(len(text))
     1696
-    
+
 ``lzma`` is in the standard library in Python 3.3 and greater.
 For 2.7, use `backports.lzma`_.
 
