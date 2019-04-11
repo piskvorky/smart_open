@@ -167,18 +167,20 @@ For example, to open xz-compressed files:
 
 .. code-block:: python
 
-    import lzma, os
-    from smart_open import open, register_compressor
+    >>> import lzma, os
+    >>> from smart_open import open, register_compressor
 
-    def _handle_xz(file_obj, mode):
-        return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+    >>> def _handle_xz(file_obj, mode):
+    ...      return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
 
-    register_compressor('.xz', _handle_xz)
+    >>> register_compressor('.xz', _handle_xz)
 
-    data_path = './smart_open/tests/test_data/crime-and-punishment.txt.xz'
-    with open(data_path) as f:
-        crime_and_punishment = f.read()
+    >>> with open('./smart_open/tests/test_data/crime-and-punishment.txt.xz') as f:
+    ...     crime_and_punishment = f.read()
 
+    >>> print(len(crime_and_punishment))
+    1696
+    
 ``lzma`` is in the standard library in Python 3.3 and greater.
 For 2.7, use `backports.lzma`_.
 
