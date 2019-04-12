@@ -144,11 +144,26 @@ Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
 
 
 def _inspect_kwargs(kallable):
-    args, varargs, keywords, defaults = inspect.getargspec(kallable)
-    if not defaults:
-        return {}
-    supported_keywords = args[-len(defaults):]
-    return dict(zip(supported_keywords, defaults))
+    #
+    # inspect.getargspec got deprecated in Py3.4, and calling it spews
+    # deprecation warnings that we'd prefer to avoid.  Unfortunately, older
+    # versions of Python (<3.3) did not have inspect.signature, so we need to
+    # handle them the old-fashioned getargspec way.
+    #
+    try:
+        signature = inspect.signature(kallable)
+    except AttributeError:
+        args, varargs, keywords, defaults = inspect.getargspec(kallable)
+        if not defaults:
+            return {}
+        supported_keywords = args[-len(defaults):]
+        return dict(zip(supported_keywords, defaults))
+    else:
+        return {
+            name: param.default
+            for name, param in signature.parameters.items()
+            if param.default != inspect.Parameter.empty
+        }
 
 
 def _check_kwargs(kallable, kwargs):
