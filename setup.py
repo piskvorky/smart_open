@@ -57,7 +57,6 @@ setup(
         'bz2file',
         'requests',
         'boto3',
-        'backports.lzma;python_version<"3.3"',
     ],
     tests_require=tests_require,
     extras_require={
