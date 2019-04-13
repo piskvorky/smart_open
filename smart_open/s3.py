@@ -10,6 +10,8 @@ import boto3
 import botocore.client
 import six
 
+import smart_open.bytebuffer
+
 logger = logging.getLogger(__name__)
 
 # Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
@@ -189,10 +191,8 @@ class BufferedInputBase(io.BufferedIOBase):
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
         self._current_pos = 0
-        self._buffer = b''
-        self._buffer_pos = 0
+        self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
-        self._buffer_size = buffer_size
         self._line_terminator = line_terminator
 
         #
@@ -227,24 +227,21 @@ class BufferedInputBase(io.BufferedIOBase):
         if size == 0:
             return b''
         elif size < 0:
-            if self._len_remaining_buffer():
-                from_buf = self._read_from_buffer(self._len_remaining_buffer())
-            else:
-                from_buf = b''
+            from_buf = self._read_from_buffer()
             self._current_pos = self._content_length
             return from_buf + self._raw_reader.read()
 
         #
         # Return unused data first
         #
-        if self._len_remaining_buffer() >= size:
+        if len(self._buffer) >= size:
             return self._read_from_buffer(size)
 
         #
         # If the stream is finished, return what we have.
         #
         if self._eof:
-            return self._read_from_buffer(self._len_remaining_buffer())
+            return self._read_from_buffer()
 
         #
         # Fill our buffer to the required size.
@@ -271,7 +268,7 @@ class BufferedInputBase(io.BufferedIOBase):
         if limit != -1:
             raise NotImplementedError('limits other than -1 not implemented yet')
         the_line = io.BytesIO()
-        while not (self._eof and self._len_remaining_buffer() == 0):
+        while not (self._eof and len(self._buffer) == 0):
             #
             # In the worst case, we're reading the unread part of self._buffer
             # twice here, once in the if condition, and once when calling index.
@@ -279,14 +276,14 @@ class BufferedInputBase(io.BufferedIOBase):
             # This is sub-optimal, but better than the alternative: wrapping
             # .index in a try..except, because that is slower.
             #
-            remaining_buffer = self._remaining_buffer()
+            remaining_buffer = self._buffer.peek()
             if self._line_terminator in remaining_buffer:
                 next_newline = remaining_buffer.index(self._line_terminator)
                 the_line.write(self._read_from_buffer(next_newline + 1))
                 break
             else:
-                the_line.write(self._read_from_buffer(self._len_remaining_buffer()))
-                self._fill_buffer(self._buffer_size)
+                the_line.write(self._read_from_buffer())
+                self._fill_buffer()
         return the_line.getvalue()
 
     def terminate(self):
@@ -296,33 +293,22 @@ class BufferedInputBase(io.BufferedIOBase):
     #
     # Internal methods.
     #
-    def _read_from_buffer(self, size):
+    def _read_from_buffer(self, size = -1):
         """Remove at most size bytes from our buffer and return them."""
         # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
-        assert size >= 0
-        part = self._buffer[self._buffer_pos : self._buffer_pos + size]
+        size = size if size > 0 else len(self._buffer)
+        part = self._buffer.read(size)
         self._current_pos += len(part)
-        self._buffer_pos += len(part)
         # logger.debug('part: %r', part)
         return part
 
-    def _fill_buffer(self, size):
-        while self._len_remaining_buffer() < size and not self._eof:
-            raw = self._raw_reader.read(size=self._buffer_size)
-            if len(raw):
-                self._buffer = self._buffer[self._buffer_pos:]
-                self._buffer_pos = 0
-                self._buffer += raw
-            else:
+    def _fill_buffer(self, size = -1):
+        size = size if size > 0 else self._buffer._chunk_size
+        while len(self._buffer) < size and not self._eof:
+            bytes_read = self._buffer.fill(self._raw_reader)
+            if bytes_read == 0:
                 logger.debug('reached EOF while filling buffer')
                 self._eof = True
-
-    def _len_remaining_buffer(self):
-        return len(self._buffer) - self._buffer_pos
-
-    def _remaining_buffer(self):
-        return self._buffer[self._buffer_pos:]
-
 
 class SeekableBufferedInputBase(BufferedInputBase):
     """Reads bytes from S3.
@@ -338,10 +324,8 @@ class SeekableBufferedInputBase(BufferedInputBase):
         self._raw_reader = SeekableRawReader(self._object)
         self._content_length = self._object.content_length
         self._current_pos = 0
-        self._buffer = b''
-        self._buffer_pos = 0
+        self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
-        self._buffer_size = buffer_size
         self._line_terminator = line_terminator
 
         #
@@ -377,8 +361,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         self._raw_reader.seek(new_position)
         logger.debug('new_position: %r', self._current_pos)
 
-        self._buffer = b""
-        self._buffer_pos = 0
+        self._buffer.empty()
         self._eof = self._current_pos == self._content_length
         return self._current_pos
 
