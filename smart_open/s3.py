@@ -296,14 +296,14 @@ class BufferedInputBase(io.BufferedIOBase):
     def _read_from_buffer(self, size = -1):
         """Remove at most size bytes from our buffer and return them."""
         # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
-        size = size if size > 0 else len(self._buffer)
+        size = size if size >= 0 else len(self._buffer)
         part = self._buffer.read(size)
         self._current_pos += len(part)
         # logger.debug('part: %r', part)
         return part
 
     def _fill_buffer(self, size = -1):
-        size = size if size > 0 else self._buffer._chunk_size
+        size = size if size >= 0 else self._buffer._chunk_size
         while len(self._buffer) < size and not self._eof:
             bytes_read = self._buffer.fill(self._raw_reader)
             if bytes_read == 0:
