@@ -89,4 +89,5 @@ setup(
         'Topic :: System :: Distributed Computing',
         'Topic :: Database :: Front-Ends',
     ],
+    package_data={'smart_open': ['VERSION']},
 )
