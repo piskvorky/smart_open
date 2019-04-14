@@ -563,6 +563,32 @@ def _s3_open_uri(parsed_uri, mode, transport_params):
     return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
 
+def _my_urlsplit(url):
+    """This is a hack to prevent the regular urlsplit from splitting around question marks.
+
+    A question mark (?) in a URL typically indicates the start of a
+    querystring, and the standard library's urlparse function handles the
+    querystring separately.  Unfortunately, question marks can also appear
+    _inside_ the actual URL for some schemas like S3.
+
+    Replaces question marks with newlines prior to splitting.  This is safe because:
+
+    1. The standard library's urlsplit completely ignores newlines
+    2. Raw newlines will never occur in innocuous URLs.  They are always URL-encoded.
+
+    See Also
+    --------
+    https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
+    https://github.com/RaRe-Technologies/smart_open/issues/285
+    """
+    if '?' not in url:
+        return urlsplit(url, allow_fragments=False)
+
+    sr = urlsplit(url.replace('?', '\n'), allow_fragments=False)
+    SplitResult = collections.namedtuple('SplitResult', 'scheme netloc path query fragment')
+    return SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
+
+
 def _parse_uri(uri_as_string):
     """
     Parse the given URI from a string.
@@ -604,7 +630,8 @@ def _parse_uri(uri_as_string):
         if '://' not in uri_as_string:
             # no protocol given => assume a local file
             uri_as_string = 'file://' + uri_as_string
-    parsed_uri = urlsplit(uri_as_string, allow_fragments=False)
+
+    parsed_uri = _my_urlsplit(uri_as_string)
 
     if parsed_uri.scheme == "hdfs":
         return _parse_uri_hdfs(parsed_uri)
