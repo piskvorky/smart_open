@@ -48,7 +48,10 @@ setup(
     long_description=read('README.rst'),
 
     packages=find_packages(),
-    package_data={"smart_open.tests": ["test_data/*gz"]},
+    package_data={
+        "smart_open": ["VERSION"]},
+        "smart_open.tests": ["test_data/*gz"]
+    },
 
     author='Radim Rehurek',
     author_email='me@radimrehurek.com',
@@ -89,5 +92,4 @@ setup(
         'Topic :: System :: Distributed Computing',
         'Topic :: Database :: Front-Ends',
     ],
-    package_data={'smart_open': ['VERSION']},
 )
