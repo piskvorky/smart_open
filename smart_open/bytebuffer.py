@@ -11,8 +11,11 @@ filled, hence the chunk_size parameter instead of some fixed capacity.
 The bytes are stored in a bytestring, and previously-read bytes are freed when
 the buffer is next filled (by slicing the bytestring into a smaller copy)."""
 
+import io
+
+
 class ByteBuffer(object):
-    def __init__(self, chunk_size):
+    def __init__(self, chunk_size=io.DEFAULT_BUFFER_SIZE):
         """The chunk_size indicates the number of bytes that will be read from
         the supplied reader when filling the buffer. The buffer has no maximum
         size."""
