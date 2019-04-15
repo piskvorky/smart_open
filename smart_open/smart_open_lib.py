@@ -127,6 +127,7 @@ Uri = collections.namedtuple(
         'access_id',
         'access_secret',
         'user',
+        'password',
     )
 )
 """Represents all the options that we parse from user input.
@@ -498,6 +499,7 @@ def _open_binary_stream(uri, mode, transport_params):
                 host=parsed_uri.host,
                 user=parsed_uri.user,
                 port=parsed_uri.port,
+                password=parsed_uri.password,
             )
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
@@ -714,23 +716,30 @@ def _parse_uri_file(input_path):
 def _parse_uri_ssh(unt):
     """Parse a Uri from a urllib namedtuple."""
     if '@' in unt.netloc:
-        user, host_port = unt.netloc.split('@', 1)
+        user_pass, host_port = unt.netloc.rsplit('@', 1)
     else:
-        user, host_port = None, unt.netloc
+        user_pass, host_port = None, unt.netloc
 
     if ':' in host_port:
         host, port = host_port.split(':', 1)
     else:
         host, port = host_port, None
 
-    if not user:
+    if not user_pass:
         user = None
+        password = None
+    elif ':' in user_pass:
+        user, password = user_pass.split(':', 1)
+    else:
+        user = user_pass
+        password = None
+
     if not port:
         port = smart_open_ssh.DEFAULT_PORT
     else:
         port = int(port)
 
-    return Uri(scheme=unt.scheme, uri_path=unt.path, user=user, host=host, port=port)
+    return Uri(scheme=unt.scheme, uri_path=unt.path, user=user, host=host, port=port, password=password)
 
 
 def _need_to_buffer(file_obj, mode, ext):
