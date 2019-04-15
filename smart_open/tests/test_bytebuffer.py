@@ -57,6 +57,16 @@ class ByteBufferTest(unittest.TestCase):
         self.assertEqual(len(buf), CHUNK_SIZE)
         self.assertEqual(buf._bytes, contents)
 
+    def test_fill_from_list(self):
+        buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
+        contents = random_byte_string(CHUNK_SIZE)
+        contents_list = [contents[i:i+7] for i in range(0, CHUNK_SIZE, 7)]
+
+        bytes_filled = buf.fill(contents_list)
+        self.assertEqual(bytes_filled, CHUNK_SIZE)
+        self.assertEqual(len(buf), CHUNK_SIZE)
+        self.assertEqual(buf._bytes, contents)
+
     def test_fill_multiple(self):
         buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
         long_contents = random_byte_string(CHUNK_SIZE * 4)

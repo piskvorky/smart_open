@@ -79,28 +79,29 @@ class ByteBuffer(object):
         self._bytes = b''
         self._pos = 0
 
-    def fill(self, reader_or_iterable, size = -1):
-        """Fill the buffer with bytes from reader_or_iterable until one of these
+    def fill(self, source, size = -1):
+        """Fill the buffer with bytes from source until one of these
         conditions is met:
-            * size bytes have been read from reader_or_iterable (if size >= 0);
-            * chunk_size bytes have been read from reader_or_iterable;
-            * no more bytes can be read from reader_or_iterable;
+            * size bytes have been read from source (if size >= 0);
+            * chunk_size bytes have been read from source;
+            * no more bytes can be read from source;
         Returns the number of new bytes added to the buffer.
         Note: all previously-read bytes in the buffer are removed.
 
         Parameters
         ----------
-        reader_or_iterable: a file-like object, or iterable that contains bytes
+        source: a file-like object, or iterable/list that contains bytes
             The source of bytes to fill the buffer with. If this argument has
             the `read` attribute, it's assumed to be a file-like object and
             `read` is called to get the bytes; otherwise it's assumed to be an
-            iterable that contains bytes, and `next` is used to get them.
+            iterable or list that contains bytes, and a for loop is used to get
+            the bytes.
         size: int, optional
-            The number of bytes to try to read from reader_or_iterable. If not
-            supplied, negative, or larger than the buffer's chunk_size, then
-            chunk_size bytes are read. Note that if reader_or_iterable is an
-            iterable, then it's possible that more bytes will be read if the
-            iterable produces more than one byte on each `next` call.
+            The number of bytes to try to read from source. If not supplied,
+            negative, or larger than the buffer's chunk_size, then chunk_size
+            bytes are read. Note that if source is an iterable or list, then
+            it's possible that more than size bytes will be read if iterating
+            over source produces more than one byte at a time.
 
         Returns
         -------
@@ -113,14 +114,13 @@ class ByteBuffer(object):
             self._bytes = self._bytes[self._pos:]
             self._pos = 0
 
-        if hasattr(reader_or_iterable, 'read'):
-            new_bytes = reader_or_iterable.read(size)
+        if hasattr(source, 'read'):
+            new_bytes = source.read(size)
         else:
             new_bytes = b''
-            while len(new_bytes) < size:
-                try:
-                    new_bytes += next(reader_or_iterable)
-                except StopIteration:
+            for more_bytes in source:
+                new_bytes += more_bytes
+                if len(new_bytes) >= size:
                     break
 
         self._bytes += new_bytes
