@@ -39,7 +39,7 @@ SCHEMES = ("ssh", "scp", "sftp")
 DEFAULT_PORT = 22
 
 
-def _connect(hostname, username, port):
+def _connect(hostname, username, port, password):
     try:
         import paramiko
     except ImportError:
@@ -55,11 +55,11 @@ def _connect(hostname, username, port):
         ssh = _SSH[key] = paramiko.client.SSHClient()
         ssh.load_system_host_keys()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(hostname, port, username)
+        ssh.connect(hostname, port, username, password)
     return ssh
 
 
-def open(path, mode='r', host=None, user=None, port=DEFAULT_PORT):
+def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT):
     """Open a file on a remote machine over SSH.
 
     Expects authentication to be already set up via existing keys on the local machine.
@@ -75,6 +75,8 @@ def open(path, mode='r', host=None, user=None, port=DEFAULT_PORT):
     user: str, optional
         The username to use to login to the remote machine.
         If None, defaults to the name of the current user.
+    password: str, optional
+        The password to use to login to the remote machine.
     port: int, optional
         The port to connect to.
 
@@ -92,6 +94,6 @@ def open(path, mode='r', host=None, user=None, port=DEFAULT_PORT):
         raise ValueError('you must specify the host to connect to')
     if not user:
         user = getpass.getuser()
-    conn = _connect(host, user, port)
+    conn = _connect(host, user, port, password)
     sftp_client = conn.get_transport().open_sftp_client()
     return sftp_client.open(path, mode)
