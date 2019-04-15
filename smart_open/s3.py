@@ -473,8 +473,14 @@ multipart upload may fail")
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
-        if not isinstance(b, six.binary_type):
-            raise TypeError("input must be a binary string, got: %r", b)
+        import sys
+        if sys.version_info < (2, 7):
+            binary_types = (six.binary_type, bytearray)
+        else:
+            binary_types = (six.binary_type, bytearray, memoryview)
+
+        if not isinstance(b, binary_types):
+            raise TypeError("input must be a buffer, got: %r", type(b))
 
         self._buf.write(b)
         self._total_bytes += len(b)
