@@ -271,7 +271,7 @@ class BufferedInputBase(io.BufferedIOBase):
         while not (self._eof and len(self._buffer) == 0):
             #
             # In the worst case, we're reading the unread part of self._buffer
-            # twice here, once in the if condition, and once when calling index.
+            # twice here, once in the if condition and once when calling index.
             #
             # This is sub-optimal, but better than the alternative: wrapping
             # .index in a try..except, because that is slower.
@@ -293,7 +293,7 @@ class BufferedInputBase(io.BufferedIOBase):
     #
     # Internal methods.
     #
-    def _read_from_buffer(self, size = -1):
+    def _read_from_buffer(self, size=-1):
         """Remove at most size bytes from our buffer and return them."""
         # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
         size = size if size >= 0 else len(self._buffer)
@@ -302,13 +302,14 @@ class BufferedInputBase(io.BufferedIOBase):
         # logger.debug('part: %r', part)
         return part
 
-    def _fill_buffer(self, size = -1):
+    def _fill_buffer(self, size=-1):
         size = size if size >= 0 else self._buffer._chunk_size
         while len(self._buffer) < size and not self._eof:
             bytes_read = self._buffer.fill(self._raw_reader)
             if bytes_read == 0:
                 logger.debug('reached EOF while filling buffer')
                 self._eof = True
+
 
 class SeekableBufferedInputBase(BufferedInputBase):
     """Reads bytes from S3.

@@ -36,7 +36,7 @@ class ByteBuffer(object):
         """Return the number of unread bytes in the buffer as an int"""
         return len(self._bytes) - self._pos
 
-    def read(self, size = -1):
+    def read(self, size=-1):
         """Read bytes from the buffer and advance the read position. Returns
         the bytes in a bytestring.
 
@@ -54,7 +54,7 @@ class ByteBuffer(object):
         self._pos += len(part)
         return part
 
-    def peek(self, size = -1):
+    def peek(self, size=-1):
         """Get bytes from the buffer without advancing the read position.
         Returns the bytes in a bytestring.
 
@@ -71,7 +71,7 @@ class ByteBuffer(object):
         if size < 0 or size > len(self):
             size = len(self)
 
-        part = self._bytes[self._pos : self._pos + size]
+        part = self._bytes[self._pos:self._pos+size]
         return part
 
     def empty(self):
@@ -79,7 +79,7 @@ class ByteBuffer(object):
         self._bytes = b''
         self._pos = 0
 
-    def fill(self, source, size = -1):
+    def fill(self, source, size=-1):
         """Fill the buffer with bytes from source until one of these
         conditions is met:
             * size bytes have been read from source (if size >= 0);

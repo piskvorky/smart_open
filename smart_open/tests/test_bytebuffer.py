@@ -10,7 +10,7 @@ import smart_open.bytebuffer
 CHUNK_SIZE = 1024
 
 
-def random_byte_string(length = CHUNK_SIZE):
+def random_byte_string(length=CHUNK_SIZE):
     rand_bytes = [six.int2byte(random.randint(0, 255)) for _ in range(length)]
     return b''.join(rand_bytes)
 
@@ -85,12 +85,12 @@ class ByteBufferTest(unittest.TestCase):
         content_reader = six.BytesIO(contents)
         fill_size = int(CHUNK_SIZE / 2)
 
-        bytes_filled = buf.fill(content_reader, size = fill_size)
+        bytes_filled = buf.fill(content_reader, size=fill_size)
 
         self.assertEqual(bytes_filled, fill_size)
         self.assertEqual(len(buf), fill_size)
 
-        second_bytes_filled = buf.fill(content_reader, size = CHUNK_SIZE + 1)
+        second_bytes_filled = buf.fill(content_reader, size=CHUNK_SIZE+1)
         self.assertEqual(second_bytes_filled, CHUNK_SIZE)
         self.assertEqual(len(buf), fill_size + CHUNK_SIZE)
 
