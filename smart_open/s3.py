@@ -5,6 +5,7 @@ import io
 import contextlib
 import functools
 import logging
+import warnings
 
 import boto3
 import botocore.client
@@ -20,7 +21,7 @@ try:
     import multiprocessing.pool
     _MULTIPROCESSING = True
 except ImportError:
-    logger.warning("multiprocessing could not be imported and won't be used")
+    warnings.warn("multiprocessing could not be imported and won't be used")
 
 
 DEFAULT_MIN_PART_SIZE = 50 * 1024**2

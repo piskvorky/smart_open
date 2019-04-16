@@ -104,6 +104,16 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.host, "hostname")
         self.assertEqual(parsed_uri.port, 1234)
 
+    def test_s3_handles_fragments(self):
+        uri_str = 's3://bucket-name/folder/picture #1.jpg'
+        parsed_uri = smart_open_lib._parse_uri(uri_str)
+        self.assertEqual(parsed_uri.key_id, "folder/picture #1.jpg")
+
+    def test_s3_handles_querystring(self):
+        uri_str = 's3://bucket-name/folder/picture1.jpg?bar'
+        parsed_uri = smart_open_lib._parse_uri(uri_str)
+        self.assertEqual(parsed_uri.key_id, "folder/picture1.jpg?bar")
+
     def test_s3_invalid_url_atmark_in_bucket_name(self):
         self.assertRaises(ValueError, smart_open_lib._parse_uri, "s3://access_id:access_secret@my@bucket@port/mykey")
 

@@ -447,6 +447,25 @@ class IterBucketTest(unittest.TestCase):
 
 
 @maybe_mock_s3
+class IterBucketSingleProcessTest(unittest.TestCase):
+    def setUp(self):
+        self.old_flag = smart_open.s3._MULTIPROCESSING
+        smart_open.s3._MULTIPROCESSING = False
+
+    def tearDown(self):
+        smart_open.s3._MULTIPROCESSING = self.old_flag
+
+    def test(self):
+        num_keys = 101
+        populate_bucket(num_keys=num_keys)
+        keys = list(smart_open.s3.iter_bucket(BUCKET_NAME))
+        self.assertEqual(len(keys), num_keys)
+
+        expected = [('key_%d' % x, b'%d' % x) for x in range(num_keys)]
+        self.assertEqual(sorted(keys), sorted(expected))
+
+
+@maybe_mock_s3
 class DownloadKeyTest(unittest.TestCase):
 
     def test_happy(self):
