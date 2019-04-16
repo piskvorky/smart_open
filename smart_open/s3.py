@@ -10,6 +10,7 @@ import warnings
 import boto3
 import botocore.client
 import six
+import sys
 
 import smart_open.bytebuffer
 
@@ -34,6 +35,11 @@ READ_BINARY = 'rb'
 WRITE_BINARY = 'wb'
 MODES = (READ_BINARY, WRITE_BINARY)
 """Allowed I/O modes for working with S3."""
+
+_BINARY_TYPES = (six.binary_type, bytearray)
+"""Allowed binary buffer types for writing to the underlying S3 stream"""
+if sys.version_info >= (2, 7):
+    _BINARY_TYPES = (six.binary_type, bytearray, memoryview)
 
 BINARY_NEWLINE = b'\n'
 
@@ -473,14 +479,10 @@ multipart upload may fail")
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
-        import sys
-        if sys.version_info < (2, 7):
-            binary_types = (six.binary_type, bytearray)
-        else:
-            binary_types = (six.binary_type, bytearray, memoryview)
 
-        if not isinstance(b, binary_types):
-            raise TypeError("input must be one of %r, got: %r" % (binary_types, type(b))
+        if not isinstance(b, _BINARY_TYPES):
+            raise TypeError(
+                "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b)))
 
         self._buf.write(b)
         self._total_bytes += len(b)
