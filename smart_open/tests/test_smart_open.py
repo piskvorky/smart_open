@@ -222,7 +222,8 @@ class SmartOpenHttpTest(unittest.TestCase):
     @mock.patch('smart_open.ssh.open')
     def test_read_ssh(self, mock_open):
         """Is SSH line iterator called correctly?"""
-        obj = smart_open.smart_open("ssh://ubuntu:pass@ip_address:1022/some/path/lines.txt")
+        obj = smart_open.smart_open("ssh://ubuntu:pass@ip_address:1022/some/path/lines.txt",
+                                    hello='world')
         obj.__iter__()
         mock_open.assert_called_with(
             '/some/path/lines.txt',
@@ -230,7 +231,8 @@ class SmartOpenHttpTest(unittest.TestCase):
             host='ip_address',
             user='ubuntu',
             password='pass',
-            port=1022
+            port=1022,
+            transport_params={'hello': 'world'}
         )
 
     @responses.activate
@@ -1188,7 +1190,7 @@ class S3OpenTest(unittest.TestCase):
             self.assertEqual(fin.read().decode("utf-8"), text)
 
     @mock_s3
-    @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
+    @mock.patch('smart_open.helpers.inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_write_mode(self):
         """Should always open in binary mode when writing through a codec."""
         s3 = boto3.resource('s3')
@@ -1200,7 +1202,7 @@ class S3OpenTest(unittest.TestCase):
             mock_open.assert_called_with('bucket', 'key.gz', 'wb')
 
     @mock_s3
-    @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
+    @mock.patch('smart_open.helpers.inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_read_mode(self):
         """Should always open in binary mode when reading through a codec."""
         s3 = boto3.resource('s3')

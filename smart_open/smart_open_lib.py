@@ -19,7 +19,6 @@ The main functions are:
 import codecs
 import collections
 import logging
-import inspect
 import os
 import os.path as P
 import importlib
@@ -28,6 +27,8 @@ import warnings
 
 # Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
 # available. The builtin ``pathlib`` will be imported with higher precedence.
+from smart_open.helpers import inspect_kwargs, check_kwargs
+
 for pathlib_module in ('pathlib', 'pathlib2'):
     try:
         pathlib = importlib.import_module(pathlib_module)
@@ -38,7 +39,7 @@ for pathlib_module in ('pathlib', 'pathlib2'):
 
 import boto
 import boto3
-from boto.compat import BytesIO, urlsplit, six
+from boto.compat import urlsplit, six
 import six
 from six.moves.urllib import parse as urlparse
 import sys
@@ -142,56 +143,6 @@ bucket_id is only for S3.
 # https://stackoverflow.com/questions/11351032/namedtuple-and-default-values-for-optional-keyword-arguments
 #
 Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
-
-
-def _inspect_kwargs(kallable):
-    #
-    # inspect.getargspec got deprecated in Py3.4, and calling it spews
-    # deprecation warnings that we'd prefer to avoid.  Unfortunately, older
-    # versions of Python (<3.3) did not have inspect.signature, so we need to
-    # handle them the old-fashioned getargspec way.
-    #
-    try:
-        signature = inspect.signature(kallable)
-    except AttributeError:
-        args, varargs, keywords, defaults = inspect.getargspec(kallable)
-        if not defaults:
-            return {}
-        supported_keywords = args[-len(defaults):]
-        return dict(zip(supported_keywords, defaults))
-    else:
-        return {
-            name: param.default
-            for name, param in signature.parameters.items()
-            if param.default != inspect.Parameter.empty
-        }
-
-
-def _check_kwargs(kallable, kwargs):
-    """Check which keyword arguments the callable supports.
-
-    Parameters
-    ----------
-    kallable: callable
-        A function or method to test
-    kwargs: dict
-        The keyword arguments to check.  If the callable doesn't support any
-        of these, a warning message will get printed.
-
-    Returns
-    -------
-    dict
-        A dictionary of argument names and values supported by the callable.
-    """
-    supported_keywords = sorted(_inspect_kwargs(kallable))
-    unsupported_keywords = [k for k in sorted(kwargs) if k not in supported_keywords]
-    supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
-
-    if unsupported_keywords:
-        logger.warn('ignoring unsupported keyword arguments: %r', unsupported_keywords)
-
-    return supported_kwargs
-
 
 _builtin_open = open
 
@@ -384,7 +335,7 @@ def smart_open(uri, mode="rb", **kw):
     #
     ignore_extension = kw.pop('ignore_extension', False)
 
-    expected_kwargs = _inspect_kwargs(open)
+    expected_kwargs = inspect_kwargs(open)
     scrubbed_kwargs = {}
     transport_params = {}
     for key, value in kw.items():
@@ -500,15 +451,16 @@ def _open_binary_stream(uri, mode, transport_params):
                 user=parsed_uri.user,
                 port=parsed_uri.port,
                 password=parsed_uri.password,
+                transport_params=transport_params
             )
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
             return _s3_open_uri(parsed_uri, mode, transport_params), filename
         elif parsed_uri.scheme == "hdfs":
-            _check_kwargs(smart_open_hdfs.open, transport_params)
+            check_kwargs(smart_open_hdfs.open, transport_params, logger)
             return smart_open_hdfs.open(parsed_uri.uri_path, mode), filename
         elif parsed_uri.scheme == "webhdfs":
-            kw = _check_kwargs(smart_open_webhdfs.open, transport_params)
+            kw = check_kwargs(smart_open_webhdfs.open, transport_params, logger)
             return smart_open_webhdfs.open(parsed_uri.uri_path, mode, **kw), filename
         elif parsed_uri.scheme.startswith('http'):
             #
@@ -516,7 +468,7 @@ def _open_binary_stream(uri, mode, transport_params):
             # with our compressed/uncompressed estimation, so we strip them.
             #
             filename = P.basename(urlparse.urlparse(uri).path)
-            kw = _check_kwargs(smart_open_http.open, transport_params)
+            kw = check_kwargs(smart_open_http.open, transport_params, logger)
             return smart_open_http.open(uri, mode, **kw), filename
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
@@ -561,7 +513,7 @@ def _s3_open_uri(parsed_uri, mode, transport_params):
             aws_secret_access_key=parsed_uri.access_secret,
         )
 
-    kwargs = _check_kwargs(smart_open_s3.open, transport_params)
+    kwargs = check_kwargs(smart_open_s3.open, transport_params, logger)
     return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
 
