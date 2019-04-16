@@ -480,7 +480,7 @@ multipart upload may fail")
             binary_types = (six.binary_type, bytearray, memoryview)
 
         if not isinstance(b, binary_types):
-            raise TypeError("input must be a buffer, got: %r", type(b))
+            raise TypeError("input must be one of %r, got: %r" % (binary_types, type(b))
 
         self._buf.write(b)
         self._total_bytes += len(b)
