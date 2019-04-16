@@ -920,6 +920,7 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.smart_open(key, "rb") as fin:
             self.assertEqual(fin.read().decode("utf-8"), text)
 
+    @unittest.skipIf(six.PY2, 'this test does not work with Py2')
     @mock_s3
     def test_gzip_write_mode(self):
         """Should always open in binary mode when writing through a codec."""
@@ -931,6 +932,7 @@ class S3OpenTest(unittest.TestCase):
             smart_open.smart_open("s3://bucket/key.gz", "wb")
             mock_open.assert_called_with('bucket', 'key.gz', 'wb')
 
+    @unittest.skipIf(six.PY2, 'this test does not work with Py2')
     @mock_s3
     def test_gzip_read_mode(self):
         """Should always open in binary mode when reading through a codec."""
