@@ -390,7 +390,6 @@ class BufferedOutputBase(io.BufferedIOBase):
             bucket,
             key,
             min_part_size=DEFAULT_MIN_PART_SIZE,
-            s3_upload=None,
             session=None,
             resource_kwargs=dict(),
             multipart_upload_kwargs=dict(),

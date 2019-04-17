@@ -386,6 +386,39 @@ def smart_open(uri, mode="rb", **kw):
     expected_kwargs = _inspect_kwargs(open)
     scrubbed_kwargs = {}
     transport_params = {}
+
+    #
+    # Handle renamed keyword arguments.  This is required to maintain backward
+    # compatibility.  See test_smart_open_old.py for tests.
+    #
+    if 'host' in kw or 's3_upload' in kw:
+        transport_params['multipart_upload_kwargs'] = {}
+        transport_params['resource_kwargs'] = {}
+
+    if 'host' in kw:
+        url = kw.pop('host')
+        if not url.startswith('http'):
+            url = 'http://' + url
+        transport_params['multipart_upload_kwargs'].update(endpoint_url=url)
+        transport_params['resource_kwargs'].update(endpoint_url=url)
+
+    if 's3_upload' in kw:
+        transport_params['multipart_upload_kwargs'].update(**kw.pop('s3_upload'))
+
+    #
+    # Providing the entire Session object as opposed to just the profile name
+    # is more flexible and powerful, and thus preferable in the case of
+    # conflict.
+    #
+    if 'profile_name' in kw and 's3_session' in kw:
+        logger.error('profile_name and s3_session are mutually exclusive, ignoring the former')
+
+    if 'profile_name' in kw:
+        transport_params['session'] = boto3.Session(profile_name=kw.pop('profile_name'))
+
+    if 's3_session' in kw:
+        transport_params['session'] = kw.pop('s3_session')
+
     for key, value in kw.items():
         if key in expected_kwargs:
             scrubbed_kwargs[key] = value
