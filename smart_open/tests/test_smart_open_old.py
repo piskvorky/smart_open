@@ -471,13 +471,6 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             ContentType='application/json'
         )
 
-    @mock.patch('boto3.Session')
-    def test_s3_upload_is_none(self, mock_session):
-        smart_open.smart_open("s3://bucket/key", 'wb', s3_upload=None)
-        s3_resource = mock_session.return_value.resource.return_value
-        s3_object = s3_resource.Object.return_value
-        s3_object.initiate_multipart_upload.assert_called()
-
     def test_session_read_mode(self):
         """
         Read stream should use a custom boto3.Session
