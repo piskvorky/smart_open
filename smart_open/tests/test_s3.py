@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
-import logging
 import gzip
 import io
+import logging
 import os
-import uuid
 import unittest
+import uuid
+from io import TextIOWrapper
 
+import boto.s3.bucket
 import boto3
 import botocore.client
-import boto.s3.bucket
 import mock
 import moto
 
 import smart_open
 import smart_open.s3
-
 
 BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)  # generate random bucket (avoid race-condition in CI)
 KEY_NAME = 'test-key'
@@ -64,7 +64,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
     def setUp(self):
         # lower the multipart upload size, to speed up these tests
         self.old_min_part_size = smart_open.s3.DEFAULT_MIN_PART_SIZE
-        smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024**2
+        smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024 ** 2
 
     def tearDown(self):
         smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
@@ -193,7 +193,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
         with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
             fin.readline()
-            self.assertEqual(fin.tell(), content.index(b'\n')+1)
+            self.assertEqual(fin.tell(), content.index(b'\n') + 1)
 
             fin.seek(0)
             actual = list(fin)
@@ -228,6 +228,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
     Test writing into s3 files.
 
     """
+
     def tearDown(self):
         s3 = boto3.resource('s3')
         cleanup_bucket(s3, delete_bucket=True)
@@ -317,6 +318,29 @@ class BufferedOutputBaseTest(unittest.TestCase):
         with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, WRITE_KEY_NAME) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
+
+        self.assertEqual(expected, actual)
+
+    def test_buffered_writer_wrapper_works(self):
+        """
+        Ensure that we can wrap a smart_open s3 stream in a subclass of
+        BufferedWriter. BufferedWriter passes a memoryview object to the
+        underlying stream in python >= 2.7
+        """
+
+        class BufferedWriterSubclass(io.BufferedWriter):
+            pass
+
+        create_bucket_and_key()
+        expected = u'не думай о секундах свысока'
+
+        with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+            with BufferedWriterSubclass(fout) as sub_out:
+                sub_out.write(expected.encode('utf-8'))
+
+        with smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)) as fin:
+            with TextIOWrapper(fin, encoding='utf-8') as text:
+                actual = text.read()
 
         self.assertEqual(expected, actual)
 
