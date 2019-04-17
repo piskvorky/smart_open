@@ -64,7 +64,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
     def setUp(self):
         # lower the multipart upload size, to speed up these tests
         self.old_min_part_size = smart_open.s3.DEFAULT_MIN_PART_SIZE
-        smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024 ** 2
+        smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024**2
 
     def tearDown(self):
         smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
@@ -193,7 +193,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
         with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
             fin.readline()
-            self.assertEqual(fin.tell(), content.index(b'\n') + 1)
+            self.assertEqual(fin.tell(), content.index(b'\n')+1)
 
             fin.seek(0)
             actual = list(fin)
