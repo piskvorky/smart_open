@@ -1,6 +1,19 @@
 # Unreleased
 
-- Removed dependency on lzma (PR [#262](https://github.com/RaRe-Technologies/smart_open/pull/282), [@tdhopper](https://github.com/tdhopper))
+# 1.8.2, 17 April 2019
+
+  - Removed dependency on lzma (PR [#262](https://github.com/RaRe-Technologies/smart_open/pull/282), [@tdhopper](https://github.com/tdhopper))
+  - backward compatibility fixes (PR [#294](https://github.com/RaRe-Technologies/smart_open/pull/294), [@mpenkov](https://github.com/mpenkov))
+  - Minor fixes (PR [#291](https://github.com/RaRe-Technologies/smart_open/pull/291), [@mpenkov](https://github.com/mpenkov))
+  - Fix #289: the smart_open package now correctly exposes a `__version__` attribute
+  - Fix #285: handle edge case with question marks in an S3 URL
+
+This release rolls back support for transparently decompressing .xz files,
+previously introduced in 1.8.1.  This is a useful feature, but it requires a
+tricky dependency.  It's still possible to handle .xz files with relatively
+little effort. Please see the
+[README.rst](https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst#supported-compression-formats)
+file for details.
 
 # 1.8.1, 6 April 2019
 
@@ -10,7 +23,7 @@
   - Added support for SSH/SCP/SFTP (PR [#58](https://github.com/RaRe-Technologies/smart_open/pull/58), [@val314159](https://github.com/val314159) & [@mpenkov](https://github.com/mpenkov))
   - Added new feature: compressor registry (PR [#266](https://github.com/RaRe-Technologies/smart_open/pull/266), [@mpenkov](https://github.com/mpenkov))
   - Implemented new `smart_open.open` function (PR [#268](https://github.com/RaRe-Technologies/smart_open/pull/268), [@mpenkov](https://github.com/mpenkov))
-  
+
 ## smart_open.open
 
 This new function replaces `smart_open.smart_open`, which is now deprecated.
