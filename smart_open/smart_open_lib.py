@@ -402,7 +402,7 @@ def smart_open(uri, mode="rb", **kw):
         transport_params['multipart_upload_kwargs'].update(endpoint_url=url)
         transport_params['resource_kwargs'].update(endpoint_url=url)
 
-    if 's3_upload' in kw:
+    if 's3_upload' in kw and kw['s3_upload']:
         transport_params['multipart_upload_kwargs'].update(**kw.pop('s3_upload'))
 
     #
