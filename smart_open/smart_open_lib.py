@@ -187,7 +187,7 @@ def _check_kwargs(kallable, kwargs):
     supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
 
     if unsupported_keywords:
-        logger.warn('ignoring unsupported keyword arguments: %r', unsupported_keywords)
+        logger.warning('ignoring unsupported keyword arguments: %r', unsupported_keywords)
 
     return supported_kwargs
 
@@ -402,7 +402,7 @@ def smart_open(uri, mode="rb", **kw):
         transport_params['multipart_upload_kwargs'].update(endpoint_url=url)
         transport_params['resource_kwargs'].update(endpoint_url=url)
 
-    if 's3_upload' in kw:
+    if 's3_upload' in kw and kw['s3_upload']:
         transport_params['multipart_upload_kwargs'].update(**kw.pop('s3_upload'))
 
     #
