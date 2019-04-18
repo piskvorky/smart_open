@@ -5,7 +5,6 @@ import logging
 import os
 import unittest
 import uuid
-from io import TextIOWrapper
 
 import boto.s3.bucket
 import boto3
@@ -323,23 +322,19 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_buffered_writer_wrapper_works(self):
         """
-        Ensure that we can wrap a smart_open s3 stream in a subclass of
-        BufferedWriter. BufferedWriter passes a memoryview object to the
-        underlying stream in python >= 2.7
+        Ensure that we can wrap a smart_open s3 stream in a BufferedWriter, which
+        passes a memoryview object to the underlying stream in python >= 2.7
         """
-
-        class BufferedWriterSubclass(io.BufferedWriter):
-            pass
 
         create_bucket_and_key()
         expected = u'не думай о секундах свысока'
 
         with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
-            with BufferedWriterSubclass(fout) as sub_out:
+            with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 
         with smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)) as fin:
-            with TextIOWrapper(fin, encoding='utf-8') as text:
+            with io.TextIOWrapper(fin, encoding='utf-8') as text:
                 actual = text.read()
 
         self.assertEqual(expected, actual)
