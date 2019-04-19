@@ -14,20 +14,20 @@ This will create a local release branch.
 Look around the branch and make sure everything is in order.
 Checklist:
 
-[ ] Does smart_open/VERSION contain the correct version number for the release?
-[ ] Does the CHANGELOG.md contain a section detailing the new release?
-[ ] Are there any PRs that should be in CHANGELOG.md, but currently aren't?
+- [ ] Does smart_open/VERSION contain the correct version number for the release?
+- [ ] Does the CHANGELOG.md contain a section detailing the new release?
+- [ ] Are there any PRs that should be in CHANGELOG.md, but currently aren't?
 
 If anything is out of order, make the appropriate changes and commit them to the release branch before proceeding.
 For example, you may use the summarize_pr.sh helper script to generate one-line summaries of PRs and copy-paste them into the CHANGELOG.md.
 
-*Once you're happy with the release branch*, run:
+**Once you're happy with the release branch**, run:
 
     bash merge.sh
 
 This will perform a merge and push your changes to github.com.
 
-This is the point of no return.  Run:
+**This is the point of no return**.  Run:
 
     bash push_pypi.sh
 
