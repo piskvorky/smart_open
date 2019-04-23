@@ -28,11 +28,6 @@ import warnings
 
 logger = logging.getLogger(__name__)
 
-try:
-    import paramiko
-except ImportError:
-    warnings.warn('paramiko missing, opening SSH/SCP/SFTP paths will be disabled.  `pip install paramiko` to suppress')
-
 #
 # Global storage for SSH connections.
 #
@@ -45,6 +40,14 @@ DEFAULT_PORT = 22
 
 
 def _connect(hostname, username, port):
+    try:
+        import paramiko
+    except ImportError:
+        warnings.warn(
+            'paramiko missing, opening SSH/SCP/SFTP paths will be disabled. '
+            '`pip install paramiko` to suppress'
+        )
+
     key = (hostname, username)
     ssh = _SSH.get(key)
     if ssh is None:
