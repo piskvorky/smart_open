@@ -205,7 +205,7 @@ def open(
         closefd=True,
         opener=None,
         ignore_ext=False,
-        transport_params=dict(),
+        transport_params=None,
         ):
     r"""Open the URI object, returning a file-like object.
 
@@ -291,6 +291,9 @@ def open(
 
     if not isinstance(mode, six.string_types):
         raise TypeError('mode should be a string')
+
+    if transport_params is None:
+        transport_params = {}
 
     fobj = _shortcut_open(
         uri,
