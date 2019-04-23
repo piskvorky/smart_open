@@ -1323,7 +1323,6 @@ class S3OpenTest(unittest.TestCase):
 
         expected = {'endpoint_url': 'https://play.min.io:9000'}
         self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
-        self.assertEqual(mock_open.call_args[1]['multipart_upload_kwargs'], expected)
 
 
 def function(a, b, c, foo='bar', baz='boz'):
