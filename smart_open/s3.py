@@ -170,7 +170,7 @@ class SeekableRawReader(object):
         #
         try:
             self._body.close()
-        except AttributeError as e:
+        except AttributeError:
             pass
 
         if position == self._content_length == 0 or position == self._content_length:
