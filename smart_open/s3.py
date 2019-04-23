@@ -93,7 +93,7 @@ def open(
     session: object, optional
         The S3 session to use when working with boto3.
     resource_kwargs: dict, optional
-        Keyword arguments to use when creating a new resource.  For writing only.
+        Keyword arguments to use when accessing the S3 resource for reading or writing.
     multipart_upload_kwargs: dict, optional
         Additional parameters to pass to boto3's initiate_multipart_upload function.
         For writing only.

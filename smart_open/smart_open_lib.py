@@ -595,8 +595,49 @@ def _s3_open_uri(parsed_uri, mode, transport_params):
             aws_secret_access_key=parsed_uri.access_secret,
         )
 
+    #
+    # There are two explicit ways the user can provide the endpoint URI:
+    #
+    # 1. Via the URL.  The protocol is implicit, and we assume HTTPS in this case.
+    # 2. Via the resource_kwargs and multipart_upload_kwargs endpoint_url parameter.
+    #
+    # Again, these are not mutually exclusive: the user can specify both.  We
+    # have to pick one to proceed, however, and we go with 2.
+    #
+    if parsed_uri.host:
+        endpoint_url = 'https://%s:%d' % (parsed_uri.host, parsed_uri.port)
+        _override_endpoint_url(transport_params, endpoint_url)
+
     kwargs = _check_kwargs(smart_open_s3.open, transport_params)
     return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
+
+
+def _override_endpoint_url(tp, url):
+    try:
+        resource_kwargs = tp['resource_kwargs']
+    except KeyError:
+        resource_kwargs = tp['resource_kwargs'] = {}
+
+    if resource_kwargs.get('endpoint_url'):
+        logger.warning(
+            'ignoring endpoint_url parsed from URL because it conflicts '
+            'with transport_params.resource_kwargs.endpoint_url. '
+        )
+    else:
+        resource_kwargs.update(endpoint_url=url)
+
+    try:
+        mu_kwargs = tp['multipart_upload_kwargs']
+    except KeyError:
+        mu_kwargs = tp['multipart_upload_kwargs'] = {}
+
+    if mu_kwargs.get('endpoint_url'):
+        logger.warning(
+            'ignoring endpoint_url parsed from URL because it conflicts '
+            'with transport_params.multipart_upload_kwargs.endpoint_url. '
+        )
+    else:
+        mu_kwargs.update(endpoint_url=url)
 
 
 def _my_urlsplit(url):

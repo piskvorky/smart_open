@@ -1308,6 +1308,23 @@ class S3OpenTest(unittest.TestCase):
         self.assertIsNone(mock_open.call_args_list[1][1]['session'])
         self.assertIsNotNone(mock_open.call_args_list[0][1]['session'])
 
+    @mock.patch('smart_open.s3.SeekableBufferedInputBase')
+    def test_respects_endpoint_url_read(self, mock_open):
+        url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
+        smart_open.open(url)
+
+        expected = {'endpoint_url': 'https://play.min.io:9000'}
+        self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
+
+    @mock.patch('smart_open.s3.BufferedOutputBase')
+    def test_respects_endpoint_url_write(self, mock_open):
+        url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
+        smart_open.open(url, 'wb')
+
+        expected = {'endpoint_url': 'https://play.min.io:9000'}
+        self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
+        self.assertEqual(mock_open.call_args[1]['multipart_upload_kwargs'], expected)
+
 
 def function(a, b, c, foo='bar', baz='boz'):
     pass
