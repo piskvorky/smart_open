@@ -1,20 +1,19 @@
 # -*- coding: utf-8 -*-
-import logging
 import gzip
 import io
+import logging
 import os
-import uuid
 import unittest
+import uuid
 
+import boto.s3.bucket
 import boto3
 import botocore.client
-import boto.s3.bucket
 import mock
 import moto
 
 import smart_open
 import smart_open.s3
-
 
 BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)  # generate random bucket (avoid race-condition in CI)
 KEY_NAME = 'test-key'
@@ -228,6 +227,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
     Test writing into s3 files.
 
     """
+
     def tearDown(self):
         s3 = boto3.resource('s3')
         cleanup_bucket(s3, delete_bucket=True)
@@ -317,6 +317,25 @@ class BufferedOutputBaseTest(unittest.TestCase):
         with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, WRITE_KEY_NAME) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
+
+        self.assertEqual(expected, actual)
+
+    def test_buffered_writer_wrapper_works(self):
+        """
+        Ensure that we can wrap a smart_open s3 stream in a BufferedWriter, which
+        passes a memoryview object to the underlying stream in python >= 2.7
+        """
+
+        create_bucket_and_key()
+        expected = u'не думай о секундах свысока'
+
+        with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+            with io.BufferedWriter(fout) as sub_out:
+                sub_out.write(expected.encode('utf-8'))
+
+        with smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)) as fin:
+            with io.TextIOWrapper(fin, encoding='utf-8') as text:
+                actual = text.read()
 
         self.assertEqual(expected, actual)
 
@@ -444,6 +463,25 @@ class IterBucketTest(unittest.TestCase):
             for k, c in smart_open.s3.iter_bucket(mybucket):
                 result[k] = c
             self.assertEqual(result, expected)
+
+
+@maybe_mock_s3
+class IterBucketSingleProcessTest(unittest.TestCase):
+    def setUp(self):
+        self.old_flag = smart_open.s3._MULTIPROCESSING
+        smart_open.s3._MULTIPROCESSING = False
+
+    def tearDown(self):
+        smart_open.s3._MULTIPROCESSING = self.old_flag
+
+    def test(self):
+        num_keys = 101
+        populate_bucket(num_keys=num_keys)
+        keys = list(smart_open.s3.iter_bucket(BUCKET_NAME))
+        self.assertEqual(len(keys), num_keys)
+
+        expected = [('key_%d' % x, b'%d' % x) for x in range(num_keys)]
+        self.assertEqual(sorted(keys), sorted(expected))
 
 
 @maybe_mock_s3

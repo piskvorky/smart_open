@@ -24,6 +24,7 @@ Similarly, from a command line::
 
 import getpass
 import logging
+import warnings
 from io import StringIO
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 try:
     import paramiko
 except ImportError:
-    logger.warning('paramiko missing, opening SSH/SCP/SFTP paths will be disabled.  `pip install paramiko` to suppress')
+    warnings.warn('paramiko missing, opening SSH/SCP/SFTP paths will be disabled.  `pip install paramiko` to suppress')
 
 #
 # Global storage for SSH connections.

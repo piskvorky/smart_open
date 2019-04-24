@@ -5,10 +5,14 @@ import io
 import contextlib
 import functools
 import logging
+import warnings
 
 import boto3
 import botocore.client
 import six
+import sys
+
+import smart_open.bytebuffer
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +24,7 @@ try:
     import multiprocessing.pool
     _MULTIPROCESSING = True
 except ImportError:
-    logger.warning("multiprocessing could not be imported and won't be used")
+    warnings.warn("multiprocessing could not be imported and won't be used")
 
 
 DEFAULT_MIN_PART_SIZE = 50 * 1024**2
@@ -31,6 +35,11 @@ READ_BINARY = 'rb'
 WRITE_BINARY = 'wb'
 MODES = (READ_BINARY, WRITE_BINARY)
 """Allowed I/O modes for working with S3."""
+
+_BINARY_TYPES = (six.binary_type, bytearray)
+"""Allowed binary buffer types for writing to the underlying S3 stream"""
+if sys.version_info >= (2, 7):
+    _BINARY_TYPES = (six.binary_type, bytearray, memoryview)
 
 BINARY_NEWLINE = b'\n'
 
@@ -189,9 +198,8 @@ class BufferedInputBase(io.BufferedIOBase):
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
         self._current_pos = 0
-        self._buffer = b''
+        self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
-        self._buffer_size = buffer_size
         self._line_terminator = line_terminator
 
         #
@@ -226,10 +234,7 @@ class BufferedInputBase(io.BufferedIOBase):
         if size == 0:
             return b''
         elif size < 0:
-            if len(self._buffer):
-                from_buf = self._read_from_buffer(len(self._buffer))
-            else:
-                from_buf = b''
+            from_buf = self._read_from_buffer()
             self._current_pos = self._content_length
             return from_buf + self._raw_reader.read()
 
@@ -243,7 +248,7 @@ class BufferedInputBase(io.BufferedIOBase):
         # If the stream is finished, return what we have.
         #
         if self._eof:
-            return self._read_from_buffer(len(self._buffer))
+            return self._read_from_buffer()
 
         #
         # Fill our buffer to the required size.
@@ -272,19 +277,20 @@ class BufferedInputBase(io.BufferedIOBase):
         the_line = io.BytesIO()
         while not (self._eof and len(self._buffer) == 0):
             #
-            # In the worst case, we're reading self._buffer twice here, once in
-            # the if condition, and once when calling index.
+            # In the worst case, we're reading the unread part of self._buffer
+            # twice here, once in the if condition and once when calling index.
             #
             # This is sub-optimal, but better than the alternative: wrapping
             # .index in a try..except, because that is slower.
             #
-            if self._line_terminator in self._buffer:
-                next_newline = self._buffer.index(self._line_terminator)
+            remaining_buffer = self._buffer.peek()
+            if self._line_terminator in remaining_buffer:
+                next_newline = remaining_buffer.index(self._line_terminator)
                 the_line.write(self._read_from_buffer(next_newline + 1))
                 break
             else:
-                the_line.write(self._read_from_buffer(len(self._buffer)))
-                self._fill_buffer(self._buffer_size)
+                the_line.write(self._read_from_buffer())
+                self._fill_buffer()
         return the_line.getvalue()
 
     def terminate(self):
@@ -294,22 +300,20 @@ class BufferedInputBase(io.BufferedIOBase):
     #
     # Internal methods.
     #
-    def _read_from_buffer(self, size):
+    def _read_from_buffer(self, size=-1):
         """Remove at most size bytes from our buffer and return them."""
         # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
-        assert size >= 0
-        part = self._buffer[:size]
-        self._buffer = self._buffer[size:]
+        size = size if size >= 0 else len(self._buffer)
+        part = self._buffer.read(size)
         self._current_pos += len(part)
         # logger.debug('part: %r', part)
         return part
 
-    def _fill_buffer(self, size):
+    def _fill_buffer(self, size=-1):
+        size = size if size >= 0 else self._buffer._chunk_size
         while len(self._buffer) < size and not self._eof:
-            raw = self._raw_reader.read(size=self._buffer_size)
-            if len(raw):
-                self._buffer += raw
-            else:
+            bytes_read = self._buffer.fill(self._raw_reader)
+            if bytes_read == 0:
                 logger.debug('reached EOF while filling buffer')
                 self._eof = True
 
@@ -328,9 +332,8 @@ class SeekableBufferedInputBase(BufferedInputBase):
         self._raw_reader = SeekableRawReader(self._object)
         self._content_length = self._object.content_length
         self._current_pos = 0
-        self._buffer = b''
+        self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
-        self._buffer_size = buffer_size
         self._line_terminator = line_terminator
 
         #
@@ -366,7 +369,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         self._raw_reader.seek(new_position)
         logger.debug('new_position: %r', self._current_pos)
 
-        self._buffer = b""
+        self._buffer.empty()
         self._eof = self._current_pos == self._content_length
         return self._current_pos
 
@@ -389,7 +392,6 @@ class BufferedOutputBase(io.BufferedIOBase):
             bucket,
             key,
             min_part_size=DEFAULT_MIN_PART_SIZE,
-            s3_upload=None,
             session=None,
             resource_kwargs=dict(),
             multipart_upload_kwargs=dict(),
@@ -477,8 +479,10 @@ multipart upload may fail")
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
-        if not isinstance(b, six.binary_type):
-            raise TypeError("input must be a binary string, got: %r", b)
+
+        if not isinstance(b, _BINARY_TYPES):
+            raise TypeError(
+                "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b)))
 
         self._buf.write(b)
         self._total_bytes += len(b)

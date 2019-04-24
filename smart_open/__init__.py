@@ -23,10 +23,20 @@ The main functions are:
 """
 
 import logging
+import os.path
 
 from .smart_open_lib import open, smart_open, register_compressor
 from .s3 import iter_bucket as s3_iter_bucket
 __all__ = ['open', 'smart_open', 's3_iter_bucket', 'register_compressor']
+
+
+def _get_version():
+    curr_dir = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(curr_dir, 'VERSION')) as fin:
+        return fin.read().strip()
+
+
+__version__ = _get_version()
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

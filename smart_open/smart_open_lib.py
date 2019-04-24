@@ -107,24 +107,11 @@ def _handle_gzip(file_obj, mode):
     return gzip.GzipFile(fileobj=file_obj, mode=mode)
 
 
-def _handle_xz(file_obj, mode):
-    #
-    # Delay import of compressor library until we actually need it
-    #
-    try:
-        import lzma
-    except ImportError:
-        # py<3.3
-        from backports import lzma
-    return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
-
-
 #
 # NB. avoid using lambda here to make stack traces more readable.
 #
 register_compressor('.bz2', _handle_bz2)
 register_compressor('.gz', _handle_gzip)
-register_compressor('.xz', _handle_xz)
 
 
 Uri = collections.namedtuple(
@@ -157,11 +144,26 @@ Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
 
 
 def _inspect_kwargs(kallable):
-    args, varargs, keywords, defaults = inspect.getargspec(kallable)
-    if not defaults:
-        return {}
-    supported_keywords = args[-len(defaults):]
-    return dict(zip(supported_keywords, defaults))
+    #
+    # inspect.getargspec got deprecated in Py3.4, and calling it spews
+    # deprecation warnings that we'd prefer to avoid.  Unfortunately, older
+    # versions of Python (<3.3) did not have inspect.signature, so we need to
+    # handle them the old-fashioned getargspec way.
+    #
+    try:
+        signature = inspect.signature(kallable)
+    except AttributeError:
+        args, varargs, keywords, defaults = inspect.getargspec(kallable)
+        if not defaults:
+            return {}
+        supported_keywords = args[-len(defaults):]
+        return dict(zip(supported_keywords, defaults))
+    else:
+        return {
+            name: param.default
+            for name, param in signature.parameters.items()
+            if param.default != inspect.Parameter.empty
+        }
 
 
 def _check_kwargs(kallable, kwargs):
@@ -185,7 +187,7 @@ def _check_kwargs(kallable, kwargs):
     supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
 
     if unsupported_keywords:
-        logger.warn('ignoring unsupported keyword arguments: %r', unsupported_keywords)
+        logger.warning('ignoring unsupported keyword arguments: %r', unsupported_keywords)
 
     return supported_kwargs
 
@@ -224,7 +226,6 @@ def open(
 
     - ``.gz``
     - ``.bz2``
-    - ``.xz``
 
     The function depends on the file extension to determine the appropriate codec.
 
@@ -385,6 +386,39 @@ def smart_open(uri, mode="rb", **kw):
     expected_kwargs = _inspect_kwargs(open)
     scrubbed_kwargs = {}
     transport_params = {}
+
+    #
+    # Handle renamed keyword arguments.  This is required to maintain backward
+    # compatibility.  See test_smart_open_old.py for tests.
+    #
+    if 'host' in kw or 's3_upload' in kw:
+        transport_params['multipart_upload_kwargs'] = {}
+        transport_params['resource_kwargs'] = {}
+
+    if 'host' in kw:
+        url = kw.pop('host')
+        if not url.startswith('http'):
+            url = 'http://' + url
+        transport_params['multipart_upload_kwargs'].update(endpoint_url=url)
+        transport_params['resource_kwargs'].update(endpoint_url=url)
+
+    if 's3_upload' in kw and kw['s3_upload']:
+        transport_params['multipart_upload_kwargs'].update(**kw.pop('s3_upload'))
+
+    #
+    # Providing the entire Session object as opposed to just the profile name
+    # is more flexible and powerful, and thus preferable in the case of
+    # conflict.
+    #
+    if 'profile_name' in kw and 's3_session' in kw:
+        logger.error('profile_name and s3_session are mutually exclusive, ignoring the former')
+
+    if 'profile_name' in kw:
+        transport_params['session'] = boto3.Session(profile_name=kw.pop('profile_name'))
+
+    if 's3_session' in kw:
+        transport_params['session'] = kw.pop('s3_session')
+
     for key, value in kw.items():
         if key in expected_kwargs:
             scrubbed_kwargs[key] = value
@@ -563,6 +597,32 @@ def _s3_open_uri(parsed_uri, mode, transport_params):
     return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
 
+def _my_urlsplit(url):
+    """This is a hack to prevent the regular urlsplit from splitting around question marks.
+
+    A question mark (?) in a URL typically indicates the start of a
+    querystring, and the standard library's urlparse function handles the
+    querystring separately.  Unfortunately, question marks can also appear
+    _inside_ the actual URL for some schemas like S3.
+
+    Replaces question marks with newlines prior to splitting.  This is safe because:
+
+    1. The standard library's urlsplit completely ignores newlines
+    2. Raw newlines will never occur in innocuous URLs.  They are always URL-encoded.
+
+    See Also
+    --------
+    https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
+    https://github.com/RaRe-Technologies/smart_open/issues/285
+    """
+    if '?' not in url:
+        return urlsplit(url, allow_fragments=False)
+
+    sr = urlsplit(url.replace('?', '\n'), allow_fragments=False)
+    SplitResult = collections.namedtuple('SplitResult', 'scheme netloc path query fragment')
+    return SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
+
+
 def _parse_uri(uri_as_string):
     """
     Parse the given URI from a string.
@@ -597,7 +657,6 @@ def _parse_uri(uri_as_string):
       * file:///home/user/file.bz2
       * [ssh|scp|sftp]://username@host//path/file
       * [ssh|scp|sftp]://username@host/path/file
-      * file:///home/user/file.xz
 
     """
     if os.name == 'nt':
@@ -605,7 +664,8 @@ def _parse_uri(uri_as_string):
         if '://' not in uri_as_string:
             # no protocol given => assume a local file
             uri_as_string = 'file://' + uri_as_string
-    parsed_uri = urlsplit(uri_as_string, allow_fragments=False)
+
+    parsed_uri = _my_urlsplit(uri_as_string)
 
     if parsed_uri.scheme == "hdfs":
         return _parse_uri_hdfs(parsed_uri)
