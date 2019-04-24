@@ -68,7 +68,6 @@ setup(
 
     install_requires=[
         'boto >= 2.32',
-        'bz2file',
         'requests',
         'boto3',
     ],

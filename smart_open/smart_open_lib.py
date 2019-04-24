@@ -95,8 +95,21 @@ def register_compressor(ext, callback):
 
 
 def _handle_bz2(file_obj, mode):
+    #
+    # Under Py3, bz2 is part of the standard library, so the import is safe.
+    # Under Py2, we need to import bz2file, which is rather old and obsolete.
+    # We avoid forcing _everyone_ to install bz2file, because only Py2 people
+    # will need it, and furthermore, only if they work with bz2.
+    #
     if six.PY2:
-        from bz2file import BZ2File
+        try:
+            from bz2file import BZ2File
+        except ImportError:
+            logger.error(
+                'unable to transparently handle bz2 compression under Py2. '
+                'run `pip install bz2file` to suppress this error.'
+            )
+            return file_obj
     else:
         from bz2 import BZ2File
     return BZ2File(file_obj, mode)
