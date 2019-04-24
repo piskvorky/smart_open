@@ -414,7 +414,6 @@ def smart_open(uri, mode="rb", **kw):
         url = kw.pop('host')
         if not url.startswith('http'):
             url = 'http://' + url
-        transport_params['multipart_upload_kwargs'].update(endpoint_url=url)
         transport_params['resource_kwargs'].update(endpoint_url=url)
 
     if 's3_upload' in kw and kw['s3_upload']:
