@@ -80,11 +80,13 @@ def register_compressor(ext, callback):
     --------
 
     Instruct smart_open to use the identity function whenever opening a file
-    with a .foo extension:
+    with a .xz extension (see README.rst for the complete example showing I/O):
 
-    >>> def identity(file_obj, mode):
-    ...     return file_obj
-    >>> register_compressor('.foo', identity)
+    >>> def _handle_xz(file_obj, mode):
+    ...     import lzma
+    ...     return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+    >>>
+    >>> register_compressor('.xz', _handle_xz)
 
     """
     if not (ext and ext[0] == '.'):
