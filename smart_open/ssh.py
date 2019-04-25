@@ -47,6 +47,7 @@ def _connect(hostname, username, port):
             'paramiko missing, opening SSH/SCP/SFTP paths will be disabled. '
             '`pip install paramiko` to suppress'
         )
+        raise
 
     key = (hostname, username)
     ssh = _SSH.get(key)
