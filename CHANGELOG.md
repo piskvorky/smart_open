@@ -1,5 +1,13 @@
 # Unreleased
 
+# 1.8.3, 26 April 2019
+
+  - Improve S3 read performance by not copying buffer (PR [#284](https://github.com/RaRe-Technologies/smart_open/pull/284), [@aperiodic](https://github.com/aperiodic))
+  - accept bytearray and memoryview as input to write in s3 submodule (PR [#293](https://github.com/RaRe-Technologies/smart_open/pull/293), [@bmizhen-exos](https://github.com/bmizhen-exos))
+  - Fix two S3 bugs (PR [#307](https://github.com/RaRe-Technologies/smart_open/pull/307), [@mpenkov](https://github.com/mpenkov))
+  - Minor fixes: bz2file dependency, paramiko warning handling (PR [#309](https://github.com/RaRe-Technologies/smart_open/pull/309), [@mpenkov](https://github.com/mpenkov))
+  - improve unit tests (PR [#310](https://github.com/RaRe-Technologies/smart_open/pull/310), [@mpenkov](https://github.com/mpenkov))
+
 # 1.8.2, 17 April 2019
 
   - Removed dependency on lzma (PR [#262](https://github.com/RaRe-Technologies/smart_open/pull/282), [@tdhopper](https://github.com/tdhopper))
