@@ -13,6 +13,7 @@ import boto3
 import botocore.client
 import mock
 import moto
+import six
 
 import smart_open
 import smart_open.s3
@@ -79,7 +80,10 @@ def create_bucket_and_key(
 def ignore_resource_warnings():
     #
     # https://github.com/boto/boto3/issues/454
+    # Py2 doesn't have ResourceWarning, so do nothing.
     #
+    if six.PY2:
+        return
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")
 
 
