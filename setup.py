@@ -9,6 +9,8 @@
 
 import io
 import os
+import sys
+
 from setuptools import setup, find_packages
 
 
@@ -41,6 +43,14 @@ tests_require = [
     'google-compute-engine==2.8.12'
 ]
 
+install_requires = [
+    'boto >= 2.32',
+    'requests',
+    'boto3',
+]
+if sys.version_info[0] == 2:
+    install_requires.append('bz2file')
+
 setup(
     name='smart_open',
     version=_get_version(),
@@ -66,12 +76,7 @@ setup(
     license='MIT',
     platforms='any',
 
-    install_requires=[
-        'boto >= 2.32',
-        'bz2file',
-        'requests',
-        'boto3',
-    ],
+    install_requires=install_requires,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
