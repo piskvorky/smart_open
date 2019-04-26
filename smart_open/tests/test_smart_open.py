@@ -12,9 +12,7 @@ import unittest
 import logging
 import tempfile
 import os
-import sys
 import hashlib
-import unittest
 
 import boto3
 import mock
@@ -103,6 +101,16 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_secret, "access/secret")
         self.assertEqual(parsed_uri.host, "hostname")
         self.assertEqual(parsed_uri.port, 1234)
+
+    def test_s3_uri_has_atmark_in_key_name3(self):
+        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@hostname@mybucket/dir/my@ke@y")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "dir/my@ke@y")
+        self.assertEqual(parsed_uri.access_id, "accessid")
+        self.assertEqual(parsed_uri.access_secret, "access/secret")
+        self.assertEqual(parsed_uri.host, "hostname")
+        self.assertEqual(parsed_uri.port, 443)
 
     def test_s3_handles_fragments(self):
         uri_str = 's3://bucket-name/folder/picture #1.jpg'
@@ -1286,6 +1294,47 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.smart_open(key, 'r', encoding='utf-8') as fin:
             actual = fin.read()
         self.assertEqual(text, actual)
+
+    @mock.patch('smart_open.s3.SeekableBufferedInputBase')
+    def test_transport_params_is_not_mutable(self, mock_open):
+        smart_open.open('s3://access_key:secret_key@host@bucket/key')
+        smart_open.open('s3://bucket/key')
+
+        #
+        # The first call should have a non-null session, because the session
+        # keys were explicitly specified in the URL.  The second call should
+        # _not_ have a session.
+        #
+        self.assertIsNone(mock_open.call_args_list[1][1]['session'])
+        self.assertIsNotNone(mock_open.call_args_list[0][1]['session'])
+
+    @mock.patch('smart_open.s3.SeekableBufferedInputBase')
+    def test_respects_endpoint_url_read(self, mock_open):
+        url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
+        smart_open.open(url)
+
+        expected = {'endpoint_url': 'https://play.min.io:9000'}
+        self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
+
+    @mock.patch('smart_open.s3.BufferedOutputBase')
+    def test_respects_endpoint_url_write(self, mock_open):
+        url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
+        smart_open.open(url, 'wb')
+
+        expected = {'endpoint_url': 'https://play.min.io:9000'}
+        self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
+
+
+def function(a, b, c, foo='bar', baz='boz'):
+    pass
+
+
+class CheckKwargsTest(unittest.TestCase):
+    def test(self):
+        kwargs = {'foo': 123, 'bad': False}
+        expected = {'foo': 123}
+        actual = smart_open.smart_open_lib._check_kwargs(function, kwargs)
+        self.assertEqual(expected, actual)
 
 
 if __name__ == '__main__':

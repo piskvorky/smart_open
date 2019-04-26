@@ -62,6 +62,7 @@ SYSTEM_ENCODING = sys.getdefaultencoding()
 
 _ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
 
+_DEFAULT_S3_HOST = 's3.amazonaws.com'
 
 _COMPRESSOR_REGISTRY = {}
 
@@ -205,7 +206,7 @@ def open(
         closefd=True,
         opener=None,
         ignore_ext=False,
-        transport_params=dict(),
+        transport_params=None,
         ):
     r"""Open the URI object, returning a file-like object.
 
@@ -291,6 +292,9 @@ def open(
 
     if not isinstance(mode, six.string_types):
         raise TypeError('mode should be a string')
+
+    if transport_params is None:
+        transport_params = {}
 
     fobj = _shortcut_open(
         uri,
@@ -399,7 +403,6 @@ def smart_open(uri, mode="rb", **kw):
         url = kw.pop('host')
         if not url.startswith('http'):
             url = 'http://' + url
-        transport_params['multipart_upload_kwargs'].update(endpoint_url=url)
         transport_params['resource_kwargs'].update(endpoint_url=url)
 
     if 's3_upload' in kw and kw['s3_upload']:
@@ -592,8 +595,36 @@ def _s3_open_uri(parsed_uri, mode, transport_params):
             aws_secret_access_key=parsed_uri.access_secret,
         )
 
+    #
+    # There are two explicit ways the user can provide the endpoint URI:
+    #
+    # 1. Via the URL.  The protocol is implicit, and we assume HTTPS in this case.
+    # 2. Via the resource_kwargs and multipart_upload_kwargs endpoint_url parameter.
+    #
+    # Again, these are not mutually exclusive: the user can specify both.  We
+    # have to pick one to proceed, however, and we go with 2.
+    #
+    if parsed_uri.host != _DEFAULT_S3_HOST:
+        endpoint_url = 'https://%s:%d' % (parsed_uri.host, parsed_uri.port)
+        _override_endpoint_url(transport_params, endpoint_url)
+
     kwargs = _check_kwargs(smart_open_s3.open, transport_params)
     return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
+
+
+def _override_endpoint_url(tp, url):
+    try:
+        resource_kwargs = tp['resource_kwargs']
+    except KeyError:
+        resource_kwargs = tp['resource_kwargs'] = {}
+
+    if resource_kwargs.get('endpoint_url'):
+        logger.warning(
+            'ignoring endpoint_url parsed from URL because it conflicts '
+            'with transport_params.resource_kwargs.endpoint_url. '
+        )
+    else:
+        resource_kwargs.update(endpoint_url=url)
 
 
 def _my_urlsplit(url):
@@ -723,7 +754,7 @@ def _parse_uri_s3x(parsed_uri):
     assert parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES
 
     port = 443
-    host = boto.config.get('s3', 'host', 's3.amazonaws.com')
+    host = boto.config.get('s3', 'host', _DEFAULT_S3_HOST)
     ordinary_calling_format = False
     #
     # These defaults tell boto3 to look for credentials elsewhere

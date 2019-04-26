@@ -73,8 +73,8 @@ def open(
         buffer_size=DEFAULT_BUFFER_SIZE,
         min_part_size=DEFAULT_MIN_PART_SIZE,
         session=None,
-        resource_kwargs=dict(),
-        multipart_upload_kwargs=dict(),
+        resource_kwargs=None,
+        multipart_upload_kwargs=None,
         ):
     """Open an S3 object for reading or writing.
 
@@ -93,7 +93,7 @@ def open(
     session: object, optional
         The S3 session to use when working with boto3.
     resource_kwargs: dict, optional
-        Keyword arguments to use when creating a new resource.  For writing only.
+        Keyword arguments to use when accessing the S3 resource for reading or writing.
     multipart_upload_kwargs: dict, optional
         Additional parameters to pass to boto3's initiate_multipart_upload function.
         For writing only.
@@ -102,6 +102,11 @@ def open(
     logger.debug('%r', locals())
     if mode not in MODES:
         raise NotImplementedError('bad mode: %r expected one of %r' % (mode, MODES))
+
+    if resource_kwargs is None:
+        resource_kwargs = {}
+    if multipart_upload_kwargs is None:
+        multipart_upload_kwargs = {}
 
     if mode == READ_BINARY:
         fileobj = SeekableBufferedInputBase(
@@ -165,7 +170,7 @@ class SeekableRawReader(object):
         #
         try:
             self._body.close()
-        except AttributeError as e:
+        except AttributeError:
             pass
 
         if position == self._content_length == 0 or position == self._content_length:
@@ -190,9 +195,12 @@ class SeekableRawReader(object):
 
 class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=dict()):
+                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None):
         if session is None:
             session = boto3.Session()
+        if resource_kwargs is None:
+            resource_kwargs = {}
+
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
         self._raw_reader = RawReader(self._object)
@@ -324,9 +332,11 @@ class SeekableBufferedInputBase(BufferedInputBase):
     Implements the io.BufferedIOBase interface of the standard library."""
 
     def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=dict()):
+                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None):
         if session is None:
             session = boto3.Session()
+        if resource_kwargs is None:
+            resource_kwargs = {}
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
         self._raw_reader = SeekableRawReader(self._object)
@@ -393,8 +403,8 @@ class BufferedOutputBase(io.BufferedIOBase):
             key,
             min_part_size=DEFAULT_MIN_PART_SIZE,
             session=None,
-            resource_kwargs=dict(),
-            multipart_upload_kwargs=dict(),
+            resource_kwargs=None,
+            multipart_upload_kwargs=None,
             ):
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
@@ -402,6 +412,10 @@ multipart upload may fail")
 
         if session is None:
             session = boto3.Session()
+        if resource_kwargs is None:
+            resource_kwargs = {}
+        if multipart_upload_kwargs is None:
+            multipart_upload_kwargs = {}
 
         s3 = session.resource('s3', **resource_kwargs)
 
