@@ -2,6 +2,23 @@
 
 This subdirectory contains various scripts for making a smart_open release.
 
+## Prerequisites
+
+You need a GNU-like environment to run these scripts.  I perform the releases
+using Ubuntu 18.04, but other O/S like MacOS should also work.  The
+prerequisites are minimal:
+
+- bash
+- git with authentication set up (e.g. via ssh-agent)
+- virtualenv
+- pip
+- wget (for summarize_pr.sh)
+- jq (for summarize_pr.sh)
+
+All of the above are generally freely available, e.g. installable via apt in Ubuntu.
+
+You'll also need your PyPI username and password (for push_pypi.sh).
+
 ## Release Procedure
 
 First, check that the [latest commit](https://github.com/RaRe-Technologies/smart_open/commits/master) passed all CI.
