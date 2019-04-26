@@ -3,8 +3,10 @@ import gzip
 import io
 import logging
 import os
+import time
 import unittest
 import uuid
+import warnings
 
 import boto.s3.bucket
 import boto3
@@ -18,12 +20,14 @@ import smart_open.s3
 BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)  # generate random bucket (avoid race-condition in CI)
 KEY_NAME = 'test-key'
 WRITE_KEY_NAME = 'test-write-key'
+DISABLE_MOCKS = os.environ.get('SO_DISABLE_MOCKS') == "1"
+
 
 logger = logging.getLogger(__name__)
 
 
 def maybe_mock_s3(func):
-    if os.environ.get('SO_DISABLE_MOCKS') == "1":
+    if DISABLE_MOCKS:
         return func
     else:
         return moto.mock_s3(func)
@@ -42,7 +46,9 @@ def cleanup_bucket(s3, delete_bucket=False):
     return False
 
 
-def create_bucket_and_key(bucket_name=BUCKET_NAME, key_name=KEY_NAME, contents=None):
+def create_bucket_and_key(
+        bucket_name=BUCKET_NAME, key_name=KEY_NAME, contents=None,
+        num_attempts=12, sleep_time=5):
     # fake (or not) connection, bucket and key
     logger.debug('%r', locals())
     s3 = boto3.resource('s3')
@@ -51,11 +57,30 @@ def create_bucket_and_key(bucket_name=BUCKET_NAME, key_name=KEY_NAME, contents=N
     if not bucket_exist:
         mybucket = s3.create_bucket(Bucket=bucket_name)
 
-    mybucket = s3.Bucket(bucket_name)
-    mykey = s3.Object(bucket_name, key_name)
-    if contents is not None:
-        mykey.put(Body=contents)
-    return mybucket, mykey
+    #
+    # In real life, it can take a few seconds for the bucket to become ready.
+    # If we try to write to the key while the bucket while it isn't ready, we
+    # will get a ClientError: NoSuchBucket.
+    #
+    for attempt in range(num_attempts):
+        try:
+            mybucket = s3.Bucket(bucket_name)
+            mykey = s3.Object(bucket_name, key_name)
+            if contents is not None:
+                mykey.put(Body=contents)
+            return mybucket, mykey
+        except botocore.exceptions.ClientError as err:
+            logger.error('caught %r, retrying', err)
+            time.sleep(sleep_time)
+
+    assert False, 'failed to create bucket after %d attempts' % num_attempts
+
+
+def ignore_resource_warnings():
+    #
+    # https://github.com/boto/boto3/issues/454
+    #
+    warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")
 
 
 @maybe_mock_s3
@@ -64,6 +89,8 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         # lower the multipart upload size, to speed up these tests
         self.old_min_part_size = smart_open.s3.DEFAULT_MIN_PART_SIZE
         smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024**2
+
+        ignore_resource_warnings()
 
     def tearDown(self):
         smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
@@ -227,6 +254,8 @@ class BufferedOutputBaseTest(unittest.TestCase):
     Test writing into s3 files.
 
     """
+    def setUp(self):
+        ignore_resource_warnings()
 
     def tearDown(self):
         s3 = boto3.resource('s3')
@@ -388,6 +417,9 @@ ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operatio
 
 @maybe_mock_s3
 class IterBucketTest(unittest.TestCase):
+    def setUp(self):
+        ignore_resource_warnings()
+
     def test_iter_bucket(self):
         populate_bucket()
         results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
@@ -471,6 +503,8 @@ class IterBucketSingleProcessTest(unittest.TestCase):
         self.old_flag = smart_open.s3._MULTIPROCESSING
         smart_open.s3._MULTIPROCESSING = False
 
+        ignore_resource_warnings()
+
     def tearDown(self):
         smart_open.s3._MULTIPROCESSING = self.old_flag
 
@@ -486,6 +520,8 @@ class IterBucketSingleProcessTest(unittest.TestCase):
 
 @maybe_mock_s3
 class DownloadKeyTest(unittest.TestCase):
+    def setUp(self):
+        ignore_resource_warnings()
 
     def test_happy(self):
         contents = b'hello'
@@ -532,6 +568,8 @@ class DownloadKeyTest(unittest.TestCase):
 
 @maybe_mock_s3
 class OpenTest(unittest.TestCase):
+    def setUp(self):
+        ignore_resource_warnings()
 
     def test_read_never_returns_none(self):
         """read should never return None."""
