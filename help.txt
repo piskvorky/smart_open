@@ -3,9 +3,6 @@ Help on package smart_open:
 NAME
     smart_open
 
-FILE
-    /home/misha/git/smart_open/smart_open/__init__.py
-
 DESCRIPTION
     Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
     filesystem / compressed files, and many more, using a simple, Pythonic API.
@@ -20,6 +17,7 @@ DESCRIPTION
     * `register_compressor()`, which registers callbacks for transparent compressor handling
 
 PACKAGE CONTENTS
+    bytebuffer
     doctools
     hdfs
     http
@@ -30,7 +28,7 @@ PACKAGE CONTENTS
     webhdfs
 
 FUNCTIONS
-    open(uri, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, ignore_ext=False, transport_params={})
+    open(uri, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, ignore_ext=False, transport_params=None)
         Open the URI object, returning a file-like object.
         
         The URI is usually a string in a variety of formats:
@@ -50,7 +48,7 @@ FUNCTIONS
         
         - ``.gz``
         - ``.bz2``
-
+        
         The function depends on the file extension to determine the appropriate codec.
         
         Parameters
@@ -97,7 +95,7 @@ FUNCTIONS
         session: object, optional
             The S3 session to use when working with boto3.
         resource_kwargs: dict, optional
-            Keyword arguments to use when creating a new resource.  For writing only.
+            Keyword arguments to use when accessing the S3 resource for reading or writing.
         multipart_upload_kwargs: dict, optional
             Additional parameters to pass to boto3's initiate_multipart_upload function.
             For writing only.
@@ -184,7 +182,6 @@ FUNCTIONS
           file:///home/user/file
           file:///home/user/file.bz2
           [ssh|scp|sftp]://username@host//path/file
-          [ssh|scp|sftp]://username@host/path/file
         
         
         See Also
@@ -206,11 +203,13 @@ FUNCTIONS
         --------
         
         Instruct smart_open to use the identity function whenever opening a file
-        with a .foo extension:
+        with a .xz extension (see README.rst for the complete example showing I/O):
         
-        >>> def identity(file_obj, mode):
-        ...     return file_obj
-        >>> register_compressor('.foo', identity)
+        >>> def _handle_xz(file_obj, mode):
+        ...     import lzma
+        ...     return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+        >>>
+        >>> register_compressor('.xz', _handle_xz)
     
     s3_iter_bucket = iter_bucket(bucket_name, prefix='', accept_key=None, key_limit=None, workers=16, retries=3)
         Iterate and download all S3 objects under `s3://bucket_name/prefix`.
@@ -261,5 +260,11 @@ FUNCTIONS
 
 DATA
     __all__ = ['open', 'smart_open', 's3_iter_bucket', 'register_compresso...
+
+VERSION
+    1.8.3
+
+FILE
+    /home/misha/git/smart_open/smart_open/__init__.py
 
 
