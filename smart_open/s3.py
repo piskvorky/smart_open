@@ -418,17 +418,12 @@ multipart upload may fail")
             multipart_upload_kwargs = {}
 
         s3 = session.resource('s3', **resource_kwargs)
-
-        #
-        # https://stackoverflow.com/questions/26871884/how-can-i-easily-determine-if-a-boto-3-s3-bucket-resource-exists
-        #
         try:
-            s3.meta.client.head_bucket(Bucket=bucket)
+            self._object = s3.Object(bucket, key)
+            self._min_part_size = min_part_size
+            self._mp = self._object.initiate_multipart_upload(**multipart_upload_kwargs)
         except botocore.client.ClientError:
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
-        self._object = s3.Object(bucket, key)
-        self._min_part_size = min_part_size
-        self._mp = self._object.initiate_multipart_upload(**multipart_upload_kwargs)
 
         self._buf = io.BytesIO()
         self._total_bytes = 0
