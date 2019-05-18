@@ -35,16 +35,18 @@ def maybe_mock_s3(func):
 
 
 def cleanup_bucket(s3, delete_bucket=False):
-    for bucket in s3.buckets.all():
-        if bucket.name == BUCKET_NAME:
-            for key in bucket.objects.all():
-                key.delete()
+    bucket = s3.Bucket(BUCKET_NAME)
+    try:
+        for key in bucket.objects.all():
+            key.delete()
 
-            if delete_bucket:
-                bucket.delete()
-                return False
-            return True
-    return False
+        if delete_bucket:
+            bucket.delete()
+            return False
+    except s3.meta.client.exceptions.NoSuchBucket:
+        return False
+
+    return True
 
 
 def create_bucket_and_key(
@@ -53,10 +55,8 @@ def create_bucket_and_key(
     # fake (or not) connection, bucket and key
     logger.debug('%r', locals())
     s3 = boto3.resource('s3')
-    bucket_exist = cleanup_bucket(s3)
-
-    if not bucket_exist:
-        mybucket = s3.create_bucket(Bucket=bucket_name)
+    mybucket = s3.create_bucket(Bucket=bucket_name)
+    cleanup_bucket(s3)
 
     #
     # In real life, it can take a few seconds for the bucket to become ready.
@@ -74,7 +74,7 @@ def create_bucket_and_key(
             logger.error('caught %r, retrying', err)
             time.sleep(sleep_time)
 
-    assert False, 'failed to create bucket after %d attempts' % num_attempts
+    assert False, 'failed to create bucket %s after %d attempts' % (bucket_name, num_attempts)
 
 
 def ignore_resource_warnings():
