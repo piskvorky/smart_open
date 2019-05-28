@@ -382,7 +382,7 @@ open.__doc__ = open.__doc__ % {
 
 def smart_open(uri, mode="rb", **kw):
     """Deprecated, use smart_open.open instead."""
-    logger.warning('this function is deprecated, use smart_open.open instead')
+    warnings.warn('this function is deprecated, use smart_open.open instead')
 
     #
     # The new function uses a shorter name for this parameter, handle it separately.
