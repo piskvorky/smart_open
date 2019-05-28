@@ -147,12 +147,9 @@ class RawReader(object):
 class SeekableRawReader(object):
     """Read an S3 object."""
 
-    def __init__(self, s3_object):
+    def __init__(self, s3_object, content_length):
         self._object = s3_object
-        try:
-            self._content_length = self._object.content_length
-        except botocore.client.ClientError:
-            raise ValueError('the s3 key %r does not exist, or is forbidden for access' % s3_object.key)
+        self._content_length = content_length
         self.seek(0)
 
     def seek(self, position):
@@ -339,8 +336,8 @@ class SeekableBufferedInputBase(BufferedInputBase):
             resource_kwargs = {}
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
-        self._raw_reader = SeekableRawReader(self._object)
         self._content_length = self._object.content_length
+        self._raw_reader = SeekableRawReader(self._object, self._content_length)
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
