@@ -56,6 +56,16 @@ read -p "Press Enter to continue..."
 $EDITOR CHANGELOG.md
 git commit CHANGELOG.md -m "updated CHANGELOG.md for version $version"
 
+python -c 'help("smart_open")' > help.txt
+
+#
+# The below command will fail if there are no changes to help.txt.
+# We can safely ignore that failure.
+#
+set +e
+git commit help.txt -m "updated help.txt for version $version"
+set -e
+
 echo "Have a look at the current branch, and if all looks good, run merge.sh"
 
 cd "$script_dir"
