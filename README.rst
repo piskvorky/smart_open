@@ -260,7 +260,7 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
   annual/monthly_rain/2012.monthly_rain.nc 13
 
 
-Migrating to the New open Function
+Migrating to the new `open` function
 ----------------------------------
 
 Since 1.8.1, there is a `smart_open.open` function that replaces `smart_open.smart_open`.
