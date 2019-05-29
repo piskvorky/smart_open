@@ -275,6 +275,8 @@ These instructions will help you migrate to the new function painlessly.
 
 First, update your imports:
 
+.. code-block:: python
+
   >>> from smart_open import smart_open  # before
   >>> from smart_open import open  # after
 
@@ -289,10 +291,14 @@ binary), then you'll need to update it and pass "r" explicitly.
 
 Before:
 
+.. code-block:: python
+
   >>> buf = b''
   >>> buf += smart_open('s3://commoncrawl/robots.txt').read(32)
 
 After:
+
+.. code-block:: python
 
   >>> buf = b''
   >>> buf += open('s3://commoncrawl/robots.txt', 'rb').read(32)
@@ -303,6 +309,8 @@ It behaves identically otherwise.
 The most significant change is in the handling on keyword parameters for the
 transport layer, e.g. HTTP, S3, etc.  The old function accepted these directly:
 
+.. code-block:: python
+
   >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
   >>> session = boto3.Session(profile_name='smart_open')
   >>> smart_open(url, 'r', session=session).read(32)
@@ -310,6 +318,8 @@ transport layer, e.g. HTTP, S3, etc.  The old function accepted these directly:
 
 The new function accepts a `transport_params` keyword argument.  It's a dict.
 Put your transport parameters in that dictionary.
+
+.. code-block:: python
 
   >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
   >>> session = boto3.Session(profile_name='smart_open')
@@ -331,11 +341,15 @@ Pass an entire boto3.Session object instead.
 
 Before:
 
+.. code-block:: python
+
   >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
   >>> smart_open(url, 'r', profile_name='smart_open').read(32)
   'first line\nsecond line\nthird lin'
 
 After:
+
+.. code-block:: python
 
   >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
   >>> session = boto3.Session(profile_name='smart_open')
