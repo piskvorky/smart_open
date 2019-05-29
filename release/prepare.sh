@@ -32,6 +32,8 @@ set +u  # work around virtualenv awkwardness
 source sandbox.venv/bin/activate
 set -u
 
+python -m doctest ../README.rst
+
 cd ..
 pip install -e .[test]  # for smart_open
 pip install .[test]  # for gensim
