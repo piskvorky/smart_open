@@ -389,7 +389,7 @@ _MIGRATION_NOTES_URL = (
 def smart_open(uri, mode="rb", **kw):
     """Deprecated, use smart_open.open instead.
 
-    See the migration notes for details: %s
+    See the migration instructions: %s
 
     """ % _MIGRATION_NOTES_URL
 

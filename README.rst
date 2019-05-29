@@ -260,18 +260,19 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
   annual/monthly_rain/2012.monthly_rain.nc 13
 
 
-Migrating to the new `open` function
-----------------------------------
+Migrating to the New `open` Function
+------------------------------------
 
 Since 1.8.1, there is a `smart_open.open` function that replaces `smart_open.smart_open`.
 The new function offers several advantages over the old one:
 
-- 100% compatible with the built-in open function (aka io.open): it accepts all
-  the parameters that the built-in open accepts.
-- Default open mode is now "r", the same as for the built-in open
+- 100% compatible with the built-in `open` function (aka `io.open`): it accepts all
+  the parameters that the built-in `open` accepts.
+- The default open mode is now "r", the same as for the built-in `open`.
+  The default for the old `smart_open.smart_open` function used to be "rb".
 - Fully documented keyword parameters (try `help("smart_open.open")`)
 
-These instructions will help you migrate to the new function painlessly.
+The instructions below will help you migrate to the new function painlessly.
 
 First, update your imports:
 
