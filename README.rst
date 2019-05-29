@@ -260,7 +260,7 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
   annual/monthly_rain/2012.monthly_rain.nc 13
 
 
-Migrating to the new open function
+Migrating to the New open Function
 ----------------------------------
 
 Since 1.8.1, there is a `smart_open.open` function that replaces `smart_open.smart_open`.
@@ -357,7 +357,8 @@ After:
   >>> open(url, 'r', transport_params=params).read(32)
   'first line\nsecond line\nthird lin'
 
-See `help("smart_open.open")` for the full list of acceptable parameter names.
+See `help("smart_open.open")` for the full list of acceptable parameter names,
+or view the help online `here <https://github.com/RaRe-Technologies/smart_open/blob/master/help.txt>`__.
 
 If you pass an invalid parameter names, the `open` function will warn you about it.
 Keep an eye on your logs for WARNING messages from smart_open.

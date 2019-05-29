@@ -381,7 +381,7 @@ open.__doc__ = open.__doc__ % {
 
 
 _MIGRATION_NOTES_URL = (
-    'https://github.com/rare-technologies/smart_open/blob/master/README.rst'
+    'https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst'
     '#migrating-to-the-new-open-function'
 )
 
