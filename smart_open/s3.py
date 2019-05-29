@@ -336,7 +336,15 @@ class SeekableBufferedInputBase(BufferedInputBase):
             resource_kwargs = {}
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
-        self._content_length = self._object.content_length
+
+        try:
+            self._content_length = self._object.content_length
+        except botocore.client.ClientError:
+            raise ValueError(
+                '%r does not exist in the bucket %r, '
+                'or is forbidden for access' % (key, bucket)
+            )
+
         self._raw_reader = SeekableRawReader(self._object, self._content_length)
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
