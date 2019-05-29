@@ -380,9 +380,23 @@ open.__doc__ = open.__doc__ % {
 }
 
 
+_MIGRATION_NOTES_URL = (
+    'https://github.com/rare-technologies/smart_open/blob/master/README.rst'
+    '#migrating-to-the-new-open-function'
+)
+
+
 def smart_open(uri, mode="rb", **kw):
-    """Deprecated, use smart_open.open instead."""
-    warnings.warn('this function is deprecated, use smart_open.open instead')
+    """Deprecated, use smart_open.open instead.
+
+    See the migration notes for details: %s
+
+    """ % _MIGRATION_NOTES_URL
+
+    warnings.warn(
+        'This function is deprecated, use smart_open.open instead. '
+        'See the migration notes for details: %s' % _MIGRATION_NOTES_URL
+    )
 
     #
     # The new function uses a shorter name for this parameter, handle it separately.
