@@ -382,6 +382,8 @@ class BufferedOutputBaseTest(unittest.TestCase):
                 fout.write(expected)
 
     def test_read_nonexisting_key(self):
+        create_bucket_and_key()
+
         with self.assertRaises(ValueError):
             with smart_open.s3.open(BUCKET_NAME, 'my_nonexisting_key', 'rb') as fin:
                 fin.read()
