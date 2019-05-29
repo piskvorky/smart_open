@@ -255,9 +255,10 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
   >>> prefix = 'annual/monthly_rain/'
   >>> for key, content in s3_iter_bucket(bucket, prefix=prefix, accept_key=lambda key: '/201' in key, workers=1, key_limit=3):
   ...     print(key, round(len(content) / 2**20))
-  annual/monthly_rain/2010.monthly_rain.nc 14
-  annual/monthly_rain/2011.monthly_rain.nc 14
-  annual/monthly_rain/2012.monthly_rain.nc 14
+  annual/monthly_rain/2010.monthly_rain.nc 13
+  annual/monthly_rain/2011.monthly_rain.nc 13
+  annual/monthly_rain/2012.monthly_rain.nc 13
+
 
 Migrating to the new open function
 ----------------------------------
@@ -305,6 +306,7 @@ transport layer, e.g. HTTP, S3, etc.  The old function accepted these directly:
   >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
   >>> session = boto3.Session(profile_name='smart_open')
   >>> smart_open(url, 'r', session=session).read(32)
+  'first line\nsecond line\nthird lin'
 
 The new function accepts a `transport_params` keyword argument.  It's a dict.
 Put your transport parameters in that dictionary.
@@ -313,6 +315,7 @@ Put your transport parameters in that dictionary.
   >>> session = boto3.Session(profile_name='smart_open')
   >>> params = {'session': session}
   >>> open(url, 'r', transport_params=params).read(32)
+  'first line\nsecond line\nthird lin'
 
 Renamed parameters:
 
@@ -330,13 +333,15 @@ Before:
 
   >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
   >>> smart_open(url, 'r', profile_name='smart_open').read(32)
+  'first line\nsecond line\nthird lin'
 
 After:
 
   >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
   >>> session = boto3.Session(profile_name='smart_open')
   >>> params = {'session': session}
-  >>> smart_open(url, 'r', transport_params=params).read(32)
+  >>> open(url, 'r', transport_params=params).read(32)
+  'first line\nsecond line\nthird lin'
 
 See `help("smart_open.open")` for the full list of acceptable parameter names.
 
