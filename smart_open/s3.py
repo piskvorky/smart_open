@@ -635,7 +635,9 @@ def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True):
         else:
             for c in content:
                 key = c['Key']
-                if accept_key(key):
+                if accept_key.__code__.co_argcount == 1 and accept_key(key):
+                    yield key
+                elif accept_key(key, content):
                     yield key
         ctoken = response.get('NextContinuationToken', None)
         if not ctoken:
