@@ -256,13 +256,12 @@ FUNCTIONS
           ...     print key, len(content)
     
     smart_open(uri, mode='rb', **kw)
-        Deprecated, use smart_open.open instead.
 
 DATA
     __all__ = ['open', 'smart_open', 's3_iter_bucket', 'register_compresso...
 
 VERSION
-    1.8.3
+    1.8.4
 
 FILE
     /home/misha/git/smart_open/smart_open/__init__.py

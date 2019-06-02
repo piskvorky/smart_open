@@ -25,14 +25,19 @@ cd "$script_dir"
 
 git fetch upstream
 
+#
+# Using the current environment, that has smart_open installed
+#
+cd ..
+python -m doctest README.rst
+cd "$script_dir"
+
 rm -rf sandbox.venv
 virtualenv sandbox.venv -p $(which python3)
 
 set +u  # work around virtualenv awkwardness
 source sandbox.venv/bin/activate
 set -u
-
-python -m doctest ../README.rst
 
 cd ..
 pip install -e .[test]  # for smart_open
@@ -51,12 +56,14 @@ git checkout upstream/master -b release-"$version"
 echo "$version" > smart_open/VERSION
 git commit smart_open/VERSION -m "bump version to $version"
 
-echo "Next, update CHANGELOG.md."  
+echo "Next, update CHANGELOG.md."
 echo "Consider running summarize_pr.sh for each PR merged since the last release."
 read -p "Press Enter to continue..."
 
 $EDITOR CHANGELOG.md
+set +e
 git commit CHANGELOG.md -m "updated CHANGELOG.md for version $version"
+set -e
 
 python -c 'help("smart_open")' > help.txt
 
