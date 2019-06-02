@@ -1,5 +1,12 @@
 # Unreleased
 
+# 1.8.4, 2 Jun 2019
+
+  - Don't use s3 bucket_head to check for bucket existence (PR [#315](https://github.com/RaRe-Technologies/smart_open/pull/315), [@caboteria](https://github.com/caboteria))
+  - Dont list buckets in s3 tests (PR [#318](https://github.com/RaRe-Technologies/smart_open/pull/318), [@caboteria](https://github.com/caboteria))
+  - Use warnings.warn instead of logger.warning (PR [#321](https://github.com/RaRe-Technologies/smart_open/pull/321), [@mpenkov](https://github.com/mpenkov))
+  - Optimize reading from S3 (PR [#322](https://github.com/RaRe-Technologies/smart_open/pull/322), [@mpenkov](https://github.com/mpenkov))
+
 # 1.8.3, 26 April 2019
 
   - Improve S3 read performance by not copying buffer (PR [#284](https://github.com/RaRe-Technologies/smart_open/pull/284), [@aperiodic](https://github.com/aperiodic))
