@@ -25,14 +25,19 @@ cd "$script_dir"
 
 git fetch upstream
 
+#
+# Using the current environment, that has smart_open installed
+#
+cd ..
+python -m doctest README.rst
+cd "$script_dir"
+
 rm -rf sandbox.venv
 virtualenv sandbox.venv -p $(which python3)
 
 set +u  # work around virtualenv awkwardness
 source sandbox.venv/bin/activate
 set -u
-
-python -m doctest ../README.rst
 
 cd ..
 pip install -e .[test]  # for smart_open
