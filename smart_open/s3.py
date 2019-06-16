@@ -26,7 +26,8 @@ try:
 except ImportError:
     warnings.warn("multiprocessing could not be imported and won't be used")
 
-DEFAULT_MIN_PART_SIZE = 50 * 1024 ** 2
+
+DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 """Default minimum part size for S3 multipart uploads"""
 MIN_MIN_PART_SIZE = 5 * 1024 ** 2
 """The absolute minimum permitted by Amazon."""
@@ -98,7 +99,7 @@ def open(
         Additional parameters to pass to boto3's initiate_multipart_upload function.
         For writing only.
     version_id: str, optional
-        Version of the object.
+        Version of the object. If None, will fetch the most recent version.
 
     """
     logger.debug('%r', locals())
@@ -114,7 +115,7 @@ def open(
         fileobj = SeekableBufferedInputBase(
             bucket_id,
             key_id,
-            version_id,
+            version_id=version_id,
             buffer_size=buffer_size,
             session=session,
             resource_kwargs=resource_kwargs,
@@ -186,8 +187,7 @@ class SeekableRawReader(object):
             #
             self._body = io.BytesIO()
         else:
-            getkwargs = dict(Range=range_string)
-            self._body = _get(self._object, self._version_id, **getkwargs)['Body']
+            self._body = _get(self._object, self._version_id, Range=range_string)['Body']
 
     def read(self, size=-1):
         if self._position >= self._content_length:
@@ -212,7 +212,13 @@ class BufferedInputBase(io.BufferedIOBase):
         self._object = s3.Object(bucket, key)
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
-        self._object.get(VersionId=self.version_id)['ContentLength']
+        try:
+            self._content_length = _get(self._object, self._version_id)['ContentLength']
+        except botocore.client.ClientError as error:
+            raise IOError(str(error) + "\n" +
+                '%r does not exist in the bucket %r, version_id %r'
+                'or is forbidden for access' % (key, bucket, self._version_id)
+            )
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
@@ -352,9 +358,9 @@ class SeekableBufferedInputBase(BufferedInputBase):
             self._content_length = _get(self._object, self._version_id)['ContentLength']
         except botocore.client.ClientError as error:
             raise IOError(str(error) + "\n" +
-                          '%r does not exist in the bucket %r, version_id %r'
-                          'or is forbidden for access' % (key, bucket, self._version_id)
-                          )
+                '%r does not exist in the bucket %r, version_id %r'
+                'or is forbidden for access' % (key, bucket, self._version_id)
+            )
 
         self._raw_reader = SeekableRawReader(self._object, self._content_length, self._version_id)
         self._current_pos = 0
