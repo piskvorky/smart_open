@@ -135,9 +135,15 @@ def open(
 
 
 def _get(s3_object, version=None, **kwargs):
-    if version is not None:
-        kwargs['VersionId'] = version
-    return s3_object.get(**kwargs)
+    try:
+        if version is not None:
+            kwargs['VersionId'] = version
+        return s3_object.get(**kwargs)
+    except botocore.client.ClientError as error:
+        raise IOError(str(error) + "\n" +
+                      '%r does not exist in the bucket %r, version_id %r'
+                      'or is forbidden for access' % (s3_object.key, s3_object.bucket_name, version)
+                      )
 
 
 class RawReader(object):
@@ -212,13 +218,7 @@ class BufferedInputBase(io.BufferedIOBase):
         self._object = s3.Object(bucket, key)
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
-        try:
-            self._content_length = _get(self._object, self._version_id)['ContentLength']
-        except botocore.client.ClientError as error:
-            raise IOError(str(error) + "\n" +
-                '%r does not exist in the bucket %r, version_id %r'
-                'or is forbidden for access' % (key, bucket, self._version_id)
-            )
+        self._content_length = _get(self._object, self._version_id)['ContentLength']
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
@@ -354,13 +354,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
         self._version_id = version_id
-        try:
-            self._content_length = _get(self._object, self._version_id)['ContentLength']
-        except botocore.client.ClientError as error:
-            raise IOError(str(error) + "\n" +
-                '%r does not exist in the bucket %r, version_id %r'
-                'or is forbidden for access' % (key, bucket, self._version_id)
-            )
+        self._content_length = _get(self._object, self._version_id)['ContentLength']
 
         self._raw_reader = SeekableRawReader(self._object, self._content_length, self._version_id)
         self._current_pos = 0
