@@ -258,6 +258,24 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
   annual/monthly_rain/2010.monthly_rain.nc 13
   annual/monthly_rain/2011.monthly_rain.nc 13
   annual/monthly_rain/2012.monthly_rain.nc 13
+  
+  Specific s3 object version
+--------------------------------------
+
+The ''open'' function has the parameter version_id, which allows you to get the desired version of the file from bake C3
+
+.. code-block:: python
+
+  >>> from smart_open import open
+  >>> with s3.open('smart-open-bucket', 'test_s3_version.txt', 'rb',version_id='azaMK5Yf_wg03QI1vzKBgzDG8RMin3l1') as file:
+  ...   for line in file:
+  ......   print(line)
+  b'sdsaf\r\n'
+  b'1234\r\n'
+  b'asdf\r\n'
+  b'23154ffd\r\n'
+  b's'
+  
 
 
 Migrating to the new ``open`` function
