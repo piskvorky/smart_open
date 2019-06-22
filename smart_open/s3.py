@@ -140,10 +140,11 @@ def _get(s3_object, version=None, **kwargs):
     try:
         return s3_object.get(**kwargs)
     except botocore.client.ClientError as error:
-        raise IOError(str(error) + "\n" +
-                      '%r does not exist in the bucket %r, version_id %r'
-                      'or is forbidden for access' % (s3_object.key, s3_object.bucket_name, version)
-                      )
+        raise IOError(
+            str(error) + "\n" +
+            '%r does not exist in the bucket %r, version_id %r'
+            'or is forbidden for access' % (s3_object.key, s3_object.bucket_name, version)
+        )
 
 
 class RawReader(object):
