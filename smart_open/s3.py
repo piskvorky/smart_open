@@ -135,9 +135,9 @@ def open(
 
 
 def _get(s3_object, version=None, **kwargs):
+    if version is not None:
+        kwargs['VersionId'] = version
     try:
-        if version is not None:
-            kwargs['VersionId'] = version
         return s3_object.get(**kwargs)
     except botocore.client.ClientError as error:
         raise IOError(str(error) + "\n" +
