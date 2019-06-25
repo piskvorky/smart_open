@@ -82,7 +82,7 @@ class TestVersionId(unittest.TestCase):
         check_version = list(versions)[0].get()['VersionId']
 
         with self.assertRaises(IOError):
-            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb', version_id=check_version+check_version)
+            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb', version_id='bad-version-does-not-exist')
 
 
 if __name__ == '__main__':
