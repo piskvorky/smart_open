@@ -269,7 +269,7 @@ The ``smart_open``'s ``open`` function has the parameter version_id, which allow
 .. code-block:: python
 
   >>> from smart_open import open
-  >>> with s3.open('smart-open-bucket', 'test_s3_version.txt', 'rb',version_id='azaMK5Yf_wg03QI1vzKBgzDG8RMin3l1') as file:
+  >>> with open('smart-open-bucket', 'test_s3_version.txt', 'rb', version_id='azaMK5Yf_wg03QI1vzKBgzDG8RMin3l1') as file:
   ...   for line in file:
   ......   print(line)
   b'sdsaf\r\n'
