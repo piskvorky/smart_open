@@ -65,32 +65,25 @@ def put_to_bucket(contents, num_attempts=12, sleep_time=5):
 
 @maybe_mock_s3
 class TestVersionId(unittest.TestCase):
+    def setUp(self):
+        self.test_ver0 = u"String version 1.0".encode('utf8')
+        self.test_ver1 = u"String version 2.0".encode('utf8')
+        # write into key
+        with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+            fout.write(self.test_ver0)
+        with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+            fout.write(self.test_ver1)
 
     def test_good_id(self):
         """Does version_id into s3 work correctly?"""
-        test_ver0 = u"String version 1.0".encode('utf8')
-        test_ver1 = u"String version 2.0".encode('utf8')
-        # write into key
-        with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
-            fout.write(test_ver0)
-        with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
-            fout.write(test_ver1)
-
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
         with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, WRITE_KEY_NAME,check_version) as fin:
             expected = fin.read()
-        self.assertEqual(expected, test_ver0)
+        self.assertEqual(expected, self.test_ver0)
 
     def test_bad_id(self):
         """Does version_id exception into s3 work correctly?"""
-        test_string_ver0 = u"String version 1.0".encode('utf8')
-        test_string_ver1 = u"String version 2.0".encode('utf8')
-        # write into key
-        with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
-            fout.write(test_string_ver0)
-        with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
-            fout.write(test_string_ver1)
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
 
