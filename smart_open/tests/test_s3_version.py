@@ -1,19 +1,13 @@
 # -*- coding: utf-8 -*-
-import gzip
-import io
 import logging
 import os
 import time
 import unittest
 import uuid
-import warnings
 
-import boto.s3.bucket
 import boto3
 import botocore.client
-import mock
 import moto
-import six
 
 import smart_open
 
@@ -78,7 +72,7 @@ class TestVersionId(unittest.TestCase):
         """Does version_id into s3 work correctly?"""
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, WRITE_KEY_NAME,check_version) as fin:
+        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, WRITE_KEY_NAME, check_version) as fin:
             expected = fin.read()
         self.assertEqual(expected, self.test_ver0)
 
@@ -89,6 +83,7 @@ class TestVersionId(unittest.TestCase):
 
         with self.assertRaises(IOError):
             smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb', version_id=check_version+check_version)
+
 
 if __name__ == '__main__':
     unittest.main()
