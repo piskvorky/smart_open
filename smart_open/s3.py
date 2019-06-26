@@ -111,6 +111,9 @@ def open(
     if multipart_upload_kwargs is None:
         multipart_upload_kwargs = {}
 
+    if (mode == WRITE_BINARY) and (version_id is not None):
+        raise ValueError("version_id must be None when writing")
+
     if mode == READ_BINARY:
         fileobj = SeekableBufferedInputBase(
             bucket_id,
@@ -141,9 +144,9 @@ def _get(s3_object, version=None, **kwargs):
         return s3_object.get(**kwargs)
     except botocore.client.ClientError as error:
         raise IOError(
-            str(error) + "\n" +
-            '%r does not exist in the bucket %r, version_id %r'
-            'or is forbidden for access' % (s3_object.key, s3_object.bucket_name, version)
+            'unable to access bucket: %r key: %r version: %r error: %s' % (
+                s3_object.bucket_name, s3_object.key, version, error
+            )
         )
 
 
