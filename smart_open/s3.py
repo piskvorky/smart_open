@@ -99,7 +99,7 @@ def open(
         Additional parameters to pass to boto3's initiate_multipart_upload function.
         For writing only.
     version_id: str, optional
-        Version of the object. If None, will fetch the most recent version.
+        Version of the object, used when reading object. If None, will fetch the most recent version.
 
     """
     logger.debug('%r', locals())
