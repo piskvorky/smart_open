@@ -220,6 +220,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
+        self._version_id = version_id
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
         self._content_length = _get(self._object, self._version_id)['ContentLength']
