@@ -10,6 +10,7 @@ import botocore.client
 import moto
 
 import smart_open
+from smart_open import open
 
 BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 KEY_NAME = 'test-key'
@@ -85,13 +86,19 @@ class TestVersionId(unittest.TestCase):
             smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb', version_id='bad-version-does-not-exist')
 
     def test_bad_mode(self):
-        """Does version_id exception into s3 work correctly?"""
+        """Check the write mode selection when transferring the version"""
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
 
         with self.assertRaises(ValueError):
             smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'wb', version_id=check_version)
 
+    def test_top_level(self):
+        "Checks top level function open"
+        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
+        check_version = list(versions)[0].get()['VersionId']
+        with open("s3://"+BUCKET_NAME+"/"+WRITE_KEY_NAME, 'rb', check_version) as fin:
+            expected = fin.read()
 
 if __name__ == '__main__':
     unittest.main()
