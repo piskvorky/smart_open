@@ -70,7 +70,7 @@ class TestVersionId(unittest.TestCase):
             fout.write(self.test_ver1)
 
     def test_good_id(self):
-        """Does version_id into s3 work correctly?"""
+        """Does passing the version_id parameter into the s3 submodule work correctly when reading?"""
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
         with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, WRITE_KEY_NAME, check_version) as fin:
@@ -78,7 +78,7 @@ class TestVersionId(unittest.TestCase):
         self.assertEqual(expected, self.test_ver0)
 
     def test_bad_id(self):
-        """Does version_id exception into s3 work correctly?"""
+        """Does passing an invalid version_id exception into the s3 submodule get handled correctly?"""
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
 
@@ -86,7 +86,7 @@ class TestVersionId(unittest.TestCase):
             smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb', version_id='bad-version-does-not-exist')
 
     def test_bad_mode(self):
-        """Check the write mode selection when transferring the version"""
+        """Do we correctly handle non-None version when writing?"""
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
 
@@ -94,7 +94,7 @@ class TestVersionId(unittest.TestCase):
             smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'wb', version_id=check_version)
 
     def test_top_level(self):
-        "Checks top level function open"
+        "Does the top-level open function now accept the version_id parameter?"
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
         with open("s3://"+BUCKET_NAME+"/"+WRITE_KEY_NAME, 'rb', check_version) as fin:
