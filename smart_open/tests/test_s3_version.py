@@ -14,7 +14,7 @@ from smart_open import open
 
 BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 KEY_NAME = 'test-key'
-WRITE_KEY_NAME = 'test-write-key'
+#WRITE_KEY_NAME = 'test-write-key'
 DISABLE_MOCKS = os.environ.get('SO_DISABLE_MOCKS') == "1"
 
 
@@ -36,6 +36,8 @@ def setUpModule():
     '''
     boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
     boto3.resource('s3').BucketVersioning(BUCKET_NAME).enable()
+
+    #put_to_bucket(u"String version 1.0".encode('utf8'))
 
 
 def put_to_bucket(contents, num_attempts=12, sleep_time=5):
@@ -60,44 +62,67 @@ def put_to_bucket(contents, num_attempts=12, sleep_time=5):
 
 @maybe_mock_s3
 class TestVersionId(unittest.TestCase):
+
     def setUp(self):
-        self.test_ver0 = u"String version 1.0".encode('utf8')
-        self.test_ver1 = u"String version 2.0".encode('utf8')
+        self.WRITE_KEY_NAME = 'test-write-key-{}'.format(uuid.uuid4().hex)
+        self.test_ver1 = u"String version 1.0".encode('utf8')
+        self.test_ver2 = u"String version 2.0".encode('utf8')
         # write into key
-        with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
-            fout.write(self.test_ver0)
-        with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+        with open("s3://"+BUCKET_NAME+"/"+self.WRITE_KEY_NAME, 'wb') as fout:
             fout.write(self.test_ver1)
+        with open("s3://" + BUCKET_NAME + "/" + self.WRITE_KEY_NAME, 'wb') as fout:
+            fout.write(self.test_ver2)
 
     def test_good_id(self):
         """Does passing the version_id parameter into the s3 submodule work correctly when reading?"""
-        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
+        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, WRITE_KEY_NAME, check_version) as fin:
+        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, self.WRITE_KEY_NAME, check_version) as fin:
             expected = fin.read()
-        self.assertEqual(expected, self.test_ver0)
+        self.assertEqual(expected, self.test_ver1)
 
     def test_bad_id(self):
         """Does passing an invalid version_id exception into the s3 submodule get handled correctly?"""
-        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
+        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
 
         with self.assertRaises(IOError):
-            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb', version_id='bad-version-does-not-exist')
+            smart_open.s3.open(BUCKET_NAME, self.WRITE_KEY_NAME, 'rb', version_id='bad-version-does-not-exist')
 
     def test_bad_mode(self):
         """Do we correctly handle non-None version when writing?"""
-        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
+        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
-
         with self.assertRaises(ValueError):
-            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'wb', version_id=check_version)
+            smart_open.s3.open(BUCKET_NAME, self.WRITE_KEY_NAME, 'wb', version_id=check_version)
+
+    def test_no_version(self):
+        """Passing in no version at all gives the newest version of the file?"""
+        with open("s3://"+BUCKET_NAME+"/"+self.WRITE_KEY_NAME, 'rb') as fin:
+            expected = fin.read()
+        self.assertEqual(expected, self.test_ver2)
+
+    def test_newest_version(self):
+        """Passing in the newest version explicitly gives the same as above?"""
+        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
+        newest_version = list(versions)[-1].get()['VersionId']
+        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, self.WRITE_KEY_NAME, newest_version) as fin:
+            expected = fin.read()
+        self.assertEqual(expected, self.test_ver2)
+
+    def test_oldset_version(self):
+        """Passing in the oldest version gives you the oldest version?"""
+        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
+        oldest_version = list(versions)[0].get()['VersionId']
+        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, self.WRITE_KEY_NAME, oldest_version) as fin:
+            expected = fin.read()
+        self.assertEqual(expected, self.test_ver1)
 
     def test_top_level(self):
         "Does the top-level open function now accept the version_id parameter?"
-        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=WRITE_KEY_NAME)
+        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
-        with open("s3://"+BUCKET_NAME+"/"+WRITE_KEY_NAME, 'rb', check_version) as fin:
+        with open("s3://"+BUCKET_NAME+"/"+self.WRITE_KEY_NAME, 'rb', check_version) as fin:
             expected = fin.read()
 
 if __name__ == '__main__':
