@@ -98,7 +98,7 @@ class TestVersionId(unittest.TestCase):
 
     def test_no_version(self):
         """Passing in no version at all gives the newest version of the file?"""
-        with open("s3://"+BUCKET_NAME+"/"+self.WRITE_KEY_NAME, 'rb') as fin:
+        with open("s3://%s/%s" % (BUCKET_NAME, self.WRITE_KEY_NAME), 'rb') as fin:
             expected = fin.read()
         self.assertEqual(expected, self.test_ver2)
 
@@ -106,7 +106,7 @@ class TestVersionId(unittest.TestCase):
         """Passing in the newest version explicitly gives the same as above?"""
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
         newest_version = list(versions)[-1].get()['VersionId']
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, self.WRITE_KEY_NAME, newest_version) as fin:
+        with open("s3://%s/%s" % (BUCKET_NAME, self.WRITE_KEY_NAME), 'rb', newest_version) as fin:
             expected = fin.read()
         self.assertEqual(expected, self.test_ver2)
 
@@ -114,16 +114,9 @@ class TestVersionId(unittest.TestCase):
         """Passing in the oldest version gives you the oldest version?"""
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
         oldest_version = list(versions)[0].get()['VersionId']
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, self.WRITE_KEY_NAME, oldest_version) as fin:
+        with open("s3://%s/%s" % (BUCKET_NAME, self.WRITE_KEY_NAME), 'rb', oldest_version) as fin:
             expected = fin.read()
         self.assertEqual(expected, self.test_ver1)
-
-    def test_top_level(self):
-        "Does the top-level open function now accept the version_id parameter?"
-        versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
-        check_version = list(versions)[0].get()['VersionId']
-        with open("s3://"+BUCKET_NAME+"/"+self.WRITE_KEY_NAME, 'rb', check_version) as fin:
-            expected = fin.read()
 
 if __name__ == '__main__':
     unittest.main()
