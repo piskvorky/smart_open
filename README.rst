@@ -332,16 +332,16 @@ code already uses ``open`` for local file I/O, then it will continue to work.
 If you want to continue using the built-in ``open`` function for e.g. debugging,
 then you can ``import smart_open`` and use ``smart_open.open``.
 
-**The default read mode is now "r" (read text) by default.**
+**The default read mode is now "r" (read text).**
 If your code was implicitly relying on the default mode being "rb" (read
-binary), then you'll need to update it and pass "r" explicitly.
+binary), you'll need to update it and pass "rb" explicitly.
 
 Before:
 
 .. code-block:: python
 
   >>> import smart_open
-  >>> smart_open.smart_open('s3://commoncrawl/robots.txt').read(32)  # 'rb' used to be default
+  >>> smart_open.smart_open('s3://commoncrawl/robots.txt').read(32)  # 'rb' used to be the default
   b'User-Agent: *\nDisallow: /'
 
 After:
