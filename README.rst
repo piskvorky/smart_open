@@ -149,7 +149,7 @@ This is useful when you already have an open file, and would like to transparent
 
 In this case, ``smart_open`` relied on the ``.name`` attribute of our file object to determine which decompressor to use.
 If your file object doesn't have one, set the ``.name`` attribute to an appropriate value.
-Furthermore, that value has to end with **known** file extension (see the ``register_compressor`` function).
+Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
 Otherwise, the transparent decompression will **not occur**.
 
 Why?
