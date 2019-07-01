@@ -20,8 +20,8 @@ What?
 Why?
 ====
 
-Working with large remote files, for example using Amazon's  `boto <http://docs.pythonboto.org/en/latest/>`_ and `boto3 <https://boto3.readthedocs.io/en/latest/>`_ Python library is a pain.
-Its ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` methods only work for small files (loaded in RAM, no streaming).
+Working with large remote files, for example using Amazon's  `boto <http://docs.pythonboto.org/en/latest/>`_ and `boto3 <https://boto3.readthedocs.io/en/latest/>`_ Python library, is a pain.
+``boto``'s ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` methods only work for small files, because they're loaded fully into RAM, no streaming.
 There are nasty hidden gotchas when using ``boto``'s multipart upload functionality that is needed for large files, and a lot of boilerplate.
 
 ``smart_open`` shields you from that. It builds on boto3 and other remote storage libraries, but offers a **clean unified Pythonic API**. The result is less code for you to write and fewer bugs to make.
@@ -30,7 +30,7 @@ There are nasty hidden gotchas when using ``boto``'s multipart upload functional
 How?
 =====
 
-``smart_open`` is well-tested, well-documented, and has a simple, Pythonic API:
+``smart_open`` is well-tested, well-documented, and has a simple Pythonic API:
 
 
 .. _doctools_before_examples:
@@ -269,15 +269,23 @@ This is useful when you already have an open file, and would like to wrap it wit
 
 .. code-block:: python
 
-    >>> import io
-    >>> filepath = 'smart_open/tests/test_data/1984.txt.gz'
-    >>> with io.open(filepath, 'rb') as open_file:
-    ...     fin.name = filepath
-    ...     with open(open_file, 'rb') as fin:
-    ...         print(repr(fin.readline()))
-    b'It was a bright cold day in April, and the clocks were striking thirteen.\n'
+    >>> import io, gzip
+    >>>
+    >>> # Prepare some gzipped binary data in memory, as an example.
+    >>> # Note that any binary file will do; we're using BytesIO here for simplicity.
+    >>> buf = io.BytesIO()
+    >>> with gzip.GzipFile(fileobj=buf, mode='w') as fout:
+    ...     fout.write(b'this is a bytestring')
+    >>> buf.seek(0)
+    >>>
+    >>> # Use case starts here.
+    >>> buf.name = 'file.gz'  # add a .name attribute so smart_open knows what compressor to use
+    >>> import smart_open
+    >>> smart_open.open(buf, 'rb').read() # will gzip-decompress transparently!
+    b'this is a bytestring'
 
-In this case, ``smart_open`` relied on the ``.name`` attribute of our file object to determine which decompressor to use.
+
+In this case, ``smart_open`` relied on the ``.name`` attribute of our file-like ``buf`` object to determine which decompressor to use.
 If your file object doesn't have one, set the ``.name`` attribute to an appropriate value.
 Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
 Otherwise, the transparent decompression will not occur.
