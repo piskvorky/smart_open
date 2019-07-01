@@ -264,7 +264,7 @@ File-like Binary Streams
 ------------------------
 
 The ``open`` function also accepts file-like objects.
-This is useful when you already have an open file, and would like to wrap it with transparent decompression:
+This is useful when you already have a `binary file <https://docs.python.org/3/glossary.html#term-binary-file>`_ open, and would like to wrap it with transparent decompression:
 
 
 .. code-block:: python
@@ -281,7 +281,7 @@ This is useful when you already have an open file, and would like to wrap it wit
     >>> # Use case starts here.
     >>> buf.name = 'file.gz'  # add a .name attribute so smart_open knows what compressor to use
     >>> import smart_open
-    >>> smart_open.open(buf, 'rb').read() # will gzip-decompress transparently!
+    >>> smart_open.open(buf, 'rb').read()  # will gzip-decompress transparently!
     b'this is a bytestring'
 
 
