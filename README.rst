@@ -285,7 +285,7 @@ This is useful when you already have a `binary file <https://docs.python.org/3/g
     b'this is a bytestring'
 
 
-In this case, ``smart_open`` relied on the ``.name`` attribute of our file-like ``buf`` object to determine which decompressor to use.
+In this case, ``smart_open`` relied on the ``.name`` attribute of our `binary I/O stream <https://docs.python.org/3/library/io.html#binary-i-o>`_ ``buf`` object to determine which decompressor to use.
 If your file object doesn't have one, set the ``.name`` attribute to an appropriate value.
 Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
 Otherwise, the transparent decompression will not occur.
