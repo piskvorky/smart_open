@@ -12,7 +12,7 @@ smart_open — utils for streaming large files in Python
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to storages such as S3, HDFS, WebHDFS, HTTP, HTTPS, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
+``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to storages such as S3, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
@@ -97,6 +97,21 @@ Other examples of URIs that ``smart_open`` accepts::
 
 Documentation
 =============
+
+Installation
+------------
+::
+
+    pip install smart_open
+
+Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pypi/smart_open>`_::
+
+    python setup.py test  # run unit tests
+    python setup.py install
+
+To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>`_ (``pip install mock moto responses``).
+The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
+
 
 Built-in help
 -------------
@@ -289,21 +304,6 @@ In this case, ``smart_open`` relied on the ``.name`` attribute of our `binary I/
 If your file object doesn't have one, set the ``.name`` attribute to an appropriate value.
 Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
 Otherwise, the transparent decompression will not occur.
-
-
-Installation
-============
-::
-
-    pip install smart_open
-
-Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pypi/smart_open>`_::
-
-    python setup.py test  # run unit tests
-    python setup.py install
-
-To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>`_ (``pip install mock moto responses``).
-The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
 
 
 Migrating to the new ``open`` function
