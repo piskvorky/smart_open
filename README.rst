@@ -134,6 +134,24 @@ More examples:
     with open('s3://bucket/key.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'here we stand')
 
+The ``open`` function also accepts file-like objects.
+This is useful when you already have an open file, and would like to transparently decompress it.
+
+.. code-block:: python
+
+    >>> import io
+    >>> filepath = 'smart_open/tests/test_data/1984.txt.gz'
+    >>> with io.open(filepath, 'rb') as open_file:
+    ...     fin.name = filepath
+    ...     with open(open_file, 'rb') as fin:
+    ...         print(repr(fin.readline()))
+    b'It was a bright cold day in April, and the clocks were striking thirteen.\n'
+
+In this case, ``smart_open`` relied on the ``.name`` attribute of our file object to determine which decompressor to use.
+If your file object doesn't have one, set the ``.name`` attribute to an appropriate value.
+Furthermore, that value has to end with **known** file extension (see the ``register_compressor`` function).
+Otherwise, the transparent decompression will **not occur**.
+
 Why?
 ----
 
@@ -294,13 +312,17 @@ Before:
 
 .. code-block:: python
 
+  >>> import smart_open
   >>> smart_open.smart_open('s3://commoncrawl/robots.txt').read(32)  # 'rb' used to be default
+  b'User-Agent: *\nDisallow: /'
 
 After:
 
 .. code-block:: python
 
+  >>> import smart_open
   >>> smart_open.open('s3://commoncrawl/robots.txt', 'rb').read(32)
+  b'User-Agent: *\nDisallow: /'
 
 The ``ignore_extension`` keyword parameter is now called ``ignore_ext``.
 It behaves identically otherwise.
@@ -312,7 +334,7 @@ transport layer, e.g. HTTP, S3, etc. The old function accepted these directly:
 
   >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
   >>> session = boto3.Session(profile_name='smart_open')
-  >>> smart_open(url, 'r', session=session).read(32)
+  >>> smart_open.smart_open(url, 'r', session=session).read(32)
   'first line\nsecond line\nthird lin'
 
 The new function accepts a ``transport_params`` keyword argument.  It's a dict.
@@ -342,7 +364,7 @@ Before:
 .. code-block:: python
 
   >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-  >>> smart_open(url, 'r', profile_name='smart_open').read(32)
+  >>> smart_open.smart_open(url, 'r', profile_name='smart_open').read(32)
   'first line\nsecond line\nthird lin'
 
 After:
