@@ -12,9 +12,23 @@ smart_open — utils for streaming large files in Python
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to S3, HDFS, WebHDFS, HTTP, or local storage. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
+``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to storages such as S3, HDFS, WebHDFS, HTTP, HTTPS, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
+
+
+Why?
+====
+
+Working with large remote files, for example using Amazon's  `boto <http://docs.pythonboto.org/en/latest/>`_ and `boto3 <https://boto3.readthedocs.io/en/latest/>`_ Python library is a pain.
+Its ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` methods only work for small files (loaded in RAM, no streaming).
+There are nasty hidden gotchas when using ``boto``'s multipart upload functionality that is needed for large files, and a lot of boilerplate.
+
+``smart_open`` shields you from that. It builds on boto3 and other remote storage libraries, but offers a **clean unified Pythonic API**. The result is less code for you to write and fewer bugs to make.
+
+
+How?
+=====
 
 ``smart_open`` is well-tested, well-documented, and has a simple, Pythonic API:
 
@@ -61,7 +75,7 @@ What?
   ...     break
   '<!doctype html>\n'
 
-Other examples of URLs that ``smart_open`` accepts::
+Other examples of URIs that ``smart_open`` accepts::
 
     s3://my_bucket/my_key
     s3://my_key:my_secret@my_bucket/my_key
@@ -80,6 +94,13 @@ Other examples of URLs that ``smart_open`` accepts::
 
 .. _doctools_after_examples:
 
+
+Documentation
+=============
+
+Built-in help
+-------------
+
 For detailed API info, see the online help:
 
 .. code-block:: python
@@ -88,7 +109,8 @@ For detailed API info, see the online help:
 
 or click `here <https://github.com/RaRe-Technologies/smart_open/blob/master/help.txt>`__ to view the help in your browser.
 
-More examples:
+More examples
+-------------
 
 .. code-block:: python
 
@@ -134,47 +156,6 @@ More examples:
     with open('s3://bucket/key.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'here we stand')
 
-The ``open`` function also accepts file-like objects.
-This is useful when you already have an open file, and would like to transparently decompress it.
-
-.. code-block:: python
-
-    >>> import io
-    >>> filepath = 'smart_open/tests/test_data/1984.txt.gz'
-    >>> with io.open(filepath, 'rb') as open_file:
-    ...     fin.name = filepath
-    ...     with open(open_file, 'rb') as fin:
-    ...         print(repr(fin.readline()))
-    b'It was a bright cold day in April, and the clocks were striking thirteen.\n'
-
-In this case, ``smart_open`` relied on the ``.name`` attribute of our file object to determine which decompressor to use.
-If your file object doesn't have one, set the ``.name`` attribute to an appropriate value.
-Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
-Otherwise, the transparent decompression will **not occur**.
-
-Why?
-----
-
-Working with large S3 files using Amazon's default Python library, `boto <http://docs.pythonboto.org/en/latest/>`_ and `boto3 <https://boto3.readthedocs.io/en/latest/>`_, is a pain.
-Its ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` methods only work for small files (loaded in RAM, no streaming).
-There are nasty hidden gotchas when using ``boto``'s multipart upload functionality that is needed for large files, and a lot of boilerplate.
-
-``smart_open`` shields you from that. It builds on boto3 but offers a cleaner, Pythonic API. The result is less code for you to write and fewer bugs to make.
-
-Installation
-------------
-::
-
-    pip install smart_open
-
-Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pypi/smart_open>`_::
-
-    python setup.py test  # run unit tests
-    python setup.py install
-
-To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>`_ (``pip install mock moto responses``).
-The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
-
 Supported Compression Formats
 -----------------------------
 
@@ -202,6 +183,7 @@ For example, to open xz-compressed files:
 For 2.7, use `backports.lzma`_.
 
 .. _backports.lzma: https://pypi.org/project/backports.lzma/
+
 
 Transport-specific Options
 --------------------------
@@ -276,6 +258,44 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
   annual/monthly_rain/2010.monthly_rain.nc 13
   annual/monthly_rain/2011.monthly_rain.nc 13
   annual/monthly_rain/2012.monthly_rain.nc 13
+
+
+File-like Binary Streams
+------------------------
+
+The ``open`` function also accepts file-like objects.
+This is useful when you already have an open file, and would like to wrap it with transparent decompression:
+
+
+.. code-block:: python
+
+    >>> import io
+    >>> filepath = 'smart_open/tests/test_data/1984.txt.gz'
+    >>> with io.open(filepath, 'rb') as open_file:
+    ...     fin.name = filepath
+    ...     with open(open_file, 'rb') as fin:
+    ...         print(repr(fin.readline()))
+    b'It was a bright cold day in April, and the clocks were striking thirteen.\n'
+
+In this case, ``smart_open`` relied on the ``.name`` attribute of our file object to determine which decompressor to use.
+If your file object doesn't have one, set the ``.name`` attribute to an appropriate value.
+Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
+Otherwise, the transparent decompression will not occur.
+
+
+Installation
+============
+::
+
+    pip install smart_open
+
+Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pypi/smart_open>`_::
+
+    python setup.py test  # run unit tests
+    python setup.py install
+
+To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>`_ (``pip install mock moto responses``).
+The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
 
 
 Migrating to the new ``open`` function
@@ -357,7 +377,7 @@ Removed parameters:
 - ``profile_name``
 
 **The profile_name parameter has been removed.**
-Pass an entire boto3.Session object instead.
+Pass an entire ``boto3.Session`` object instead.
 
 Before:
 
@@ -383,7 +403,7 @@ If you pass an invalid parameter name, the ``smart_open.open`` function will war
 Keep an eye on your logs for WARNING messages from ``smart_open``.
 
 Comments, bug reports
----------------------
+=====================
 
 ``smart_open`` lives on `Github <https://github.com/RaRe-Technologies/smart_open>`_. You can file
 issues or pull requests there. Suggestions, pull requests and improvements welcome!
