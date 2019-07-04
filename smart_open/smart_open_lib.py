@@ -209,6 +209,7 @@ def open(
         opener=None,
         ignore_ext=False,
         transport_params=None,
+        version_id=None
         ):
     r"""Open the URI object, returning a file-like object.
 
@@ -345,7 +346,7 @@ def open(
                        'a': 'ab', 'a+': 'ab+'}[mode]
     except KeyError:
         binary_mode = mode
-    binary, filename = _open_binary_stream(uri, binary_mode, transport_params)
+    binary, filename = _open_binary_stream(uri, binary_mode, version_id, transport_params)
     if ignore_ext:
         decompressed = binary
     else:
@@ -515,7 +516,7 @@ def _shortcut_open(
     return io.open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
 
 
-def _open_binary_stream(uri, mode, transport_params):
+def _open_binary_stream(uri, mode, version_id, transport_params):
     """Open an arbitrary URI in the specified binary mode.
 
     Not all modes are supported for all protocols.
@@ -553,7 +554,7 @@ def _open_binary_stream(uri, mode, transport_params):
             )
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
-            return _s3_open_uri(parsed_uri, mode, transport_params), filename
+            return _s3_open_uri(parsed_uri, mode, version_id, transport_params), filename
         elif parsed_uri.scheme == "hdfs":
             _check_kwargs(smart_open_hdfs.open, transport_params)
             return smart_open_hdfs.open(parsed_uri.uri_path, mode), filename
@@ -582,7 +583,7 @@ def _open_binary_stream(uri, mode, transport_params):
         raise TypeError("don't know how to handle uri %r" % uri)
 
 
-def _s3_open_uri(parsed_uri, mode, transport_params):
+def _s3_open_uri(parsed_uri, mode, version_id, transport_params):
     logger.debug('s3_open_uri: %r', locals())
     if mode in ('r', 'w'):
         raise ValueError('this function can only open binary streams. '
@@ -625,7 +626,7 @@ def _s3_open_uri(parsed_uri, mode, transport_params):
         _override_endpoint_url(transport_params, endpoint_url)
 
     kwargs = _check_kwargs(smart_open_s3.open, transport_params)
-    return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
+    return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, version_id,  **kwargs)
 
 
 def _override_endpoint_url(tp, url):
