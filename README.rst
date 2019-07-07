@@ -61,6 +61,14 @@ What?
   ...     break
   '<!doctype html>\n'
 
+  >>> from smart_open import open
+  >>> with open('s3://bucket/key.txt', 'rb', transport_params = {'version_id':'need_key_version_id') as file:
+  ...   for line in file:
+  ...       print(line)
+  b'sdsaf\r\n'
+  b'1234\r\n'
+
+
 Other examples of URLs that ``smart_open`` accepts::
 
     s3://my_bucket/my_key
@@ -269,15 +277,12 @@ The ``smart_open``'s ``open`` function has the parameter version_id, which allow
 .. code-block:: python
 
   >>> from smart_open import open
-  >>> with open('s3://bucket/key.txt', 'rb', version_id='azaMK5Yf_wg03QI1vzKBgzDG8RMin3l1') as file:
+  >>> with open('s3://bucket/key.txt', 'rb', transport_params = {'version_id':'need_key_version_id') as file:
   ...   for line in file:
   ......   print(line)
   b'sdsaf\r\n'
   b'1234\r\n'
-  b'asdf\r\n'
-  b'23154ffd\r\n'
-  b's'
-  
+
 
 
 Migrating to the new ``open`` function
