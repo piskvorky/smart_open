@@ -291,8 +291,8 @@ The ``smart_open``'s ``open`` function has the parameter version_id, which allow
 .. code-block:: python
 
   >>> from smart_open import open
-  >>> with open('s3://bucket/key.txt', 'rb', transport_params = {'version_id':'need_key_version_id') as file:
-  ...   for line in file:
+  >>> with open('s3://bucket/key.txt', 'rb', transport_params = {'version_id':'need_key_version_id'}) as fin:
+  ...   for line in fin:
   ......   print(line)
   b'sdsaf\r\n'
   b'1234\r\n'
