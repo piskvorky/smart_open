@@ -75,13 +75,6 @@ How?
   ...     break
   '<!doctype html>\n'
 
-  >>> from smart_open import open
-  >>> with open('s3://bucket/key.txt', 'rb', transport_params={'version_id': 'need_key_version_id'}) as fin:
-  ...     for line in fin:
-  ...       print(line)
-  b'sdsaf\r\n'
-  b'1234\r\n'
-
 Other examples of URLs that ``smart_open`` accepts::
 
     s3://my_bucket/my_key
@@ -279,7 +272,7 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
   ...     print(key, round(len(content) / 2**20))
   annual/monthly_rain/2010.monthly_rain.nc 13
   annual/monthly_rain/2011.monthly_rain.nc 13
-  annual/monthly_rain/2012.monthly_rain.nc 13 
+  annual/monthly_rain/2012.monthly_rain.nc 13
 
 Specific s3 object version
 --------------------------------------
@@ -290,14 +283,19 @@ The ``smart_open``'s ``open`` function has the parameter version_id, which allow
 
 .. code-block:: python
 
-  >>> from smart_open import open
-  >>> with open('s3://bucket/key.txt', 'rb', transport_params={'version_id': 'need_key_version_id'}) as fin:
-  ...     for line in fin:
-  ...         print(line)
-  b'sdsaf\r\n'
-  b'1234\r\n'
+  >>> # Read previous versions of an object in a versioned bucket
+  >>> bucket, key = 'smart-open-versioned', 'demo.txt'
+  >>> versions = [v.id for v in boto3.resource('s3').Bucket(bucket).object_versions.filter(Prefix=key)]
+  >>> for v in versions:
+  ...     with open('s3://%s/%s' % (bucket, key), transport_params={'version_id': v}) as fin:
+  ...         print(v, repr(fin.read()))
+  KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg 'second version\n'
+  N0GJcE3TQCKtkaS.gF.MUBZS85Gs3hzn 'first version\n'
 
-
+  >>> # If you don't specify a version, smart_open will read the most recent one
+  >>> with open('s3://%s/%s' % (bucket, key)) as fin:
+  ...     print(repr(fin.read()))
+  'second version\n'
 
 File-like Binary Streams
 ------------------------
@@ -311,11 +309,11 @@ This is useful when you already have a `binary file <https://docs.python.org/3/g
     >>> import io, gzip
     >>>
     >>> # Prepare some gzipped binary data in memory, as an example.
-    >>> # Note that any binary file will do; we're using BytesIO here for simplicity.
+    >>> # Any binary file will do; we're using BytesIO here for simplicity.
     >>> buf = io.BytesIO()
     >>> with gzip.GzipFile(fileobj=buf, mode='w') as fout:
-    ...     fout.write(b'this is a bytestring')
-    >>> buf.seek(0)
+    ...     _ = fout.write(b'this is a bytestring')
+    >>> _ = buf.seek(0)
     >>>
     >>> # Use case starts here.
     >>> buf.name = 'file.gz'  # add a .name attribute so smart_open knows what compressor to use
