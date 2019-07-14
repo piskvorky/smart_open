@@ -274,12 +274,15 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
   annual/monthly_rain/2011.monthly_rain.nc 13
   annual/monthly_rain/2012.monthly_rain.nc 13
 
-Specific s3 object version
---------------------------------------
+Specific S3 object version
+--------------------------
 
-The ``smart_open``'s ``open`` function has the parameter version_id, which allows you to get the desired version of the file from bucket S3.
+The ``version_id`` transport parameter enables you to get the desired version of the object from an S3 bucket.
 
-*Important*: Version control disabled by default. Before starting to use version_id parameter, enable version control in bucket S3. Read https://docs.aws.amazon.com/AmazonS3/latest/dev/Versioning.html
+.. Important::
+    Version control disabled by default.
+    Before starting to use version_id parameter, enable version control in bucket S3.
+    Read https://docs.aws.amazon.com/AmazonS3/latest/dev/Versioning.html for details.
 
 .. code-block:: python
 

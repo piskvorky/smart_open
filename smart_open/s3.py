@@ -599,13 +599,6 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
       >>> # limit to 10k files, using 32 parallel workers (default is 16)
       >>> for key, content in iter_bucket(bucket_name, key_limit=10000, workers=32):
       ...     print key, len(content)
-
-      >>> # get the desired version of the file from bucket S3.
-      >>> from smart_open import open
-      >>> with open('s3://bucket/key.txt',
-              mode='rb', transport_params={'version_id': 'need_key_version_id'}) as fin:
-      ...     for line in fin:
-      ...         print(line)
     """
     if accept_key is None:
         accept_key = lambda key: True
