@@ -75,7 +75,8 @@ class TestVersionId(unittest.TestCase):
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
         check_version = list(versions)[0].get()['VersionId']
         transport_params = {'version_id': check_version}
-        with open("s3://%s/%s" % (BUCKET_NAME, self.WRITE_KEY_NAME), mode='rb', transport_params=transport_params) as fin:
+        with open("s3://%s/%s" % (BUCKET_NAME, self.WRITE_KEY_NAME),
+                  mode='rb', transport_params=transport_params) as fin:
             expected = fin.read()
         self.assertEqual(expected, self.test_ver1)
 
@@ -104,7 +105,8 @@ class TestVersionId(unittest.TestCase):
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
         newest_version = list(versions)[-1].get()['VersionId']
         transport_params = {'version_id': newest_version}
-        with open("s3://%s/%s" % (BUCKET_NAME, self.WRITE_KEY_NAME), 'rb', transport_params=transport_params) as fin:
+        with open("s3://%s/%s" % (BUCKET_NAME, self.WRITE_KEY_NAME),
+                  mode='rb', transport_params=transport_params) as fin:
             expected = fin.read()
         self.assertEqual(expected, self.test_ver2)
 
@@ -113,7 +115,8 @@ class TestVersionId(unittest.TestCase):
         versions = boto3.resource('s3').Bucket(BUCKET_NAME).object_versions.filter(Prefix=self.WRITE_KEY_NAME)
         oldest_version = list(versions)[0].get()['VersionId']
         transport_params = {'version_id': oldest_version}
-        with open("s3://%s/%s" % (BUCKET_NAME, self.WRITE_KEY_NAME), 'rb', transport_params=transport_params) as fin:
+        with open("s3://%s/%s" % (BUCKET_NAME, self.WRITE_KEY_NAME),
+                  mode='rb', transport_params=transport_params) as fin:
             expected = fin.read()
         self.assertEqual(expected, self.test_ver1)
 
