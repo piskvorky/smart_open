@@ -602,9 +602,10 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
 
       >>> # get the desired version of the file from bucket S3.
       >>> from smart_open import open
-      >>> with open('s3://bucket/key.txt', 'rb', transport_params={'version_id': 'need_key_version_id'}) as fin:
-      ...   for line in fin:
-      ...       print(line)
+      >>> with open('s3://bucket/key.txt',
+              mode='rb', transport_params={'version_id': 'need_key_version_id'}) as fin:
+      ...     for line in fin:
+      ...         print(line)
     """
     if accept_key is None:
         accept_key = lambda key: True
