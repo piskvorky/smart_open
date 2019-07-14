@@ -280,8 +280,8 @@ Specific S3 object version
 The ``version_id`` transport parameter enables you to get the desired version of the object from an S3 bucket.
 
 .. Important::
-    Version control disabled by default.
-    Before starting to use version_id parameter, enable version control in bucket S3.
+    S3 disables version control by default.
+    Before using the ``version_id`` parameter, you must explicitly enable version control for your S3 bucket.
     Read https://docs.aws.amazon.com/AmazonS3/latest/dev/Versioning.html for details.
 
 .. code-block:: python
