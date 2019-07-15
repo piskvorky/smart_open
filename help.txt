@@ -99,6 +99,8 @@ FUNCTIONS
         multipart_upload_kwargs: dict, optional
             Additional parameters to pass to boto3's initiate_multipart_upload function.
             For writing only.
+        version_id: str, optional
+            Version of the object, used when reading object. If None, will fetch the most recent version.
         
         HTTP (for details, see :mod:`smart_open.http` and :func:`smart_open.http.open`):
         
@@ -264,6 +266,6 @@ VERSION
     1.8.4
 
 FILE
-    /home/misha/git/smart_open/smart_open/__init__.py
+    /Users/misha/git/smart_open/smart_open/__init__.py
 
 
