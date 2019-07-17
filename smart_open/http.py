@@ -41,22 +41,26 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
     password: str, optional
         The password for authenticating over HTTP
     headers: dict, optional
-        Any headers to send in the request. If none, default headers sent are: {'Accept-Encoding': 'identity'}
-        To not use default headers or any other headers, set this variable to an empty dict, {}
+        Any headers to send in the request. If none, default headers sent are:
+        {'Accept-Encoding': 'identity'}. To not use default headers or any other
+        headers, set this variable to an empty dict, {}.
 
     Note
     ----
-    If neither kerberos or (user, password) are set, will connect unauthenticated, unless set separately in headers.
+    If neither kerberos or (user, password) are set, will connect
+    unauthenticated, unless set separately in headers.
 
     """
     if mode == 'rb':
-        return BufferedInputBase(uri, mode, kerberos=kerberos, user=user, password=password, headers=headers)
+        return BufferedInputBase(uri, mode, kerberos=kerberos,
+                                 user=user, password=password, headers=headers)
     else:
         raise NotImplementedError('http support for mode %r not implemented' % mode)
-        
+
 
 class BufferedInputBase(io.BufferedIOBase):
-    def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE, kerberos=False, user=None, password=None, headers=None):
+    def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
+                 kerberos=False, user=None, password=None, headers=None):
         if kerberos:
             import requests_kerberos
             auth = requests_kerberos.HTTPKerberosAuth()
@@ -72,7 +76,6 @@ class BufferedInputBase(io.BufferedIOBase):
             self.headers = _HEADERS.copy()
         else:
             self.headers = headers
-            
 
         self.response = requests.get(url, auth=auth, stream=True, headers=self.headers)
 
@@ -128,7 +131,10 @@ class BufferedInputBase(io.BufferedIOBase):
             self._read_buffer = b''
         else:
             while len(self._read_buffer) < size:
-                logger.debug("http reading more content at current_pos: %d with size: %d", self._current_pos, size)
+                logger.debug(
+                    "http reading more content at current_pos: %d with size: %d",
+                    self._current_pos, size
+                )
                 try:
                     self._read_buffer += next(self._read_iter)
                 except StopIteration:

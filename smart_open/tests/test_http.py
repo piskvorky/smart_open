@@ -95,7 +95,7 @@ class HttpTest(unittest.TestCase):
         x.headers['Other-Header'] = 'value'
 
         # use default again, global shoudn't overwritten from x
-        y = smart_open.http.BufferedInputBase(URL)  
+        y = smart_open.http.BufferedInputBase(URL)
         # should be default headers
         self.assertEqual(y.headers, {'Accept-Encoding': 'identity'})
         # should be assigned headers
