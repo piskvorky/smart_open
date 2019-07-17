@@ -61,7 +61,10 @@ def get_versions(bucket, key):
     """Return object versions in chronological order."""
     return [
         v.id
-        for v in boto3.resource('s3').Bucket(bucket).object_versions.filter(Prefix=key)
+        for v in sorted(
+            boto3.resource('s3').Bucket(bucket).object_versions.filter(Prefix=key),
+            key=lambda version: version.last_modified,
+        )
     ]
 
 
@@ -95,7 +98,6 @@ class TestVersionId(unittest.TestCase):
 
         self.versions = get_versions(BUCKET_NAME, self.key)
         logging.critical('versions after second write: %r', get_versions(BUCKET_NAME, self.key))
-
 
     def test_good_id(self):
         """Does passing the version_id parameter into the s3 submodule work correctly when reading?"""
