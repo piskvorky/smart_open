@@ -100,3 +100,10 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(y.headers, {'Accept-Encoding': 'identity'})
         # should be assigned headers
         self.assertEqual(x.headers, {'Accept-Encoding': 'compress, gzip', 'Other-Header': 'value'})
+
+    @responses.activate
+    def test_headers(self):
+        """Does the top-level http.open function correctly handle headers?"""
+        responses.add_callback(responses.GET, URL, callback=request_callback)
+        reader = smart_open.http.open(URL, 'rb', headers={'Foo': 'bar'})
+        self.assertEqual(reader.headers['Foo'], 'bar')
