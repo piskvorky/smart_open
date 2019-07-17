@@ -103,7 +103,7 @@ class HttpTest(unittest.TestCase):
 
     @responses.activate
     def test_headers(self):
-        """Does the top-level http.open function correctly handle headers?"""
+        """Does the top-level http.open function handle headers correctly?"""
         responses.add_callback(responses.GET, URL, callback=request_callback)
         reader = smart_open.http.open(URL, 'rb', headers={'Foo': 'bar'})
         self.assertEqual(reader.headers['Foo'], 'bar')

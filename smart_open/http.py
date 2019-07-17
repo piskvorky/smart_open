@@ -40,9 +40,9 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
     password: str, optional
         The password for authenticating over HTTP
     headers: dict, optional
-        Any headers to send in the request. If none, default headers sent are:
-        {'Accept-Encoding': 'identity'}. To not use default headers or any other
-        headers, set this variable to an empty dict, {}.
+        Any headers to send in the request. If ``None``, the default headers are sent:
+        ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
+        set this variable to an empty dict, ``{}``.
 
     Note
     ----
@@ -51,8 +51,10 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
 
     """
     if mode == 'rb':
-        return BufferedInputBase(uri, mode, kerberos=kerberos,
-                                 user=user, password=password, headers=headers)
+        return BufferedInputBase(
+            uri, mode, kerberos=kerberos,
+            user=user, password=password, headers=headers
+        )
     else:
         raise NotImplementedError('http support for mode %r not implemented' % mode)
 
