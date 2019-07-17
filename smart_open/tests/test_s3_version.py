@@ -86,6 +86,13 @@ class TestVersionId(unittest.TestCase):
 
         logging.critical('versions after first write: %r', get_versions(BUCKET_NAME, self.key))
 
+        if DISABLE_MOCKS:
+            #
+            # I suspect there is a race condition that's messing up the
+            # order of the versions in the test.
+            #
+            time.sleep(5)
+
         with open(self.url, 'wb') as fout:
             fout.write(self.test_ver2)
 
