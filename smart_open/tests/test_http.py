@@ -86,6 +86,8 @@ class HttpTest(unittest.TestCase):
 
     @responses.activate
     def test_headers_are_as_assigned(self):
+        responses.add_callback(responses.GET, URL, callback=request_callback)
+
         # use default _HEADERS
         x = smart_open.http.BufferedInputBase(URL)
         # set different ones
