@@ -1,62 +1,101 @@
 # -*- coding: utf-8 -*-
-import logging
 import gzip
 import io
+import logging
 import os
-import uuid
+import time
 import unittest
+import uuid
+import warnings
 
+import boto.s3.bucket
 import boto3
 import botocore.client
-import boto.s3.bucket
 import mock
 import moto
+import six
 
 import smart_open
 import smart_open.s3
 
-
-BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)  # generate random bucket (avoid race-condition in CI)
+# To reduce spurious errors due to S3's eventually-consistent behavior
+# we create this bucket once before running these tests and then
+# remove it when we're done.  The bucket has a random name so that we
+# can run multiple instances of this suite in parallel and not have
+# them conflict with one another. Travis, for example, runs the Python
+# 2.7, 3.6, and 3.7 suites concurrently.
+BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 KEY_NAME = 'test-key'
 WRITE_KEY_NAME = 'test-write-key'
+DISABLE_MOCKS = os.environ.get('SO_DISABLE_MOCKS') == "1"
+
 
 logger = logging.getLogger(__name__)
 
 
 def maybe_mock_s3(func):
-    if os.environ.get('SO_DISABLE_MOCKS') == "1":
+    if DISABLE_MOCKS:
         return func
     else:
         return moto.mock_s3(func)
 
 
-def cleanup_bucket(s3, delete_bucket=False):
-    for bucket in s3.buckets.all():
-        if bucket.name == BUCKET_NAME:
-            for key in bucket.objects.all():
-                key.delete()
+@maybe_mock_s3
+def setUpModule():
+    '''Called once by unittest when initializing this module.  Sets up the
+    test S3 bucket.
 
-            if delete_bucket:
-                bucket.delete()
-                return False
-            return True
-    return False
+    '''
+    boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
 
 
-def create_bucket_and_key(bucket_name=BUCKET_NAME, key_name=KEY_NAME, contents=None):
+@maybe_mock_s3
+def tearDownModule():
+    '''Called once by unittest when tearing down this module.  Empties and
+    removes the test S3 bucket.
+
+    '''
+    s3 = boto3.resource('s3')
+    try:
+        cleanup_bucket()
+        s3.Bucket(BUCKET_NAME).delete()
+    except s3.meta.client.exceptions.NoSuchBucket:
+        pass
+
+
+def cleanup_bucket():
+    for key in boto3.resource('s3').Bucket(BUCKET_NAME).objects.all():
+        key.delete()
+
+
+def put_to_bucket(contents, num_attempts=12, sleep_time=5):
     # fake (or not) connection, bucket and key
     logger.debug('%r', locals())
-    s3 = boto3.resource('s3')
-    bucket_exist = cleanup_bucket(s3)
 
-    if not bucket_exist:
-        mybucket = s3.create_bucket(Bucket=bucket_name)
+    #
+    # In real life, it can take a few seconds for the bucket to become ready.
+    # If we try to write to the key while the bucket while it isn't ready, we
+    # will get a ClientError: NoSuchBucket.
+    #
+    for attempt in range(num_attempts):
+        try:
+            boto3.resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=contents)
+            return
+        except botocore.exceptions.ClientError as err:
+            logger.error('caught %r, retrying', err)
+            time.sleep(sleep_time)
 
-    mybucket = s3.Bucket(bucket_name)
-    mykey = s3.Object(bucket_name, key_name)
-    if contents is not None:
-        mykey.put(Body=contents)
-    return mybucket, mykey
+    assert False, 'failed to create bucket %s after %d attempts' % (BUCKET_NAME, num_attempts)
+
+
+def ignore_resource_warnings():
+    #
+    # https://github.com/boto/boto3/issues/454
+    # Py2 doesn't have ResourceWarning, so do nothing.
+    #
+    if six.PY2:
+        return
+    warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")
 
 
 @maybe_mock_s3
@@ -66,16 +105,17 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         self.old_min_part_size = smart_open.s3.DEFAULT_MIN_PART_SIZE
         smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024**2
 
+        ignore_resource_warnings()
+
     def tearDown(self):
         smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
-        s3 = boto3.resource('s3')
-        cleanup_bucket(s3, delete_bucket=True)
+        cleanup_bucket()
 
     def test_iter(self):
         """Are S3 files iterated over correctly?"""
         # a list of strings to test with
         expected = u"hello wořld\nhow are you?".encode('utf8')
-        create_bucket_and_key(contents=expected)
+        put_to_bucket(contents=expected)
 
         # connect to fake s3 and read from the fake key we filled above
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
@@ -85,7 +125,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
     def test_iter_context_manager(self):
         # same thing but using a context manager
         expected = u"hello wořld\nhow are you?".encode('utf8')
-        create_bucket_and_key(contents=expected)
+        put_to_bucket(contents=expected)
         with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
             output = [line.rstrip(b'\n') for line in fin]
             self.assertEqual(output, expected.split(b'\n'))
@@ -93,7 +133,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
     def test_read(self):
         """Are S3 files read correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
-        create_bucket_and_key(contents=content)
+        put_to_bucket(contents=content)
         logger.debug('content: %r len: %r', content, len(content))
 
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
@@ -104,7 +144,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
     def test_seek_beginning(self):
         """Does seeking to the beginning of S3 files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
-        create_bucket_and_key(contents=content)
+        put_to_bucket(contents=content)
 
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
         self.assertEqual(content[:6], fin.read(6))
@@ -119,7 +159,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
     def test_seek_start(self):
         """Does seeking from the start of S3 files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
-        create_bucket_and_key(contents=content)
+        put_to_bucket(contents=content)
 
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
         seek = fin.seek(6)
@@ -130,7 +170,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
     def test_seek_current(self):
         """Does seeking from the middle of S3 files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
-        create_bucket_and_key(contents=content)
+        put_to_bucket(contents=content)
 
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
         self.assertEqual(fin.read(5), b'hello')
@@ -141,7 +181,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
     def test_seek_end(self):
         """Does seeking from the end of S3 files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
-        create_bucket_and_key(contents=content)
+        put_to_bucket(contents=content)
 
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
         seek = fin.seek(-4, whence=smart_open.s3.END)
@@ -150,7 +190,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
     def test_detect_eof(self):
         content = u"hello wořld\nhow are you?".encode('utf8')
-        create_bucket_and_key(contents=content)
+        put_to_bucket(contents=content)
 
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
         fin.read()
@@ -165,7 +205,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         buf.close = lambda: None  # keep buffer open so that we can .getvalue()
         with gzip.GzipFile(fileobj=buf, mode='w') as zipfile:
             zipfile.write(expected)
-        create_bucket_and_key(contents=buf.getvalue())
+        put_to_bucket(contents=buf.getvalue())
 
         #
         # Make sure we're reading things correctly.
@@ -189,7 +229,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
     def test_readline(self):
         content = b'englishman\nin\nnew\nyork\n'
-        create_bucket_and_key(contents=content)
+        put_to_bucket(contents=content)
 
         with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
             fin.readline()
@@ -204,7 +244,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
     def test_readline_tiny_buffer(self):
         content = b'englishman\nin\nnew\nyork\n'
-        create_bucket_and_key(contents=content)
+        put_to_bucket(contents=content)
 
         with smart_open.s3.BufferedInputBase(BUCKET_NAME, KEY_NAME, buffer_size=8) as fin:
             actual = list(fin)
@@ -214,7 +254,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
     def test_read0_does_not_return_data(self):
         content = b'englishman\nin\nnew\nyork\n'
-        create_bucket_and_key(contents=content)
+        put_to_bucket(contents=content)
 
         with smart_open.s3.BufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
             data = fin.read(0)
@@ -228,13 +268,14 @@ class BufferedOutputBaseTest(unittest.TestCase):
     Test writing into s3 files.
 
     """
+    def setUp(self):
+        ignore_resource_warnings()
+
     def tearDown(self):
-        s3 = boto3.resource('s3')
-        cleanup_bucket(s3, delete_bucket=True)
+        cleanup_bucket()
 
     def test_write_01(self):
         """Does writing into s3 work correctly?"""
-        create_bucket_and_key()
         test_string = u"žluťoučký koníček".encode('utf8')
 
         # write into key
@@ -248,8 +289,6 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_01a(self):
         """Does s3 write fail on incorrect input?"""
-        create_bucket_and_key()
-
         try:
             with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fin:
                 fin.write(None)
@@ -260,8 +299,6 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_02(self):
         """Does s3 write unicode-utf8 conversion work?"""
-        create_bucket_and_key()
-
         smart_open_write = smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME)
         smart_open_write.tell()
         logger.info("smart_open_write: %r", smart_open_write)
@@ -271,8 +308,6 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_03(self):
         """Does s3 multipart chunking work correctly?"""
-        create_bucket_and_key()
-
         # write
         smart_open_write = smart_open.s3.BufferedOutputBase(
             BUCKET_NAME, WRITE_KEY_NAME, min_part_size=10
@@ -295,8 +330,6 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
-        _ = create_bucket_and_key()
-
         smart_open_write = smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME)
         with smart_open_write as fout:  # noqa
             pass
@@ -307,8 +340,6 @@ class BufferedOutputBaseTest(unittest.TestCase):
         self.assertEqual(output, [])
 
     def test_gzip(self):
-        create_bucket_and_key()
-
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
         with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
             with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
@@ -320,9 +351,26 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
         self.assertEqual(expected, actual)
 
+    def test_buffered_writer_wrapper_works(self):
+        """
+        Ensure that we can wrap a smart_open s3 stream in a BufferedWriter, which
+        passes a memoryview object to the underlying stream in python >= 2.7
+        """
+        expected = u'не думай о секундах свысока'
+
+        with smart_open.s3.BufferedOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+            with io.BufferedWriter(fout) as sub_out:
+                sub_out.write(expected.encode('utf-8'))
+
+        with smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)) as fin:
+            with io.TextIOWrapper(fin, encoding='utf-8') as text:
+                actual = text.read()
+
+        self.assertEqual(expected, actual)
+
     def test_binary_iterator(self):
         expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
-        create_bucket_and_key(contents=b"\n".join(expected))
+        put_to_bucket(contents=b"\n".join(expected))
         with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'rb') as fin:
             actual = [line.rstrip() for line in fin]
         self.assertEqual(expected, actual)
@@ -334,13 +382,11 @@ class BufferedOutputBaseTest(unittest.TestCase):
                 fout.write(expected)
 
     def test_read_nonexisting_key(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(IOError):
             with smart_open.s3.open(BUCKET_NAME, 'my_nonexisting_key', 'rb') as fin:
                 fin.read()
 
     def test_double_close(self):
-        create_bucket_and_key()
-
         text = u'там за туманами, вечными, пьяными'.encode('utf-8')
         fout = smart_open.s3.open(BUCKET_NAME, 'key', 'wb')
         fout.write(text)
@@ -348,8 +394,6 @@ class BufferedOutputBaseTest(unittest.TestCase):
         fout.close()
 
     def test_flush_close(self):
-        create_bucket_and_key()
-
         text = u'там за туманами, вечными, пьяными'.encode('utf-8')
         fout = smart_open.s3.open(BUCKET_NAME, 'key', 'wb')
         fout.write(text)
@@ -369,6 +413,12 @@ ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operatio
 
 @maybe_mock_s3
 class IterBucketTest(unittest.TestCase):
+    def setUp(self):
+        ignore_resource_warnings()
+
+    def tearDown(self):
+        cleanup_bucket()
+
     def test_iter_bucket(self):
         populate_bucket()
         results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
@@ -376,8 +426,7 @@ class IterBucketTest(unittest.TestCase):
 
     def test_accepts_boto3_bucket(self):
         populate_bucket()
-        s3 = boto3.resource('s3')
-        bucket = s3.Bucket(BUCKET_NAME)
+        bucket = boto3.resource('s3').Bucket(BUCKET_NAME)
         results = list(smart_open.s3.iter_bucket(bucket))
         self.assertEqual(len(results), 10)
 
@@ -407,8 +456,6 @@ class IterBucketTest(unittest.TestCase):
 
     def test_old(self):
         """Does s3_iter_bucket work correctly?"""
-        create_bucket_and_key()
-
         #
         # Use an old-school boto Bucket class for historical reasons.
         #
@@ -447,18 +494,45 @@ class IterBucketTest(unittest.TestCase):
 
 
 @maybe_mock_s3
+class IterBucketSingleProcessTest(unittest.TestCase):
+    def setUp(self):
+        self.old_flag = smart_open.s3._MULTIPROCESSING
+        smart_open.s3._MULTIPROCESSING = False
+
+        ignore_resource_warnings()
+
+    def tearDown(self):
+        smart_open.s3._MULTIPROCESSING = self.old_flag
+        cleanup_bucket()
+
+    def test(self):
+        num_keys = 101
+        populate_bucket(num_keys=num_keys)
+        keys = list(smart_open.s3.iter_bucket(BUCKET_NAME))
+        self.assertEqual(len(keys), num_keys)
+
+        expected = [('key_%d' % x, b'%d' % x) for x in range(num_keys)]
+        self.assertEqual(sorted(keys), sorted(expected))
+
+
+@maybe_mock_s3
 class DownloadKeyTest(unittest.TestCase):
+    def setUp(self):
+        ignore_resource_warnings()
+
+    def tearDown(self):
+        cleanup_bucket()
 
     def test_happy(self):
         contents = b'hello'
-        create_bucket_and_key(contents=contents)
+        put_to_bucket(contents=contents)
         expected = (KEY_NAME, contents)
         actual = smart_open.s3._download_key(KEY_NAME, bucket_name=BUCKET_NAME)
         self.assertEqual(expected, actual)
 
     def test_intermittent_error(self):
         contents = b'hello'
-        create_bucket_and_key(contents=contents)
+        put_to_bucket(contents=contents)
         expected = (KEY_NAME, contents)
         side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, contents]
         with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
@@ -467,7 +541,7 @@ class DownloadKeyTest(unittest.TestCase):
 
     def test_persistent_error(self):
         contents = b'hello'
-        create_bucket_and_key(contents=contents)
+        put_to_bucket(contents=contents)
         side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR,
                        ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR]
         with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
@@ -476,7 +550,7 @@ class DownloadKeyTest(unittest.TestCase):
 
     def test_intermittent_error_retries(self):
         contents = b'hello'
-        create_bucket_and_key(contents=contents)
+        put_to_bucket(contents=contents)
         expected = (KEY_NAME, contents)
         side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR,
                        ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, contents]
@@ -486,7 +560,7 @@ class DownloadKeyTest(unittest.TestCase):
 
     def test_propagates_other_exception(self):
         contents = b'hello'
-        create_bucket_and_key(contents=contents)
+        put_to_bucket(contents=contents)
         with mock.patch('smart_open.s3._download_fileobj', side_effect=ValueError):
             self.assertRaises(ValueError, smart_open.s3._download_key,
                               KEY_NAME, bucket_name=BUCKET_NAME)
@@ -494,12 +568,14 @@ class DownloadKeyTest(unittest.TestCase):
 
 @maybe_mock_s3
 class OpenTest(unittest.TestCase):
+    def setUp(self):
+        ignore_resource_warnings()
+
+    def tearDown(self):
+        cleanup_bucket()
 
     def test_read_never_returns_none(self):
         """read should never return None."""
-        s3 = boto3.resource('s3')
-        s3.create_bucket(Bucket=BUCKET_NAME)
-
         test_string = u"ветер по морю гуляет..."
         with smart_open.s3.open(BUCKET_NAME, KEY_NAME, "wb") as fout:
             fout.write(test_string.encode('utf8'))
@@ -510,20 +586,14 @@ class OpenTest(unittest.TestCase):
         self.assertEqual(r.read(), b"")
 
 
-def populate_bucket(bucket_name=BUCKET_NAME, num_keys=10):
+def populate_bucket(num_keys=10):
     # fake (or not) connection, bucket and key
     logger.debug('%r', locals())
+
     s3 = boto3.resource('s3')
-    bucket_exist = cleanup_bucket(s3)
-
-    if not bucket_exist:
-        mybucket = s3.create_bucket(Bucket=bucket_name)
-
-    mybucket = s3.Bucket(bucket_name)
-
     for key_number in range(num_keys):
         key_name = 'key_%d' % key_number
-        s3.Object(bucket_name, key_name).put(Body=str(key_number))
+        s3.Object(BUCKET_NAME, key_name).put(Body=str(key_number))
 
 
 if __name__ == '__main__':

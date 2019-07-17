@@ -1,24 +1,18 @@
-#!/usr/bin/env python
+#
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2015 Radim Rehurek <me@radimrehurek.com>
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
+#
 
-
-"""
-Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
-filesystem / compressed files, and many more, using a simple, Pythonic API.
-
-The streaming makes heavy use of generators and pipes, to avoid loading
-full file contents into memory, allowing work with arbitrarily large files.
+"""Implements the majority of smart_open's top-level API.
 
 The main functions are:
 
-* `open()`, which opens the given file for reading/writing
-* `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
-* `register_compressor()`, which registers callbacks for transparent compressor handling
+  * `open()`
+  * `register_compressor()`
 
 """
 
@@ -55,7 +49,6 @@ import sys
 # smart_open.submodule to reference to the submodules.
 #
 import smart_open.s3 as smart_open_s3
-from smart_open.s3 import iter_bucket as s3_iter_bucket
 import smart_open.hdfs as smart_open_hdfs
 import smart_open.webhdfs as smart_open_webhdfs
 import smart_open.http as smart_open_http
@@ -69,6 +62,7 @@ SYSTEM_ENCODING = sys.getdefaultencoding()
 
 _ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
 
+_DEFAULT_S3_HOST = 's3.amazonaws.com'
 
 _COMPRESSOR_REGISTRY = {}
 
@@ -86,9 +80,14 @@ def register_compressor(ext, callback):
     Examples
     --------
 
-    >>> def identity(file_obj, mode):
-    ...     return file_obj
-    >>> register_compressor('.foo', identity)
+    Instruct smart_open to use the identity function whenever opening a file
+    with a .xz extension (see README.rst for the complete example showing I/O):
+
+    >>> def _handle_xz(file_obj, mode):
+    ...     import lzma
+    ...     return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+    >>>
+    >>> register_compressor('.xz', _handle_xz)
 
     """
     if not (ext and ext[0] == '.'):
@@ -111,24 +110,11 @@ def _handle_gzip(file_obj, mode):
     return gzip.GzipFile(fileobj=file_obj, mode=mode)
 
 
-def _handle_xz(file_obj, mode):
-    #
-    # Delay import of compressor library until we actually need it
-    #
-    try:
-        import lzma
-    except ImportError:
-        # py<3.3
-        from backports import lzma
-    return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
-
-
 #
 # NB. avoid using lambda here to make stack traces more readable.
 #
 register_compressor('.bz2', _handle_bz2)
 register_compressor('.gz', _handle_gzip)
-register_compressor('.xz', _handle_xz)
 
 
 Uri = collections.namedtuple(
@@ -161,11 +147,26 @@ Uri.__new__.__defaults__ = (None,) * len(Uri._fields)
 
 
 def _inspect_kwargs(kallable):
-    args, varargs, keywords, defaults = inspect.getargspec(kallable)
-    if not defaults:
-        return {}
-    supported_keywords = args[-len(defaults):]
-    return dict(zip(supported_keywords, defaults))
+    #
+    # inspect.getargspec got deprecated in Py3.4, and calling it spews
+    # deprecation warnings that we'd prefer to avoid.  Unfortunately, older
+    # versions of Python (<3.3) did not have inspect.signature, so we need to
+    # handle them the old-fashioned getargspec way.
+    #
+    try:
+        signature = inspect.signature(kallable)
+    except AttributeError:
+        args, varargs, keywords, defaults = inspect.getargspec(kallable)
+        if not defaults:
+            return {}
+        supported_keywords = args[-len(defaults):]
+        return dict(zip(supported_keywords, defaults))
+    else:
+        return {
+            name: param.default
+            for name, param in signature.parameters.items()
+            if param.default != inspect.Parameter.empty
+        }
 
 
 def _check_kwargs(kallable, kwargs):
@@ -189,7 +190,7 @@ def _check_kwargs(kallable, kwargs):
     supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
 
     if unsupported_keywords:
-        logger.warn('ignoring unsupported keyword arguments: %r', unsupported_keywords)
+        logger.warning('ignoring unsupported keyword arguments: %r', unsupported_keywords)
 
     return supported_kwargs
 
@@ -207,9 +208,9 @@ def open(
         closefd=True,
         opener=None,
         ignore_ext=False,
-        tkwa=dict(),
+        transport_params=None,
         ):
-    """Open the URI object, returning a file-like object.
+    r"""Open the URI object, returning a file-like object.
 
     The URI is usually a string in a variety of formats:
 
@@ -228,7 +229,6 @@ def open(
 
     - ``.gz``
     - ``.bz2``
-    - ``.xz``
 
     The function depends on the file extension to determine the appropriate codec.
 
@@ -252,8 +252,8 @@ def open(
         Mimicks built-in open parameter of the same name.  Ignored.
     ignore_ext: boolean, optional
         Disable transparent compression/decompression based on the file extension.
-    tkwa: dict
-        Keyword arguments for the transport layer (see notes below).
+    transport_params: dict, optional
+        Additional parameters for the transport layer (see notes below).
 
     Returns
     -------
@@ -276,51 +276,27 @@ def open(
     WebHDFS (for details, see :mod:`smart_open.webhdfs` and :func:`smart_open.webhdfs.open`):
 
 %(webhdfs)s
+    SSH (for details, see :mod:`smart_open.ssh` and :func:`smart_open.ssh.open`):
+
+%(ssh)s
 
     Examples
     --------
-    >>> from smart_open import open
-    >>> # stream lines from http; you can use context managers too:
-    >>> with open('http://www.google.com') as fin:
-    ...     for line in fin:
-    ...         print(line)
+%(examples)s
 
-    >>> # stream lines from S3; you can use context managers too:
-    >>> with open('s3://mybucket/mykey.txt') as fin:
-    ...     for line in fin:
-    ...         print(line)
-
-    >>> # stream line-by-line from an HDFS file
-    >>> for line in open('hdfs:///user/hadoop/my_file.txt'):
-    ...    print(line)
-
-    >>> # stream content *into* S3:
-    >>> with open('s3://mybucket/mykey.txt', 'wb') as fout:
-    ...     for line in ['first line', 'second line', 'third line']:
-    ...          fout.write(line + '\n')
-
-    >>> # stream from/to (compressed) local files:
-    >>> for line in open('/home/radim/my_file.txt'):
-    ...    print(line)
-    >>> for line in open('/home/radim/my_file.txt.gz'):
-    ...    print(line)
-    >>> with open('/home/radim/my_file.txt.gz', 'wb') as fout:
-    ...    fout.write("hello world!\n")
-    >>> with open('/home/radim/another.txt.bz2', 'wb') as fout:
-    ...    fout.write("good bye!\n")
-    >>> with open('/home/radim/another.txt.xz', 'wb') as fout:
-    ...    fout.write("never say never!\n")
-    >>> # stream from/to (compressed) local files with Expand ~ and ~user constructions:
-    >>> for line in open('~/my_file.txt'):
-    ...    print(line)
-    >>> for line in open('my_file.txt'):
-    ...    print(line)
+    See Also
+    --------
+    - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
+    - `smart_open README.rst <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
 
     """
     logger.debug('%r', locals())
 
     if not isinstance(mode, six.string_types):
         raise TypeError('mode should be a string')
+
+    if transport_params is None:
+        transport_params = {}
 
     fobj = _shortcut_open(
         uri,
@@ -369,7 +345,7 @@ def open(
                        'a': 'ab', 'a+': 'ab+'}[mode]
     except KeyError:
         binary_mode = mode
-    binary, filename = _open_binary_stream(uri, binary_mode, tkwa)
+    binary, filename = _open_binary_stream(uri, binary_mode, transport_params)
     if ignore_ext:
         decompressed = binary
     else:
@@ -383,9 +359,6 @@ def open(
     return decoded
 
 
-#
-# Inject transport keyword argument documentation into the docstring.
-#
 open.__doc__ = open.__doc__ % {
     's3': doctools.to_docstring(
         doctools.extract_kwargs(smart_open_s3.open.__doc__),
@@ -399,12 +372,31 @@ open.__doc__ = open.__doc__ % {
         doctools.extract_kwargs(smart_open_webhdfs.open.__doc__),
         lpad=u'    ',
     ),
+    'ssh': doctools.to_docstring(
+        doctools.extract_kwargs(smart_open_ssh.open.__doc__),
+        lpad=u'    ',
+    ),
+    'examples': doctools.extract_examples_from_readme_rst(),
 }
 
 
+_MIGRATION_NOTES_URL = (
+    'https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst'
+    '#migrating-to-the-new-open-function'
+)
+
+
 def smart_open(uri, mode="rb", **kw):
-    """Deprecated, use smart_open.open instead."""
-    logger.warning('this function is deprecated, use smart_open.open instead')
+    """Deprecated, use smart_open.open instead.
+
+    See the migration instructions: %s
+
+    """ % _MIGRATION_NOTES_URL
+
+    warnings.warn(
+        'This function is deprecated, use smart_open.open instead. '
+        'See the migration notes for details: %s' % _MIGRATION_NOTES_URL
+    )
 
     #
     # The new function uses a shorter name for this parameter, handle it separately.
@@ -413,7 +405,39 @@ def smart_open(uri, mode="rb", **kw):
 
     expected_kwargs = _inspect_kwargs(open)
     scrubbed_kwargs = {}
-    tkwa = {}
+    transport_params = {}
+
+    #
+    # Handle renamed keyword arguments.  This is required to maintain backward
+    # compatibility.  See test_smart_open_old.py for tests.
+    #
+    if 'host' in kw or 's3_upload' in kw:
+        transport_params['multipart_upload_kwargs'] = {}
+        transport_params['resource_kwargs'] = {}
+
+    if 'host' in kw:
+        url = kw.pop('host')
+        if not url.startswith('http'):
+            url = 'http://' + url
+        transport_params['resource_kwargs'].update(endpoint_url=url)
+
+    if 's3_upload' in kw and kw['s3_upload']:
+        transport_params['multipart_upload_kwargs'].update(**kw.pop('s3_upload'))
+
+    #
+    # Providing the entire Session object as opposed to just the profile name
+    # is more flexible and powerful, and thus preferable in the case of
+    # conflict.
+    #
+    if 'profile_name' in kw and 's3_session' in kw:
+        logger.error('profile_name and s3_session are mutually exclusive, ignoring the former')
+
+    if 'profile_name' in kw:
+        transport_params['session'] = boto3.Session(profile_name=kw.pop('profile_name'))
+
+    if 's3_session' in kw:
+        transport_params['session'] = kw.pop('s3_session')
+
     for key, value in kw.items():
         if key in expected_kwargs:
             scrubbed_kwargs[key] = value
@@ -424,9 +448,9 @@ def smart_open(uri, mode="rb", **kw):
             # the argument ends up being unsupported in the transport layer,
             # it will only cause a logging warning, not a crash.
             #
-            tkwa[key] = value
+            transport_params[key] = value
 
-    return open(uri, mode, ignore_ext=ignore_extension, tkwa=tkwa, **scrubbed_kwargs)
+    return open(uri, mode, ignore_ext=ignore_extension, transport_params=transport_params, **scrubbed_kwargs)
 
 
 def _shortcut_open(
@@ -491,14 +515,14 @@ def _shortcut_open(
     return io.open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
 
 
-def _open_binary_stream(uri, mode, tkwa):
+def _open_binary_stream(uri, mode, transport_params):
     """Open an arbitrary URI in the specified binary mode.
 
     Not all modes are supported for all protocols.
 
     :arg uri: The URI to open.  May be a string, or something else.
     :arg str mode: The mode to open with.  Must be rb, wb or ab.
-    :arg tkwa: Keyword argumens for the transport layer.
+    :arg transport_params: Keyword argumens for the transport layer.
     :returns: A file object and the filename
     :rtype: tuple
     """
@@ -529,12 +553,12 @@ def _open_binary_stream(uri, mode, tkwa):
             )
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
-            return _s3_open_uri(parsed_uri, mode, tkwa), filename
+            return _s3_open_uri(parsed_uri, mode, transport_params), filename
         elif parsed_uri.scheme == "hdfs":
-            _check_kwargs(smart_open_hdfs.open, tkwa)
+            _check_kwargs(smart_open_hdfs.open, transport_params)
             return smart_open_hdfs.open(parsed_uri.uri_path, mode), filename
         elif parsed_uri.scheme == "webhdfs":
-            kw = _check_kwargs(smart_open_webhdfs.open, tkwa)
+            kw = _check_kwargs(smart_open_webhdfs.open, transport_params)
             return smart_open_webhdfs.open(parsed_uri.uri_path, mode, **kw), filename
         elif parsed_uri.scheme.startswith('http'):
             #
@@ -542,7 +566,7 @@ def _open_binary_stream(uri, mode, tkwa):
             # with our compressed/uncompressed estimation, so we strip them.
             #
             filename = P.basename(urlparse.urlparse(uri).path)
-            kw = _check_kwargs(smart_open_http.open, tkwa)
+            kw = _check_kwargs(smart_open_http.open, transport_params)
             return smart_open_http.open(uri, mode, **kw), filename
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
@@ -558,7 +582,7 @@ def _open_binary_stream(uri, mode, tkwa):
         raise TypeError("don't know how to handle uri %r" % uri)
 
 
-def _s3_open_uri(parsed_uri, mode, tkwa):
+def _s3_open_uri(parsed_uri, mode, transport_params):
     logger.debug('s3_open_uri: %r', locals())
     if mode in ('r', 'w'):
         raise ValueError('this function can only open binary streams. '
@@ -569,26 +593,80 @@ def _s3_open_uri(parsed_uri, mode, tkwa):
     #
     # There are two explicit ways we can receive session parameters from the user.
     #
-    # 1. Via the session keyword argument (tkwa)
+    # 1. Via the session keyword argument (transport_params)
     # 2. Via the URI itself
     #
     # They are not mutually exclusive, but we have to pick one of the two.
     # Go with 1).
     #
-    if tkwa.get('session') is not None and (parsed_uri.access_id or parsed_uri.access_secret):
+    if transport_params.get('session') is not None and (parsed_uri.access_id or parsed_uri.access_secret):
         logger.warning(
-            'ignoring credentials parsed from URL because '
-            'they conflict with tkwa.session.  Set tkwa.session to None to '
-            'suppress this warning.'
+            'ignoring credentials parsed from URL because they conflict with '
+            'transport_params.session. Set transport_params.session to None '
+            'to suppress this warning.'
         )
     elif (parsed_uri.access_id and parsed_uri.access_secret):
-        tkwa['session'] = boto3.Session(
+        transport_params['session'] = boto3.Session(
             aws_access_key_id=parsed_uri.access_id,
             aws_secret_access_key=parsed_uri.access_secret,
         )
 
-    kwargs = _check_kwargs(smart_open_s3.open, tkwa)
+    #
+    # There are two explicit ways the user can provide the endpoint URI:
+    #
+    # 1. Via the URL.  The protocol is implicit, and we assume HTTPS in this case.
+    # 2. Via the resource_kwargs and multipart_upload_kwargs endpoint_url parameter.
+    #
+    # Again, these are not mutually exclusive: the user can specify both.  We
+    # have to pick one to proceed, however, and we go with 2.
+    #
+    if parsed_uri.host != _DEFAULT_S3_HOST:
+        endpoint_url = 'https://%s:%d' % (parsed_uri.host, parsed_uri.port)
+        _override_endpoint_url(transport_params, endpoint_url)
+
+    kwargs = _check_kwargs(smart_open_s3.open, transport_params)
     return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
+
+
+def _override_endpoint_url(tp, url):
+    try:
+        resource_kwargs = tp['resource_kwargs']
+    except KeyError:
+        resource_kwargs = tp['resource_kwargs'] = {}
+
+    if resource_kwargs.get('endpoint_url'):
+        logger.warning(
+            'ignoring endpoint_url parsed from URL because it conflicts '
+            'with transport_params.resource_kwargs.endpoint_url. '
+        )
+    else:
+        resource_kwargs.update(endpoint_url=url)
+
+
+def _my_urlsplit(url):
+    """This is a hack to prevent the regular urlsplit from splitting around question marks.
+
+    A question mark (?) in a URL typically indicates the start of a
+    querystring, and the standard library's urlparse function handles the
+    querystring separately.  Unfortunately, question marks can also appear
+    _inside_ the actual URL for some schemas like S3.
+
+    Replaces question marks with newlines prior to splitting.  This is safe because:
+
+    1. The standard library's urlsplit completely ignores newlines
+    2. Raw newlines will never occur in innocuous URLs.  They are always URL-encoded.
+
+    See Also
+    --------
+    https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
+    https://github.com/RaRe-Technologies/smart_open/issues/285
+    """
+    if '?' not in url:
+        return urlsplit(url, allow_fragments=False)
+
+    sr = urlsplit(url.replace('?', '\n'), allow_fragments=False)
+    SplitResult = collections.namedtuple('SplitResult', 'scheme netloc path query fragment')
+    return SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
 
 
 def _parse_uri(uri_as_string):
@@ -625,7 +703,6 @@ def _parse_uri(uri_as_string):
       * file:///home/user/file.bz2
       * [ssh|scp|sftp]://username@host//path/file
       * [ssh|scp|sftp]://username@host/path/file
-      * file:///home/user/file.xz
 
     """
     if os.name == 'nt':
@@ -633,7 +710,8 @@ def _parse_uri(uri_as_string):
         if '://' not in uri_as_string:
             # no protocol given => assume a local file
             uri_as_string = 'file://' + uri_as_string
-    parsed_uri = urlsplit(uri_as_string, allow_fragments=False)
+
+    parsed_uri = _my_urlsplit(uri_as_string)
 
     if parsed_uri.scheme == "hdfs":
         return _parse_uri_hdfs(parsed_uri)
@@ -692,7 +770,7 @@ def _parse_uri_s3x(parsed_uri):
     assert parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES
 
     port = 443
-    host = boto.config.get('s3', 'host', 's3.amazonaws.com')
+    host = boto.config.get('s3', 'host', _DEFAULT_S3_HOST)
     ordinary_calling_format = False
     #
     # These defaults tell boto3 to look for credentials elsewhere

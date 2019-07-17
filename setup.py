@@ -9,11 +9,24 @@
 
 import io
 import os
+import sys
+
 from setuptools import setup, find_packages
 
 
 def read(fname):
     return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
+
+
+#
+# This code intentially duplicates a similar function in __init__.py.  The
+# alternative would be to somehow import that module to access the function,
+# which would be too messy for a setup.py script.
+#
+def _get_version():
+    curr_dir = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(curr_dir, 'smart_open', 'VERSION')) as fin:
+        return fin.read().strip()
 
 
 tests_require = [
@@ -30,14 +43,25 @@ tests_require = [
     'google-compute-engine==2.8.12'
 ]
 
+install_requires = [
+    'boto >= 2.32',
+    'requests',
+    'boto3',
+]
+if sys.version_info[0] == 2:
+    install_requires.append('bz2file')
+
 setup(
     name='smart_open',
-    version='1.8.0',
+    version=_get_version(),
     description='Utils for streaming large files (S3, HDFS, gzip, bz2...)',
     long_description=read('README.rst'),
 
     packages=find_packages(),
-    package_data={"smart_open.tests": ["test_data/*gz"]},
+    package_data={
+        "smart_open": ["VERSION"],
+        "smart_open.tests": ["test_data/*gz"],
+    },
 
     author='Radim Rehurek',
     author_email='me@radimrehurek.com',
@@ -52,13 +76,7 @@ setup(
     license='MIT',
     platforms='any',
 
-    install_requires=[
-        'boto >= 2.32',
-        'bz2file',
-        'requests',
-        'boto3',
-        'backports.lzma;python_version<"3.3"',
-    ],
+    install_requires=install_requires,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,

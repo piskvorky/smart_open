@@ -1,19 +1,51 @@
 # Unreleased
 
+# 1.8.4, 2 Jun 2019
+
+  - Don't use s3 bucket_head to check for bucket existence (PR [#315](https://github.com/RaRe-Technologies/smart_open/pull/315), [@caboteria](https://github.com/caboteria))
+  - Dont list buckets in s3 tests (PR [#318](https://github.com/RaRe-Technologies/smart_open/pull/318), [@caboteria](https://github.com/caboteria))
+  - Use warnings.warn instead of logger.warning (PR [#321](https://github.com/RaRe-Technologies/smart_open/pull/321), [@mpenkov](https://github.com/mpenkov))
+  - Optimize reading from S3 (PR [#322](https://github.com/RaRe-Technologies/smart_open/pull/322), [@mpenkov](https://github.com/mpenkov))
+
+# 1.8.3, 26 April 2019
+
+  - Improve S3 read performance by not copying buffer (PR [#284](https://github.com/RaRe-Technologies/smart_open/pull/284), [@aperiodic](https://github.com/aperiodic))
+  - accept bytearray and memoryview as input to write in s3 submodule (PR [#293](https://github.com/RaRe-Technologies/smart_open/pull/293), [@bmizhen-exos](https://github.com/bmizhen-exos))
+  - Fix two S3 bugs (PR [#307](https://github.com/RaRe-Technologies/smart_open/pull/307), [@mpenkov](https://github.com/mpenkov))
+  - Minor fixes: bz2file dependency, paramiko warning handling (PR [#309](https://github.com/RaRe-Technologies/smart_open/pull/309), [@mpenkov](https://github.com/mpenkov))
+  - improve unit tests (PR [#310](https://github.com/RaRe-Technologies/smart_open/pull/310), [@mpenkov](https://github.com/mpenkov))
+
+# 1.8.2, 17 April 2019
+
+  - Removed dependency on lzma (PR [#262](https://github.com/RaRe-Technologies/smart_open/pull/282), [@tdhopper](https://github.com/tdhopper))
+  - backward compatibility fixes (PR [#294](https://github.com/RaRe-Technologies/smart_open/pull/294), [@mpenkov](https://github.com/mpenkov))
+  - Minor fixes (PR [#291](https://github.com/RaRe-Technologies/smart_open/pull/291), [@mpenkov](https://github.com/mpenkov))
+  - Fix #289: the smart_open package now correctly exposes a `__version__` attribute
+  - Fix #285: handle edge case with question marks in an S3 URL
+
+This release rolls back support for transparently decompressing .xz files,
+previously introduced in 1.8.1.  This is a useful feature, but it requires a
+tricky dependency.  It's still possible to handle .xz files with relatively
+little effort. Please see the
+[README.rst](https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst#supported-compression-formats)
+file for details.
+
+# 1.8.1, 6 April 2019
+
   - Added support for .xz / lzma (PR [#262](https://github.com/RaRe-Technologies/smart_open/pull/262), [@vmarkovtsev](https://github.com/vmarkovtsev))
   - Added streaming HTTP support (PR [#236](https://github.com/RaRe-Technologies/smart_open/pull/236), [@handsomezebra](https://github.com/handsomezebra))
   - Fix handling of "+" mode, refactor tests (PR [#263](https://github.com/RaRe-Technologies/smart_open/pull/263), [@vmarkovtsev](https://github.com/vmarkovtsev))
   - Added support for SSH/SCP/SFTP (PR [#58](https://github.com/RaRe-Technologies/smart_open/pull/58), [@val314159](https://github.com/val314159) & [@mpenkov](https://github.com/mpenkov))
   - Added new feature: compressor registry (PR [#266](https://github.com/RaRe-Technologies/smart_open/pull/266), [@mpenkov](https://github.com/mpenkov))
   - Implemented new `smart_open.open` function (PR [#268](https://github.com/RaRe-Technologies/smart_open/pull/268), [@mpenkov](https://github.com/mpenkov))
-  
+
 ## smart_open.open
 
 This new function replaces `smart_open.smart_open`, which is now deprecated.
 Main differences:
 
 - ignore_extension → ignore_ext
-- new `tkwa` dict parameter to contain keyword parameters for the transport layer (S3, HTTPS, HDFS, etc). 
+- new `transport_params` dict parameter to contain keyword parameters for the transport layer (S3, HTTPS, HDFS, etc).
 
 Main advantages of the new function:
 

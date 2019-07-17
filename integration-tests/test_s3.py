@@ -23,6 +23,18 @@ def write_read(key, content, write_mode, read_mode, encoding=None, s3_upload=Non
     return actual
 
 
+def read_length_prefixed_messages(key, read_mode, encoding=None, **kwargs):
+    with smart_open.smart_open(key, read_mode, encoding=encoding, **kwargs) as fin:
+        actual = b''
+        length_byte = fin.read(1);
+        while len(length_byte):
+            actual += length_byte
+            msg = fin.read(ord(length_byte))
+            actual += msg
+            length_byte = fin.read(1)
+    return actual
+
+
 def test_s3_readwrite_text(benchmark):
     initialize_bucket()
 
@@ -83,6 +95,24 @@ def test_s3_performance_gz(benchmark):
     key = _S3_URL + '/performance.txt.gz'
     actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
     assert actual == one_megabyte
+
+def test_s3_performance_small_reads(benchmark):
+    initialize_bucket()
+
+    ONE_MIB = 1024**2
+    one_megabyte_of_msgs = io.BytesIO()
+    msg = b'\x0f' + b'0123456789abcde' # a length-prefixed "message"
+    for _ in range(0, ONE_MIB, len(msg)):
+            one_megabyte_of_msgs.write(msg)
+    one_megabyte_of_msgs = one_megabyte_of_msgs.getvalue()
+
+    key = _S3_URL + '/many_reads_performance.bin'
+
+    with smart_open.smart_open(key, 'wb') as fout:
+        fout.write(one_megabyte_of_msgs)
+
+    actual = benchmark(read_length_prefixed_messages, key, 'rb', buffer_size = ONE_MIB)
+    assert actual == one_megabyte_of_msgs
 
 def test_s3_encrypted_file(benchmark):
     initialize_bucket()

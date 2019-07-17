@@ -5,14 +5,19 @@
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
+#
+# These are tests that test the deprecated smart_open.smart_open function.
+# They mostly duplicate tests in test_smart_open.py and are here to guarantee
+# backwards compatibility.
+#
 
-import bz2
 import io
-import unittest
 import logging
 import tempfile
 import os
+import sys
 import hashlib
+import unittest
 
 import boto3
 import mock
@@ -26,192 +31,8 @@ from smart_open import smart_open_lib
 
 logger = logging.getLogger(__name__)
 
+PY2 = sys.version_info[0] == 2
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
-SAMPLE_TEXT = 'Hello, world!'
-SAMPLE_BYTES = SAMPLE_TEXT.encode('utf-8')
-
-
-class ParseUriTest(unittest.TestCase):
-    """
-    Test ParseUri class.
-
-    """
-    def test_scheme(self):
-        """Do URIs schemes parse correctly?"""
-        # supported schemes
-        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https"):
-            parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
-            self.assertEqual(parsed_uri.scheme, scheme)
-
-        # unsupported scheme => NotImplementedError
-        self.assertRaises(NotImplementedError, smart_open_lib._parse_uri, "foobar://mybucket/mykey")
-
-        # unknown scheme => default_scheme
-        parsed_uri = smart_open_lib._parse_uri("blah blah")
-        self.assertEqual(parsed_uri.scheme, "file")
-
-    def test_s3_uri(self):
-        """Do S3 URIs parse correctly?"""
-        # correct uri without credentials
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "mykey")
-        self.assertEqual(parsed_uri.access_id, None)
-        self.assertEqual(parsed_uri.access_secret, None)
-
-    def test_s3_uri_contains_slash(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "mydir/mykey")
-        self.assertEqual(parsed_uri.access_id, None)
-        self.assertEqual(parsed_uri.access_secret, None)
-
-    def test_s3_uri_with_credentials(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "mykey")
-        self.assertEqual(parsed_uri.access_id, "ACCESSID456")
-        self.assertEqual(parsed_uri.access_secret, "acces/sse_cr-et")
-
-    def test_s3_uri_with_credentials2(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/mykey")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "mykey")
-        self.assertEqual(parsed_uri.access_id, "accessid")
-        self.assertEqual(parsed_uri.access_secret, "access/secret")
-
-    def test_s3_uri_has_atmark_in_key_name(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/my@ke@y")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "my@ke@y")
-        self.assertEqual(parsed_uri.access_id, "accessid")
-        self.assertEqual(parsed_uri.access_secret, "access/secret")
-
-    def test_s3_uri_has_atmark_in_key_name2(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "dir/my@ke@y")
-        self.assertEqual(parsed_uri.access_id, "accessid")
-        self.assertEqual(parsed_uri.access_secret, "access/secret")
-        self.assertEqual(parsed_uri.host, "hostname")
-        self.assertEqual(parsed_uri.port, 1234)
-
-    def test_s3_uri_has_atmark_in_key_name3(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@hostname@mybucket/dir/my@ke@y")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "dir/my@ke@y")
-        self.assertEqual(parsed_uri.access_id, "accessid")
-        self.assertEqual(parsed_uri.access_secret, "access/secret")
-        self.assertEqual(parsed_uri.host, "hostname")
-        self.assertEqual(parsed_uri.port, 443)
-
-    def test_s3_handles_fragments(self):
-        uri_str = 's3://bucket-name/folder/picture #1.jpg'
-        parsed_uri = smart_open_lib._parse_uri(uri_str)
-        self.assertEqual(parsed_uri.key_id, "folder/picture #1.jpg")
-
-    def test_s3_handles_querystring(self):
-        uri_str = 's3://bucket-name/folder/picture1.jpg?bar'
-        parsed_uri = smart_open_lib._parse_uri(uri_str)
-        self.assertEqual(parsed_uri.key_id, "folder/picture1.jpg?bar")
-
-    def test_s3_invalid_url_atmark_in_bucket_name(self):
-        self.assertRaises(ValueError, smart_open_lib._parse_uri, "s3://access_id:access_secret@my@bucket@port/mykey")
-
-    def test_s3_invalid_uri_missing_colon(self):
-        self.assertRaises(ValueError, smart_open_lib._parse_uri, "s3://access_id@access_secret@mybucket@port/mykey")
-
-    def test_webhdfs_uri(self):
-        """Do webhdfs URIs parse correctly"""
-        # valid uri, no query
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:port/path/file")
-        self.assertEqual(parsed_uri.scheme, "webhdfs")
-        self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file")
-
-        # valid uri, with query
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:port/path/file?query_part_1&query_part2")
-        self.assertEqual(parsed_uri.scheme, "webhdfs")
-        self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file?query_part_1&query_part2")
-
-    def test_uri_from_issue_223_works(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://:@omax-mis/twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "omax-mis")
-        self.assertEqual(parsed_uri.key_id, "twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6")
-        self.assertEqual(parsed_uri.access_id, "")
-        self.assertEqual(parsed_uri.access_secret, "")
-
-    def test_s3_uri_with_colon_in_key_name(self):
-        """ Correctly parse the s3 url if there is a colon in the key or dir """
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/my:key")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "mydir/my:key")
-        self.assertEqual(parsed_uri.access_id, None)
-        self.assertEqual(parsed_uri.access_secret, None)
-
-    def test_host_and_port(self):
-        as_string = 's3u://user:secret@host:1234@mybucket/mykey.txt'
-        uri = smart_open_lib._parse_uri(as_string)
-        self.assertEqual(uri.scheme, "s3u")
-        self.assertEqual(uri.bucket_id, "mybucket")
-        self.assertEqual(uri.key_id, "mykey.txt")
-        self.assertEqual(uri.access_id, "user")
-        self.assertEqual(uri.access_secret, "secret")
-        self.assertEqual(uri.host, "host")
-        self.assertEqual(uri.port, 1234)
-
-    def test_invalid_port(self):
-        as_string = 's3u://user:secret@host:port@mybucket/mykey.txt'
-        self.assertRaises(ValueError, smart_open_lib._parse_uri, as_string)
-
-    def test_invalid_port2(self):
-        as_string = 's3u://user:secret@host:port:foo@mybucket/mykey.txt'
-        self.assertRaises(ValueError, smart_open_lib._parse_uri, as_string)
-
-    def test_leading_slash_local_file(self):
-        path = "/home/misha/hello.txt"
-        uri = smart_open_lib._parse_uri(path)
-        self.assertEqual(uri.scheme, "file")
-        self.assertEqual(uri.uri_path, path)
-
-        uri = smart_open_lib._parse_uri('//' + path)
-        self.assertEqual(uri.scheme, "file")
-        self.assertEqual(uri.uri_path, '//' + path)
-
-    def test_ssh(self):
-        as_string = 'ssh://user@host:1234/path/to/file'
-        uri = smart_open_lib._parse_uri(as_string)
-        self.assertEqual(uri.scheme, 'ssh')
-        self.assertEqual(uri.uri_path, '/path/to/file')
-        self.assertEqual(uri.user, 'user')
-        self.assertEqual(uri.host, 'host')
-        self.assertEqual(uri.port, 1234)
-
-    def test_scp(self):
-        as_string = 'scp://user@host:/path/to/file'
-        uri = smart_open_lib._parse_uri(as_string)
-        self.assertEqual(uri.scheme, 'scp')
-        self.assertEqual(uri.uri_path, '/path/to/file')
-        self.assertEqual(uri.user, 'user')
-        self.assertEqual(uri.host, 'host')
-        self.assertEqual(uri.port, 22)
-
-    def test_sftp(self):
-        as_string = 'sftp://host/path/to/file'
-        uri = smart_open_lib._parse_uri(as_string)
-        self.assertEqual(uri.scheme, 'sftp')
-        self.assertEqual(uri.uri_path, '/path/to/file')
-        self.assertEqual(uri.user, None)
-        self.assertEqual(uri.host, 'host')
-        self.assertEqual(uri.port, 22)
 
 
 class SmartOpenHttpTest(unittest.TestCase):
@@ -219,19 +40,6 @@ class SmartOpenHttpTest(unittest.TestCase):
     Test reading from HTTP connections in various ways.
 
     """
-    @mock.patch('smart_open.ssh.open')
-    def test_read_ssh(self, mock_open):
-        """Is SSH line iterator called correctly?"""
-        obj = smart_open.smart_open("ssh://ubuntu@ip_address:1022/some/path/lines.txt")
-        obj.__iter__()
-        mock_open.assert_called_with(
-            '/some/path/lines.txt',
-            'rb',
-            host='ip_address',
-            user='ubuntu',
-            port=1022
-        )
-
     @responses.activate
     def test_http_read(self):
         """Does http read method work correctly"""
@@ -260,141 +68,68 @@ class SmartOpenHttpTest(unittest.TestCase):
         self.assertTrue(actual_request.headers['Authorization'].startswith('Basic '))
 
     @responses.activate
-    def _test_compressed_http(self, suffix, query):
-        """Can open <suffix> via http?"""
-        raw_data = b'Hello World Compressed.' * 10000
-        buffer = make_buffer(name='data' + suffix)
-        with smart_open.smart_open(buffer, 'wb') as outfile:
-            outfile.write(raw_data)
-        compressed_data = buffer.getvalue()
-        # check that the string was actually compressed
-        self.assertNotEqual(compressed_data, raw_data)
-
-        responses.add(responses.GET, 'http://127.0.0.1/data' + suffix, body=compressed_data, stream=True)
-        smart_open_object = smart_open.smart_open(
-            'http://127.0.0.1/data%s%s' % (suffix, '?some_param=some_val' if query else ''))
-
-        # decompress the file and get the same md5 hash
-        self.assertEqual(smart_open_object.read(), raw_data)
-
     @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
     def test_http_gz(self):
         """Can open gzip via http?"""
-        self._test_compressed_http(".gz", False)
+        fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
+        with open(fpath, 'rb') as infile:
+            data = infile.read()
 
-    def test_http_bz2(self):
-        """Can open bzip2 via http?"""
-        self._test_compressed_http(".bz2", False)
+        with gzip.GzipFile(fpath) as fin:
+            expected_hash = hashlib.md5(fin.read()).hexdigest()
 
+        responses.add(responses.GET, "http://127.0.0.1/data.gz", body=data, stream=True)
+        smart_open_object = smart_open.smart_open("http://127.0.0.1/data.gz?some_param=some_val")
+
+        m = hashlib.md5(smart_open_object.read())
+        # decompress the gzip and get the same md5 hash
+        self.assertEqual(m.hexdigest(), expected_hash)
+
+    @responses.activate
     @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
-    def test_http_gz_query(self):
-        """Can open gzip via http with a query appended to URI?"""
-        self._test_compressed_http(".gz", True)
+    def test_http_gz_noquerystring(self):
+        """Can open gzip via http?"""
+        fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
+        with open(fpath, 'rb') as infile:
+            data = infile.read()
 
-    def test_http_bz2_query(self):
-        """Can open bzip2 via http with a query appended to URI?"""
-        self._test_compressed_http(".bz2", True)
+        with gzip.GzipFile(fpath) as fin:
+            expected_hash = hashlib.md5(fin.read()).hexdigest()
 
+        responses.add(responses.GET, "http://127.0.0.1/data.gz", body=data, stream=True)
+        smart_open_object = smart_open.smart_open("http://127.0.0.1/data.gz")
 
-def make_buffer(cls=six.BytesIO, initial_value=None, name=None):
-    """
-    Construct a new in-memory file object aka "buffer".
+        m = hashlib.md5(smart_open_object.read())
+        # decompress the gzip and get the same md5 hash
+        self.assertEqual(m.hexdigest(), expected_hash)
 
-    :param cls: Class of the file object. Meaningful values are BytesIO and StringIO.
-    :param initial_value: Passed directly to the constructor, this is the content of the returned buffer.
-    :param name: Associated file path. Not assigned if is None (default).
-    :return: Instance of `cls`.
-    """
-    buf = cls(initial_value) if initial_value else cls()
-    if name is not None:
-        buf.name = name
-    if six.PY2:
-        buf.__enter__ = lambda: buf
-        buf.__exit__ = lambda exc_type, exc_val, exc_tb: None
-    return buf
+    @responses.activate
+    def test_http_bz2(self):
+        """Can open bz2 via http?"""
+        test_string = b'Hello World Compressed.'
+        #
+        # TODO: why are these tests writing to temporary files?  We can do the
+        # bz2 compression in memory.
+        #
+        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as infile:
+            test_file = infile.name
 
+        with smart_open.smart_open(test_file, 'wb') as outfile:
+            outfile.write(test_string)
 
-class SmartOpenFileObjTest(unittest.TestCase):
-    """
-    Test passing raw file objects.
-    """
+        with open(test_file, 'rb') as infile:
+            compressed_data = infile.read()
 
-    def test_read_bytes(self):
-        """Can we read bytes from a byte stream?"""
-        buffer = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buffer, 'rb') as sf:
-            data = sf.read()
-        self.assertEqual(data, SAMPLE_BYTES)
+        if os.path.isfile(test_file):
+            os.unlink(test_file)
 
-    def test_write_bytes(self):
-        """Can we write bytes to a byte stream?"""
-        buffer = make_buffer()
-        with smart_open.smart_open(buffer, 'wb') as sf:
-            sf.write(SAMPLE_BYTES)
-            self.assertEqual(buffer.getvalue(), SAMPLE_BYTES)
+        responses.add(responses.GET, "http://127.0.0.1/data.bz2",
+                      body=compressed_data, stream=True)
+        smart_open_object = smart_open.smart_open("http://127.0.0.1/data.bz2")
 
-    @unittest.skipIf(six.PY2, "Python 2 does not differentiate between str and bytes")
-    def test_read_text_stream_fails(self):
-        """Attempts to read directly from a text stream should fail."""
-        buffer = make_buffer(six.StringIO, initial_value=SAMPLE_TEXT)
-        with smart_open.smart_open(buffer, 'r') as sf:
-            self.assertRaises(TypeError, sf.read)  # we expect binary mode
+        # decompress the gzip and get the same md5 hash
+        self.assertEqual(smart_open_object.read(), test_string)
 
-    @unittest.skipIf(six.PY2, "Python 2 does not differentiate between str and bytes")
-    def test_write_text_stream_fails(self):
-        """Attempts to write directly to a text stream should fail."""
-        buffer = make_buffer(six.StringIO)
-        with smart_open.smart_open(buffer, 'w') as sf:
-            self.assertRaises(TypeError, sf.write, SAMPLE_TEXT)  # we expect binary mode
-
-    def test_read_str_from_bytes(self):
-        """Can we read strings from a byte stream?"""
-        buffer = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buffer, 'r') as sf:
-            data = sf.read()
-        self.assertEqual(data, SAMPLE_TEXT)
-
-    def test_write_str_to_bytes(self):
-        """Can we write strings to a byte stream?"""
-        buffer = make_buffer()
-        with smart_open.smart_open(buffer, 'w') as sf:
-            sf.write(SAMPLE_TEXT)
-            self.assertEqual(buffer.getvalue(), SAMPLE_BYTES)
-
-    def test_name_read(self):
-        """Can we use the "name" attribute to decompress on the fly?"""
-        data = SAMPLE_BYTES * 1000
-        buffer = make_buffer(initial_value=bz2.compress(data), name='data.bz2')
-        with smart_open.smart_open(buffer, 'rb') as sf:
-            data = sf.read()
-        self.assertEqual(data, data)
-
-    def test_name_write(self):
-        """Can we use the "name" attribute to compress on the fly?"""
-        data = SAMPLE_BYTES * 1000
-        buffer = make_buffer(name='data.bz2')
-        with smart_open.smart_open(buffer, 'wb') as sf:
-            sf.write(data)
-        self.assertEqual(bz2.decompress(buffer.getvalue()), data)
-
-    def test_open_side_effect(self):
-        """
-        Does our detection of the `name` attribute work with wrapped open()-ed streams?
-
-        We `open()` a file with ".bz2" extension, pass the file object to `smart_open()` and check that
-        we read decompressed data. This behavior is driven by detecting the `name` attribute in
-        `_open_binary_stream()`.
-        """
-        data = SAMPLE_BYTES * 1000
-        with tempfile.NamedTemporaryFile(prefix='smart_open_tests_', suffix=".bz2", delete=False) as tmpf:
-            tmpf.write(bz2.compress(data))
-        try:
-            with open(tmpf.name, 'rb') as openf:
-                with smart_open.smart_open(openf) as smartf:
-                    smart_data = smartf.read()
-            self.assertEqual(data, smart_data)
-        finally:
-            os.unlink(tmpf.name)
 
 #
 # What exactly to patch here differs on _how_ we're opening the file.
@@ -697,6 +432,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.Session')
     def test_no_kwargs(self, mock_session):
         smart_open.smart_open('s3://mybucket/mykey')
+        mock_session.assert_called()
         mock_session.return_value.resource.assert_called_with('s3')
 
     @mock.patch('boto3.Session')
@@ -706,28 +442,23 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         mock_session.return_value.resource.assert_called_with('s3')
 
     @mock.patch('boto3.Session')
+    def test_profile(self, mock_session):
+        smart_open.smart_open('s3://mybucket/mykey', profile_name='my_credentials')
+        mock_session.assert_called_with(profile_name='my_credentials')
+        mock_session.return_value.resource.assert_called_with('s3')
+
+    @mock.patch('boto3.Session')
     def test_host(self, mock_session):
-        transport_params = {'resource_kwargs': {'endpoint_url': 'http://aa.domain.com'}}
-        smart_open.open("s3://access_id:access_secret@mybucket/mykey", transport_params=transport_params)
-        mock_session.assert_called_with(
-            aws_access_key_id='access_id',
-            aws_secret_access_key='access_secret',
-        )
-        mock_session.return_value.resource.assert_called_with(
-            's3',
-            endpoint_url='http://aa.domain.com',
-        )
+        smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey", host='aa.domain.com')
+        mock_session.assert_called_with(aws_access_key_id='access_id', aws_secret_access_key='access_secret')
+        mock_session.return_value.resource.assert_called_with('s3', endpoint_url='http://aa.domain.com')
 
     @mock.patch('boto3.Session')
     def test_s3_upload(self, mock_session):
-        smart_open.open(
-            "s3://bucket/key", 'wb', transport_params={
-                'multipart_upload_kwargs': {
-                    'ServerSideEncryption': 'AES256',
-                    'ContentType': 'application/json',
-                }
-            }
-        )
+        smart_open.smart_open("s3://bucket/key", 'wb', s3_upload={
+            'ServerSideEncryption': 'AES256',
+            'ContentType': 'application/json'
+        })
 
         # Locate the s3.Object instance (mock)
         s3_resource = mock_session.return_value.resource.return_value
@@ -740,6 +471,13 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             ContentType='application/json'
         )
 
+    @mock.patch('boto3.Session')
+    def test_s3_upload_is_none(self, mock_session):
+        smart_open.smart_open("s3://bucket/key", 'wb', s3_upload=None)
+        s3_resource = mock_session.return_value.resource.return_value
+        s3_object = s3_resource.Object.return_value
+        s3_object.initiate_multipart_upload.assert_called()
+
     def test_session_read_mode(self):
         """
         Read stream should use a custom boto3.Session
@@ -747,7 +485,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         session = boto3.Session()
         session.resource = mock.MagicMock()
 
-        smart_open.open('s3://bucket/key', transport_params={'session': session})
+        smart_open.smart_open('s3://bucket/key', s3_session=session)
         session.resource.assert_called_with('s3')
 
     def test_session_write_mode(self):
@@ -757,7 +495,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         session = boto3.Session()
         session.resource = mock.MagicMock()
 
-        smart_open.open('s3://bucket/key', 'wb', transport_params={'session': session})
+        smart_open.smart_open('s3://bucket/key', 'wb', s3_session=session)
         session.resource.assert_called_with('s3')
 
 
@@ -844,8 +582,7 @@ class SmartOpenTest(unittest.TestCase):
         """Are s3:// open modes passed correctly?"""
 
         # correct write mode, correct s3 URI
-        transport_params = {'resource_kwargs': {'endpoint_url': 'http://s3.amazonaws.com'}}
-        smart_open.open("s3://mybucket/mykey", "w", transport_params=transport_params)
+        smart_open.smart_open("s3://mybucket/mykey", "w", host='s3.amazonaws.com')
         mock_session.return_value.resource.assert_called_with(
             's3', endpoint_url='http://s3.amazonaws.com'
         )
@@ -873,18 +610,18 @@ class SmartOpenTest(unittest.TestCase):
         # fake bucket and key
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
-        raw_data = b"second test"
+        test_string = b"second test"
 
         # correct write mode, correct s3 URI
         with smart_open.smart_open("s3://mybucket/newkey", "wb") as fout:
             logger.debug('fout: %r', fout)
-            fout.write(raw_data)
+            fout.write(test_string)
 
         logger.debug("write successfully completed")
 
         output = list(smart_open.smart_open("s3://mybucket/newkey", "rb"))
 
-        self.assertEqual(output, [raw_data])
+        self.assertEqual(output, [test_string])
 
     @mock_s3
     def test_s3_metadata_write(self):
@@ -899,13 +636,11 @@ class SmartOpenTest(unittest.TestCase):
         s3.create_bucket(Bucket='mybucket')
 
         # Write data, with multipart_upload options
-        write_stream = smart_open.open(
+        write_stream = smart_open.smart_open(
             's3://mybucket/crime-and-punishment.txt.gz', 'wb',
-            transport_params={
-                'multipart_upload_kwargs': {
-                    'ContentType': 'text/plain',
-                    'ContentEncoding': 'gzip',
-                }
+            s3_upload={
+                'ContentType': 'text/plain',
+                'ContentEncoding': 'gzip'
             }
         )
         with write_stream as fout:
@@ -997,15 +732,17 @@ class CompressionFormatTest(unittest.TestCase):
     Test that compression
     """
 
-    def write_read_assertion(self, suffix):
-        test_file = make_buffer(name='file' + suffix)
-        with smart_open.smart_open(test_file, 'wb') as fout:
-            fout.write(SAMPLE_BYTES)
-        self.assertNotEqual(SAMPLE_BYTES, test_file.getvalue())
-        # we have to recreate the buffer because it is closed
-        test_file = make_buffer(initial_value=test_file.getvalue(), name=test_file.name)
+    TEXT = 'Hello'
+
+    def write_read_assertion(self, test_file):
+        with smart_open.smart_open(test_file, 'wb') as fout:  # 'b' for binary, needed on Windows
+            fout.write(self.TEXT.encode('utf8'))
+
         with smart_open.smart_open(test_file, 'rb') as fin:
-            self.assertEqual(fin.read(), SAMPLE_BYTES)
+            self.assertEqual(fin.read().decode('utf8'), self.TEXT)
+
+        if os.path.isfile(test_file):
+            os.unlink(test_file)
 
     def test_open_gz(self):
         """Can open gzip?"""
@@ -1018,11 +755,15 @@ class CompressionFormatTest(unittest.TestCase):
 
     def test_write_read_gz(self):
         """Can write and read gzip?"""
-        self.write_read_assertion('.gz')
+        with tempfile.NamedTemporaryFile('wb', suffix='.gz', delete=False) as infile:
+            test_file_name = infile.name
+        self.write_read_assertion(test_file_name)
 
     def test_write_read_bz2(self):
         """Can write and read bz2?"""
-        self.write_read_assertion('.bz2')
+        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as infile:
+            test_file_name = infile.name
+        self.write_read_assertion(test_file_name)
 
 
 class MultistreamsBZ2Test(unittest.TestCase):
@@ -1085,7 +826,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
             os.unlink(test_file)
 
     def test_can_read_multistream_bz2(self):
-        if six.PY2:
+        if PY2:
             # this is a backport from Python 3
             from bz2file import BZ2File
         else:
@@ -1098,7 +839,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
 
     def test_python2_stdlib_bz2_cannot_read_multistream(self):
         # Multistream bzip is included in Python 3
-        if not six.PY2:
+        if not PY2:
             return
         import bz2
 
@@ -1186,8 +927,8 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.smart_open(key, "rb") as fin:
             self.assertEqual(fin.read().decode("utf-8"), text)
 
+    @unittest.skipIf(six.PY2, 'this test does not work with Py2')
     @mock_s3
-    @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_write_mode(self):
         """Should always open in binary mode when writing through a codec."""
         s3 = boto3.resource('s3')
@@ -1198,8 +939,8 @@ class S3OpenTest(unittest.TestCase):
             smart_open.smart_open("s3://bucket/key.gz", "wb")
             mock_open.assert_called_with('bucket', 'key.gz', 'wb')
 
+    @unittest.skipIf(six.PY2, 'this test does not work with Py2')
     @mock_s3
-    @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_read_mode(self):
         """Should always open in binary mode when reading through a codec."""
         s3 = boto3.resource('s3')
@@ -1294,47 +1035,6 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.smart_open(key, 'r', encoding='utf-8') as fin:
             actual = fin.read()
         self.assertEqual(text, actual)
-
-    @mock.patch('smart_open.s3.SeekableBufferedInputBase')
-    def test_transport_params_is_not_mutable(self, mock_open):
-        smart_open.open('s3://access_key:secret_key@host@bucket/key')
-        smart_open.open('s3://bucket/key')
-
-        #
-        # The first call should have a non-null session, because the session
-        # keys were explicitly specified in the URL.  The second call should
-        # _not_ have a session.
-        #
-        self.assertIsNone(mock_open.call_args_list[1][1]['session'])
-        self.assertIsNotNone(mock_open.call_args_list[0][1]['session'])
-
-    @mock.patch('smart_open.s3.SeekableBufferedInputBase')
-    def test_respects_endpoint_url_read(self, mock_open):
-        url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
-        smart_open.open(url)
-
-        expected = {'endpoint_url': 'https://play.min.io:9000'}
-        self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
-
-    @mock.patch('smart_open.s3.BufferedOutputBase')
-    def test_respects_endpoint_url_write(self, mock_open):
-        url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
-        smart_open.open(url, 'wb')
-
-        expected = {'endpoint_url': 'https://play.min.io:9000'}
-        self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
-
-
-def function(a, b, c, foo='bar', baz='boz'):
-    pass
-
-
-class CheckKwargsTest(unittest.TestCase):
-    def test(self):
-        kwargs = {'foo': 123, 'bad': False}
-        expected = {'foo': 123}
-        actual = smart_open.smart_open_lib._check_kwargs(function, kwargs)
-        self.assertEqual(expected, actual)
 
 
 if __name__ == '__main__':

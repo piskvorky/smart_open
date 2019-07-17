@@ -6,12 +6,11 @@ import logging
 
 import requests
 
-from smart_open import s3
+from smart_open import bytebuffer, s3
 
 DEFAULT_BUFFER_SIZE = 128 * 1024
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
 
 
 _HEADERS = {'Accept-Encoding': 'identity'}
@@ -83,7 +82,7 @@ class BufferedInputBase(io.BufferedIOBase):
             self.response.raise_for_status()
 
         self._read_iter = self.response.iter_content(self.buffer_size)
-        self._read_buffer = b''
+        self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
         self._current_pos = 0
 
         #
@@ -124,31 +123,24 @@ class BufferedInputBase(io.BufferedIOBase):
 
         if size == 0:
             return b''
-        elif size < 0 and not self._read_buffer:
+        elif size < 0 and len(self._read_buffer) == 0:
             retval = self.response.raw.read()
         elif size < 0:
-            retval = self._read_buffer + self.response.raw.read()
-            self._read_buffer = b''
+            retval = self._read_buffer.read() + self.response.raw.read()
         else:
             while len(self._read_buffer) < size:
-                logger.debug(
-                    "http reading more content at current_pos: %d with size: %d",
-                    self._current_pos, size
-                )
-                try:
-                    self._read_buffer += next(self._read_iter)
-                except StopIteration:
+                logger.debug("http reading more content at current_pos: %d with size: %d", self._current_pos, size)
+                bytes_read = self._read_buffer.fill(self._read_iter)
+                if bytes_read == 0:
                     # Oops, ran out of data early.
-                    retval = self._read_buffer
+                    retval = self._read_buffer.read()
                     self._current_pos += len(retval)
-                    self._read_buffer = b''
 
                     return retval
 
             # If we got here, it means we have enough data in the buffer
             # to return to the caller.
-            retval = self._read_buffer[:size]
-            self._read_buffer = self._read_buffer[size:]
+            retval = self._read_buffer.read(size)
 
         self._current_pos += len(retval)
         return retval
@@ -214,7 +206,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             self._seekable = False
 
         self._read_iter = self.response.iter_content(self.buffer_size)
-        self._read_buffer = b''
+        self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
         self._current_pos = 0
 
         #
@@ -255,13 +247,13 @@ class SeekableBufferedInputBase(BufferedInputBase):
         if new_pos == self.content_length:
             self.response = None
             self._read_iter = None
-            self._read_buffer = b''
+            self._read_buffer.empty()
         else:
             response = self._partial_request(new_pos)
             if response.ok:
                 self.response = response
                 self._read_iter = self.response.iter_content(self.buffer_size)
-                self._read_buffer = b''
+                self._read_buffer.empty()
             else:
                 self.response = None
 

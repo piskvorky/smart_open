@@ -5,23 +5,26 @@ import io
 import contextlib
 import functools
 import logging
+import warnings
 
 import boto3
 import botocore.client
 import six
+import sys
+
+import smart_open.bytebuffer
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
 
 # Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
-# The only method currently relying on it is s3_iter_bucket, which is instructed
+# The only method currently relying on it is iter_bucket, which is instructed
 # whether to use it by the MULTIPROCESSING flag.
 _MULTIPROCESSING = False
 try:
     import multiprocessing.pool
     _MULTIPROCESSING = True
 except ImportError:
-    logger.warning("multiprocessing could not be imported and won't be used")
+    warnings.warn("multiprocessing could not be imported and won't be used")
 
 
 DEFAULT_MIN_PART_SIZE = 50 * 1024**2
@@ -32,6 +35,11 @@ READ_BINARY = 'rb'
 WRITE_BINARY = 'wb'
 MODES = (READ_BINARY, WRITE_BINARY)
 """Allowed I/O modes for working with S3."""
+
+_BINARY_TYPES = (six.binary_type, bytearray)
+"""Allowed binary buffer types for writing to the underlying S3 stream"""
+if sys.version_info >= (2, 7):
+    _BINARY_TYPES = (six.binary_type, bytearray, memoryview)
 
 BINARY_NEWLINE = b'\n'
 
@@ -62,11 +70,12 @@ def open(
         bucket_id,
         key_id,
         mode,
+        version_id=None,
         buffer_size=DEFAULT_BUFFER_SIZE,
         min_part_size=DEFAULT_MIN_PART_SIZE,
         session=None,
-        resource_kwargs=dict(),
-        multipart_upload_kwargs=dict(),
+        resource_kwargs=None,
+        multipart_upload_kwargs=None,
         ):
     """Open an S3 object for reading or writing.
 
@@ -77,27 +86,39 @@ def open(
     key_id: str
         The name of the key within the bucket.
     mode: str
-        The mode with which to open the object.  Must be either rb or wb.
+        The mode for opening the object.  Must be either "rb" or "wb".
     buffer_size: int, optional
         The buffer size to use when performing I/O.
-    min_part_size: int
-        For writing only.
+    min_part_size: int, optional
+        The minimum part size for multipart uploads.  For writing only.
     session: object, optional
         The S3 session to use when working with boto3.
     resource_kwargs: dict, optional
-        Keyword arguments to use when creating a new resource.
+        Keyword arguments to use when accessing the S3 resource for reading or writing.
     multipart_upload_kwargs: dict, optional
+        Additional parameters to pass to boto3's initiate_multipart_upload function.
         For writing only.
+    version_id: str, optional
+        Version of the object, used when reading object. If None, will fetch the most recent version.
 
     """
     logger.debug('%r', locals())
     if mode not in MODES:
         raise NotImplementedError('bad mode: %r expected one of %r' % (mode, MODES))
 
+    if resource_kwargs is None:
+        resource_kwargs = {}
+    if multipart_upload_kwargs is None:
+        multipart_upload_kwargs = {}
+
+    if (mode == WRITE_BINARY) and (version_id is not None):
+        raise ValueError("version_id must be None when writing")
+
     if mode == READ_BINARY:
         fileobj = SeekableBufferedInputBase(
             bucket_id,
             key_id,
+            version_id=version_id,
             buffer_size=buffer_size,
             session=session,
             resource_kwargs=resource_kwargs,
@@ -113,8 +134,20 @@ def open(
         )
     else:
         assert False, 'unexpected mode: %r' % mode
-
     return fileobj
+
+
+def _get(s3_object, version=None, **kwargs):
+    if version is not None:
+        kwargs['VersionId'] = version
+    try:
+        return s3_object.get(**kwargs)
+    except botocore.client.ClientError as error:
+        raise IOError(
+            'unable to access bucket: %r key: %r version: %r error: %s' % (
+                s3_object.bucket_name, s3_object.key, version, error
+            )
+        )
 
 
 class RawReader(object):
@@ -133,12 +166,10 @@ class RawReader(object):
 class SeekableRawReader(object):
     """Read an S3 object."""
 
-    def __init__(self, s3_object):
+    def __init__(self, s3_object, content_length, version_id=None):
         self._object = s3_object
-        try:
-            self._content_length = self._object.content_length
-        except botocore.client.ClientError:
-            raise ValueError('the s3 key %r does not exist, or is forbidden for access' % s3_object.key)
+        self._content_length = content_length
+        self._version_id = version_id
         self.seek(0)
 
     def seek(self, position):
@@ -156,7 +187,7 @@ class SeekableRawReader(object):
         #
         try:
             self._body.close()
-        except AttributeError as e:
+        except AttributeError:
             pass
 
         if position == self._content_length == 0 or position == self._content_length:
@@ -166,7 +197,7 @@ class SeekableRawReader(object):
             #
             self._body = io.BytesIO()
         else:
-            self._body = self._object.get(Range=range_string)['Body']
+            self._body = _get(self._object, self._version_id, Range=range_string)['Body']
 
     def read(self, size=-1):
         if self._position >= self._content_length:
@@ -180,18 +211,22 @@ class SeekableRawReader(object):
 
 
 class BufferedInputBase(io.BufferedIOBase):
-    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=dict()):
+    def __init__(self, bucket, key, version_id=None, buffer_size=DEFAULT_BUFFER_SIZE,
+                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None):
         if session is None:
             session = boto3.Session()
+        if resource_kwargs is None:
+            resource_kwargs = {}
+
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
+        self._version_id = version_id
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
+        self._content_length = _get(self._object, self._version_id)['ContentLength']
         self._current_pos = 0
-        self._buffer = b''
+        self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
-        self._buffer_size = buffer_size
         self._line_terminator = line_terminator
 
         #
@@ -226,10 +261,7 @@ class BufferedInputBase(io.BufferedIOBase):
         if size == 0:
             return b''
         elif size < 0:
-            if len(self._buffer):
-                from_buf = self._read_from_buffer(len(self._buffer))
-            else:
-                from_buf = b''
+            from_buf = self._read_from_buffer()
             self._current_pos = self._content_length
             return from_buf + self._raw_reader.read()
 
@@ -243,7 +275,7 @@ class BufferedInputBase(io.BufferedIOBase):
         # If the stream is finished, return what we have.
         #
         if self._eof:
-            return self._read_from_buffer(len(self._buffer))
+            return self._read_from_buffer()
 
         #
         # Fill our buffer to the required size.
@@ -272,19 +304,20 @@ class BufferedInputBase(io.BufferedIOBase):
         the_line = io.BytesIO()
         while not (self._eof and len(self._buffer) == 0):
             #
-            # In the worst case, we're reading self._buffer twice here, once in
-            # the if condition, and once when calling index.
+            # In the worst case, we're reading the unread part of self._buffer
+            # twice here, once in the if condition and once when calling index.
             #
             # This is sub-optimal, but better than the alternative: wrapping
             # .index in a try..except, because that is slower.
             #
-            if self._line_terminator in self._buffer:
-                next_newline = self._buffer.index(self._line_terminator)
+            remaining_buffer = self._buffer.peek()
+            if self._line_terminator in remaining_buffer:
+                next_newline = remaining_buffer.index(self._line_terminator)
                 the_line.write(self._read_from_buffer(next_newline + 1))
                 break
             else:
-                the_line.write(self._read_from_buffer(len(self._buffer)))
-                self._fill_buffer(self._buffer_size)
+                the_line.write(self._read_from_buffer())
+                self._fill_buffer()
         return the_line.getvalue()
 
     def terminate(self):
@@ -294,22 +327,20 @@ class BufferedInputBase(io.BufferedIOBase):
     #
     # Internal methods.
     #
-    def _read_from_buffer(self, size):
+    def _read_from_buffer(self, size=-1):
         """Remove at most size bytes from our buffer and return them."""
         # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
-        assert size >= 0
-        part = self._buffer[:size]
-        self._buffer = self._buffer[size:]
+        size = size if size >= 0 else len(self._buffer)
+        part = self._buffer.read(size)
         self._current_pos += len(part)
         # logger.debug('part: %r', part)
         return part
 
-    def _fill_buffer(self, size):
+    def _fill_buffer(self, size=-1):
+        size = size if size >= 0 else self._buffer._chunk_size
         while len(self._buffer) < size and not self._eof:
-            raw = self._raw_reader.read(size=self._buffer_size)
-            if len(raw):
-                self._buffer += raw
-            else:
+            bytes_read = self._buffer.fill(self._raw_reader)
+            if bytes_read == 0:
                 logger.debug('reached EOF while filling buffer')
                 self._eof = True
 
@@ -319,18 +350,21 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=dict()):
+    def __init__(self, bucket, key, version_id=None, buffer_size=DEFAULT_BUFFER_SIZE,
+                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None):
         if session is None:
             session = boto3.Session()
+        if resource_kwargs is None:
+            resource_kwargs = {}
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
-        self._raw_reader = SeekableRawReader(self._object)
-        self._content_length = self._object.content_length
+        self._version_id = version_id
+        self._content_length = _get(self._object, self._version_id)['ContentLength']
+
+        self._raw_reader = SeekableRawReader(self._object, self._content_length, self._version_id)
         self._current_pos = 0
-        self._buffer = b''
+        self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
-        self._buffer_size = buffer_size
         self._line_terminator = line_terminator
 
         #
@@ -366,7 +400,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         self._raw_reader.seek(new_position)
         logger.debug('new_position: %r', self._current_pos)
 
-        self._buffer = b""
+        self._buffer.empty()
         self._eof = self._current_pos == self._content_length
         return self._current_pos
 
@@ -389,10 +423,9 @@ class BufferedOutputBase(io.BufferedIOBase):
             bucket,
             key,
             min_part_size=DEFAULT_MIN_PART_SIZE,
-            s3_upload=None,
             session=None,
-            resource_kwargs=dict(),
-            multipart_upload_kwargs=dict(),
+            resource_kwargs=None,
+            multipart_upload_kwargs=None,
             ):
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
@@ -400,19 +433,18 @@ multipart upload may fail")
 
         if session is None:
             session = boto3.Session()
+        if resource_kwargs is None:
+            resource_kwargs = {}
+        if multipart_upload_kwargs is None:
+            multipart_upload_kwargs = {}
 
         s3 = session.resource('s3', **resource_kwargs)
-
-        #
-        # https://stackoverflow.com/questions/26871884/how-can-i-easily-determine-if-a-boto-3-s3-bucket-resource-exists
-        #
         try:
-            s3.meta.client.head_bucket(Bucket=bucket)
+            self._object = s3.Object(bucket, key)
+            self._min_part_size = min_part_size
+            self._mp = self._object.initiate_multipart_upload(**multipart_upload_kwargs)
         except botocore.client.ClientError:
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
-        self._object = s3.Object(bucket, key)
-        self._min_part_size = min_part_size
-        self._mp = self._object.initiate_multipart_upload(**multipart_upload_kwargs)
 
         self._buf = io.BytesIO()
         self._total_bytes = 0
@@ -477,8 +509,10 @@ multipart upload may fail")
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
-        if not isinstance(b, six.binary_type):
-            raise TypeError("input must be a binary string, got: %r", b)
+
+        if not isinstance(b, _BINARY_TYPES):
+            raise TypeError(
+                "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b)))
 
         self._buf.write(b)
         self._total_bytes += len(b)
@@ -520,23 +554,43 @@ multipart upload may fail")
             self.close()
 
 
-def iter_bucket(bucket_name, prefix='', accept_key=lambda key: True,
+def iter_bucket(bucket_name, prefix='', accept_key=None,
                 key_limit=None, workers=16, retries=3):
     """
-    Iterate and download all S3 files under `bucket/prefix`, yielding out
-    `(key, key content)` 2-tuples (generator).
+    Iterate and download all S3 objects under `s3://bucket_name/prefix`.
 
-    `accept_key` is a function that accepts a key name (unicode string) and
-    returns True/False, signalling whether the given key should be downloaded out or
-    not (default: accept all keys).
+    Parameters
+    ----------
+    bucket_name: str
+        The name of the bucket.
+    prefix: str, optional
+        Limits the iteration to keys starting wit the prefix.
+    accept_key: callable, optional
+        This is a function that accepts a key name (unicode string) and
+        returns True/False, signalling whether the given key should be downloaded.
+        The default behavior is to accept all keys.
+    key_limit: int, optional
+        If specified, the iterator will stop after yielding this many results.
+    workers: int, optional
+        The number of subprocesses to use.
+    retries: int, optional
+        The number of time to retry a failed download.
 
-    If `key_limit` is given, stop after yielding out that many results.
+    Yields
+    ------
+    str
+        The full key name (does not include the bucket name).
+    bytes
+        The full contents of the key.
 
+    Notes
+    -----
     The keys are processed in parallel, using `workers` processes (default: 16),
     to speed up downloads greatly. If multiprocessing is not available, thus
     _MULTIPROCESSING is False, this parameter will be ignored.
 
-    Example::
+    Examples
+    --------
 
       >>> # get all JSON files under "mybucket/foo/"
       >>> for key, content in iter_bucket(bucket_name, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
@@ -546,6 +600,9 @@ def iter_bucket(bucket_name, prefix='', accept_key=lambda key: True,
       >>> for key, content in iter_bucket(bucket_name, key_limit=10000, workers=32):
       ...     print key, len(content)
     """
+    if accept_key is None:
+        accept_key = lambda key: True
+
     #
     # If people insist on giving us bucket instances, silently extract the name
     # before moving on.  Works for boto3 as well as boto.

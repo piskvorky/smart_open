@@ -5,12 +5,16 @@
 #
 # This code is distributed under the terms and conditions from the MIT License (MIT).
 #
+
 """Common functions for working with docstrings.
 
 For internal use only.
 """
+
 import inspect
 import io
+import os.path
+import re
 
 
 def extract_kwargs(docstring):
@@ -119,3 +123,33 @@ def to_docstring(kwargs, lpad=''):
         for line in description:
             buf.write('%s    %s\n' % (lpad, line))
     return buf.getvalue()
+
+
+def extract_examples_from_readme_rst(indent='    '):
+    """Extract examples from this project's README.rst file.
+
+    Parameters
+    ----------
+    indent: str
+        Prepend each line with this string.  Should contain some number of spaces.
+
+    Returns
+    -------
+    str
+        The examples.
+
+    Notes
+    -----
+    Quite fragile, depends on named labels inside the README.rst file.
+    """
+    curr_dir = os.path.dirname(os.path.abspath(__file__))
+    readme_path = os.path.join(curr_dir, '..', 'README.rst')
+    try:
+        with open(readme_path) as fin:
+            lines = list(fin)
+        start = lines.index('.. _doctools_before_examples:\n')
+        end = lines.index(".. _doctools_after_examples:\n")
+        lines = lines[start+4:end-2]
+        return ''.join([indent + re.sub('^  ', '', l) for l in lines])
+    except Exception:
+        return indent + 'See README.rst'

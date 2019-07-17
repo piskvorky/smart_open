@@ -1,3 +1,11 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
+#
+# This code is distributed under the terms and conditions from the MIT License (MIT).
+#
+
 """Implements I/O streams over SSH.
 
 Examples
@@ -16,12 +24,9 @@ Similarly, from a command line::
 
 import getpass
 import logging
-logger = logging.getLogger(__name__)
+import warnings
 
-try:
-    import paramiko
-except ImportError:
-    logger.warning('paramiko missing, opening SSH/SCP/SFTP paths will be disabled.  `pip install paramiko` to suppress')
+logger = logging.getLogger(__name__)
 
 #
 # Global storage for SSH connections.
@@ -35,6 +40,15 @@ DEFAULT_PORT = 22
 
 
 def _connect(hostname, username, port):
+    try:
+        import paramiko
+    except ImportError:
+        warnings.warn(
+            'paramiko missing, opening SSH/SCP/SFTP paths will be disabled. '
+            '`pip install paramiko` to suppress'
+        )
+        raise
+
     key = (hostname, username)
     ssh = _SSH.get(key)
     if ssh is None:
