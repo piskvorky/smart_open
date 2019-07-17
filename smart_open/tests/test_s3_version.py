@@ -81,20 +81,20 @@ class TestVersionId(unittest.TestCase):
         with open(self.url, 'wb') as fout:
             fout.write(self.test_ver1)
 
-        logging.info('versions after first write: %r', get_versions(BUCKET_NAME, self.key))
+        logging.critical('versions after first write: %r', get_versions(BUCKET_NAME, self.key))
 
         if DISABLE_MOCKS:
             #
             # I suspect there is a race condition that's messing up the
             # order of the versions in the test.
             #
-            time.sleep(1)
+            time.sleep(5)
 
         with open(self.url, 'wb') as fout:
             fout.write(self.test_ver2)
 
         self.versions = get_versions(BUCKET_NAME, self.key)
-        logging.info('versions after second write: %r', get_versions(BUCKET_NAME, self.key))
+        logging.critical('versions after second write: %r', get_versions(BUCKET_NAME, self.key))
 
 
     def test_good_id(self):
