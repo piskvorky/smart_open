@@ -83,3 +83,27 @@ class HttpTest(unittest.TestCase):
         read_bytes = reader.read(size=10)
         self.assertEqual(reader.tell(), len(BYTES))
         self.assertEqual(BYTES[-10:], read_bytes)
+
+    @responses.activate
+    def test_headers_are_as_assigned(self):
+        responses.add_callback(responses.GET, URL, callback=request_callback)
+
+        # use default _HEADERS
+        x = smart_open.http.BufferedInputBase(URL)
+        # set different ones
+        x.headers['Accept-Encoding'] = 'compress, gzip'
+        x.headers['Other-Header'] = 'value'
+
+        # use default again, global shoudn't overwritten from x
+        y = smart_open.http.BufferedInputBase(URL)
+        # should be default headers
+        self.assertEqual(y.headers, {'Accept-Encoding': 'identity'})
+        # should be assigned headers
+        self.assertEqual(x.headers, {'Accept-Encoding': 'compress, gzip', 'Other-Header': 'value'})
+
+    @responses.activate
+    def test_headers(self):
+        """Does the top-level http.open function handle headers correctly?"""
+        responses.add_callback(responses.GET, URL, callback=request_callback)
+        reader = smart_open.http.open(URL, 'rb', headers={'Foo': 'bar'})
+        self.assertEqual(reader.headers['Foo'], 'bar')
