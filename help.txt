@@ -110,6 +110,10 @@ FUNCTIONS
             The username for authenticating over HTTP
         password: str, optional
             The password for authenticating over HTTP
+        headers: dict, optional
+            Any headers to send in the request. If ``None``, the default headers are sent:
+            ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
+            set this variable to an empty dict, ``{}``.
         
         WebHDFS (for details, see :mod:`smart_open.webhdfs` and :func:`smart_open.webhdfs.open`):
         
@@ -266,6 +270,6 @@ VERSION
     1.8.4
 
 FILE
-    /Users/misha/git/smart_open/smart_open/__init__.py
+    /home/misha/git/smart_open/smart_open/__init__.py
 
 
