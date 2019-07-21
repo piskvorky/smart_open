@@ -51,7 +51,7 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
 
     """
     if mode == 'rb':
-        return BufferedInputBase(
+        return SeekableBufferedInputBase(
             uri, mode, kerberos=kerberos,
             user=user, password=password, headers=headers
         )

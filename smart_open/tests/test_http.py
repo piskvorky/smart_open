@@ -107,3 +107,11 @@ class HttpTest(unittest.TestCase):
         responses.add_callback(responses.GET, URL, callback=request_callback)
         reader = smart_open.http.open(URL, 'rb', headers={'Foo': 'bar'})
         self.assertEqual(reader.headers['Foo'], 'bar')
+
+    @responses.activate
+    def test_https_seek(self):
+        """Does the top-level http.open function handle headers correctly?"""
+        responses.add_callback(responses.GET, 'https://localhost', callback=request_callback)
+
+        with smart_open.open("https://localhost", "rb") as fin:
+            fin.seek(5)
