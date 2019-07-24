@@ -112,9 +112,9 @@ class HttpTest(unittest.TestCase):
     @responses.activate
     def test_https_seek_forward(self):
         """Did the seek start over HTTPS work?"""
-        responses.add_callback(responses.GET, "https://localhost", callback=request_callback)
+        responses.add_callback(responses.GET, HTTPS_URL, callback=request_callback)
 
-        with smart_open.open("https://localhost", "rb") as fin:
+        with smart_open.open(HTTPS_URL, "rb") as fin:
             fin.seek(10)
             read_bytes = fin.read(size=10)
             self.assertEqual(BYTES[0:10], read_bytes)
@@ -122,9 +122,9 @@ class HttpTest(unittest.TestCase):
     @responses.activate
     def test_https_seek_forward(self):
         """Did the seek forward over HTTPS work?"""
-        responses.add_callback(responses.GET, "https://localhost", callback=request_callback)
+        responses.add_callback(responses.GET, HTTPS_URL, callback=request_callback)
 
-        with smart_open.open("https://localhost", "rb") as fin:
+        with smart_open.open(HTTPS_URL, "rb") as fin:
             fin.seek(10)
             read_bytes = fin.read(size=10)
             self.assertEqual(BYTES[10:20], read_bytes)
