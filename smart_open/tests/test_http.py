@@ -115,9 +115,10 @@ class HttpTest(unittest.TestCase):
         responses.add_callback(responses.GET, HTTPS_URL, callback=request_callback)
 
         with smart_open.open(HTTPS_URL, "rb") as fin:
+            read_bytes_1 = fin.read(size=10)
             fin.seek(0)
-            read_bytes = fin.read(size=10)
-            self.assertEqual(BYTES[0:10], read_bytes)
+            read_bytes_2 = fin.read(size=10)
+            self.assertEqual(read_bytes_1, read_bytes_2)
 
     @responses.activate
     def test_https_seek_forward(self):
