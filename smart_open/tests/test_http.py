@@ -131,7 +131,7 @@ class HttpTest(unittest.TestCase):
 
     @responses.activate
     def test_https_seek_reverse(self):
-        """Did the seek revert over HTTPS work?"""
+        """Did the seek in reverse over HTTPS work?"""
         responses.add_callback(responses.GET, HTTPS_URL, callback=request_callback)
 
         with smart_open.open(HTTPS_URL, "rb") as fin:
