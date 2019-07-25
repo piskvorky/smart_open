@@ -130,7 +130,7 @@ class HttpTest(unittest.TestCase):
             self.assertEqual(BYTES[10:20], read_bytes)
 
     @responses.activate
-    def test_https_seek_revert(self):
+    def test_https_seek_reverse(self):
         """Did the seek revert over HTTPS work?"""
         responses.add_callback(responses.GET, HTTPS_URL, callback=request_callback)
 
