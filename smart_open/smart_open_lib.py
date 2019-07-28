@@ -341,6 +341,7 @@ def open(
     #
     try:
         binary_mode = {'r': 'rb', 'r+': 'rb+',
+                       'rt': 'rb', 'rt+': 'rb+',
                        'w': 'wb', 'w+': 'wb+',
                        'a': 'ab', 'a+': 'ab+'}[mode]
     except KeyError:
