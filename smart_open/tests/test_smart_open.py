@@ -354,10 +354,17 @@ class SmartOpenFileObjTest(unittest.TestCase):
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
-    def test_read_str_from_bytes_api(self):
+    def test_read_str_from_bytes_api_rt(self):
         """Can we read strings from a byte stream?"""
         buffer = make_buffer(initial_value=SAMPLE_BYTES)
         with smart_open.smart_open(buffer, 'rt') as sf:
+            data = sf.read()
+        self.assertEqual(data, SAMPLE_TEXT)
+
+    def test_read_str_from_bytes_api_rt_plus(self):
+        """Can we read strings from a byte stream?"""
+        buffer = make_buffer(initial_value=SAMPLE_BYTES)
+        with smart_open.smart_open(buffer, 'rt+') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
