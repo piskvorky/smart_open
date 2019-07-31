@@ -343,7 +343,8 @@ def open(
         binary_mode = {'r': 'rb', 'r+': 'rb+',
                        'rt': 'rb', 'rt+': 'rb+',
                        'w': 'wb', 'w+': 'wb+',
-                       'a': 'ab', 'a+': 'ab+'}[mode]
+                       'a': 'ab', 'a+': 'ab+',
+                       'at': 'ab', 'at+': 'ab+'}[mode]
     except KeyError:
         binary_mode = mode
     binary, filename = _open_binary_stream(uri, binary_mode, transport_params)
