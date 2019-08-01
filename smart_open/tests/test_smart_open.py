@@ -361,6 +361,50 @@ class SmartOpenFileObjTest(unittest.TestCase):
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
+    def test_read_str_from_bytes_api_a(self):
+        """Can we read strings from a byte stream?"""
+        buffer = make_buffer()
+        with smart_open.smart_open("test", 'wb') as sf:
+            sf.write(SAMPLE_BYTES)
+        with smart_open.smart_open("test", 'ab') as sf:
+            sf.write(SAMPLE_BYTES)
+        with smart_open.smart_open("test", 'rb') as sf:
+            data = sf.read()
+        self.assertEqual(data.decode('utf-8'), SAMPLE_TEXT+SAMPLE_TEXT)
+
+    def test_read_str_from_bytes_api_a_plus(self):
+        """Can we read strings from a byte stream?"""
+        buffer = make_buffer()
+        with smart_open.smart_open("test", 'wb') as sf:
+            sf.write(SAMPLE_BYTES)
+        with smart_open.smart_open("test", 'a+') as sf:
+            sf.write(SAMPLE_TEXT)
+        with smart_open.smart_open("test", 'rb') as sf:
+            data = sf.read()
+        self.assertEqual(data.decode('utf-8'), SAMPLE_TEXT+SAMPLE_TEXT)
+
+    def test_read_str_from_bytes_api_at_plus(self):
+        """Can we read strings from a byte stream?"""
+        buffer = make_buffer()
+        with smart_open.smart_open("test", 'wb') as sf:
+            sf.write(SAMPLE_BYTES)
+        with smart_open.smart_open("test", 'at') as sf:
+            sf.write(SAMPLE_TEXT)
+        with smart_open.smart_open("test", 'rb') as sf:
+            data = sf.read()
+        self.assertEqual(data.decode('utf-8'), SAMPLE_TEXT+SAMPLE_TEXT)
+
+    def test_read_str_from_bytes_api_at_plus(self):
+        """Can we read strings from a byte stream?"""
+        buffer = make_buffer()
+        with smart_open.smart_open("test", 'wb') as sf:
+            sf.write(SAMPLE_BYTES)
+        with smart_open.smart_open("test", 'at+') as sf:
+            sf.write(SAMPLE_TEXT)
+        with smart_open.smart_open("test", 'rb') as sf:
+            data = sf.read()
+        self.assertEqual(data.decode('utf-8'), SAMPLE_TEXT+SAMPLE_TEXT)
+
     def test_read_str_from_bytes_api_rt_plus(self):
         """Can we read strings from a byte stream?"""
         buffer = make_buffer(initial_value=SAMPLE_BYTES)
