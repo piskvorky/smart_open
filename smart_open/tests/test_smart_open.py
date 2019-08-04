@@ -319,6 +319,9 @@ class SmartOpenFileObjTest(unittest.TestCase):
     Test passing raw file objects.
     """
 
+    def setUp(self):
+        self.temp_file = tempfile.NamedTemporaryFile(prefix='test', delete=True).name
+
     def test_read_bytes(self):
         """Can we read bytes from a byte stream?"""
         buffer = make_buffer(initial_value=SAMPLE_BYTES)
@@ -364,45 +367,45 @@ class SmartOpenFileObjTest(unittest.TestCase):
     def test_read_str_from_bytes_api_a(self):
         """Can we write, append, and read strings from a real text file?"""
         buffer = make_buffer()
-        with smart_open.smart_open("test", 'wb') as sf:
-            sf.write(SAMPLE_BYTES)
-        with smart_open.smart_open("test", 'ab') as sf:
-            sf.write(SAMPLE_BYTES)
-        with smart_open.smart_open("test", 'rb') as sf:
-            data = sf.read()
+        with smart_open.smart_open(self.temp_file, 'wb') as fout:
+            fout.write(SAMPLE_BYTES)
+        with smart_open.smart_open(self.temp_file, 'ab') as fout:
+            fout.write(SAMPLE_BYTES)
+        with smart_open.smart_open(self.temp_file, 'rb') as fin:
+            data = fin.read()
         self.assertEqual(data.decode('utf-8'), SAMPLE_TEXT+SAMPLE_TEXT)
 
     def test_read_str_from_bytes_api_a_plus(self):
         """Can we read strings from a byte stream?"""
         buffer = make_buffer()
-        with smart_open.smart_open("test", 'wb') as sf:
-            sf.write(SAMPLE_BYTES)
-        with smart_open.smart_open("test", 'a+') as sf:
-            sf.write(SAMPLE_TEXT)
-        with smart_open.smart_open("test", 'rb') as sf:
-            data = sf.read()
+        with smart_open.smart_open(self.temp_file, 'wb') as fout:
+            fout.write(SAMPLE_BYTES)
+        with smart_open.smart_open(self.temp_file, 'a+') as fout:
+            fout.write(SAMPLE_TEXT)
+        with smart_open.smart_open(self.temp_file, 'rb') as fin:
+            data = fin.read()
         self.assertEqual(data.decode('utf-8'), SAMPLE_TEXT+SAMPLE_TEXT)
 
     def test_read_str_from_bytes_api_at_plus(self):
         """Can we read strings from a byte stream?"""
         buffer = make_buffer()
-        with smart_open.smart_open("test", 'wb') as sf:
-            sf.write(SAMPLE_BYTES)
-        with smart_open.smart_open("test", 'at') as sf:
-            sf.write(SAMPLE_TEXT)
-        with smart_open.smart_open("test", 'rb') as sf:
-            data = sf.read()
+        with smart_open.smart_open(self.temp_file, 'wb') as fout:
+            fout.write(SAMPLE_BYTES)
+        with smart_open.smart_open(self.temp_file, 'at') as fout:
+            fout.write(SAMPLE_TEXT)
+        with smart_open.smart_open(self.temp_file, 'rb') as fin:
+            data = fin.read()
         self.assertEqual(data.decode('utf-8'), SAMPLE_TEXT+SAMPLE_TEXT)
 
     def test_read_str_from_bytes_api_at_plus(self):
         """Can we read strings from a byte stream?"""
         buffer = make_buffer()
-        with smart_open.smart_open("test", 'wb') as sf:
-            sf.write(SAMPLE_BYTES)
-        with smart_open.smart_open("test", 'at+') as sf:
-            sf.write(SAMPLE_TEXT)
-        with smart_open.smart_open("test", 'rb') as sf:
-            data = sf.read()
+        with smart_open.smart_open(self.temp_file, 'wb') as fout:
+            fout.write(SAMPLE_BYTES)
+        with smart_open.smart_open(self.temp_file, 'at+') as fout:
+            fout.write(SAMPLE_TEXT)
+        with smart_open.smart_open(self.temp_file, 'rb') as fin:
+            data = fin.read()
         self.assertEqual(data.decode('utf-8'), SAMPLE_TEXT+SAMPLE_TEXT)
 
     def test_read_str_from_bytes_api_rt_plus(self):
