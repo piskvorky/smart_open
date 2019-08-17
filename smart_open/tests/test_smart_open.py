@@ -320,7 +320,10 @@ class SmartOpenFileObjTest(unittest.TestCase):
     """
 
     def setUp(self):
-        self.temp_file = tempfile.NamedTemporaryFile(prefix='test', delete=True).name
+        self.temp_file = tempfile.NamedTemporaryFile(prefix='test').name
+
+    def tearDown(self):
+        os.unlink(self.temp_file)
 
     def test_read_bytes(self):
         """Can we read bytes from a byte stream?"""
