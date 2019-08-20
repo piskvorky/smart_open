@@ -368,7 +368,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
         self.assertEqual(data, SAMPLE_TEXT)
 
     def test_append_str_from_bytes_api_a(self):
-        """Can we write, append, and read bytes from a real text file?"""
+        """Can we write, append, and read bytes from a real binary file?"""
         buffer = make_buffer()
         with smart_open.smart_open(self.temp_file, 'wb') as fout:
             fout.write(SAMPLE_BYTES)
@@ -379,7 +379,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
         self.assertEqual(data, SAMPLE_BYTES * 2)
 
     def test_append_str_api_a_plus(self):
-        """Can we read strings from a byte stream?"""
+        """Can we write, append write/read, and read text from a real text file?"""
         buffer = make_buffer()
         with smart_open.smart_open(self.temp_file, 'wt') as fout:
             fout.write(SAMPLE_TEXT)
@@ -390,7 +390,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
         self.assertEqual(text, SAMPLE_TEXT * 2)
 
     def test_append_str_api_at(self):
-        """Can we read strings from a byte stream?"""
+        """Can we write, append, and read text from a real text file?"""
         buffer = make_buffer()
         with smart_open.smart_open(self.temp_file, 'wt') as fout:
             fout.write(SAMPLE_TEXT)
@@ -401,7 +401,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
         self.assertEqual(text, SAMPLE_TEXT * 2)
 
     def test_append_str_api_at_plus(self):
-        """Can we read strings from a byte stream?"""
+        """Can we write, append write/read, and read text from a real text file?"""
         buffer = make_buffer()
         with smart_open.smart_open(self.temp_file, 'wt') as fout:
             fout.write(SAMPLE_TEXT)
@@ -412,7 +412,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
         self.assertEqual(text, SAMPLE_TEXT * 2)
 
     def test_read_str_api_rt_plus(self):
-        """Can we read strings from a byte stream?"""
+        """Can we read strings in mode read/write?"""
         buffer = make_buffer(initial_value=SAMPLE_BYTES)
         with smart_open.smart_open(buffer, 'rt+') as sf:
             data = sf.read()
