@@ -12,21 +12,11 @@ import os
 import sys
 
 from setuptools import setup, find_packages
+from smart_open.version import __version__
 
 
 def read(fname):
     return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
-
-
-#
-# This code intentially duplicates a similar function in __init__.py.  The
-# alternative would be to somehow import that module to access the function,
-# which would be too messy for a setup.py script.
-#
-def _get_version():
-    curr_dir = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(curr_dir, 'smart_open', 'VERSION')) as fin:
-        return fin.read().strip()
 
 
 tests_require = [
@@ -53,7 +43,7 @@ if sys.version_info[0] == 2:
 
 setup(
     name='smart_open',
-    version=_get_version(),
+    version=__version__,
     description='Utils for streaming large files (S3, HDFS, gzip, bz2...)',
     long_description=read('README.rst'),
 
