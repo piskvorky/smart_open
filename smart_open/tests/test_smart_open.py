@@ -325,6 +325,23 @@ class RealFileSystemTests(unittest.TestCase):
     def tearDown(self):
         os.unlink(self.temp_file)
 
+    def test_rt(self):
+        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+            data = fin.read()
+        self.assertEqual(data, SAMPLE_TEXT)
+
+    def test_wt(self):
+        #
+        # The file already contains SAMPLE_TEXT, so write something different.
+        #
+        text = 'nippon budokan'
+        with smart_open.smart_open(self.temp_file, 'wt') as fout:
+            fout.write(text)
+
+        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+            data = fin.read()
+        self.assertEqual(data, text)
+
     def test_ab(self):
         with smart_open.smart_open(self.temp_file, 'ab') as fout:
             fout.write(SAMPLE_BYTES)
