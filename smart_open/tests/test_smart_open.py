@@ -314,16 +314,54 @@ def make_buffer(cls=six.BytesIO, initial_value=None, name=None):
     return buf
 
 
+class RealFileSystemTests(unittest.TestCase):
+    """Tests that touch the file system via temporary files."""
+
+    def setUp(self):
+        with tempfile.NamedTemporaryFile(prefix='test', delete=False) as fout:
+            fout.write(SAMPLE_BYTES)
+            self.temp_file = fout.name
+
+    def tearDown(self):
+        os.unlink(self.temp_file)
+
+    def test_append_str_from_bytes_api_a(self):
+        """Can we write, append, and read bytes from a real binary file?"""
+        with smart_open.smart_open(self.temp_file, 'ab') as fout:
+            fout.write(SAMPLE_BYTES)
+        with smart_open.smart_open(self.temp_file, 'rb') as fin:
+            data = fin.read()
+        self.assertEqual(data, SAMPLE_BYTES * 2)
+
+    def test_append_str_api_a_plus(self):
+        """Can we write, append write/read, and read text from a real text file?"""
+        with smart_open.smart_open(self.temp_file, 'a+') as fout:
+            fout.write(SAMPLE_TEXT)
+        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+            text = fin.read()
+        self.assertEqual(text, SAMPLE_TEXT * 2)
+
+    def test_append_str_api_at(self):
+        """Can we write, append, and read text from a real text file?"""
+        with smart_open.smart_open(self.temp_file, 'at') as fout:
+            fout.write(SAMPLE_TEXT)
+        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+            text = fin.read()
+        self.assertEqual(text, SAMPLE_TEXT * 2)
+
+    def test_append_str_api_at_plus(self):
+        """Can we write, append write/read, and read text from a real text file?"""
+        with smart_open.smart_open(self.temp_file, 'at+') as fout:
+            fout.write(SAMPLE_TEXT)
+        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+            text = fin.read()
+        self.assertEqual(text, SAMPLE_TEXT * 2)
+
+
 class SmartOpenFileObjTest(unittest.TestCase):
     """
     Test passing raw file objects.
     """
-
-    def setUp(self):
-        self.temp_file = tempfile.NamedTemporaryFile(prefix='test', delete=False).name
-
-    def tearDown(self):
-        os.unlink(self.temp_file)
 
     def test_read_bytes(self):
         """Can we read bytes from a byte stream?"""
@@ -366,46 +404,6 @@ class SmartOpenFileObjTest(unittest.TestCase):
         with smart_open.smart_open(buffer, 'rt') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
-
-    def test_append_str_from_bytes_api_a(self):
-        """Can we write, append, and read bytes from a real binary file?"""
-        with smart_open.smart_open(self.temp_file, 'wb') as fout:
-            fout.write(SAMPLE_BYTES)
-        with smart_open.smart_open(self.temp_file, 'ab') as fout:
-            fout.write(SAMPLE_BYTES)
-        with smart_open.smart_open(self.temp_file, 'rb') as fin:
-            data = fin.read()
-        self.assertEqual(data, SAMPLE_BYTES * 2)
-
-    def test_append_str_api_a_plus(self):
-        """Can we write, append write/read, and read text from a real text file?"""
-        with smart_open.smart_open(self.temp_file, 'wt') as fout:
-            fout.write(SAMPLE_TEXT)
-        with smart_open.smart_open(self.temp_file, 'a+') as fout:
-            fout.write(SAMPLE_TEXT)
-        with smart_open.smart_open(self.temp_file, 'rt') as fin:
-            text = fin.read()
-        self.assertEqual(text, SAMPLE_TEXT * 2)
-
-    def test_append_str_api_at(self):
-        """Can we write, append, and read text from a real text file?"""
-        with smart_open.smart_open(self.temp_file, 'wt') as fout:
-            fout.write(SAMPLE_TEXT)
-        with smart_open.smart_open(self.temp_file, 'at') as fout:
-            fout.write(SAMPLE_TEXT)
-        with smart_open.smart_open(self.temp_file, 'rt') as fin:
-            text = fin.read()
-        self.assertEqual(text, SAMPLE_TEXT * 2)
-
-    def test_append_str_api_at_plus(self):
-        """Can we write, append write/read, and read text from a real text file?"""
-        with smart_open.smart_open(self.temp_file, 'wt') as fout:
-            fout.write(SAMPLE_TEXT)
-        with smart_open.smart_open(self.temp_file, 'at+') as fout:
-            fout.write(SAMPLE_TEXT)
-        with smart_open.smart_open(self.temp_file, 'rt') as fin:
-            text = fin.read()
-        self.assertEqual(text, SAMPLE_TEXT * 2)
 
     def test_read_str_api_rt_plus(self):
         """Can we read strings in mode read/write?"""
