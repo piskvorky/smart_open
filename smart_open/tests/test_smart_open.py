@@ -296,13 +296,14 @@ class SmartOpenHttpTest(unittest.TestCase):
         self._test_compressed_http(".bz2", True)
 
 
-def make_buffer(cls=six.BytesIO, initial_value=None, name=None):
+def make_buffer(cls=six.BytesIO, initial_value=None, name=None, noclose=False):
     """
     Construct a new in-memory file object aka "buf".
 
     :param cls: Class of the file object. Meaningful values are BytesIO and StringIO.
     :param initial_value: Passed directly to the constructor, this is the content of the returned buffer.
     :param name: Associated file path. Not assigned if is None (default).
+    :param noclose: If True, disables the .close function.
     :return: Instance of `cls`.
     """
     buf = cls(initial_value) if initial_value else cls()
@@ -311,6 +312,8 @@ def make_buffer(cls=six.BytesIO, initial_value=None, name=None):
     if six.PY2:
         buf.__enter__ = lambda: buf
         buf.__exit__ = lambda exc_type, exc_val, exc_tb: None
+    if noclose:
+        buf.close = lambda: None
     return buf
 
 
@@ -392,7 +395,12 @@ class SmartOpenFileObjTest(unittest.TestCase):
 
     @unittest.skipIf(six.PY2, "Python 2 does not differentiate between str and bytes")
     def test_read_text_stream_fails(self):
-        """Attempts to read directly from a text stream should fail."""
+        """Attempts to read directly from a text stream should fail.
+
+        This is because smart_open.open expects a byte stream as input.
+        If you have a text stream, there's no point passing it to smart_open:
+        you can read from it directly.
+        """
         buf = make_buffer(six.StringIO, initial_value=SAMPLE_TEXT)
         with smart_open.smart_open(buf, 'r') as sf:
             self.assertRaises(TypeError, sf.read)  # we expect binary mode
@@ -404,33 +412,47 @@ class SmartOpenFileObjTest(unittest.TestCase):
         with smart_open.smart_open(buf, 'w') as sf:
             self.assertRaises(TypeError, sf.write, SAMPLE_TEXT)  # we expect binary mode
 
-    def test_read_str_from_bytes(self):
-        """Can we read strings from a byte stream?"""
+    def test_read_text_from_bytestream(self):
         buf = make_buffer(initial_value=SAMPLE_BYTES)
         with smart_open.smart_open(buf, 'r') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
-    def test_read_str_api_rt(self):
-        """Can we read strings from a byte stream?"""
+    def test_read_text_from_bytestream_rt(self):
         buf = make_buffer(initial_value=SAMPLE_BYTES)
         with smart_open.smart_open(buf, 'rt') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
-    def test_read_str_api_rt_plus(self):
-        """Can we read strings in mode read/write?"""
+    def test_read_text_from_bytestream_rtplus(self):
         buf = make_buffer(initial_value=SAMPLE_BYTES)
         with smart_open.smart_open(buf, 'rt+') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
-    def test_write_str_to_bytes(self):
+    def test_write_text_to_bytestream(self):
         """Can we write strings to a byte stream?"""
-        buf = make_buffer()
+        buf = make_buffer(noclose=True)
         with smart_open.smart_open(buf, 'w') as sf:
             sf.write(SAMPLE_TEXT)
-            self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
+
+        self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
+
+    def test_write_text_to_bytestream_wt(self):
+        """Can we write strings to a byte stream?"""
+        buf = make_buffer(noclose=True)
+        with smart_open.smart_open(buf, 'wt') as sf:
+            sf.write(SAMPLE_TEXT)
+
+        self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
+
+    def test_write_text_to_bytestream_wtplus(self):
+        """Can we write strings to a byte stream?"""
+        buf = make_buffer(noclose=True)
+        with smart_open.smart_open(buf, 'wt+') as sf:
+            sf.write(SAMPLE_TEXT)
+
+        self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
 
     def test_name_read(self):
         """Can we use the "name" attribute to decompress on the fly?"""
