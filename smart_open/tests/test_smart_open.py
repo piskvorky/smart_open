@@ -369,7 +369,6 @@ class SmartOpenFileObjTest(unittest.TestCase):
 
     def test_append_str_from_bytes_api_a(self):
         """Can we write, append, and read bytes from a real binary file?"""
-        buffer = make_buffer()
         with smart_open.smart_open(self.temp_file, 'wb') as fout:
             fout.write(SAMPLE_BYTES)
         with smart_open.smart_open(self.temp_file, 'ab') as fout:
@@ -380,7 +379,6 @@ class SmartOpenFileObjTest(unittest.TestCase):
 
     def test_append_str_api_a_plus(self):
         """Can we write, append write/read, and read text from a real text file?"""
-        buffer = make_buffer()
         with smart_open.smart_open(self.temp_file, 'wt') as fout:
             fout.write(SAMPLE_TEXT)
         with smart_open.smart_open(self.temp_file, 'a+') as fout:
@@ -391,7 +389,6 @@ class SmartOpenFileObjTest(unittest.TestCase):
 
     def test_append_str_api_at(self):
         """Can we write, append, and read text from a real text file?"""
-        buffer = make_buffer()
         with smart_open.smart_open(self.temp_file, 'wt') as fout:
             fout.write(SAMPLE_TEXT)
         with smart_open.smart_open(self.temp_file, 'at') as fout:
@@ -402,7 +399,6 @@ class SmartOpenFileObjTest(unittest.TestCase):
 
     def test_append_str_api_at_plus(self):
         """Can we write, append write/read, and read text from a real text file?"""
-        buffer = make_buffer()
         with smart_open.smart_open(self.temp_file, 'wt') as fout:
             fout.write(SAMPLE_TEXT)
         with smart_open.smart_open(self.temp_file, 'at+') as fout:
