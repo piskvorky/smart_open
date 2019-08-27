@@ -263,10 +263,10 @@ class SmartOpenHttpTest(unittest.TestCase):
     def _test_compressed_http(self, suffix, query):
         """Can open <suffix> via http?"""
         raw_data = b'Hello World Compressed.' * 10000
-        buffer = make_buffer(name='data' + suffix)
-        with smart_open.smart_open(buffer, 'wb') as outfile:
+        buf = make_buffer(name='data' + suffix)
+        with smart_open.smart_open(buf, 'wb') as outfile:
             outfile.write(raw_data)
-        compressed_data = buffer.getvalue()
+        compressed_data = buf.getvalue()
         # check that the string was actually compressed
         self.assertNotEqual(compressed_data, raw_data)
 
@@ -298,7 +298,7 @@ class SmartOpenHttpTest(unittest.TestCase):
 
 def make_buffer(cls=six.BytesIO, initial_value=None, name=None):
     """
-    Construct a new in-memory file object aka "buffer".
+    Construct a new in-memory file object aka "buf".
 
     :param cls: Class of the file object. Meaningful values are BytesIO and StringIO.
     :param initial_value: Passed directly to the constructor, this is the content of the returned buffer.
@@ -325,32 +325,28 @@ class RealFileSystemTests(unittest.TestCase):
     def tearDown(self):
         os.unlink(self.temp_file)
 
-    def test_append_str_from_bytes_api_a(self):
-        """Can we write, append, and read bytes from a real binary file?"""
+    def test_ab(self):
         with smart_open.smart_open(self.temp_file, 'ab') as fout:
             fout.write(SAMPLE_BYTES)
         with smart_open.smart_open(self.temp_file, 'rb') as fin:
             data = fin.read()
         self.assertEqual(data, SAMPLE_BYTES * 2)
 
-    def test_append_str_api_a_plus(self):
-        """Can we write, append write/read, and read text from a real text file?"""
+    def test_aplus(self):
         with smart_open.smart_open(self.temp_file, 'a+') as fout:
             fout.write(SAMPLE_TEXT)
         with smart_open.smart_open(self.temp_file, 'rt') as fin:
             text = fin.read()
         self.assertEqual(text, SAMPLE_TEXT * 2)
 
-    def test_append_str_api_at(self):
-        """Can we write, append, and read text from a real text file?"""
+    def test_at(self):
         with smart_open.smart_open(self.temp_file, 'at') as fout:
             fout.write(SAMPLE_TEXT)
         with smart_open.smart_open(self.temp_file, 'rt') as fin:
             text = fin.read()
         self.assertEqual(text, SAMPLE_TEXT * 2)
 
-    def test_append_str_api_at_plus(self):
-        """Can we write, append write/read, and read text from a real text file?"""
+    def test_atplus(self):
         with smart_open.smart_open(self.temp_file, 'at+') as fout:
             fout.write(SAMPLE_TEXT)
         with smart_open.smart_open(self.temp_file, 'rt') as fin:
@@ -365,75 +361,75 @@ class SmartOpenFileObjTest(unittest.TestCase):
 
     def test_read_bytes(self):
         """Can we read bytes from a byte stream?"""
-        buffer = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buffer, 'rb') as sf:
+        buf = make_buffer(initial_value=SAMPLE_BYTES)
+        with smart_open.smart_open(buf, 'rb') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_BYTES)
 
     def test_write_bytes(self):
         """Can we write bytes to a byte stream?"""
-        buffer = make_buffer()
-        with smart_open.smart_open(buffer, 'wb') as sf:
+        buf = make_buffer()
+        with smart_open.smart_open(buf, 'wb') as sf:
             sf.write(SAMPLE_BYTES)
-            self.assertEqual(buffer.getvalue(), SAMPLE_BYTES)
+            self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
 
     @unittest.skipIf(six.PY2, "Python 2 does not differentiate between str and bytes")
     def test_read_text_stream_fails(self):
         """Attempts to read directly from a text stream should fail."""
-        buffer = make_buffer(six.StringIO, initial_value=SAMPLE_TEXT)
-        with smart_open.smart_open(buffer, 'r') as sf:
+        buf = make_buffer(six.StringIO, initial_value=SAMPLE_TEXT)
+        with smart_open.smart_open(buf, 'r') as sf:
             self.assertRaises(TypeError, sf.read)  # we expect binary mode
 
     @unittest.skipIf(six.PY2, "Python 2 does not differentiate between str and bytes")
     def test_write_text_stream_fails(self):
         """Attempts to write directly to a text stream should fail."""
-        buffer = make_buffer(six.StringIO)
-        with smart_open.smart_open(buffer, 'w') as sf:
+        buf = make_buffer(six.StringIO)
+        with smart_open.smart_open(buf, 'w') as sf:
             self.assertRaises(TypeError, sf.write, SAMPLE_TEXT)  # we expect binary mode
 
     def test_read_str_from_bytes(self):
         """Can we read strings from a byte stream?"""
-        buffer = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buffer, 'r') as sf:
+        buf = make_buffer(initial_value=SAMPLE_BYTES)
+        with smart_open.smart_open(buf, 'r') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
     def test_read_str_api_rt(self):
         """Can we read strings from a byte stream?"""
-        buffer = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buffer, 'rt') as sf:
+        buf = make_buffer(initial_value=SAMPLE_BYTES)
+        with smart_open.smart_open(buf, 'rt') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
     def test_read_str_api_rt_plus(self):
         """Can we read strings in mode read/write?"""
-        buffer = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buffer, 'rt+') as sf:
+        buf = make_buffer(initial_value=SAMPLE_BYTES)
+        with smart_open.smart_open(buf, 'rt+') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
     def test_write_str_to_bytes(self):
         """Can we write strings to a byte stream?"""
-        buffer = make_buffer()
-        with smart_open.smart_open(buffer, 'w') as sf:
+        buf = make_buffer()
+        with smart_open.smart_open(buf, 'w') as sf:
             sf.write(SAMPLE_TEXT)
-            self.assertEqual(buffer.getvalue(), SAMPLE_BYTES)
+            self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
 
     def test_name_read(self):
         """Can we use the "name" attribute to decompress on the fly?"""
         data = SAMPLE_BYTES * 1000
-        buffer = make_buffer(initial_value=bz2.compress(data), name='data.bz2')
-        with smart_open.smart_open(buffer, 'rb') as sf:
+        buf = make_buffer(initial_value=bz2.compress(data), name='data.bz2')
+        with smart_open.smart_open(buf, 'rb') as sf:
             data = sf.read()
         self.assertEqual(data, data)
 
     def test_name_write(self):
         """Can we use the "name" attribute to compress on the fly?"""
         data = SAMPLE_BYTES * 1000
-        buffer = make_buffer(name='data.bz2')
-        with smart_open.smart_open(buffer, 'wb') as sf:
+        buf = make_buffer(name='data.bz2')
+        with smart_open.smart_open(buf, 'wb') as sf:
             sf.write(data)
-        self.assertEqual(bz2.decompress(buffer.getvalue()), data)
+        self.assertEqual(bz2.decompress(buf.getvalue()), data)
 
     def test_open_side_effect(self):
         """
