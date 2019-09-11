@@ -2,4 +2,3 @@ include LICENSE
 include README.rst
 include CHANGELOG.rst
 include setup.py
-include smart_open/VERSION

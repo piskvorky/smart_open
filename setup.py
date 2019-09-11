@@ -14,19 +14,29 @@ import sys
 from setuptools import setup, find_packages
 
 
-def read(fname):
-    return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
-
-
-#
-# This code intentially duplicates a similar function in __init__.py.  The
-# alternative would be to somehow import that module to access the function,
-# which would be too messy for a setup.py script.
-#
 def _get_version():
     curr_dir = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(curr_dir, 'smart_open', 'VERSION')) as fin:
-        return fin.read().strip()
+    with open(os.path.join(curr_dir, 'smart_open', 'version.py')) as fin:
+        #
+        # __version__ = '1.8.4'
+        #
+        line = fin.readline().strip()
+        parts = line.split(' ')
+        assert parts[0] == '__version__'
+        assert parts[1] == '='
+        return parts[2][1:-1]
+
+
+#
+# We cannot do "from smart_open.version import __version__" because that will
+# require the dependencies for smart_open to already be in place, and that is
+# not necessarily the case when running setup.py for the first time.
+#
+__version__ = _get_version()
+
+
+def read(fname):
+    return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
 
 
 tests_require = [
@@ -53,13 +63,12 @@ if sys.version_info[0] == 2:
 
 setup(
     name='smart_open',
-    version=_get_version(),
+    version=__version__,
     description='Utils for streaming large files (S3, HDFS, gzip, bz2...)',
     long_description=read('README.rst'),
 
     packages=find_packages(),
     package_data={
-        "smart_open": ["VERSION"],
         "smart_open.tests": ["test_data/*gz"],
     },
 
