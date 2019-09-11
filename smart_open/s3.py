@@ -281,7 +281,8 @@ class BufferedInputBase(io.BufferedIOBase):
         # Fill our buffer to the required size.
         #
         # logger.debug('filling %r byte-long buffer up to %r bytes', len(self._buffer), size)
-        self._fill_buffer(size)
+        fill_size = size if size > DEFAULT_BUFFER_SIZE else DEFAULT_BUFFER_SIZE
+        self._fill_buffer(fill_size)
         return self._read_from_buffer(size)
 
     def read1(self, size=-1):
