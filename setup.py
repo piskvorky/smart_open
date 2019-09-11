@@ -12,7 +12,27 @@ import os
 import sys
 
 from setuptools import setup, find_packages
-from smart_open.version import __version__
+
+
+def _get_version():
+    curr_dir = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(curr_dir, 'smart_open', 'version.py')) as fin:
+        #
+        # __version__ = '1.8.4'
+        #
+        line = fin.readline().strip()
+        parts = line.split(' ')
+        assert parts[0] == '__version__'
+        assert parts[1] == '='
+        return parts[2][1:-1]
+
+
+#
+# We cannot do "from smart_open.version import __version__" because that will
+# require the dependencies for smart_open to already be in place, and that is
+# not necessarily the case when running setup.py for the first time.
+#
+__version__ = _get_version()
 
 
 def read(fname):
