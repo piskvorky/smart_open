@@ -49,7 +49,6 @@ setup(
 
     packages=find_packages(),
     package_data={
-        "smart_open": ["VERSION"],
         "smart_open.tests": ["test_data/*gz"],
     },
 
