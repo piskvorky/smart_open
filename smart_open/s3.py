@@ -555,7 +555,7 @@ multipart upload may fail")
 
 
 def iter_bucket(bucket_name, prefix='', accept_key=None,
-                key_limit=None, workers=16, retries=3):
+                key_limit=None, workers=16, retries=3, resource_kwargs=None):
     """
     Iterate and download all S3 objects under `s3://bucket_name/prefix`.
 
@@ -575,6 +575,8 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
         The number of subprocesses to use.
     retries: int, optional
         The number of time to retry a failed download.
+    resource_kwargs: dict, optional
+        Keyword arguments to use when accessing the S3 resource for reading or writing.
 
     Yields
     ------
@@ -613,7 +615,7 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
         pass
 
     total_size, key_no = 0, -1
-    key_iterator = _list_bucket(bucket_name, prefix=prefix, accept_key=accept_key)
+    key_iterator = _list_bucket(bucket_name, prefix=prefix, accept_key=accept_key, resource_kwargs=resource_kwargs)
     download_key = functools.partial(_download_key, bucket_name=bucket_name, retries=retries)
 
     with _create_process_pool(processes=workers) as pool:
@@ -633,8 +635,12 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
     logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
 
 
-def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True):
-    client = boto3.client('s3')
+def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True, resource_kwargs=None):
+    if resource_kwargs is None:
+        client = boto3.client('s3')
+    else:
+        client = boto3.client('s3', **resource_kwargs)
+
     ctoken = None
 
     while True:
