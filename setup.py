@@ -43,6 +43,7 @@ tests_require = [
     'pytest',
     'pytest-mock',
     'pytest-rerunfailures',
+    'pytest_benchmark',
     'mock',
     'moto==1.3.4',
     'pathlib2',

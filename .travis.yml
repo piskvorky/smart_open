@@ -13,14 +13,18 @@ matrix:
         - SO_DISABLE_MOCKS: "1"
         - SO_S3_URL: "s3://smart-open-py27-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py27-benchmark-results"
+        - TOXENV: py27
 
     - python: '3.5'
+      env:
+        - TOXENV: py35
 
     - python: '3.6'
       env:
         - SO_DISABLE_MOCKS: "1"
         - SO_S3_URL: "s3://smart-open-py36-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
+        - TOXENV: py36
 
     - python: '3.7'
       env:
@@ -28,14 +32,13 @@ matrix:
         - SO_S3_URL: "s3://smart-open-py37-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
+        - TOXENV: py37
       dist: xenial
 
-
 install:
-  - pip install --upgrade setuptools
+  - pip install --upgrade setuptools tox
   - pip install .[test]
   - pip freeze
-
 
 script:
   - if [[ ${TRAVIS_SECURE_ENV_VARS} = false ]]; then
@@ -44,9 +47,8 @@ script:
       unset SO_S3_URL;
       unset SO_S3_RESULT_URL;
     fi
-  - python setup.py test
+  - tox -vv
   - export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())')
-  - pip install pytest
   - py.test integration-tests/test_http.py
   - if [[ ${SO_DISABLE_MOCKS} = "1" ]]; then
       pip install pytest_benchmark awscli;
