@@ -412,6 +412,14 @@ class SeekableBufferedInputBase(BufferedInputBase):
         """Unsupported."""
         raise io.UnsupportedOperation
 
+    def __str__(self):
+        return "s3.SeekableBufferedInputBase(bucket_name='{}', key='{}')".format(
+            self._object.bucket_name, self._object.key)
+
+    def __repr__(self):
+        return "s3.SeekableBufferedInputBase(bucket_name='{}', key='{}')".format(
+            self._object.bucket_name, self._object.key)
+
 
 class BufferedOutputBase(io.BufferedIOBase):
     """Writes bytes to S3.
@@ -553,6 +561,13 @@ multipart upload may fail")
         else:
             self.close()
 
+    def __str__(self):
+        return "s3.BufferedOutputBase(bucket_name='{}', key='{}')".format(
+            self._object.bucket_name, self._object.key)
+
+    def __repr__(self):
+        return "s3.BufferedOutputBase(bucket_name='{}', key='{}')".format(
+            self._object.bucket_name, self._object.key)
 
 def iter_bucket(bucket_name, prefix='', accept_key=None,
                 key_limit=None, workers=16, retries=3):
