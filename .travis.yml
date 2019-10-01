@@ -34,6 +34,7 @@ matrix:
 install:
   - pip install --upgrade setuptools
   - pip install .[test]
+  - pip install flake8
   - pip freeze
 
 
