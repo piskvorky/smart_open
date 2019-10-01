@@ -19,30 +19,20 @@ The main functions are:
 import codecs
 import collections
 import logging
+import io
+import importlib
 import inspect
 import os
 import os.path as P
-import importlib
-import io
 import warnings
-
-# Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
-# available. The builtin ``pathlib`` will be imported with higher precedence.
-for pathlib_module in ('pathlib', 'pathlib2'):
-    try:
-        pathlib = importlib.import_module(pathlib_module)
-        PATHLIB_SUPPORT = True
-        break
-    except ImportError:
-        PATHLIB_SUPPORT = False
+import sys
 
 import boto
 import boto3
-from boto.compat import BytesIO, urlsplit, six
 import six
-from six.moves.urllib import parse as urlparse
-import sys
 
+from boto.compat import urlsplit
+from six.moves.urllib import parse as urlparse
 
 #
 # This module defines a function called smart_open so we cannot use
@@ -55,6 +45,16 @@ import smart_open.http as smart_open_http
 import smart_open.ssh as smart_open_ssh
 
 from smart_open import doctools
+
+# Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
+# available. The builtin ``pathlib`` will be imported with higher precedence.
+for pathlib_module in ('pathlib', 'pathlib2'):
+    try:
+        pathlib = importlib.import_module(pathlib_module)
+        PATHLIB_SUPPORT = True
+        break
+    except ImportError:
+        PATHLIB_SUPPORT = False
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +214,8 @@ def open(
 
     The URI is usually a string in a variety of formats:
 
-    1. a URI for the local filesystem: `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
+    1. a URI for the local filesystem: `./lines.txt`, `/home/joe/lines.txt.gz`,
+       `file:///home/joe/lines.txt.bz2`
     2. a URI for HDFS: `hdfs:///some/path/lines.txt`
     3. a URI for Amazon's S3 (can also supply credentials inside the URI):
        `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
@@ -287,7 +288,8 @@ def open(
     See Also
     --------
     - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
-    - `smart_open README.rst <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
+    - `smart_open README.rst
+      <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
 
     """
     logger.debug('%r', locals())
@@ -450,7 +452,8 @@ def smart_open(uri, mode="rb", **kw):
             #
             transport_params[key] = value
 
-    return open(uri, mode, ignore_ext=ignore_extension, transport_params=transport_params, **scrubbed_kwargs)
+    return open(uri, mode, ignore_ext=ignore_extension,
+                transport_params=transport_params, **scrubbed_kwargs)
 
 
 def _shortcut_open(
@@ -538,7 +541,6 @@ def _open_binary_stream(uri, mode, transport_params):
         # schemes, depending on the URI protocol in `uri`
         filename = uri.split('/')[-1]
         parsed_uri = _parse_uri(uri)
-        unsupported = "%r mode not supported for %r scheme" % (mode, parsed_uri.scheme)
 
         if parsed_uri.scheme == "file":
             fobj = io.open(parsed_uri.uri_path, mode)
@@ -575,14 +577,15 @@ def _open_binary_stream(uri, mode, transport_params):
         # we need to return something as the file name, but we don't know what
         # so we probe for uri.name (e.g., this works with open() or tempfile.NamedTemporaryFile)
         # if the value ends with COMPRESSED_EXT, we will note it in _compression_wrapper()
-        # if there is no such an attribute, we return "unknown" - this effectively disables any compression
+        # if there is no such an attribute, we return "unknown" - this
+        # effectively disables any compression
         filename = getattr(uri, 'name', 'unknown')
         return uri, filename
     else:
         raise TypeError("don't know how to handle uri %r" % uri)
 
 
-def _s3_open_uri(parsed_uri, mode, transport_params):
+def _s3_open_uri(uri, mode, transport_params):
     logger.debug('s3_open_uri: %r', locals())
     if mode in ('r', 'w'):
         raise ValueError('this function can only open binary streams. '
@@ -599,16 +602,16 @@ def _s3_open_uri(parsed_uri, mode, transport_params):
     # They are not mutually exclusive, but we have to pick one of the two.
     # Go with 1).
     #
-    if transport_params.get('session') is not None and (parsed_uri.access_id or parsed_uri.access_secret):
+    if transport_params.get('session') is not None and (uri.access_id or uri.access_secret):
         logger.warning(
             'ignoring credentials parsed from URL because they conflict with '
             'transport_params.session. Set transport_params.session to None '
             'to suppress this warning.'
         )
-    elif (parsed_uri.access_id and parsed_uri.access_secret):
+    elif (uri.access_id and uri.access_secret):
         transport_params['session'] = boto3.Session(
-            aws_access_key_id=parsed_uri.access_id,
-            aws_secret_access_key=parsed_uri.access_secret,
+            aws_access_key_id=uri.access_id,
+            aws_secret_access_key=uri.access_secret,
         )
 
     #
@@ -620,12 +623,12 @@ def _s3_open_uri(parsed_uri, mode, transport_params):
     # Again, these are not mutually exclusive: the user can specify both.  We
     # have to pick one to proceed, however, and we go with 2.
     #
-    if parsed_uri.host != _DEFAULT_S3_HOST:
-        endpoint_url = 'https://%s:%d' % (parsed_uri.host, parsed_uri.port)
+    if uri.host != _DEFAULT_S3_HOST:
+        endpoint_url = 'https://%s:%d' % (uri.host, uri.port)
         _override_endpoint_url(transport_params, endpoint_url)
 
     kwargs = _check_kwargs(smart_open_s3.open, transport_params)
-    return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
+    return smart_open_s3.open(uri.bucket_id, uri.key_id, mode, **kwargs)
 
 
 def _override_endpoint_url(tp, url):

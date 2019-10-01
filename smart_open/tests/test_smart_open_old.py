@@ -320,12 +320,18 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open("hdfs:///tmp/test.txt")
         smart_open_object.__iter__()
         # called with the correct params?
-        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+        mock_subprocess.Popen.assert_called_with(
+            ["hdfs", "dfs", "-cat", "/tmp/test.txt"],
+            stdout=mock_subprocess.PIPE,
+        )
 
         # second possibility of schema
         smart_open_object = smart_open.smart_open("hdfs://tmp/test.txt")
         smart_open_object.__iter__()
-        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+        mock_subprocess.Popen.assert_called_with(
+            ["hdfs", "dfs", "-cat", "/tmp/test.txt"],
+            stdout=mock_subprocess.PIPE,
+        )
 
     @responses.activate
     def test_webhdfs(self):
@@ -367,7 +373,8 @@ class SmartOpenReadTest(unittest.TestCase):
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
 
-        with smart_open.smart_open("s3://mybucket/mykey", "wb", s3_min_part_size=5 * 1024**2) as fout:
+        with smart_open.smart_open("s3://mybucket/mykey", "wb",
+                                   s3_min_part_size=5 * 1024**2) as fout:
             # write a single huge line (=full multipart upload)
             fout.write(expected[0] + b'\n')
 
@@ -438,7 +445,10 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.Session')
     def test_credentials(self, mock_session):
         smart_open.smart_open('s3://access_id:access_secret@mybucket/mykey')
-        mock_session.assert_called_with(aws_access_key_id='access_id', aws_secret_access_key='access_secret')
+        mock_session.assert_called_with(
+            aws_access_key_id='access_id',
+            aws_secret_access_key='access_secret',
+        )
         mock_session.return_value.resource.assert_called_with('s3')
 
     @mock.patch('boto3.Session')
@@ -450,8 +460,14 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.Session')
     def test_host(self, mock_session):
         smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey", host='aa.domain.com')
-        mock_session.assert_called_with(aws_access_key_id='access_id', aws_secret_access_key='access_secret')
-        mock_session.return_value.resource.assert_called_with('s3', endpoint_url='http://aa.domain.com')
+        mock_session.assert_called_with(
+            aws_access_key_id='access_id',
+            aws_secret_access_key='access_secret',
+        )
+        mock_session.return_value.resource.assert_called_with(
+            's3',
+            endpoint_url='http://aa.domain.com',
+        )
 
     @mock.patch('boto3.Session')
     def test_s3_upload(self, mock_session):
@@ -537,7 +553,7 @@ class SmartOpenTest(unittest.TestCase):
         short_path = "~/blah"
         full_path = os.path.expanduser(short_path)
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.smart_open(short_path, "rb") as fin:
+            with smart_open.smart_open(short_path, "rb"):
                 mock_open.assert_called_with(full_path, "rb", buffering=-1)
 
     def test_incorrect(self):
@@ -690,7 +706,11 @@ class WebHdfsWriteTest(unittest.TestCase):
             headers = {'location': 'http://127.0.0.1:8440/file'}
             return 307, headers, resp_body
 
-        responses.add_callback(responses.PUT, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
+        responses.add_callback(
+            responses.PUT,
+            "http://127.0.0.1:8440/webhdfs/v1/path/file",
+            callback=request_callback,
+        )
         responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
         smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file", 'wb')
 
@@ -707,7 +727,11 @@ class WebHdfsWriteTest(unittest.TestCase):
             headers = {'location': 'http://127.0.0.1:8440/file'}
             return 307, headers, resp_body
 
-        responses.add_callback(responses.PUT, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
+        responses.add_callback(
+            responses.PUT,
+            "http://127.0.0.1:8440/webhdfs/v1/path/file",
+            callback=request_callback,
+        )
         responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
         smart_open_object = smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file", 'wb')
 
@@ -717,13 +741,21 @@ class WebHdfsWriteTest(unittest.TestCase):
             return 200, headers, ""
 
         test_string = u"žluťoučký koníček".encode('utf8')
-        responses.add_callback(responses.POST, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
-        responses.add_callback(responses.POST, "http://127.0.0.1:8440/file", callback=write_callback)
+        responses.add_callback(
+            responses.POST,
+            "http://127.0.0.1:8440/webhdfs/v1/path/file",
+            callback=request_callback,
+        )
+        responses.add_callback(
+            responses.POST,
+            "http://127.0.0.1:8440/file",
+            callback=write_callback,
+        )
         smart_open_object.write(test_string)
         smart_open_object.close()
 
         assert len(responses.calls) == 4
-        assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"
+        assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"  # noqa
         assert responses.calls[3].request.url == "http://127.0.0.1:8440/file"
 
 
@@ -800,20 +832,21 @@ class MultistreamsBZ2Test(unittest.TestCase):
 
     TEXT = b''.join(TEXT_LINES)
 
-    DATA = \
-        b'BZh91AY&SY.\xc8N\x18\x00\x01>_\x80\x00\x10@\x02\xff\xf0\x01\x07n\x00?\xe7\xff\xe00\x01\x99\xaa\x00' \
-        b'\xc0\x03F\x86\x8c#&\x83F\x9a\x03\x06\xa6\xd0\xa6\x93M\x0fQ\xa7\xa8\x06\x804hh\x12$\x11\xa4i4\xf14S' \
-        b'\xd2<Q\xb5\x0fH\xd3\xd4\xdd\xd5\x87\xbb\xf8\x94\r\x8f\xafI\x12\xe1\xc9\xf8/E\x00pu\x89\x12]\xc9' \
-        b'\xbbDL\nQ\x0e\t1\x12\xdf\xa0\xc0\x97\xac2O9\x89\x13\x94\x0e\x1c7\x0ed\x95I\x0c\xaaJ\xa4\x18L\x10' \
-        b'\x05#\x9c\xaf\xba\xbc/\x97\x8a#C\xc8\xe1\x8cW\xf9\xe2\xd0\xd6M\xa7\x8bXa<e\x84t\xcbL\xb3\xa7\xd9' \
-        b'\xcd\xd1\xcb\x84.\xaf\xb3\xab\xab\xad`n}\xa0lh\tE,\x8eZ\x15\x17VH>\x88\xe5\xcd9gd6\x0b\n\xe9\x9b' \
-        b'\xd5\x8a\x99\xf7\x08.K\x8ev\xfb\xf7xw\xbb\xdf\xa1\x92\xf1\xdd|/";\xa2\xba\x9f\xd5\xb1#A\xb6\xf6' \
-        b'\xb3o\xc9\xc5y\\\xebO\xe7\x85\x9a\xbc\xb6f8\x952\xd5\xd7"%\x89>V,\xf7\xa6z\xe2\x9f\xa3\xdf\x11' \
-        b'\x11"\xd6E)I\xa9\x13^\xca\xf3r\xd0\x03U\x922\xf26\xec\xb6\xed\x8b\xc3U\x13\x9d\xc5\x170\xa4\xfa^' \
-        b'\x92\xacDF\x8a\x97\xd6\x19\xfe\xdd\xb8\xbd\x1a\x9a\x19\xa3\x80ankR\x8b\xe5\xd83]\xa9\xc6\x08' \
-        b'\x82f\xf6\xb9"6l$\xb8j@\xc0\x8a\xb0l1..\xbak\x83ls\x15\xbc\xf4\xc1\x13\xbe\xf8E\xb8\x9d\r\xa8\x9dk' \
-        b'\x84\xd3n\xfa\xacQ\x07\xb1%y\xaav\xb4\x08\xe0z\x1b\x16\xf5\x04\xe9\xcc\xb9\x08z\x1en7.G\xfc]\xc9\x14' \
-        b'\xe1B@\xbb!8`'
+    DATA = (
+        b'BZh91AY&SY.\xc8N\x18\x00\x01>_\x80\x00\x10@\x02\xff\xf0\x01\x07n\x00?\xe7\xff\xe00\x01\x99\xaa\x00'
+        b'\xc0\x03F\x86\x8c#&\x83F\x9a\x03\x06\xa6\xd0\xa6\x93M\x0fQ\xa7\xa8\x06\x804hh\x12$\x11\xa4i4\xf14S'
+        b'\xd2<Q\xb5\x0fH\xd3\xd4\xdd\xd5\x87\xbb\xf8\x94\r\x8f\xafI\x12\xe1\xc9\xf8/E\x00pu\x89\x12]\xc9'
+        b'\xbbDL\nQ\x0e\t1\x12\xdf\xa0\xc0\x97\xac2O9\x89\x13\x94\x0e\x1c7\x0ed\x95I\x0c\xaaJ\xa4\x18L\x10'
+        b'\x05#\x9c\xaf\xba\xbc/\x97\x8a#C\xc8\xe1\x8cW\xf9\xe2\xd0\xd6M\xa7\x8bXa<e\x84t\xcbL\xb3\xa7\xd9'
+        b'\xcd\xd1\xcb\x84.\xaf\xb3\xab\xab\xad`n}\xa0lh\tE,\x8eZ\x15\x17VH>\x88\xe5\xcd9gd6\x0b\n\xe9\x9b'
+        b'\xd5\x8a\x99\xf7\x08.K\x8ev\xfb\xf7xw\xbb\xdf\xa1\x92\xf1\xdd|/";\xa2\xba\x9f\xd5\xb1#A\xb6\xf6'
+        b'\xb3o\xc9\xc5y\\\xebO\xe7\x85\x9a\xbc\xb6f8\x952\xd5\xd7"%\x89>V,\xf7\xa6z\xe2\x9f\xa3\xdf\x11'
+        b'\x11"\xd6E)I\xa9\x13^\xca\xf3r\xd0\x03U\x922\xf26\xec\xb6\xed\x8b\xc3U\x13\x9d\xc5\x170\xa4\xfa^'
+        b'\x92\xacDF\x8a\x97\xd6\x19\xfe\xdd\xb8\xbd\x1a\x9a\x19\xa3\x80ankR\x8b\xe5\xd83]\xa9\xc6\x08'
+        b'\x82f\xf6\xb9"6l$\xb8j@\xc0\x8a\xb0l1..\xbak\x83ls\x15\xbc\xf4\xc1\x13\xbe\xf8E\xb8\x9d\r\xa8\x9dk'
+        b'\x84\xd3n\xfa\xacQ\x07\xb1%y\xaav\xb4\x08\xe0z\x1b\x16\xf5\x04\xe9\xcc\xb9\x08z\x1en7.G\xfc]\xc9'
+        b'\x14\xe1B@\xbb!8`'
+    )
 
     def create_temp_bz2(self, streams=1):
         f = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False)
@@ -933,7 +966,6 @@ class S3OpenTest(unittest.TestCase):
         """Should always open in binary mode when writing through a codec."""
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='bucket')
-        uri = smart_open_lib._parse_uri("s3://bucket/key.gz")
 
         with mock.patch('smart_open.s3.open') as mock_open:
             smart_open.smart_open("s3://bucket/key.gz", "wb")

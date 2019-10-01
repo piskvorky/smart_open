@@ -25,6 +25,7 @@ def test():
         path = tofile()
         with smart_open.smart_open(path, 'rb') as fin:
             loaded = np.fromfile(fin)
+            del loaded
         return 0
     finally:
         os.unlink(path)
