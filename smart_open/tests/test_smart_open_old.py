@@ -1,15 +1,19 @@
-#!/usr/bin/env python
+#
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2015 Radim Rehurek <me@radimrehurek.com>
+# Author: Michael Penkov <m@penkov.dev>
+#
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-# These are tests that test the deprecated smart_open.smart_open function.
-# They mostly duplicate tests in test_smart_open.py and are here to guarantee
-# backwards compatibility.
-#
+"""
+These are tests that test the deprecated smart_open.smart_open function.
+They mostly duplicate tests in test_smart_open.py and are here to guarantee
+backwards compatibility.
+"""
+
 
 import io
 import logging

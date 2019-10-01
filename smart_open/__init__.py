@@ -1,12 +1,13 @@
 #
 # -*- coding: utf-8 -*-
 #
+# Author: Michael Penkov <m@penkov.dev>
+#
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-
 """
 Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
 filesystem / compressed files, and many more, using a simple, Pythonic API.
