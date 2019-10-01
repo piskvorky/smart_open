@@ -40,6 +40,9 @@ def read(fname):
 
 
 tests_require = [
+    'pytest',
+    'pytest-mock',
+    'pytest-rerunfailures',
     'mock',
     'moto==1.3.4',
     'pathlib2',
