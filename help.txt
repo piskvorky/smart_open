@@ -99,6 +99,8 @@ FUNCTIONS
         multipart_upload_kwargs: dict, optional
             Additional parameters to pass to boto3's initiate_multipart_upload function.
             For writing only.
+        version_id: str, optional
+            Version of the object, used when reading object. If None, will fetch the most recent version.
         
         HTTP (for details, see :mod:`smart_open.http` and :func:`smart_open.http.open`):
         
@@ -108,6 +110,10 @@ FUNCTIONS
             The username for authenticating over HTTP
         password: str, optional
             The password for authenticating over HTTP
+        headers: dict, optional
+            Any headers to send in the request. If ``None``, the default headers are sent:
+            ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
+            set this variable to an empty dict, ``{}``.
         
         WebHDFS (for details, see :mod:`smart_open.webhdfs` and :func:`smart_open.webhdfs.open`):
         

@@ -14,7 +14,7 @@
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-version="$(head -n 1 smart_open/VERSION)"
+version=$(env -i python -c "from smart_open.version import __version__; print(__version__)")
 
 read -p "Push version $version to github.com? yes or no: " reply
 if [ "$reply" != "yes" ]
