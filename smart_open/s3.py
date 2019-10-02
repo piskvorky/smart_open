@@ -413,12 +413,24 @@ class SeekableBufferedInputBase(BufferedInputBase):
         raise io.UnsupportedOperation
 
     def __str__(self):
-        return "s3.SeekableBufferedInputBase(bucket_name='{}', key='{}')".format(
-            self._object.bucket_name, self._object.key)
+        return ("smart_open.s3.SeekableBufferedInputBase(%r, %r)") % (
+            self._object.bucket_name,
+            self._object.key
+        )
 
     def __repr__(self):
-        return "s3.SeekableBufferedInputBase(bucket_name='{}', key='{}')".format(
-            self._object.bucket_name, self._object.key)
+        return (
+            "smart_open.s3.SeekableBufferedInputBase("
+            "bucket_name=%r, "
+            "key=%r, "
+            "version_id=%r, "
+            "line_terminator=%r, "
+        ) % (
+            self._object.bucket_name,
+            self._object.key,
+            self._version_id,
+            self._line_terminator,
+        )
 
 
 class BufferedOutputBase(io.BufferedIOBase):
@@ -562,12 +574,23 @@ multipart upload may fail")
             self.close()
 
     def __str__(self):
-        return "s3.BufferedOutputBase(bucket_name='{}', key='{}')".format(
-            self._object.bucket_name, self._object.key)
+        return "smart_open.s3.BufferedOutputBase(%r, %r)" % (
+            self._object.bucket_name,
+            self._object.key
+        )
 
     def __repr__(self):
-        return "s3.BufferedOutputBase(bucket_name='{}', key='{}')".format(
-            self._object.bucket_name, self._object.key)
+        return (
+            "smart_open.s3.BufferedOutputBase("
+            "bucket_name=%r, "
+            "key=%r, "
+            "min_part_size=%r)"
+        ) % (
+            self._object.bucket_name,
+            self._object.key,
+            self._min_part_size,
+        )
+
 
 def iter_bucket(bucket_name, prefix='', accept_key=None,
                 key_limit=None, workers=16, retries=3):
