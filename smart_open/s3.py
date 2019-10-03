@@ -424,7 +424,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             "bucket_name=%r, "
             "key=%r, "
             "version_id=%r, "
-            "line_terminator=%r, "
+            "line_terminator=%r)"
         ) % (
             self._object.bucket_name,
             self._object.key,
