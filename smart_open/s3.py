@@ -413,7 +413,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         raise io.UnsupportedOperation
 
     def __str__(self):
-        return ("smart_open.s3.SeekableBufferedInputBase(%r, %r)") % (
+        return "smart_open.s3.SeekableBufferedInputBase(%r, %r)" % (
             self._object.bucket_name,
             self._object.key
         )
