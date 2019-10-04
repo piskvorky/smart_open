@@ -352,6 +352,11 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
     def __init__(self, bucket, key, version_id=None, buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None):
+
+        self._buffer_size = buffer_size
+        self._session = session
+        self._resource_kwargs = resource_kwargs
+
         if session is None:
             session = boto3.Session()
         if resource_kwargs is None:
@@ -413,23 +418,26 @@ class SeekableBufferedInputBase(BufferedInputBase):
         raise io.UnsupportedOperation
 
     def __str__(self):
-        return "smart_open.s3.SeekableBufferedInputBase(%r, %r)" % (
-            self._object.bucket_name,
-            self._object.key
-        )
+        return "smart_open.s3.SeekableBufferedInputBase(%r, %r)" % (self._object.bucket_name, self._object.key)
 
     def __repr__(self):
         return (
             "smart_open.s3.SeekableBufferedInputBase("
-            "bucket_name=%r, "
+            "bucket=%r, "
             "key=%r, "
             "version_id=%r, "
-            "line_terminator=%r)"
+            "buffer_size=%r, "
+            "line_terminator=%r, "
+            "session=%r, "
+            "resource_kwargs=%r)"
         ) % (
             self._object.bucket_name,
             self._object.key,
             self._version_id,
+            self._buffer_size,
             self._line_terminator,
+            self._session,
+            self._resource_kwargs
         )
 
 
@@ -447,6 +455,11 @@ class BufferedOutputBase(io.BufferedIOBase):
             resource_kwargs=None,
             multipart_upload_kwargs=None,
             ):
+
+        self._session = session
+        self._resource_kwargs = resource_kwargs
+        self._multipart_upload_kwargs = multipart_upload_kwargs
+
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
@@ -470,6 +483,7 @@ multipart upload may fail")
         self._total_bytes = 0
         self._total_parts = 0
         self._parts = []
+
 
         #
         # This member is part of the io.BufferedIOBase interface.
@@ -574,21 +588,24 @@ multipart upload may fail")
             self.close()
 
     def __str__(self):
-        return "smart_open.s3.BufferedOutputBase(%r, %r)" % (
-            self._object.bucket_name,
-            self._object.key
-        )
+        return "smart_open.s3.BufferedOutputBase(%r, %r)" % (self._object.bucket_name, self._object.key)
 
     def __repr__(self):
         return (
             "smart_open.s3.BufferedOutputBase("
-            "bucket_name=%r, "
+            "bucket=%r, "
             "key=%r, "
-            "min_part_size=%r)"
+            "min_part_size=%r, "
+            "session=%r, "
+            "resource_kwargs=%r, "
+            "multipart_upload_kwargs=%r)"
         ) % (
             self._object.bucket_name,
             self._object.key,
             self._min_part_size,
+            self._session,
+            self._resource_kwargs,
+            self._multipart_upload_kwargs
         )
 
 
