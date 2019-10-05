@@ -437,7 +437,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             self._buffer_size,
             self._line_terminator,
             self._session,
-            self._resource_kwargs
+            self._resource_kwargs,
         )
 
 
@@ -605,7 +605,7 @@ multipart upload may fail")
             self._min_part_size,
             self._session,
             self._resource_kwargs,
-            self._multipart_upload_kwargs
+            self._multipart_upload_kwargs,
         )
 
 
