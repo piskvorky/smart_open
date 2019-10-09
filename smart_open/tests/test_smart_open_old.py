@@ -336,8 +336,10 @@ class SmartOpenReadTest(unittest.TestCase):
     @responses.activate
     def test_webhdfs(self):
         """Is webhdfs line iterator called correctly"""
-        responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file",
-                      body='line1\nline2', stream=True)
+        responses.add(
+            responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file",
+            body='line1\nline2', stream=True,
+        )
         smart_open_object = smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file")
         iterator = iter(smart_open_object)
         self.assertEqual(next(iterator).decode("utf-8"), "line1\n")
@@ -358,8 +360,10 @@ class SmartOpenReadTest(unittest.TestCase):
     @responses.activate
     def test_webhdfs_read(self):
         """Does webhdfs read method work correctly"""
-        responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file",
-                      body='line1\nline2', stream=True)
+        responses.add(
+            responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file",
+            body='line1\nline2', stream=True,
+        )
         smart_open_object = smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file")
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 

@@ -16,8 +16,9 @@ def initialize_bucket():
 
 
 def write_read(key, content, write_mode, read_mode, encoding=None, s3_upload=None, **kwargs):
-    with smart_open.smart_open(key, write_mode, encoding=encoding,
-                               s3_upload=s3_upload, **kwargs) as fout:
+    with smart_open.smart_open(
+            key, write_mode, encoding=encoding,
+            s3_upload=s3_upload, **kwargs) as fout:
         fout.write(content)
     with smart_open.smart_open(key, read_mode, encoding=encoding, **kwargs) as fin:
         actual = fin.read()

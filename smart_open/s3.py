@@ -597,8 +597,9 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
     --------
 
       >>> # get all JSON files under "mybucket/foo/"
-      >>> for key, content in iter_bucket(bucket_name, prefix='foo/',
-      ...                                 accept_key=lambda key: key.endswith('.json')):
+      >>> for key, content in iter_bucket(
+      ...         bucket_name, prefix='foo/',
+      ...         accept_key=lambda key: key.endswith('.json')):
       ...     print key, len(content)
 
       >>> # limit to 10k files, using 32 parallel workers (default is 16)

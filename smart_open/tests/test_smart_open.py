@@ -125,12 +125,16 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.key_id, "folder/picture1.jpg?bar")
 
     def test_s3_invalid_url_atmark_in_bucket_name(self):
-        self.assertRaises(ValueError, smart_open_lib._parse_uri,
-                          "s3://access_id:access_secret@my@bucket@port/mykey")
+        self.assertRaises(
+            ValueError, smart_open_lib._parse_uri,
+            "s3://access_id:access_secret@my@bucket@port/mykey",
+        )
 
     def test_s3_invalid_uri_missing_colon(self):
-        self.assertRaises(ValueError, smart_open_lib._parse_uri,
-                          "s3://access_id@access_secret@mybucket@port/mykey")
+        self.assertRaises(
+            ValueError, smart_open_lib._parse_uri,
+            "s3://access_id@access_secret@mybucket@port/mykey",
+        )
 
     def test_webhdfs_uri(self):
         """Do webhdfs URIs parse correctly"""

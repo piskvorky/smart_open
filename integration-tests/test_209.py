@@ -61,8 +61,11 @@ avroSchemaOut = gen_schema(data)
 
 output_url = _S3_URL + '/issue_209/out.avro'
 
-@mock.patch('avro.datafile.DataFileWriter.generate_sync_marker',
-            mock.Mock(return_value=b'0123456789abcdef'))
+
+@mock.patch(
+    'avro.datafile.DataFileWriter.generate_sync_marker',
+    mock.Mock(return_value=b'0123456789abcdef'),
+)
 def write_avro_context_manager(foutd):
     schema = avro.schema.parse(avroSchemaOut)
     dictRes = data.to_dict(orient='records')
@@ -70,8 +73,11 @@ def write_avro_context_manager(foutd):
         for ll, row in enumerate(dictRes):
             writer.append(row)
 
-@mock.patch('avro.datafile.DataFileWriter.generate_sync_marker',
-            mock.Mock(return_value=b'0123456789abcdef'))
+
+@mock.patch(
+    'avro.datafile.DataFileWriter.generate_sync_marker',
+    mock.Mock(return_value=b'0123456789abcdef'),
+)
 def write_avro_manual_close(foutd):
     schema = avro.schema.parse(avroSchemaOut)
     dictRes = data.to_dict(orient='records')
@@ -123,8 +129,10 @@ def diff(file1, file2):
 @maybe_mock_s3
 def run():
     bucket_name, key_name = split_s3_url(output_url)
-    logging.critical('output_url: %r bucket_name: %r key_name: %r',
-                     output_url, bucket_name, key_name)
+    logging.critical(
+        'output_url: %r bucket_name: %r key_name: %r',
+        output_url, bucket_name, key_name,
+    )
 
     s3 = boto3.resource('s3')
     if os.environ.get('SO_ENABLE_MOCKS') == "1":
