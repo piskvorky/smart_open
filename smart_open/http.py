@@ -1,7 +1,4 @@
-#
 # -*- coding: utf-8 -*-
-#
-# Author: Michael Penkov <m@penkov.dev>
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
