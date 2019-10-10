@@ -418,7 +418,9 @@ class SeekableBufferedInputBase(BufferedInputBase):
         raise io.UnsupportedOperation
 
     def __str__(self):
-        return "smart_open.s3.SeekableBufferedInputBase(%r, %r)" % (self._object.bucket_name, self._object.key)
+        return "smart_open.s3.SeekableBufferedInputBase(%r, %r)" % (
+            self._object.bucket_name, self._object.key
+        )
 
     def __repr__(self):
         return (
@@ -483,7 +485,6 @@ multipart upload may fail")
         self._total_bytes = 0
         self._total_parts = 0
         self._parts = []
-
 
         #
         # This member is part of the io.BufferedIOBase interface.
