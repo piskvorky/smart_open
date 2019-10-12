@@ -536,6 +536,8 @@ multipart upload may fail")
         """Write the given buffer (bytes, bytearray, memoryview or any buffer
         interface implementation) to the S3 file.
 
+        For more information about buffers, see https://docs.python.org/3/c-api/buffer.html
+
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
 
