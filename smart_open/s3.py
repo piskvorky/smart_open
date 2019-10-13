@@ -10,7 +10,6 @@ import warnings
 import boto3
 import botocore.client
 import six
-import sys
 
 import smart_open.bytebuffer
 
@@ -35,11 +34,6 @@ READ_BINARY = 'rb'
 WRITE_BINARY = 'wb'
 MODES = (READ_BINARY, WRITE_BINARY)
 """Allowed I/O modes for working with S3."""
-
-_BINARY_TYPES = (six.binary_type, bytearray)
-"""Allowed binary buffer types for writing to the underlying S3 stream"""
-if sys.version_info >= (2, 7):
-    _BINARY_TYPES = (six.binary_type, bytearray, memoryview)
 
 BINARY_NEWLINE = b'\n'
 
@@ -539,22 +533,21 @@ multipart upload may fail")
         raise io.UnsupportedOperation("detach() not supported")
 
     def write(self, b):
-        """Write the given bytes (binary string) to the S3 file.
+        """Write the given buffer (bytes, bytearray, memoryview or any buffer
+        interface implementation) to the S3 file.
+
+        For more information about buffers, see https://docs.python.org/3/c-api/buffer.html
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
 
-        if not isinstance(b, _BINARY_TYPES):
-            raise TypeError(
-                "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b)))
-
-        self._buf.write(b)
-        self._total_bytes += len(b)
+        length = self._buf.write(b)
+        self._total_bytes += length
 
         if self._buf.tell() >= self._min_part_size:
             self._upload_next_part()
 
-        return len(b)
+        return length
 
     def terminate(self):
         """Cancel the underlying multipart upload."""
