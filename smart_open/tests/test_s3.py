@@ -412,6 +412,22 @@ ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operatio
 
 
 @maybe_mock_s3
+class TestCustomS3Url(unittest.TestCase):
+    def setUp(self):
+        ignore_resource_warnings()
+
+    def tearDown(self):
+        cleanup_bucket()
+
+    def test_iter_bucket_with_resource_kwargs(self):
+        endpoint_url = "https://s3.temp.minio.amazonaws.com"
+
+        populate_bucket(endpoint_url=endpoint_url)
+        results = list(smart_open.s3.iter_bucket(BUCKET_NAME, resource_kwargs={"endpoint_url": endpoint_url}))
+        self.assertEqual(len(results), 10)
+
+
+@maybe_mock_s3
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
@@ -586,11 +602,14 @@ class OpenTest(unittest.TestCase):
         self.assertEqual(r.read(), b"")
 
 
-def populate_bucket(num_keys=10):
+def populate_bucket(num_keys=10, endpoint_url=None):
     # fake (or not) connection, bucket and key
     logger.debug('%r', locals())
 
-    s3 = boto3.resource('s3')
+    if endpoint_url is None:
+        s3 = boto3.resource('s3')
+    else:
+        s3 = boto3.resource('s3', endpoint_url=endpoint_url)
     for key_number in range(num_keys):
         key_name = 'key_%d' % key_number
         s3.Object(BUCKET_NAME, key_name).put(Body=str(key_number))
