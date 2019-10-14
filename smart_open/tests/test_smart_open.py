@@ -93,7 +93,9 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_secret, "access/secret")
 
     def test_s3_uri_has_atmark_in_key_name2(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y")
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y"
+        )
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.key_id, "dir/my@ke@y")
@@ -123,10 +125,16 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.key_id, "folder/picture1.jpg?bar")
 
     def test_s3_invalid_url_atmark_in_bucket_name(self):
-        self.assertRaises(ValueError, smart_open_lib._parse_uri, "s3://access_id:access_secret@my@bucket@port/mykey")
+        self.assertRaises(
+            ValueError, smart_open_lib._parse_uri,
+            "s3://access_id:access_secret@my@bucket@port/mykey",
+        )
 
     def test_s3_invalid_uri_missing_colon(self):
-        self.assertRaises(ValueError, smart_open_lib._parse_uri, "s3://access_id@access_secret@mybucket@port/mykey")
+        self.assertRaises(
+            ValueError, smart_open_lib._parse_uri,
+            "s3://access_id@access_secret@mybucket@port/mykey",
+        )
 
     def test_webhdfs_uri(self):
         """Do webhdfs URIs parse correctly"""
@@ -141,7 +149,8 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file?query_part_1&query_part2")
 
     def test_uri_from_issue_223_works(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://:@omax-mis/twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6")
+        uri = "s3://:@omax-mis/twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6"
+        parsed_uri = smart_open_lib._parse_uri(uri)
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "omax-mis")
         self.assertEqual(parsed_uri.key_id, "twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6")
@@ -263,10 +272,10 @@ class SmartOpenHttpTest(unittest.TestCase):
     def _test_compressed_http(self, suffix, query):
         """Can open <suffix> via http?"""
         raw_data = b'Hello World Compressed.' * 10000
-        buffer = make_buffer(name='data' + suffix)
-        with smart_open.smart_open(buffer, 'wb') as outfile:
+        buf = make_buffer(name='data' + suffix)
+        with smart_open.smart_open(buf, 'wb') as outfile:
             outfile.write(raw_data)
-        compressed_data = buffer.getvalue()
+        compressed_data = buf.getvalue()
         # check that the string was actually compressed
         self.assertNotEqual(compressed_data, raw_data)
 
@@ -296,13 +305,14 @@ class SmartOpenHttpTest(unittest.TestCase):
         self._test_compressed_http(".bz2", True)
 
 
-def make_buffer(cls=six.BytesIO, initial_value=None, name=None):
+def make_buffer(cls=six.BytesIO, initial_value=None, name=None, noclose=False):
     """
-    Construct a new in-memory file object aka "buffer".
+    Construct a new in-memory file object aka "buf".
 
     :param cls: Class of the file object. Meaningful values are BytesIO and StringIO.
     :param initial_value: Passed directly to the constructor, this is the content of the returned buffer.
     :param name: Associated file path. Not assigned if is None (default).
+    :param noclose: If True, disables the .close function.
     :return: Instance of `cls`.
     """
     buf = cls(initial_value) if initial_value else cls()
@@ -311,7 +321,66 @@ def make_buffer(cls=six.BytesIO, initial_value=None, name=None):
     if six.PY2:
         buf.__enter__ = lambda: buf
         buf.__exit__ = lambda exc_type, exc_val, exc_tb: None
+    if noclose:
+        buf.close = lambda: None
     return buf
+
+
+class RealFileSystemTests(unittest.TestCase):
+    """Tests that touch the file system via temporary files."""
+
+    def setUp(self):
+        with tempfile.NamedTemporaryFile(prefix='test', delete=False) as fout:
+            fout.write(SAMPLE_BYTES)
+            self.temp_file = fout.name
+
+    def tearDown(self):
+        os.unlink(self.temp_file)
+
+    def test_rt(self):
+        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+            data = fin.read()
+        self.assertEqual(data, SAMPLE_TEXT)
+
+    def test_wt(self):
+        #
+        # The file already contains SAMPLE_TEXT, so write something different.
+        #
+        text = 'nippon budokan'
+        with smart_open.smart_open(self.temp_file, 'wt') as fout:
+            fout.write(text)
+
+        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+            data = fin.read()
+        self.assertEqual(data, text)
+
+    def test_ab(self):
+        with smart_open.smart_open(self.temp_file, 'ab') as fout:
+            fout.write(SAMPLE_BYTES)
+        with smart_open.smart_open(self.temp_file, 'rb') as fin:
+            data = fin.read()
+        self.assertEqual(data, SAMPLE_BYTES * 2)
+
+    def test_aplus(self):
+        with smart_open.smart_open(self.temp_file, 'a+') as fout:
+            fout.write(SAMPLE_TEXT)
+        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+            text = fin.read()
+        self.assertEqual(text, SAMPLE_TEXT * 2)
+
+    def test_at(self):
+        with smart_open.smart_open(self.temp_file, 'at') as fout:
+            fout.write(SAMPLE_TEXT)
+        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+            text = fin.read()
+        self.assertEqual(text, SAMPLE_TEXT * 2)
+
+    def test_atplus(self):
+        with smart_open.smart_open(self.temp_file, 'at+') as fout:
+            fout.write(SAMPLE_TEXT)
+        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+            text = fin.read()
+        self.assertEqual(text, SAMPLE_TEXT * 2)
 
 
 class SmartOpenFileObjTest(unittest.TestCase):
@@ -321,61 +390,94 @@ class SmartOpenFileObjTest(unittest.TestCase):
 
     def test_read_bytes(self):
         """Can we read bytes from a byte stream?"""
-        buffer = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buffer, 'rb') as sf:
+        buf = make_buffer(initial_value=SAMPLE_BYTES)
+        with smart_open.smart_open(buf, 'rb') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_BYTES)
 
     def test_write_bytes(self):
         """Can we write bytes to a byte stream?"""
-        buffer = make_buffer()
-        with smart_open.smart_open(buffer, 'wb') as sf:
+        buf = make_buffer()
+        with smart_open.smart_open(buf, 'wb') as sf:
             sf.write(SAMPLE_BYTES)
-            self.assertEqual(buffer.getvalue(), SAMPLE_BYTES)
+            self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
 
     @unittest.skipIf(six.PY2, "Python 2 does not differentiate between str and bytes")
     def test_read_text_stream_fails(self):
-        """Attempts to read directly from a text stream should fail."""
-        buffer = make_buffer(six.StringIO, initial_value=SAMPLE_TEXT)
-        with smart_open.smart_open(buffer, 'r') as sf:
+        """Attempts to read directly from a text stream should fail.
+
+        This is because smart_open.open expects a byte stream as input.
+        If you have a text stream, there's no point passing it to smart_open:
+        you can read from it directly.
+        """
+        buf = make_buffer(six.StringIO, initial_value=SAMPLE_TEXT)
+        with smart_open.smart_open(buf, 'r') as sf:
             self.assertRaises(TypeError, sf.read)  # we expect binary mode
 
     @unittest.skipIf(six.PY2, "Python 2 does not differentiate between str and bytes")
     def test_write_text_stream_fails(self):
         """Attempts to write directly to a text stream should fail."""
-        buffer = make_buffer(six.StringIO)
-        with smart_open.smart_open(buffer, 'w') as sf:
+        buf = make_buffer(six.StringIO)
+        with smart_open.smart_open(buf, 'w') as sf:
             self.assertRaises(TypeError, sf.write, SAMPLE_TEXT)  # we expect binary mode
 
-    def test_read_str_from_bytes(self):
-        """Can we read strings from a byte stream?"""
-        buffer = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buffer, 'r') as sf:
+    def test_read_text_from_bytestream(self):
+        buf = make_buffer(initial_value=SAMPLE_BYTES)
+        with smart_open.smart_open(buf, 'r') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
-    def test_write_str_to_bytes(self):
+    def test_read_text_from_bytestream_rt(self):
+        buf = make_buffer(initial_value=SAMPLE_BYTES)
+        with smart_open.smart_open(buf, 'rt') as sf:
+            data = sf.read()
+        self.assertEqual(data, SAMPLE_TEXT)
+
+    def test_read_text_from_bytestream_rtplus(self):
+        buf = make_buffer(initial_value=SAMPLE_BYTES)
+        with smart_open.smart_open(buf, 'rt+') as sf:
+            data = sf.read()
+        self.assertEqual(data, SAMPLE_TEXT)
+
+    def test_write_text_to_bytestream(self):
         """Can we write strings to a byte stream?"""
-        buffer = make_buffer()
-        with smart_open.smart_open(buffer, 'w') as sf:
+        buf = make_buffer(noclose=True)
+        with smart_open.smart_open(buf, 'w') as sf:
             sf.write(SAMPLE_TEXT)
-            self.assertEqual(buffer.getvalue(), SAMPLE_BYTES)
+
+        self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
+
+    def test_write_text_to_bytestream_wt(self):
+        """Can we write strings to a byte stream?"""
+        buf = make_buffer(noclose=True)
+        with smart_open.smart_open(buf, 'wt') as sf:
+            sf.write(SAMPLE_TEXT)
+
+        self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
+
+    def test_write_text_to_bytestream_wtplus(self):
+        """Can we write strings to a byte stream?"""
+        buf = make_buffer(noclose=True)
+        with smart_open.smart_open(buf, 'wt+') as sf:
+            sf.write(SAMPLE_TEXT)
+
+        self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
 
     def test_name_read(self):
         """Can we use the "name" attribute to decompress on the fly?"""
         data = SAMPLE_BYTES * 1000
-        buffer = make_buffer(initial_value=bz2.compress(data), name='data.bz2')
-        with smart_open.smart_open(buffer, 'rb') as sf:
+        buf = make_buffer(initial_value=bz2.compress(data), name='data.bz2')
+        with smart_open.smart_open(buf, 'rb') as sf:
             data = sf.read()
         self.assertEqual(data, data)
 
     def test_name_write(self):
         """Can we use the "name" attribute to compress on the fly?"""
         data = SAMPLE_BYTES * 1000
-        buffer = make_buffer(name='data.bz2')
-        with smart_open.smart_open(buffer, 'wb') as sf:
+        buf = make_buffer(name='data.bz2')
+        with smart_open.smart_open(buf, 'wb') as sf:
             sf.write(data)
-        self.assertEqual(bz2.decompress(buffer.getvalue()), data)
+        self.assertEqual(bz2.decompress(buf.getvalue()), data)
 
     def test_open_side_effect(self):
         """
@@ -395,6 +497,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
             self.assertEqual(data, smart_data)
         finally:
             os.unlink(tmpf.name)
+
 
 #
 # What exactly to patch here differs on _how_ we're opening the file.
@@ -585,12 +688,18 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open("hdfs:///tmp/test.txt")
         smart_open_object.__iter__()
         # called with the correct params?
-        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+        mock_subprocess.Popen.assert_called_with(
+            ["hdfs", "dfs", "-cat", "/tmp/test.txt"],
+            stdout=mock_subprocess.PIPE,
+        )
 
         # second possibility of schema
         smart_open_object = smart_open.smart_open("hdfs://tmp/test.txt")
         smart_open_object.__iter__()
-        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+        mock_subprocess.Popen.assert_called_with(
+            ["hdfs", "dfs", "-cat", "/tmp/test.txt"],
+            stdout=mock_subprocess.PIPE,
+        )
 
     @responses.activate
     def test_webhdfs(self):
@@ -799,7 +908,7 @@ class SmartOpenTest(unittest.TestCase):
         short_path = "~/blah"
         full_path = os.path.expanduser(short_path)
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.smart_open(short_path, "rb") as fin:
+            with smart_open.smart_open(short_path, "rb"):
                 mock_open.assert_called_with(full_path, "rb", buffering=-1)
 
     def test_incorrect(self):
@@ -955,8 +1064,16 @@ class WebHdfsWriteTest(unittest.TestCase):
             headers = {'location': 'http://127.0.0.1:8440/file'}
             return 307, headers, resp_body
 
-        responses.add_callback(responses.PUT, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
-        responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
+        responses.add_callback(
+            responses.PUT,
+            "http://127.0.0.1:8440/webhdfs/v1/path/file",
+            callback=request_callback,
+        )
+        responses.add(
+            responses.PUT,
+            "http://127.0.0.1:8440/file",
+            status=201,
+        )
         smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file", 'wb')
 
         assert len(responses.calls) == 2
@@ -972,7 +1089,11 @@ class WebHdfsWriteTest(unittest.TestCase):
             headers = {'location': 'http://127.0.0.1:8440/file'}
             return 307, headers, resp_body
 
-        responses.add_callback(responses.PUT, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
+        responses.add_callback(
+            responses.PUT,
+            "http://127.0.0.1:8440/webhdfs/v1/path/file",
+            callback=request_callback,
+        )
         responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
         smart_open_object = smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file", 'wb')
 
@@ -982,13 +1103,21 @@ class WebHdfsWriteTest(unittest.TestCase):
             return 200, headers, ""
 
         test_string = u"žluťoučký koníček".encode('utf8')
-        responses.add_callback(responses.POST, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
-        responses.add_callback(responses.POST, "http://127.0.0.1:8440/file", callback=write_callback)
+        responses.add_callback(
+            responses.POST,
+            "http://127.0.0.1:8440/webhdfs/v1/path/file",
+            callback=request_callback,
+        )
+        responses.add_callback(
+            responses.POST,
+            "http://127.0.0.1:8440/file",
+            callback=write_callback,
+        )
         smart_open_object.write(test_string)
         smart_open_object.close()
 
         assert len(responses.calls) == 4
-        assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"
+        assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"  # noqa
         assert responses.calls[3].request.url == "http://127.0.0.1:8440/file"
 
 
@@ -1059,20 +1188,21 @@ class MultistreamsBZ2Test(unittest.TestCase):
 
     TEXT = b''.join(TEXT_LINES)
 
-    DATA = \
-        b'BZh91AY&SY.\xc8N\x18\x00\x01>_\x80\x00\x10@\x02\xff\xf0\x01\x07n\x00?\xe7\xff\xe00\x01\x99\xaa\x00' \
-        b'\xc0\x03F\x86\x8c#&\x83F\x9a\x03\x06\xa6\xd0\xa6\x93M\x0fQ\xa7\xa8\x06\x804hh\x12$\x11\xa4i4\xf14S' \
-        b'\xd2<Q\xb5\x0fH\xd3\xd4\xdd\xd5\x87\xbb\xf8\x94\r\x8f\xafI\x12\xe1\xc9\xf8/E\x00pu\x89\x12]\xc9' \
-        b'\xbbDL\nQ\x0e\t1\x12\xdf\xa0\xc0\x97\xac2O9\x89\x13\x94\x0e\x1c7\x0ed\x95I\x0c\xaaJ\xa4\x18L\x10' \
-        b'\x05#\x9c\xaf\xba\xbc/\x97\x8a#C\xc8\xe1\x8cW\xf9\xe2\xd0\xd6M\xa7\x8bXa<e\x84t\xcbL\xb3\xa7\xd9' \
-        b'\xcd\xd1\xcb\x84.\xaf\xb3\xab\xab\xad`n}\xa0lh\tE,\x8eZ\x15\x17VH>\x88\xe5\xcd9gd6\x0b\n\xe9\x9b' \
-        b'\xd5\x8a\x99\xf7\x08.K\x8ev\xfb\xf7xw\xbb\xdf\xa1\x92\xf1\xdd|/";\xa2\xba\x9f\xd5\xb1#A\xb6\xf6' \
-        b'\xb3o\xc9\xc5y\\\xebO\xe7\x85\x9a\xbc\xb6f8\x952\xd5\xd7"%\x89>V,\xf7\xa6z\xe2\x9f\xa3\xdf\x11' \
-        b'\x11"\xd6E)I\xa9\x13^\xca\xf3r\xd0\x03U\x922\xf26\xec\xb6\xed\x8b\xc3U\x13\x9d\xc5\x170\xa4\xfa^' \
-        b'\x92\xacDF\x8a\x97\xd6\x19\xfe\xdd\xb8\xbd\x1a\x9a\x19\xa3\x80ankR\x8b\xe5\xd83]\xa9\xc6\x08' \
-        b'\x82f\xf6\xb9"6l$\xb8j@\xc0\x8a\xb0l1..\xbak\x83ls\x15\xbc\xf4\xc1\x13\xbe\xf8E\xb8\x9d\r\xa8\x9dk' \
-        b'\x84\xd3n\xfa\xacQ\x07\xb1%y\xaav\xb4\x08\xe0z\x1b\x16\xf5\x04\xe9\xcc\xb9\x08z\x1en7.G\xfc]\xc9\x14' \
-        b'\xe1B@\xbb!8`'
+    DATA = (
+        b'BZh91AY&SY.\xc8N\x18\x00\x01>_\x80\x00\x10@\x02\xff\xf0\x01\x07n\x00?\xe7\xff\xe00\x01\x99\xaa\x00'
+        b'\xc0\x03F\x86\x8c#&\x83F\x9a\x03\x06\xa6\xd0\xa6\x93M\x0fQ\xa7\xa8\x06\x804hh\x12$\x11\xa4i4\xf14S'
+        b'\xd2<Q\xb5\x0fH\xd3\xd4\xdd\xd5\x87\xbb\xf8\x94\r\x8f\xafI\x12\xe1\xc9\xf8/E\x00pu\x89\x12]\xc9'
+        b'\xbbDL\nQ\x0e\t1\x12\xdf\xa0\xc0\x97\xac2O9\x89\x13\x94\x0e\x1c7\x0ed\x95I\x0c\xaaJ\xa4\x18L\x10'
+        b'\x05#\x9c\xaf\xba\xbc/\x97\x8a#C\xc8\xe1\x8cW\xf9\xe2\xd0\xd6M\xa7\x8bXa<e\x84t\xcbL\xb3\xa7\xd9'
+        b'\xcd\xd1\xcb\x84.\xaf\xb3\xab\xab\xad`n}\xa0lh\tE,\x8eZ\x15\x17VH>\x88\xe5\xcd9gd6\x0b\n\xe9\x9b'
+        b'\xd5\x8a\x99\xf7\x08.K\x8ev\xfb\xf7xw\xbb\xdf\xa1\x92\xf1\xdd|/";\xa2\xba\x9f\xd5\xb1#A\xb6\xf6'
+        b'\xb3o\xc9\xc5y\\\xebO\xe7\x85\x9a\xbc\xb6f8\x952\xd5\xd7"%\x89>V,\xf7\xa6z\xe2\x9f\xa3\xdf\x11'
+        b'\x11"\xd6E)I\xa9\x13^\xca\xf3r\xd0\x03U\x922\xf26\xec\xb6\xed\x8b\xc3U\x13\x9d\xc5\x170\xa4\xfa^'
+        b'\x92\xacDF\x8a\x97\xd6\x19\xfe\xdd\xb8\xbd\x1a\x9a\x19\xa3\x80ankR\x8b\xe5\xd83]\xa9\xc6\x08'
+        b'\x82f\xf6\xb9"6l$\xb8j@\xc0\x8a\xb0l1..\xbak\x83ls\x15\xbc\xf4\xc1\x13\xbe\xf8E\xb8\x9d\r\xa8\x9dk'
+        b'\x84\xd3n\xfa\xacQ\x07\xb1%y\xaav\xb4\x08\xe0z\x1b\x16\xf5\x04\xe9\xcc\xb9\x08z\x1en7.G\xfc]\xc9'
+        b'\x14\xe1B@\xbb!8`'
+    )
 
     def create_temp_bz2(self, streams=1):
         f = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False)
@@ -1192,7 +1322,6 @@ class S3OpenTest(unittest.TestCase):
         """Should always open in binary mode when writing through a codec."""
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='bucket')
-        uri = smart_open_lib._parse_uri("s3://bucket/key.gz")
 
         with mock.patch('smart_open.s3.open') as mock_open:
             smart_open.smart_open("s3://bucket/key.gz", "wb")

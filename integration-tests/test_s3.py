@@ -22,7 +22,9 @@ def initialize_bucket():
 
 
 def write_read(key, content, write_mode, read_mode, encoding=None, s3_upload=None, **kwargs):
-    with smart_open.smart_open(key, write_mode, encoding=encoding, s3_upload=s3_upload, **kwargs) as fout:
+    with smart_open.smart_open(
+            key, write_mode, encoding=encoding,
+            s3_upload=s3_upload, **kwargs) as fout:
         fout.write(content)
     with smart_open.smart_open(key, read_mode, encoding=encoding, **kwargs) as fin:
         actual = fin.read()
@@ -32,7 +34,7 @@ def write_read(key, content, write_mode, read_mode, encoding=None, s3_upload=Non
 def read_length_prefixed_messages(key, read_mode, encoding=None, **kwargs):
     with smart_open.smart_open(key, read_mode, encoding=encoding, **kwargs) as fin:
         actual = b''
-        length_byte = fin.read(1);
+        length_byte = fin.read(1)
         while len(length_byte):
             actual += length_byte
             msg = fin.read(ord(length_byte))
@@ -102,14 +104,15 @@ def test_s3_performance_gz(benchmark):
     actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
     assert actual == one_megabyte
 
+
 def test_s3_performance_small_reads(benchmark):
     initialize_bucket()
 
     ONE_MIB = 1024**2
     one_megabyte_of_msgs = io.BytesIO()
-    msg = b'\x0f' + b'0123456789abcde' # a length-prefixed "message"
+    msg = b'\x0f' + b'0123456789abcde'  # a length-prefixed "message"
     for _ in range(0, ONE_MIB, len(msg)):
-            one_megabyte_of_msgs.write(msg)
+        one_megabyte_of_msgs.write(msg)
     one_megabyte_of_msgs = one_megabyte_of_msgs.getvalue()
 
     key = _S3_URL + '/many_reads_performance.bin'
@@ -117,8 +120,9 @@ def test_s3_performance_small_reads(benchmark):
     with smart_open.smart_open(key, 'wb') as fout:
         fout.write(one_megabyte_of_msgs)
 
-    actual = benchmark(read_length_prefixed_messages, key, 'rb', buffer_size = ONE_MIB)
+    actual = benchmark(read_length_prefixed_messages, key, 'rb', buffer_size=ONE_MIB)
     assert actual == one_megabyte_of_msgs
+
 
 def test_s3_encrypted_file(benchmark):
     initialize_bucket()
@@ -129,5 +133,3 @@ def test_s3_encrypted_file(benchmark):
         'ServerSideEncryption': 'AES256'
     })
     assert actual == text
-
-

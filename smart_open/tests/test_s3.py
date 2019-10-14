@@ -101,7 +101,7 @@ def ignore_resource_warnings():
     #
     if six.PY2:
         return
-    warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")
+    warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
 @maybe_mock_s3
@@ -388,7 +388,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
                 fout.write(expected)
 
     def test_read_nonexisting_key(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(IOError):
             with smart_open.s3.open(BUCKET_NAME, 'my_nonexisting_key', 'rb') as fin:
                 fin.read()
 

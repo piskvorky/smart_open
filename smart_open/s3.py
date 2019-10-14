@@ -16,7 +16,6 @@ import warnings
 import boto3
 import botocore.client
 import six
-import sys
 
 import smart_open.bytebuffer
 
@@ -41,11 +40,6 @@ READ_BINARY = 'rb'
 WRITE_BINARY = 'wb'
 MODES = (READ_BINARY, WRITE_BINARY)
 """Allowed I/O modes for working with S3."""
-
-_BINARY_TYPES = (six.binary_type, bytearray)
-"""Allowed binary buffer types for writing to the underlying S3 stream"""
-if sys.version_info >= (2, 7):
-    _BINARY_TYPES = (six.binary_type, bytearray, memoryview)
 
 BINARY_NEWLINE = b'\n'
 
@@ -76,6 +70,7 @@ def open(
         bucket_id,
         key_id,
         mode,
+        version_id=None,
         buffer_size=DEFAULT_BUFFER_SIZE,
         min_part_size=DEFAULT_MIN_PART_SIZE,
         session=None,
@@ -103,6 +98,8 @@ def open(
     multipart_upload_kwargs: dict, optional
         Additional parameters to pass to boto3's initiate_multipart_upload function.
         For writing only.
+    version_id: str, optional
+        Version of the object, used when reading object. If None, will fetch the most recent version.
 
     """
     logger.debug('%r', locals())
@@ -114,10 +111,14 @@ def open(
     if multipart_upload_kwargs is None:
         multipart_upload_kwargs = {}
 
+    if (mode == WRITE_BINARY) and (version_id is not None):
+        raise ValueError("version_id must be None when writing")
+
     if mode == READ_BINARY:
         fileobj = SeekableBufferedInputBase(
             bucket_id,
             key_id,
+            version_id=version_id,
             buffer_size=buffer_size,
             session=session,
             resource_kwargs=resource_kwargs,
@@ -133,8 +134,20 @@ def open(
         )
     else:
         assert False, 'unexpected mode: %r' % mode
-
     return fileobj
+
+
+def _get(s3_object, version=None, **kwargs):
+    if version is not None:
+        kwargs['VersionId'] = version
+    try:
+        return s3_object.get(**kwargs)
+    except botocore.client.ClientError as error:
+        raise IOError(
+            'unable to access bucket: %r key: %r version: %r error: %s' % (
+                s3_object.bucket_name, s3_object.key, version, error
+            )
+        )
 
 
 class RawReader(object):
@@ -153,9 +166,10 @@ class RawReader(object):
 class SeekableRawReader(object):
     """Read an S3 object."""
 
-    def __init__(self, s3_object, content_length):
+    def __init__(self, s3_object, content_length, version_id=None):
         self._object = s3_object
         self._content_length = content_length
+        self._version_id = version_id
         self.seek(0)
 
     def seek(self, position):
@@ -183,7 +197,7 @@ class SeekableRawReader(object):
             #
             self._body = io.BytesIO()
         else:
-            self._body = self._object.get(Range=range_string)['Body']
+            self._body = _get(self._object, self._version_id, Range=range_string)['Body']
 
     def read(self, size=-1):
         if self._position >= self._content_length:
@@ -197,7 +211,7 @@ class SeekableRawReader(object):
 
 
 class BufferedInputBase(io.BufferedIOBase):
-    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
+    def __init__(self, bucket, key, version_id=None, buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None):
         if session is None:
             session = boto3.Session()
@@ -206,8 +220,10 @@ class BufferedInputBase(io.BufferedIOBase):
 
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
+        self._version_id = version_id
         self._raw_reader = RawReader(self._object)
         self._content_length = self._object.content_length
+        self._content_length = _get(self._object, self._version_id)['ContentLength']
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
@@ -334,24 +350,23 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self, bucket, key, buffer_size=DEFAULT_BUFFER_SIZE,
+    def __init__(self, bucket, key, version_id=None, buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None):
+
+        self._buffer_size = buffer_size
+        self._session = session
+        self._resource_kwargs = resource_kwargs
+
         if session is None:
             session = boto3.Session()
         if resource_kwargs is None:
             resource_kwargs = {}
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
+        self._version_id = version_id
+        self._content_length = _get(self._object, self._version_id)['ContentLength']
 
-        try:
-            self._content_length = self._object.content_length
-        except botocore.client.ClientError:
-            raise ValueError(
-                '%r does not exist in the bucket %r, '
-                'or is forbidden for access' % (key, bucket)
-            )
-
-        self._raw_reader = SeekableRawReader(self._object, self._content_length)
+        self._raw_reader = SeekableRawReader(self._object, self._content_length, self._version_id)
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
@@ -402,6 +417,31 @@ class SeekableBufferedInputBase(BufferedInputBase):
         """Unsupported."""
         raise io.UnsupportedOperation
 
+    def __str__(self):
+        return "smart_open.s3.SeekableBufferedInputBase(%r, %r)" % (
+            self._object.bucket_name, self._object.key
+        )
+
+    def __repr__(self):
+        return (
+            "smart_open.s3.SeekableBufferedInputBase("
+            "bucket=%r, "
+            "key=%r, "
+            "version_id=%r, "
+            "buffer_size=%r, "
+            "line_terminator=%r, "
+            "session=%r, "
+            "resource_kwargs=%r)"
+        ) % (
+            self._object.bucket_name,
+            self._object.key,
+            self._version_id,
+            self._buffer_size,
+            self._line_terminator,
+            self._session,
+            self._resource_kwargs,
+        )
+
 
 class BufferedOutputBase(io.BufferedIOBase):
     """Writes bytes to S3.
@@ -417,6 +457,11 @@ class BufferedOutputBase(io.BufferedIOBase):
             resource_kwargs=None,
             multipart_upload_kwargs=None,
             ):
+
+        self._session = session
+        self._resource_kwargs = resource_kwargs
+        self._multipart_upload_kwargs = multipart_upload_kwargs
+
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
@@ -495,22 +540,21 @@ multipart upload may fail")
         raise io.UnsupportedOperation("detach() not supported")
 
     def write(self, b):
-        """Write the given bytes (binary string) to the S3 file.
+        """Write the given buffer (bytes, bytearray, memoryview or any buffer
+        interface implementation) to the S3 file.
+
+        For more information about buffers, see https://docs.python.org/3/c-api/buffer.html
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
 
-        if not isinstance(b, _BINARY_TYPES):
-            raise TypeError(
-                "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b)))
-
-        self._buf.write(b)
-        self._total_bytes += len(b)
+        length = self._buf.write(b)
+        self._total_bytes += length
 
         if self._buf.tell() >= self._min_part_size:
             self._upload_next_part()
 
-        return len(b)
+        return length
 
     def terminate(self):
         """Cancel the underlying multipart upload."""
@@ -542,6 +586,31 @@ multipart upload may fail")
             self.terminate()
         else:
             self.close()
+
+    def __str__(self):
+        return "smart_open.s3.BufferedOutputBase(%r, %r)" % (self._object.bucket_name, self._object.key)
+
+    def __repr__(self):
+        return (
+            "smart_open.s3.BufferedOutputBase("
+            "bucket=%r, "
+            "key=%r, "
+            "min_part_size=%r, "
+            "session=%r, "
+            "resource_kwargs=%r, "
+            "multipart_upload_kwargs=%r)"
+        ) % (
+            self._object.bucket_name,
+            self._object.key,
+            self._min_part_size,
+            self._session,
+            self._resource_kwargs,
+            self._multipart_upload_kwargs,
+        )
+
+
+def _accept_all(key):
+    return True
 
 
 def iter_bucket(bucket_name, prefix='', accept_key=None,
@@ -583,7 +652,9 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
     --------
 
       >>> # get all JSON files under "mybucket/foo/"
-      >>> for key, content in iter_bucket(bucket_name, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
+      >>> for key, content in iter_bucket(
+      ...         bucket_name, prefix='foo/',
+      ...         accept_key=lambda key: key.endswith('.json')):
       ...     print key, len(content)
 
       >>> # limit to 10k files, using 32 parallel workers (default is 16)
@@ -591,7 +662,7 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
       ...     print key, len(content)
     """
     if accept_key is None:
-        accept_key = lambda key: True
+        accept_key = _accept_all
 
     #
     # If people insist on giving us bucket instances, silently extract the name
@@ -631,9 +702,10 @@ def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True):
         # list_objects_v2 doesn't like a None value for ContinuationToken
         # so we don't set it if we don't have one.
         if ctoken:
-            response = client.list_objects_v2(Bucket=bucket_name, Prefix=prefix, ContinuationToken=ctoken)
+            kwargs = dict(Bucket=bucket_name, Prefix=prefix, ContinuationToken=ctoken)
         else:
-            response = client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+            kwargs = dict(Bucket=bucket_name, Prefix=prefix)
+        response = client.list_objects_v2(**kwargs)
         try:
             content = response['Contents']
         except KeyError:
@@ -659,7 +731,8 @@ def _download_key(key_name, bucket_name=None, retries=3):
     s3 = session.resource('s3')
     bucket = s3.Bucket(bucket_name)
 
-    # Sometimes, https://github.com/boto/boto/issues/2409 can happen because of network issues on either side.
+    # Sometimes, https://github.com/boto/boto/issues/2409 can happen
+    # because of network issues on either side.
     # Retry up to 3 times to ensure its not a transient issue.
     for x in range(retries + 1):
         try:
