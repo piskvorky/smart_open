@@ -95,7 +95,7 @@ def ignore_resource_warnings():
     #
     if six.PY2:
         return
-    warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")
+    warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
 @maybe_mock_s3

@@ -412,7 +412,9 @@ class SeekableBufferedInputBase(BufferedInputBase):
         raise io.UnsupportedOperation
 
     def __str__(self):
-        return "smart_open.s3.SeekableBufferedInputBase(%r, %r)" % (self._object.bucket_name, self._object.key)
+        return "smart_open.s3.SeekableBufferedInputBase(%r, %r)" % (
+            self._object.bucket_name, self._object.key
+        )
 
     def __repr__(self):
         return (
@@ -477,7 +479,6 @@ multipart upload may fail")
         self._total_bytes = 0
         self._total_parts = 0
         self._parts = []
-
 
         #
         # This member is part of the io.BufferedIOBase interface.
@@ -602,6 +603,10 @@ multipart upload may fail")
         )
 
 
+def _accept_all(key):
+    return True
+
+
 def iter_bucket(bucket_name, prefix='', accept_key=None,
                 key_limit=None, workers=16, retries=3):
     """
@@ -641,7 +646,9 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
     --------
 
       >>> # get all JSON files under "mybucket/foo/"
-      >>> for key, content in iter_bucket(bucket_name, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
+      >>> for key, content in iter_bucket(
+      ...         bucket_name, prefix='foo/',
+      ...         accept_key=lambda key: key.endswith('.json')):
       ...     print key, len(content)
 
       >>> # limit to 10k files, using 32 parallel workers (default is 16)
@@ -649,7 +656,7 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
       ...     print key, len(content)
     """
     if accept_key is None:
-        accept_key = lambda key: True
+        accept_key = _accept_all
 
     #
     # If people insist on giving us bucket instances, silently extract the name
@@ -689,9 +696,10 @@ def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True):
         # list_objects_v2 doesn't like a None value for ContinuationToken
         # so we don't set it if we don't have one.
         if ctoken:
-            response = client.list_objects_v2(Bucket=bucket_name, Prefix=prefix, ContinuationToken=ctoken)
+            kwargs = dict(Bucket=bucket_name, Prefix=prefix, ContinuationToken=ctoken)
         else:
-            response = client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+            kwargs = dict(Bucket=bucket_name, Prefix=prefix)
+        response = client.list_objects_v2(**kwargs)
         try:
             content = response['Contents']
         except KeyError:
@@ -717,7 +725,8 @@ def _download_key(key_name, bucket_name=None, retries=3):
     s3 = session.resource('s3')
     bucket = s3.Bucket(bucket_name)
 
-    # Sometimes, https://github.com/boto/boto/issues/2409 can happen because of network issues on either side.
+    # Sometimes, https://github.com/boto/boto/issues/2409 can happen
+    # because of network issues on either side.
     # Retry up to 3 times to ensure its not a transient issue.
     for x in range(retries + 1):
         try:
