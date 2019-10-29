@@ -30,7 +30,6 @@ import boto
 import boto3
 import six
 
-from boto.compat import urlsplit
 from six.moves.urllib import parse as urlparse
 
 #
@@ -670,11 +669,10 @@ def _my_urlsplit(url):
     https://github.com/RaRe-Technologies/smart_open/issues/285
     """
     if '?' not in url:
-        return urlsplit(url, allow_fragments=False)
+        return urlparse.urlsplit(url, allow_fragments=False)
 
-    sr = urlsplit(url.replace('?', '\n'), allow_fragments=False)
-    SplitResult = collections.namedtuple('SplitResult', 'scheme netloc path query fragment')
-    return SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
+    sr = urlparse.urlsplit(url.replace('?', '\n'), allow_fragments=False)
+    return urlparse.SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
 
 
 def _parse_uri(uri_as_string):
@@ -828,36 +826,18 @@ def _parse_uri_file(input_path):
 
 def _parse_uri_ssh(unt):
     """Parse a Uri from a urllib namedtuple."""
-    if '@' in unt.netloc:
-        user_pass, host_port = unt.netloc.rsplit('@', 1)
-    else:
-        user_pass, host_port = None, unt.netloc
+    return Uri(
+        scheme=unt.scheme,
+        uri_path=_unquote(unt.path),
+        user=_unquote(unt.username),
+        host=unt.hostname,
+        port=int(unt.port or smart_open_ssh.DEFAULT_PORT),
+        password=_unquote(unt.password),
+    )
 
-    if ':' in host_port:
-        host, port = host_port.split(':', 1)
-    else:
-        host, port = host_port, None
 
-    if not user_pass:
-        user = None
-        password = None
-    elif ':' in user_pass:
-        user, password = user_pass.split(':', 1)
-    else:
-        user = user_pass
-        password = None
-
-    if user:
-        user = urlparse.unquote(user)
-    if password:
-        password = urlparse.unquote(password)
-
-    if not port:
-        port = smart_open_ssh.DEFAULT_PORT
-    else:
-        port = int(port)
-
-    return Uri(scheme=unt.scheme, uri_path=unt.path, user=user, host=host, port=port, password=password)
+def _unquote(text):
+    return text and urlparse.unquote(text)
 
 
 def _need_to_buffer(file_obj, mode, ext):
