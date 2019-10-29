@@ -41,7 +41,7 @@ def read(fname):
 
 tests_require = [
     'mock',
-    'moto==1.3.4',
+    'moto[server]==1.3.4',
     'pathlib2',
     'responses',
     # Temporary pin boto3 & botocore, because moto doesn't work with new version
