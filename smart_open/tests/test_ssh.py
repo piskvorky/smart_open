@@ -6,6 +6,7 @@ import unittest
 
 import smart_open.ssh
 
+
 def mock_ssh(func):
     def wrapper(*args, **kwargs):
         smart_open.ssh._SSH.clear()
@@ -13,6 +14,7 @@ def mock_ssh(func):
     return mock.patch("paramiko.client.SSHClient.get_transport")(
         mock.patch("paramiko.client.SSHClient.connect")(wrapper)
     )
+
 
 class SSHOpen(unittest.TestCase):
     @mock_ssh
@@ -39,6 +41,7 @@ class SSHOpen(unittest.TestCase):
             }
         })
         mock_connect.assert_called_with("some-host", 22, username='ubuntu', password="pwd")
+
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
