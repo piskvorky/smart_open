@@ -556,6 +556,7 @@ def _open_binary_stream(uri, mode, transport_params):
                 user=parsed_uri.user,
                 port=parsed_uri.port,
                 password=parsed_uri.password,
+                transport_params=transport_params
             )
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
@@ -845,6 +846,11 @@ def _parse_uri_ssh(unt):
     else:
         user = user_pass
         password = None
+
+    if user:
+        user = urlparse.unquote(user)
+    if password:
+        password = urlparse.unquote(password)
 
     if not port:
         port = smart_open_ssh.DEFAULT_PORT
