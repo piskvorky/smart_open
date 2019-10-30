@@ -445,3 +445,4 @@ issues or pull requests there. Suggestions, pull requests and improvements welco
 
 ``smart_open`` is open source software released under the `MIT license <https://github.com/piskvorky/smart_open/blob/master/LICENSE>`_.
 Copyright (c) 2015-now `Radim Řehůřek <https://radimrehurek.com>`_.
+i am an ex-navodian
