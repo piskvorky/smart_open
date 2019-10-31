@@ -460,6 +460,30 @@ class IterBucketTest(unittest.TestCase):
         expected = ['key_%d' % x for x in range(num_keys)]
         self.assertEqual(sorted(keys), sorted(expected))
 
+    @mock.patch('boto3.client')
+    @mock.patch('boto3.session.Session')
+    def test_credentials(self, mock_session, mock_client):
+        # setup mocks
+        mock_s3 = mock.Mock()
+        mock_client.return_value = mock_s3
+        mock_s3.list_objects_v2.return_value = {'Contents': [{'Key': 'test_key'}]}
+
+        # make call
+        # Note we disable multiprocessing since mocks only work in the thread.
+        list(smart_open.s3.iter_bucket(BUCKET_NAME,
+                                       workers=None,
+                                       aws_access_key_id='access_id',
+                                       aws_secret_access_key='access_secret'))
+
+        # asserts
+        mock_client.assert_called_with('s3',
+                                       aws_access_key_id='access_id',
+                                       aws_secret_access_key='access_secret',
+                                       aws_session_token=None)
+        mock_session.assert_called_with(aws_access_key_id='access_id',
+                                        aws_secret_access_key='access_secret',
+                                        aws_session_token=None)
+
     def test_old(self):
         """Does s3_iter_bucket work correctly?"""
         #
