@@ -1,5 +1,16 @@
 # Unreleased
 
+# 1.9.0, 3 Nov 2019
+
+  - Add version_id transport parameter for fetching a specific S3 object version (PR [#325](https://github.com/RaRe-Technologies/smart_open/pull/325), [@interpolatio](https://github.com/interpolatio))
+  - Document passthrough use case (PR [#333](https://github.com/RaRe-Technologies/smart_open/pull/333), [@mpenkov](https://github.com/mpenkov))
+  - Support seeking over HTTP and HTTPS (PR [#339](https://github.com/RaRe-Technologies/smart_open/pull/339), [@interpolatio](https://github.com/interpolatio))
+  - Add support for rt, rt+, wt, wt+, at, at+ methods (PR [#342](https://github.com/RaRe-Technologies/smart_open/pull/342), [@interpolatio](https://github.com/interpolatio))
+  - Change VERSION to version.py (PR [#349](https://github.com/RaRe-Technologies/smart_open/pull/349), [@mpenkov](https://github.com/mpenkov))
+  - Adding howto guides (PR [#355](https://github.com/RaRe-Technologies/smart_open/pull/355), [@mpenkov](https://github.com/mpenkov))
+  - smart_open/s3: Initial implementations of str and repr (PR [#359](https://github.com/RaRe-Technologies/smart_open/pull/359), [@ZlatSic](https://github.com/ZlatSic))
+  - Support writing any bytes-like object to S3. (PR [#361](https://github.com/RaRe-Technologies/smart_open/pull/361), [@gilbsgilbs](https://github.com/gilbsgilbs))
+
 # 1.8.4, 2 Jun 2019
 
   - Don't use s3 bucket_head to check for bucket existence (PR [#315](https://github.com/RaRe-Technologies/smart_open/pull/315), [@caboteria](https://github.com/caboteria))

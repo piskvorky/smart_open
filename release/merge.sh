@@ -9,12 +9,17 @@
 #
 #     bash release/merge.sh
 #
-# Expects smart_open/VERSION to be correctly incremented for the new release.
+# Expects smart_open/version.py to be correctly incremented for the new release.
 #
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-version=$(env -i python -c "from smart_open.version import __version__; print(__version__)")
+
+#
+# env -i python seems to return the wrong Python version on MacOS...
+#
+my_python=$(which python)
+version=$($my_python -c "from smart_open.version import __version__; print(__version__)")
 
 read -p "Push version $version to github.com? yes or no: " reply
 if [ "$reply" != "yes" ]
