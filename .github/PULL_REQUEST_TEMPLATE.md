@@ -1,6 +1,6 @@
 #### Title
 
-Please pick a concise, informative and complete title for your PR.
+Please **pick a concise, informative and complete title** for your PR.
 The title is important because it will appear in [our change log](https://github.com/RaRe-Technologies/smart_open/blob/master/CHANGELOG.md).
 
 #### Motivation
