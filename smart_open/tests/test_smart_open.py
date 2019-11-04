@@ -196,6 +196,16 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(uri.uri_path, '//' + path)
 
     def test_ssh(self):
+        as_string = 'ssh://user@host:1234/path/to/file'
+        uri = smart_open_lib._parse_uri(as_string)
+        self.assertEqual(uri.scheme, 'ssh')
+        self.assertEqual(uri.uri_path, '/path/to/file')
+        self.assertEqual(uri.user, 'user')
+        self.assertEqual(uri.host, 'host')
+        self.assertEqual(uri.port, 1234)
+        self.assertEqual(uri.password, None)
+
+    def test_ssh_with_pass(self):
         as_string = 'ssh://user:pass@host:1234/path/to/file'
         uri = smart_open_lib._parse_uri(as_string)
         self.assertEqual(uri.scheme, 'ssh')
@@ -206,6 +216,16 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(uri.password, 'pass')
 
     def test_scp(self):
+        as_string = 'scp://user@host:/path/to/file'
+        uri = smart_open_lib._parse_uri(as_string)
+        self.assertEqual(uri.scheme, 'scp')
+        self.assertEqual(uri.uri_path, '/path/to/file')
+        self.assertEqual(uri.user, 'user')
+        self.assertEqual(uri.host, 'host')
+        self.assertEqual(uri.port, 22)
+        self.assertEqual(uri.password, None)
+
+    def test_scp_with_pass(self):
         as_string = 'scp://user:pass@host:/path/to/file'
         uri = smart_open_lib._parse_uri(as_string)
         self.assertEqual(uri.scheme, 'scp')
@@ -249,8 +269,10 @@ class SmartOpenHttpTest(unittest.TestCase):
     @mock.patch('smart_open.ssh.open')
     def test_read_ssh(self, mock_open):
         """Is SSH line iterator called correctly?"""
-        obj = smart_open.smart_open("ssh://ubuntu:pass@ip_address:1022/some/path/lines.txt",
-                                    hello='world')
+        obj = smart_open.smart_open(
+            "ssh://ubuntu:pass@ip_address:1022/some/path/lines.txt",
+            hello='world',
+        )
         obj.__iter__()
         mock_open.assert_called_with(
             '/some/path/lines.txt',
@@ -259,7 +281,7 @@ class SmartOpenHttpTest(unittest.TestCase):
             user='ubuntu',
             password='pass',
             port=1022,
-            transport_params={'hello': 'world'}
+            transport_params={'hello': 'world'},
         )
 
     @responses.activate

@@ -94,8 +94,8 @@ def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT,
     If you specify a previously unseen host, then its host key will be added to
     the local ~/.ssh/known_hosts *automatically*.
 
-    If `username` or `password` are specified in _both_ the uri and `transport_params`,
-    `transport_params` will take precedence
+    If ``username`` or ``password`` are specified in *both* the uri and
+    ``transport_params``, ``transport_params`` will take precedence
     """
     if not host:
         raise ValueError('you must specify the host to connect to')

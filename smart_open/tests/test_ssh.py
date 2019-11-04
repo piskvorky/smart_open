@@ -11,6 +11,7 @@ def mock_ssh(func):
     def wrapper(*args, **kwargs):
         smart_open.ssh._SSH.clear()
         return func(*args, **kwargs)
+
     return mock.patch("paramiko.client.SSHClient.get_transport")(
         mock.patch("paramiko.client.SSHClient.connect")(wrapper)
     )
@@ -34,15 +35,13 @@ class SSHOpen(unittest.TestCase):
 
     @mock_ssh
     def test_open_with_transport_params(self, mock_connect, get_transp_mock):
-        smart_open.open("ssh://user:pass@some-host/", transport_params={
-            "connect_kwargs": {
-                "username": "ubuntu",
-                "password": "pwd",
-            }
-        })
-        mock_connect.assert_called_with("some-host", 22, username='ubuntu', password="pwd")
+        smart_open.open(
+            "ssh://user:pass@some-host/",
+            transport_params={"connect_kwargs": {"username": "ubuntu", "password": "pwd"}},
+        )
+        mock_connect.assert_called_with("some-host", 22, username="ubuntu", password="pwd")
 
 
-if __name__ == '__main__':
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
+if __name__ == "__main__":
+    logging.basicConfig(format="%(asctime)s : %(levelname)s : %(message)s", level=logging.DEBUG)
     unittest.main()

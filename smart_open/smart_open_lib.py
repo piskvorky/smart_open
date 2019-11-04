@@ -555,7 +555,7 @@ def _open_binary_stream(uri, mode, transport_params):
                 user=parsed_uri.user,
                 port=parsed_uri.port,
                 password=parsed_uri.password,
-                transport_params=transport_params
+                transport_params=transport_params,
             )
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
