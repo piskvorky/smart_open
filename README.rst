@@ -91,6 +91,7 @@ Other examples of URLs that ``smart_open`` accepts::
     file:///home/user/file.bz2
     [ssh|scp|sftp]://username@host//path/file
     [ssh|scp|sftp]://username@host/path/file
+    [ssh|scp|sftp]://username:password@host/path/file
 
 .. _doctools_after_examples:
 

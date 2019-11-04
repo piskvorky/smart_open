@@ -30,7 +30,6 @@ import boto
 import boto3
 import six
 
-from boto.compat import urlsplit
 from six.moves.urllib import parse as urlparse
 
 #
@@ -129,6 +128,7 @@ Uri = collections.namedtuple(
         'access_id',
         'access_secret',
         'user',
+        'password',
     )
 )
 """Represents all the options that we parse from user input.
@@ -554,6 +554,8 @@ def _open_binary_stream(uri, mode, transport_params):
                 host=parsed_uri.host,
                 user=parsed_uri.user,
                 port=parsed_uri.port,
+                password=parsed_uri.password,
+                transport_params=transport_params,
             )
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
@@ -667,11 +669,10 @@ def _my_urlsplit(url):
     https://github.com/RaRe-Technologies/smart_open/issues/285
     """
     if '?' not in url:
-        return urlsplit(url, allow_fragments=False)
+        return urlparse.urlsplit(url, allow_fragments=False)
 
-    sr = urlsplit(url.replace('?', '\n'), allow_fragments=False)
-    SplitResult = collections.namedtuple('SplitResult', 'scheme netloc path query fragment')
-    return SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
+    sr = urlparse.urlsplit(url.replace('?', '\n'), allow_fragments=False)
+    return urlparse.SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
 
 
 def _parse_uri(uri_as_string):
@@ -825,24 +826,18 @@ def _parse_uri_file(input_path):
 
 def _parse_uri_ssh(unt):
     """Parse a Uri from a urllib namedtuple."""
-    if '@' in unt.netloc:
-        user, host_port = unt.netloc.split('@', 1)
-    else:
-        user, host_port = None, unt.netloc
+    return Uri(
+        scheme=unt.scheme,
+        uri_path=_unquote(unt.path),
+        user=_unquote(unt.username),
+        host=unt.hostname,
+        port=int(unt.port or smart_open_ssh.DEFAULT_PORT),
+        password=_unquote(unt.password),
+    )
 
-    if ':' in host_port:
-        host, port = host_port.split(':', 1)
-    else:
-        host, port = host_port, None
 
-    if not user:
-        user = None
-    if not port:
-        port = smart_open_ssh.DEFAULT_PORT
-    else:
-        port = int(port)
-
-    return Uri(scheme=unt.scheme, uri_path=unt.path, user=user, host=host, port=port)
+def _unquote(text):
+    return text and urlparse.unquote(text)
 
 
 def _need_to_buffer(file_obj, mode, ext):
