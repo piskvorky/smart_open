@@ -107,6 +107,7 @@ def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT,
     conn = _connect(host, user, port, password, transport_params)
     sftp_client = conn.get_transport().open_sftp_client()
     file_obj = sftp_client.open(path, mode)
-    if mode.startswith("w"):
+    is_pipelining_enabled = transport_params.get('write_pipelining', True)
+    if is_pipelining_enabled and mode.startswith("w"):
         file_obj.set_pipelined(True)
     return file_obj

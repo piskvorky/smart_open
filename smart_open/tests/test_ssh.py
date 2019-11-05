@@ -41,6 +41,25 @@ class SSHOpen(unittest.TestCase):
         )
         mock_connect.assert_called_with("some-host", 22, username="ubuntu", password="pwd")
 
+    @mock_ssh
+    def test_write_pipelining_for_reading(self, mock_connect, get_transp_mock):
+        smart_open.open("ssh://user:pass@some-host/", "r")
+        get_transp_mock().open_sftp_client().open().set_pipelined.assert_not_called()
+
+    @mock_ssh
+    def test_write_pipelining(self, mock_connect, get_transp_mock):
+        smart_open.open("ssh://user:pass@some-host/", "w")
+        get_transp_mock().open_sftp_client().open().set_pipelined.assert_called()
+
+    @mock_ssh
+    def test_disable_write_pipelining(self, mock_connect, get_transp_mock):
+        smart_open.open(
+            "ssh://user:pass@some-host/",
+            "w",
+            transport_params={"write_pipelining": False}
+        )
+        get_transp_mock().open_sftp_client().open().set_pipelined.assert_not_called()
+
 
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s : %(levelname)s : %(message)s", level=logging.DEBUG)
