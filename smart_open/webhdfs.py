@@ -128,11 +128,11 @@ class BufferedOutputBase(io.BufferedIOBase):
         init_response = requests.put("http://" + self.uri_path,
                                      params=payload, allow_redirects=False)
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
-            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
+            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.text)
         uri = init_response.headers['location']
         response = requests.put(uri, data="", headers={'content-type': 'application/octet-stream'})
         if not response.status_code == httplib.CREATED:
-            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
+            raise WebHdfsException(str(response.status_code) + "\n" + response.text)
         self.lines = []
         self.parts = 0
         self.chunk_bytes = 0
@@ -161,12 +161,12 @@ class BufferedOutputBase(io.BufferedIOBase):
         init_response = requests.post("http://" + self.uri_path,
                                       params=payload, allow_redirects=False)
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
-            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
+            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.text)
         uri = init_response.headers['location']
         response = requests.post(uri, data=data,
                                  headers={'content-type': 'application/octet-stream'})
         if not response.status_code == httplib.OK:
-            raise WebHdfsException(str(response.status_code) + "\n" + repr(response.content))
+            raise WebHdfsException(str(response.status_code) + "\n" + repr(response.text))
 
     def write(self, b):
         """
