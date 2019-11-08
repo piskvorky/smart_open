@@ -37,7 +37,7 @@ How?
 
 .. code-block:: python
 
-  >>> from smart_open import open
+  >>> from smart_open import smart_open as open
   >>>
   >>> # stream lines from an S3 object
   >>> for line in open('s3://commoncrawl/robots.txt'):
