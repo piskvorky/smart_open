@@ -17,6 +17,7 @@ import logging
 
 import requests
 import six
+from six.moves.urllib import parse as urlparse
 
 if six.PY2:
     import httplib
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 
-def open(uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
+def open(parsed_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
     """
     Parameters
     ----------
@@ -36,12 +37,28 @@ def open(uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
         For writing only.
 
     """
+    http_uri = convert_to_http_uri(parsed_uri)
     if mode == 'rb':
-        return BufferedInputBase(uri)
+        return BufferedInputBase(http_uri)
     elif mode == 'wb':
-        return BufferedOutputBase(uri, min_part_size=min_part_size)
+        return BufferedOutputBase(http_uri, min_part_size=min_part_size)
     else:
-        raise NotImplementedError('webhdfs support for mode %r not implemented' % mode)
+        raise NotImplementedError("webhdfs support for mode %r not implemented" % mode)
+
+
+def convert_to_http_uri(parsed_uri):
+    netloc = parsed_uri.hostname
+    if parsed_uri.port:
+        netloc += ":{}".format(parsed_uri.port)
+    query = parsed_uri.query
+    if parsed_uri.username:
+        query += (
+            ("&" if query else "") + "user.name=" + urlparse.quote(parsed_uri.username)
+        )
+
+    return urlparse.urlunsplit(
+        ("http", netloc, "/webhdfs/v1" + parsed_uri.path, query, "")
+    )
 
 
 class BufferedInputBase(io.BufferedIOBase):
@@ -49,7 +66,11 @@ class BufferedInputBase(io.BufferedIOBase):
         self._uri = uri
 
         payload = {"op": "OPEN", "offset": 0}
-        self._response = requests.get("http://" + self._uri, params=payload, stream=True)
+        self._response = requests.get(self._uri, params=payload, stream=True)
+        if self._response.status_code != httplib.OK:
+            raise WebHdfsException(
+                msg=self._response.text, status_code=self._response.status_code
+            )
         self._buf = b''
 
     #
@@ -112,7 +133,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
 
 class BufferedOutputBase(io.BufferedIOBase):
-    def __init__(self, uri_path, min_part_size=WEBHDFS_MIN_PART_SIZE):
+    def __init__(self, uri, min_part_size=WEBHDFS_MIN_PART_SIZE):
         """
         Parameters
         ----------
@@ -120,19 +141,21 @@ class BufferedOutputBase(io.BufferedIOBase):
             For writing only.
 
         """
-        self.uri_path = uri_path
+        self._uri = uri
         self._closed = False
         self.min_part_size = min_part_size
         # creating empty file first
         payload = {"op": "CREATE", "overwrite": True}
-        init_response = requests.put("http://" + self.uri_path,
+        init_response = requests.put(self._uri,
                                      params=payload, allow_redirects=False)
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
-            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
+            raise WebHdfsException(
+                msg=init_response.text, status_code=init_response.status_code
+            )
         uri = init_response.headers['location']
         response = requests.put(uri, data="", headers={'content-type': 'application/octet-stream'})
         if not response.status_code == httplib.CREATED:
-            raise WebHdfsException(str(response.status_code) + "\n" + response.content)
+            raise WebHdfsException(msg=response.text, status_code=response.status_code)
         self.lines = []
         self.parts = 0
         self.chunk_bytes = 0
@@ -158,15 +181,17 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     def _upload(self, data):
         payload = {"op": "APPEND"}
-        init_response = requests.post("http://" + self.uri_path,
+        init_response = requests.post(self._uri,
                                       params=payload, allow_redirects=False)
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
-            raise WebHdfsException(str(init_response.status_code) + "\n" + init_response.content)
+            raise WebHdfsException(
+                msg=init_response.text, status_code=init_response.status_code
+            )
         uri = init_response.headers['location']
         response = requests.post(uri, data=data,
                                  headers={'content-type': 'application/octet-stream'})
         if not response.status_code == httplib.OK:
-            raise WebHdfsException(str(response.status_code) + "\n" + repr(response.content))
+            raise WebHdfsException(msg=response.text, status_code=response.status_code)
 
     def write(self, b):
         """
@@ -211,6 +236,12 @@ class BufferedOutputBase(io.BufferedIOBase):
 
 
 class WebHdfsException(Exception):
-    def __init__(self, msg=str()):
+    def __init__(self, msg="", status_code=None):
         self.msg = msg
-        super(WebHdfsException, self).__init__(self.msg)
+        self.status_code = status_code
+        super(WebHdfsException, self).__init__(repr(self))
+
+    def __repr__(self):
+        return "{}(status_code={}, msg={!r})".format(
+            self.__class__.__name__, self.status_code, self.msg
+        )

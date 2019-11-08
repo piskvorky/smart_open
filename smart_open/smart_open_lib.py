@@ -565,7 +565,7 @@ def _open_binary_stream(uri, mode, transport_params):
             return smart_open_hdfs.open(parsed_uri.uri_path, mode), filename
         elif parsed_uri.scheme == "webhdfs":
             kw = _check_kwargs(smart_open_webhdfs.open, transport_params)
-            return smart_open_webhdfs.open(parsed_uri.uri_path, mode, **kw), filename
+            return smart_open_webhdfs.open(parsed_uri, mode, **kw), filename
         elif parsed_uri.scheme.startswith('http'):
             #
             # The URI may contain a query string and fragments, which interfere
@@ -668,8 +668,9 @@ def _my_urlsplit(url):
     https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
     https://github.com/RaRe-Technologies/smart_open/issues/285
     """
-    if '?' not in url:
-        return urlparse.urlsplit(url, allow_fragments=False)
+    parsed_url = urlparse.urlsplit(url, allow_fragments=False)
+    if parsed_url.scheme not in smart_open_s3.SUPPORTED_SCHEMES or '?' not in url:
+        return parsed_url
 
     sr = urlparse.urlsplit(url.replace('?', '\n'), allow_fragments=False)
     return urlparse.SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
@@ -751,13 +752,7 @@ def _parse_uri_hdfs(parsed_uri):
 
 def _parse_uri_webhdfs(parsed_uri):
     assert parsed_uri.scheme == 'webhdfs'
-    uri_path = parsed_uri.netloc + "/webhdfs/v1" + parsed_uri.path
-    if parsed_uri.query:
-        uri_path += "?" + parsed_uri.query
-    if not uri_path:
-        raise RuntimeError("invalid WebHDFS URI: %s" % str(parsed_uri))
-
-    return Uri(scheme='webhdfs', uri_path=uri_path)
+    return parsed_uri
 
 
 def _parse_uri_s3x(parsed_uri):

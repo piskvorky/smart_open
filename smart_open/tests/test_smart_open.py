@@ -23,6 +23,7 @@ import six
 
 import smart_open
 from smart_open import smart_open_lib
+from smart_open import webhdfs
 
 logger = logging.getLogger(__name__)
 
@@ -136,17 +137,27 @@ class ParseUriTest(unittest.TestCase):
             "s3://access_id@access_secret@mybucket@port/mykey",
         )
 
-    def test_webhdfs_uri(self):
-        """Do webhdfs URIs parse correctly"""
-        # valid uri, no query
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:port/path/file")
-        self.assertEqual(parsed_uri.scheme, "webhdfs")
-        self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file")
+    def test_webhdfs_uri_to_http(self):
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path/file"
+        assert expected == actual
 
-        # valid uri, with query
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:port/path/file?query_part_1&query_part2")
-        self.assertEqual(parsed_uri.scheme, "webhdfs")
-        self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file?query_part_1&query_part2")
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file?a=1")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path/file?a=1"
+        assert expected == actual
+
+    def test_webhdfs_uri_to_http_with_user(self):
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path?user.name=user"
+        assert expected == actual
+
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path?a=1")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path?a=1&user.name=user"
+        assert expected == actual
 
     def test_uri_from_issue_223_works(self):
         uri = "s3://:@omax-mis/twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6"
