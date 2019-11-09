@@ -29,15 +29,16 @@ logger = logging.getLogger(__name__)
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 
-def open(parsed_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
+def open(http_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
     """
     Parameters
     ----------
+    http_uri: str
+        webhdfs url converted to http REST url
     min_part_size: int, optional
         For writing only.
 
     """
-    http_uri = convert_to_http_uri(parsed_uri)
     if mode == 'rb':
         return BufferedInputBase(http_uri)
     elif mode == 'wb':
@@ -47,6 +48,14 @@ def open(parsed_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
 
 
 def convert_to_http_uri(parsed_uri):
+    """
+    Convert webhdfs uri to http url and return it as text
+
+    Parameters
+    ----------
+    parsed_uri: str
+        result of urlsplit of webhdfs url
+    """
     netloc = parsed_uri.hostname
     if parsed_uri.port:
         netloc += ":{}".format(parsed_uri.port)

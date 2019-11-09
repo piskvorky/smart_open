@@ -565,7 +565,8 @@ def _open_binary_stream(uri, mode, transport_params):
             return smart_open_hdfs.open(parsed_uri.uri_path, mode), filename
         elif parsed_uri.scheme == "webhdfs":
             kw = _check_kwargs(smart_open_webhdfs.open, transport_params)
-            return smart_open_webhdfs.open(parsed_uri, mode, **kw), filename
+            http_uri = smart_open_webhdfs.convert_to_http_uri(parsed_uri)
+            return smart_open_webhdfs.open(http_uri, mode, **kw), filename
         elif parsed_uri.scheme.startswith('http'):
             #
             # The URI may contain a query string and fragments, which interfere

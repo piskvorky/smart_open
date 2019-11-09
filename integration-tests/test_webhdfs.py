@@ -7,6 +7,15 @@
 #
 """
 Sample code for WebHDFS integration tests.
+To run it working WebHDFS in your network is needed - simply
+set _SO_WEBHDFS_BASE_URL env variable to webhdfs url you have
+write access to.
+
+For example on Amazon EMR WebHDFS is accessible on driver port 14000, so
+it may look like:
+
+$ export SO_WEBHDFS_BASE_URL=webhdfs://hadoop@your-emr-driver:14000/tmp/
+$ py.test integration-tests/test_webhdfs.py
 """
 import json
 import os
@@ -24,11 +33,6 @@ def make_url(path):
     return "{base_url}/{path}".format(
         base_url=_SO_WEBHDFS_BASE_URL.rstrip("/"), path=path.lstrip("/")
     )
-
-
-def test_read():
-    with smart_open.open(make_url("test.txt"), "r") as f:
-        assert f.read() == "ok\n"
 
 
 def test_write_and_read():
