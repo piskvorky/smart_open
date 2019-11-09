@@ -68,9 +68,7 @@ class BufferedInputBase(io.BufferedIOBase):
         payload = {"op": "OPEN", "offset": 0}
         self._response = requests.get(self._uri, params=payload, stream=True)
         if self._response.status_code != httplib.OK:
-            raise WebHdfsException(
-                msg=self._response.text, status_code=self._response.status_code
-            )
+            raise WebHdfsException.from_response(self._response)
         self._buf = b''
 
     #
@@ -146,16 +144,13 @@ class BufferedOutputBase(io.BufferedIOBase):
         self.min_part_size = min_part_size
         # creating empty file first
         payload = {"op": "CREATE", "overwrite": True}
-        init_response = requests.put(self._uri,
-                                     params=payload, allow_redirects=False)
+        init_response = requests.put(self._uri, params=payload, allow_redirects=False)
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
-            raise WebHdfsException(
-                msg=init_response.text, status_code=init_response.status_code
-            )
+            raise WebHdfsException.from_response(init_response)
         uri = init_response.headers['location']
         response = requests.put(uri, data="", headers={'content-type': 'application/octet-stream'})
         if not response.status_code == httplib.CREATED:
-            raise WebHdfsException(msg=response.text, status_code=response.status_code)
+            raise WebHdfsException.from_response(response)
         self.lines = []
         self.parts = 0
         self.chunk_bytes = 0
@@ -181,17 +176,14 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     def _upload(self, data):
         payload = {"op": "APPEND"}
-        init_response = requests.post(self._uri,
-                                      params=payload, allow_redirects=False)
+        init_response = requests.post(self._uri, params=payload, allow_redirects=False)
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
-            raise WebHdfsException(
-                msg=init_response.text, status_code=init_response.status_code
-            )
+            raise WebHdfsException.from_response(init_response)
         uri = init_response.headers['location']
         response = requests.post(uri, data=data,
                                  headers={'content-type': 'application/octet-stream'})
         if not response.status_code == httplib.OK:
-            raise WebHdfsException(msg=response.text, status_code=response.status_code)
+            raise WebHdfsException.from_response(response)
 
     def write(self, b):
         """
@@ -245,3 +237,7 @@ class WebHdfsException(Exception):
         return "{}(status_code={}, msg={!r})".format(
             self.__class__.__name__, self.status_code, self.msg
         )
+
+    @classmethod
+    def from_response(cls, response):
+        return cls(msg=response.text, status_code=response.status_code)

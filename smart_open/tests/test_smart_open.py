@@ -141,23 +141,25 @@ class ParseUriTest(unittest.TestCase):
         parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file")
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path/file"
-        assert expected == actual
+        self.assertEqual(actual, expected)
 
+    def test_webhdfs_uri_to_http_with_query(self):
         parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file?a=1")
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path/file?a=1"
-        assert expected == actual
+        self.assertEqual(actual, expected)
 
     def test_webhdfs_uri_to_http_with_user(self):
         parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path")
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path?user.name=user"
-        assert expected == actual
+        self.assertEqual(actual, expected)
 
+    def test_webhdfs_uri_to_http_with_user_and_query(self):
         parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path?a=1")
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path?a=1&user.name=user"
-        assert expected == actual
+        self.assertEqual(actual, expected)
 
     def test_uri_from_issue_223_works(self):
         uri = "s3://:@omax-mis/twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6"

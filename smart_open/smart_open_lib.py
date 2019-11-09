@@ -723,7 +723,7 @@ def _parse_uri(uri_as_string):
     if parsed_uri.scheme == "hdfs":
         return _parse_uri_hdfs(parsed_uri)
     elif parsed_uri.scheme == "webhdfs":
-        return _parse_uri_webhdfs(parsed_uri)
+        return parsed_uri
     elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
         return _parse_uri_s3x(parsed_uri)
     elif parsed_uri.scheme == 'file':
@@ -748,11 +748,6 @@ def _parse_uri_hdfs(parsed_uri):
         raise RuntimeError("invalid HDFS URI: %s" % str(parsed_uri))
 
     return Uri(scheme='hdfs', uri_path=uri_path)
-
-
-def _parse_uri_webhdfs(parsed_uri):
-    assert parsed_uri.scheme == 'webhdfs'
-    return parsed_uri
 
 
 def _parse_uri_s3x(parsed_uri):
