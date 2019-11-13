@@ -19,6 +19,8 @@ import six
 
 import smart_open.bytebuffer
 
+from botocore.exceptions import IncompleteReadError
+
 logger = logging.getLogger(__name__)
 
 # Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
@@ -199,13 +201,22 @@ class SeekableRawReader(object):
         else:
             self._body = _get(self._object, self._version_id, Range=range_string)['Body']
 
-    def read(self, size=-1):
-        if self._position >= self._content_length:
-            return b''
+    def _read_from_body(self, size=-1):
         if size == -1:
             binary = self._body.read()
         else:
             binary = self._body.read(size)
+        return binary
+
+    def read(self, size=-1):
+        if self._position >= self._content_length:
+            return b''
+        try:
+            binary = self._read_from_body(size)
+        except IncompleteReadError:
+            self._body = None
+            self.seek(self._position)
+            binary = self._read_from_body(size)
         self._position += len(binary)
         return binary
 
