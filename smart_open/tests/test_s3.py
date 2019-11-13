@@ -103,6 +103,7 @@ def ignore_resource_warnings():
         return
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
+
 @maybe_mock_s3
 class SeekableRawReaderTest(unittest.TestCase):
 
@@ -121,6 +122,7 @@ class SeekableRawReaderTest(unittest.TestCase):
         self.assertEqual(reader.read(1), b'1')
         reader._body.close()
         self.assertEqual(reader.read(2), b'23')
+
 
 @maybe_mock_s3
 class SeekableBufferedInputBaseTest(unittest.TestCase):
