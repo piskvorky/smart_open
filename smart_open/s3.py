@@ -172,27 +172,28 @@ class SeekableRawReader(object):
         self._object = s3_object
         self._content_length = content_length
         self._version_id = version_id
-        self.seek(0)
+        self._position = 0
+        self._body = None
 
     def seek(self, position):
         """Seek to the specified position (byte offset) in the S3 key.
 
         :param int position: The byte offset from the beginning of the key.
         """
-        self._position = position
-        range_string = make_range_string(self._position)
-        logger.debug('content_length: %r range_string: %r', self._content_length, range_string)
-
         #
         # Close old body explicitly.
         # When first seek(), self._body is not exist. Catch the exception and do nothing.
         #
-        try:
+        if self._body is not None:
             self._body.close()
-        except AttributeError:
-            pass
+        self._body = None
+        self._position = position
 
-        if position == self._content_length == 0 or position == self._content_length:
+    def _load_body(self):
+        range_string = make_range_string(self._position)
+        logger.debug('content_length: %r range_string: %r', self._content_length, range_string)
+
+        if self._position == self._content_length == 0 or self._position == self._content_length:
             #
             # When reading, we can't seek to the first byte of an empty file.
             # Similarly, we can't seek past the last byte.  Do nothing here.
@@ -211,11 +212,14 @@ class SeekableRawReader(object):
     def read(self, size=-1):
         if self._position >= self._content_length:
             return b''
+        if self._body is None:
+            self._load_body()
+
         try:
             binary = self._read_from_body(size)
         except IncompleteReadError:
-            self._body = None
-            self.seek(self._position)
+            # The underlying connection of the self._body was closed by the remote peer.
+            self._load_body()
             binary = self._read_from_body(size)
         self._position += len(binary)
         return binary
