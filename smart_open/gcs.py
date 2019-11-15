@@ -5,7 +5,7 @@ import io
 import logging
 import sys
 
-from google.cloud import storage
+from google.cloud import storage, exceptions
 import google.auth.transport.requests as google_requests
 import six
 
@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 READ_BINARY = 'rb'
 WRITE_BINARY = 'wb'
 MODES = (READ_BINARY, WRITE_BINARY)
-"""Allowed I/O modes for working with S3."""
+"""Allowed I/O modes for working with GCS."""
 
 _BINARY_TYPES = (six.binary_type, bytearray)
-"""Allowed binary buffer types for writing to the underlying S3 stream"""
+"""Allowed binary buffer types for writing to the underlying GCS stream"""
 if sys.version_info >= (2, 7):
     _BINARY_TYPES = (six.binary_type, bytearray, memoryview)
 
@@ -312,7 +312,8 @@ class SeekableBufferedInputBase(BufferedInputBase):
         bucket = client.get_bucket(bucket)
 
         self._blob = bucket.get_blob(key)
-        assert self._blob.exists(), 'Blob %s does not exist!' % key
+        if self._blob is None:
+            raise exceptions.NotFound('blob {} not found in {}'.format(key, bucket))
         self._size = self._blob.size if self._blob.size is not None else 0
 
         self._raw_reader = SeekableRawReader(self._blob, self._size)
