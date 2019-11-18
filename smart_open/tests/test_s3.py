@@ -104,19 +104,19 @@ def ignore_resource_warnings():
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
-@maybe_mock_s3
 class SeekableRawReaderTest(unittest.TestCase):
 
     def setUp(self):
-        put_to_bucket(b'123456')
+        self._moto_pipe = os.popen('moto_server --port 5000', 'r')
+        self._local_resoruce = boto3.resource('s3', endpoint_url='http://localhost:5000')
+        self._local_resoruce.Bucket(BUCKET_NAME).create()
+        self._local_resoruce.Object(BUCKET_NAME, KEY_NAME).put(Body=b'123456')
 
     def tearDown(self):
-        cleanup_bucket()
+        self._moto_pipe.close()
 
-    @unittest.skipIf(not DISABLE_MOCKS, "The moto uses a file to simulate StramingBody, \
-            calling read on a closed file object does not cause an IncompleteReadError exception.")
     def test_read_from_a_closed_body(self):
-        obj = boto3.resource('s3').Object(BUCKET_NAME, KEY_NAME)
+        obj = self._local_resoruce.Object(BUCKET_NAME, KEY_NAME)
         content_length = obj.content_length
         reader = smart_open.s3.SeekableRawReader(obj, content_length)
         self.assertEqual(reader.read(1), b'1')
