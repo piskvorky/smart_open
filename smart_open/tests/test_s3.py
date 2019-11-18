@@ -107,13 +107,13 @@ def ignore_resource_warnings():
 class SeekableRawReaderTest(unittest.TestCase):
 
     def setUp(self):
-        self._moto_pipe = os.popen('moto_server --port 5000', 'r')
         self._local_resoruce = boto3.resource('s3', endpoint_url='http://localhost:5000')
         self._local_resoruce.Bucket(BUCKET_NAME).create()
         self._local_resoruce.Object(BUCKET_NAME, KEY_NAME).put(Body=b'123456')
 
     def tearDown(self):
-        self._moto_pipe.close()
+        self._local_resoruce.Object(BUCKET_NAME, KEY_NAME).delete()
+        self._local_resoruce.Bucket(BUCKET_NAME).delete()
 
     def test_read_from_a_closed_body(self):
         obj = self._local_resoruce.Object(BUCKET_NAME, KEY_NAME)
