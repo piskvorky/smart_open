@@ -182,7 +182,7 @@ class SeekableRawReader(object):
         """
         #
         # Close old body explicitly.
-        # When first seek(), self._body is not exist. Catch the exception and do nothing.
+        # When first seek() after __init__(), self._body is not exist.
         #
         if self._body is not None:
             self._body.close()
@@ -190,6 +190,8 @@ class SeekableRawReader(object):
         self._position = position
 
     def _load_body(self):
+        """Build a continuous connection with the remote peer starts from the current postion.
+        """
         range_string = make_range_string(self._position)
         logger.debug('content_length: %r range_string: %r', self._content_length, range_string)
 
@@ -210,9 +212,11 @@ class SeekableRawReader(object):
         return binary
 
     def read(self, size=-1):
+        """Read from the continuous connection with the remote peer."""
         if self._position >= self._content_length:
             return b''
         if self._body is None:
+            # When the first read() after __init__() or seek(), self._body is not exist.
             self._load_body()
 
         try:
