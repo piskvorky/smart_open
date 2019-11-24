@@ -19,6 +19,8 @@ import six
 
 import smart_open.bytebuffer
 
+from botocore.exceptions import IncompleteReadError
+
 logger = logging.getLogger(__name__)
 
 # Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
@@ -170,27 +172,30 @@ class SeekableRawReader(object):
         self._object = s3_object
         self._content_length = content_length
         self._version_id = version_id
-        self.seek(0)
+        self._position = 0
+        self._body = None
 
     def seek(self, position):
         """Seek to the specified position (byte offset) in the S3 key.
 
         :param int position: The byte offset from the beginning of the key.
         """
+        #
+        # Close old body explicitly.
+        # When first seek() after __init__(), self._body is not exist.
+        #
+        if self._body is not None:
+            self._body.close()
+        self._body = None
         self._position = position
+
+    def _load_body(self):
+        """Build a continuous connection with the remote peer starts from the current postion.
+        """
         range_string = make_range_string(self._position)
         logger.debug('content_length: %r range_string: %r', self._content_length, range_string)
 
-        #
-        # Close old body explicitly.
-        # When first seek(), self._body is not exist. Catch the exception and do nothing.
-        #
-        try:
-            self._body.close()
-        except AttributeError:
-            pass
-
-        if position == self._content_length == 0 or position == self._content_length:
+        if self._position == self._content_length == 0 or self._position == self._content_length:
             #
             # When reading, we can't seek to the first byte of an empty file.
             # Similarly, we can't seek past the last byte.  Do nothing here.
@@ -199,13 +204,27 @@ class SeekableRawReader(object):
         else:
             self._body = _get(self._object, self._version_id, Range=range_string)['Body']
 
-    def read(self, size=-1):
-        if self._position >= self._content_length:
-            return b''
+    def _read_from_body(self, size=-1):
         if size == -1:
             binary = self._body.read()
         else:
             binary = self._body.read(size)
+        return binary
+
+    def read(self, size=-1):
+        """Read from the continuous connection with the remote peer."""
+        if self._position >= self._content_length:
+            return b''
+        if self._body is None:
+            # When the first read() after __init__() or seek(), self._body is not exist.
+            self._load_body()
+
+        try:
+            binary = self._read_from_body(size)
+        except IncompleteReadError:
+            # The underlying connection of the self._body was closed by the remote peer.
+            self._load_body()
+            binary = self._read_from_body(size)
         self._position += len(binary)
         return binary
 

@@ -34,6 +34,7 @@ BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 KEY_NAME = 'test-key'
 WRITE_KEY_NAME = 'test-write-key'
 DISABLE_MOCKS = os.environ.get('SO_DISABLE_MOCKS') == "1"
+DISABLE_MOTO_SERVER = os.environ.get("SO_DISABLE_MOTO_SERVER") == "1"
 
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,27 @@ def ignore_resource_warnings():
     if six.PY2:
         return
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
+
+
+@unittest.skipIf(DISABLE_MOTO_SERVER, 'The test case needs a Moto server running on the local 5000 port.')
+class SeekableRawReaderTest(unittest.TestCase):
+
+    def setUp(self):
+        self._local_resource = boto3.resource('s3', endpoint_url='http://localhost:5000')
+        self._local_resource.Bucket(BUCKET_NAME).create()
+        self._local_resource.Object(BUCKET_NAME, KEY_NAME).put(Body=b'123456')
+
+    def tearDown(self):
+        self._local_resource.Object(BUCKET_NAME, KEY_NAME).delete()
+        self._local_resource.Bucket(BUCKET_NAME).delete()
+
+    def test_read_from_a_closed_body(self):
+        obj = self._local_resource.Object(BUCKET_NAME, KEY_NAME)
+        content_length = obj.content_length
+        reader = smart_open.s3.SeekableRawReader(obj, content_length)
+        self.assertEqual(reader.read(1), b'1')
+        reader._body.close()
+        self.assertEqual(reader.read(2), b'23')
 
 
 @maybe_mock_s3
