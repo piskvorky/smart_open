@@ -78,6 +78,7 @@ def open(
         session=None,
         resource_kwargs=None,
         multipart_upload_kwargs=None,
+        multipart_upload=True,
         object_kwargs=None,
         ):
     """Open an S3 object for reading or writing.
@@ -100,6 +101,12 @@ def open(
         Keyword arguments to use when accessing the S3 resource for reading or writing.
     multipart_upload_kwargs: dict, optional
         Additional parameters to pass to boto3's initiate_multipart_upload function.
+        For writing only.
+    multipart_upload: bool, optional
+        Default: `True`
+        If set to `True`, will use multipart upload for writing to S3. If set
+        to `false`, S3 upload will use the S3 Single-Part Upload API, which
+        is more ideal for small file sizes.
         For writing only.
     version_id: str, optional
         Version of the object, used when reading object.
@@ -134,14 +141,23 @@ def open(
             object_kwargs=object_kwargs,
         )
     elif mode == WRITE_BINARY:
-        fileobj = MultipartWriter(
-            bucket_id,
-            key_id,
-            min_part_size=min_part_size,
-            session=session,
-            multipart_upload_kwargs=multipart_upload_kwargs,
-            resource_kwargs=resource_kwargs,
-        )
+        if multipart_upload:
+            fileobj = MultipartWriter(
+                bucket_id,
+                key_id,
+                min_part_size=min_part_size,
+                session=session,
+                multipart_upload_kwargs=multipart_upload_kwargs,
+                resource_kwargs=resource_kwargs,
+            )
+        else:
+            fileobj = SinglepartWriter(
+                bucket_id,
+                key_id,
+                session=session,
+                multipart_upload_kwargs=multipart_upload_kwargs,
+                resource_kwargs=resource_kwargs,
+            )
     else:
         assert False, 'unexpected mode: %r' % mode
     return fileobj
@@ -464,7 +480,7 @@ class Reader(io.BufferedIOBase):
 
 
 class MultipartWriter(io.BufferedIOBase):
-    """Writes bytes to S3.
+    """Writes bytes to S3 using the multi part API.
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
@@ -638,6 +654,130 @@ multipart upload may fail")
             self._object.bucket_name,
             self._object.key,
             self._min_part_size,
+            self._session,
+            self._resource_kwargs,
+            self._multipart_upload_kwargs,
+        )
+
+
+class SinglepartWriter(io.BufferedIOBase):
+    """Writes bytes to S3 using the single part API.
+
+    Implements the io.BufferedIOBase interface of the standard library."""
+
+    def __init__(
+            self,
+            bucket,
+            key,
+            session=None,
+            resource_kwargs=None,
+            multipart_upload_kwargs=None,
+            ):
+
+        self._session = session
+        self._resource_kwargs = resource_kwargs
+
+        if session is None:
+            session = boto3.Session()
+        if resource_kwargs is None:
+            resource_kwargs = {}
+        if multipart_upload_kwargs is None:
+            multipart_upload_kwargs = {}
+
+        self._multipart_upload_kwargs = multipart_upload_kwargs
+
+        s3 = session.resource('s3', **resource_kwargs)
+        try:
+            self._object = s3.Object(bucket, key)
+            s3.meta.client.head_bucket(Bucket=bucket)
+        except botocore.client.ClientError:
+            raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
+
+        self._buf = io.BytesIO()
+        self._total_bytes = 0
+        self._closed = False
+
+        #
+        # This member is part of the io.BufferedIOBase interface.
+        #
+        self.raw = None
+
+    def flush(self):
+        pass
+
+    #
+    # Override some methods from io.IOBase.
+    #
+    def close(self):
+        self._buf.seek(0)
+
+        try:
+            self._object.put(Body=self._buf, **self._multipart_upload_kwargs)
+        except botocore.client.ClientError:
+            raise ValueError('the bucket %r does not exist, or is forbidden for access' % self._object.bucket_name)
+
+        logger.debug("direct upload finished")
+        self._closed = True
+
+    @property
+    def closed(self):
+        return self._closed
+
+    def writable(self):
+        """Return True if the stream supports writing."""
+        return True
+
+    def tell(self):
+        """Return the current stream position."""
+        return self._total_bytes
+
+    #
+    # io.BufferedIOBase methods.
+    #
+    def detach(self):
+        raise io.UnsupportedOperation("detach() not supported")
+
+    def write(self, b):
+        """Write the given buffer (bytes, bytearray, memoryview or any buffer
+        interface implementation) into the buffer. Content of the buffer will be
+        written to S3 on close as a single-part upload.
+
+        For more information about buffers, see https://docs.python.org/3/c-api/buffer.html"""
+
+        length = self._buf.write(b)
+        self._total_bytes += length
+        return length
+
+    def terminate(self):
+        """Nothing to cancel in single-part uploads."""
+        return
+
+    #
+    # Internal methods.
+    #
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.terminate()
+        else:
+            self.close()
+
+    def __str__(self):
+        return "smart_open.s3.SinglepartWriter(%r, %r)" % (self._object.bucket_name, self._object.key)
+
+    def __repr__(self):
+        return (
+            "smart_open.s3.SinglepartWriter("
+            "bucket=%r, "
+            "key=%r, "
+            "session=%r, "
+            "resource_kwargs=%r, "
+            "multipart_upload_kwargs=%r)"
+        ) % (
+            self._object.bucket_name,
+            self._object.key,
             self._session,
             self._resource_kwargs,
             self._multipart_upload_kwargs,
