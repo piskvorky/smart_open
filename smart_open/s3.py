@@ -492,6 +492,9 @@ multipart upload may fail")
         if multipart_upload_kwargs is None:
             multipart_upload_kwargs = {}
 
+        if 'x-amz-acl' in resource_kwargs:
+            self._x_amz_acl = resource_kwargs.pop('x-amz-acl')
+
         s3 = session.resource('s3', **resource_kwargs)
         try:
             self._object = s3.Object(bucket, key)
@@ -537,6 +540,10 @@ multipart upload may fail")
             self._mp.abort()
 
             self._object.put(Body=b'')
+
+        if self._x_amz_acl:
+            self._object.Acl().put(ACL=self._x_amz_acl)
+
         self._mp = None
         logger.debug("successfully closed")
 
