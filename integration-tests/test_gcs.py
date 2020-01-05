@@ -2,7 +2,7 @@
 import io
 import os
 
-from google.cloud import storage
+import google.cloud.storage
 
 import smart_open
 
@@ -12,7 +12,7 @@ assert _GCS_BUCKET is not None, 'please set the SO_GCS_BUCKET environment variab
 
 
 def initialize_bucket():
-    storage_client = storage.Client()
+    storage_client = google.cloud.storage.Client()
     bucket = storage_client.get_bucket(_GCS_BUCKET)
     blobs = bucket.list_blobs()
     for blob in blobs:
@@ -116,5 +116,5 @@ def test_gcs_performance_small_reads(benchmark):
     with smart_open.open(key, 'wb') as fout:
         fout.write(one_megabyte_of_msgs)
 
-    actual = benchmark(read_length_prefixed_messages, key, 'rb', buffer_size=ONE_MIB)
+    actual = benchmark(read_length_prefixed_messages, key, 'rb', buffering=ONE_MIB)
     assert actual == one_megabyte_of_msgs

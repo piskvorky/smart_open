@@ -5,7 +5,8 @@ import io
 import logging
 import sys
 
-from google.cloud import storage, exceptions
+import google.cloud.exceptions
+import google.cloud.storage
 import google.auth.transport.requests as google_requests
 import six
 
@@ -67,9 +68,9 @@ def open(
         bucket_id,
         blob_id,
         mode,
-        buffer_size=DEFAULT_BUFFER_SIZE,
+        buffering=DEFAULT_BUFFER_SIZE,
         min_part_size=MIN_MIN_PART_SIZE,
-        client=None,  # type: storage.Client
+        client=None,  # type: google.cloud.storage.Client
         ):
     """Open an GCS blob for reading or writing.
 
@@ -81,11 +82,11 @@ def open(
         The name of the blob within the bucket.
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
-    buffer_size: int, optional
+    buffering: int, optional
         The buffer size to use when performing I/O.
     min_part_size: int, optional
         The minimum part size for multipart uploads.  For writing only.
-    client: google.cloud.storage.Client, optional
+    client: google.cloud.google.cloud.storage.Client, optional
         The GCS client to use when working with google-cloud-storage.
 
     """
@@ -93,7 +94,7 @@ def open(
         return SeekableBufferedInputBase(
             bucket_id,
             blob_id,
-            buffer_size=buffer_size,
+            buffering=buffering,
             line_terminator=BINARY_NEWLINE,
             client=client,
         )
@@ -166,12 +167,12 @@ class BufferedInputBase(io.BufferedIOBase):
             self,
             bucket,
             key,
-            buffer_size=DEFAULT_BUFFER_SIZE,
+            buffering=DEFAULT_BUFFER_SIZE,
             line_terminator=BINARY_NEWLINE,
-            client=None,  # type: storage.Client
+            client=None,  # type: google.cloud.storage.Client
     ):
         if not client:
-            client = storage.Client()
+            client = google.cloud.storage.Client()
 
         bucket = client.get_bucket(bucket)  # type: storage.Bucket
 
@@ -180,8 +181,8 @@ class BufferedInputBase(io.BufferedIOBase):
 
         self._raw_reader = RawReader(self._blob)
         self._current_pos = 0
-        self._buffer_size = buffer_size
-        self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
+        self._buffer_size = buffering
+        self._buffer = smart_open.bytebuffer.ByteBuffer(buffering)
         self._eof = False
         self._line_terminator = line_terminator
 
@@ -310,23 +311,23 @@ class SeekableBufferedInputBase(BufferedInputBase):
             self,
             bucket,
             key,
-            buffer_size=DEFAULT_BUFFER_SIZE,
+            buffering=DEFAULT_BUFFER_SIZE,
             line_terminator=BINARY_NEWLINE,
-            client=None,  # type: storage.Client
+            client=None,  # type: google.cloud.storage.Client
     ):
         if not client:
-            client = storage.Client()
+            client = google.cloud.storage.Client()
         bucket = client.get_bucket(bucket)
 
         self._blob = bucket.get_blob(key)
         if self._blob is None:
-            raise exceptions.NotFound('blob {} not found in {}'.format(key, bucket))
+            raise google.cloud.exceptions.NotFound('blob {} not found in {}'.format(key, bucket))
         self._size = self._blob.size if self._blob.size is not None else 0
 
         self._raw_reader = SeekableRawReader(self._blob, self._size)
         self._current_pos = 0
-        self._buffer_size = buffer_size
-        self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
+        self._buffer_size = buffering
+        self._buffer = smart_open.bytebuffer.ByteBuffer(buffering)
         self._eof = False
         self._line_terminator = line_terminator
 
@@ -386,10 +387,10 @@ class BufferedOutputBase(io.BufferedIOBase):
             bucket,
             blob,
             min_part_size=MIN_MIN_PART_SIZE,
-            client=None,  # type: storage.Client
+            client=None,  # type: google.cloud.storage.Client
     ):
         if client is None:
-            client = storage.Client()
+            client = google.cloud.storage.Client()
         self._client = client
         self._credentials = self._client._credentials
         self._bucket = self._client.bucket(bucket)  # type: storage.Bucket
