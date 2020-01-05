@@ -26,8 +26,6 @@ if sys.version_info >= (2, 7):
 
 _UNKNOWN_FILE_SIZE = '*'
 
-_RESUME_INCOMPLETE = 308
-
 BINARY_NEWLINE = b'\n'
 
 SUPPORTED_SCHEMES = ("gcs", "gs")
@@ -45,6 +43,7 @@ END = 2
 WHENCE_CHOICES = (START, CURRENT, END)
 
 SUCCESSFUL_STATUS_CODES = (200, 201)
+_RESUME_INCOMPLETE = 308
 
 
 def clamp(value, minval, maxval):
@@ -133,7 +132,7 @@ class SeekableRawReader(object):
         return binary
 
     def _download_blob_chunk(self, size):
-        position = self._position
+        start = position = self._position
         if position == self._size:
             #
             # When reading, we can't seek to the first byte of an empty file.
@@ -141,9 +140,9 @@ class SeekableRawReader(object):
             #
             binary = b''
         elif size == -1:
-            binary = self._blob.download_as_string(start=position)
+            binary = self._blob.download_as_string(start=start)
         else:
-            start, end = position, position + size
+            end = position + size
             binary = self._blob.download_as_string(start=start, end=end)
         return binary
 
@@ -229,6 +228,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         self._raw_reader.seek(new_position)
         logger.debug('new_position: %r', self._current_pos)
 
+        self._buffer.empty()
         self._eof = self._current_pos == self._size
         return self._current_pos
 
@@ -264,7 +264,6 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         #
         # Fill our buffer to the required size.
         #
-        # logger.debug('filling %r byte-long buffer up to %r bytes', len(self._buffer), size)
         self._fill_buffer(size)
         return self._read_from_buffer(size)
 
@@ -355,7 +354,10 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._buf = io.BytesIO()
 
         self._session = google_requests.AuthorizedSession(self._credentials)
+
+        #
         # https://cloud.google.com/storage/docs/json_api/v1/how-tos/resumable-upload#start-resumable
+        #
         self._resumeable_upload_url = self._blob.create_resumable_upload_session()
 
         #
@@ -410,7 +412,9 @@ class BufferedOutputBase(io.BufferedIOBase):
         return len(b)
 
     def terminate(self):
+        #
         # https://cloud.google.com/storage/docs/xml-api/resumable-upload#example_cancelling_an_upload
+        #
         self._session.delete(self._resumeable_upload_url)
 
     #
