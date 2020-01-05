@@ -100,6 +100,7 @@ def test_gcs_performance_gz(benchmark):
     actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
     assert actual == one_megabyte
 
+
 def test_gcs_performance_small_reads(benchmark):
     initialize_bucket()
 

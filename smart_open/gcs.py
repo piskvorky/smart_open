@@ -25,18 +25,25 @@ if sys.version_info >= (2, 7):
 
 _UNKNOWN_FILE_SIZE = '*'
 
+_RESUME_INCOMPLETE = 308
+
 BINARY_NEWLINE = b'\n'
 
 SUPPORTED_SCHEMES = ("gcs", "gs")
 
-DEFAULT_MIN_PART_SIZE = MIN_MIN_PART_SIZE = 256 * 1024
+REQUIRED_CHUNK_MULTIPLE = 256 * 1024
+"""Google requires you to upload in multiples of 256 KB, except for the last part."""
+
+MIN_MIN_PART_SIZE = 256 * 1024
 """The absolute minimum permitted by Google."""
-DEFAULT_BUFFER_SIZE = 128 * 1024
+DEFAULT_BUFFER_SIZE = 256 * 1024
 
 START = 0
 CURRENT = 1
 END = 2
 WHENCE_CHOICES = [START, CURRENT, END]
+
+SUCCESSFUL_STATUS_CODES = (200, 201)
 
 
 def clamp(value, minval, maxval):
@@ -52,12 +59,15 @@ def make_range_string(start, stop=None, end=_UNKNOWN_FILE_SIZE):
     return 'bytes %d-%d/%s' % (start, stop, end)
 
 
+class UploadFailedError(Exception):
+    """Raised when a multi-part upload to GCS returns a failed response status code."""
+
+
 def open(
         bucket_id,
         blob_id,
         mode,
         buffer_size=DEFAULT_BUFFER_SIZE,
-        min_part_size=DEFAULT_MIN_PART_SIZE,
         client=None,  # type: storage.Client
         ):
     """Open an GCS blob for reading or writing.
@@ -72,8 +82,6 @@ def open(
         The mode for opening the object.  Must be either "rb" or "wb".
     buffer_size: int, optional
         The buffer size to use when performing I/O.
-    min_part_size: int, optional
-        The minimum part size for multipart uploads.  For writing only.
     client: object, optional
         The GCS client to use when working with google-cloud-storage.
 
@@ -90,7 +98,7 @@ def open(
         return BufferedOutputBase(
             bucket_id,
             blob_id,
-            min_part_size=min_part_size,
+            buffer_size=buffer_size,
             client=client,
         )
     else:
@@ -118,9 +126,9 @@ class SeekableRawReader(object):
     """Read an GCS object."""
 
     def __init__(
-            self,
-            gcs_blob,  # type: storage.Blob
-            size,
+        self,
+        gcs_blob,  # type: storage.Blob
+        size,
      ):
         self._blob = gcs_blob
         self._size = size
@@ -378,7 +386,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             self,
             bucket,
             blob,
-            min_part_size=DEFAULT_MIN_PART_SIZE,
+            buffer_size=DEFAULT_BUFFER_SIZE,
             client=None,  # type: storage.Client
     ):
         if client is None:
@@ -387,8 +395,9 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._credentials = self._client._credentials
         self._bucket = self._client.bucket(bucket)  # type: storage.Bucket
         self._blob = self._bucket.blob(blob)  # type: storage.Blob
+        assert buffer_size % MIN_MIN_PART_SIZE == 0, 'buffer size must be a multiple of 256KB'
+        self._buffer_size = buffer_size
 
-        self._min_part_size = min_part_size
         self._total_size = 0
         self._total_parts = 0
         self._buf = io.BytesIO()
@@ -443,7 +452,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._buf.write(b)
         self._total_size += len(b)
 
-        if self._buf.tell() >= self._min_part_size:
+        if self._buf.tell() >= self._buffer_size:
             self._upload_next_part()
 
         return len(b)
@@ -462,19 +471,34 @@ class BufferedOutputBase(io.BufferedIOBase):
         content_length = self._buf.tell()
         start = self._total_size - content_length
         stop = self._total_size - 1
-        if content_length < MIN_MIN_PART_SIZE:
+        if content_length != self._buffer_size:
             end = content_length
         else:
             end = _UNKNOWN_FILE_SIZE
+            if content_length != REQUIRED_CHUNK_MULTIPLE:
+                stop = content_length // REQUIRED_CHUNK_MULTIPLE * REQUIRED_CHUNK_MULTIPLE - 1
+
         self._buf.seek(0)
 
         headers = {
             'Content-Length': str(content_length),
             'Content-Range': make_range_string(start, stop, end)
         }
-        # TODO: Add error handling / retrying here
-        response = self._session.put(self._resumeable_upload_url, data=self._buf, headers=headers)
-        assert response.status_code in (200, 201)
+        data = self._buf
+        response = self._session.put(self._resumeable_upload_url, data=data, headers=headers)
+        # TODO: Figure out a way to avoid sending another request when the last upload part
+        # is a multiple of the min part size
+        if response.status_code == _RESUME_INCOMPLETE:
+            end = content_length
+            headers = {
+                'Content-Length': str(content_length),
+                'Content-Range': make_range_string(start, stop, end)
+            }
+            response = self._session.put(self._resumeable_upload_url, data=data, headers=headers)
+        if response.status_code not in SUCCESSFUL_STATUS_CODES:
+            logger.error("upload failed with status %s", response.status_code)
+            logger.error("response message: %s", str(response.json()))
+            raise UploadFailedError
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
