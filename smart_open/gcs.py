@@ -112,7 +112,7 @@ def open(
 class RawReader(object):
     """Read an GCS blob."""
     def __init__(self, gcs_blob):
-        # type: (storage.Blob) -> None
+        # type: (google.cloud.storage.Blob) -> None
         self.position = 0
         self._blob = gcs_blob
 
@@ -128,10 +128,11 @@ class SeekableRawReader(object):
     """Read an GCS object."""
 
     def __init__(self, gcs_blob, size):
-        # type: (storage.Blob, int) -> None
+        # type: (google.cloud.storage.Blob, int) -> None
         self._blob = gcs_blob
         self._size = size
-        self.seek(0)
+        self._position = 0
+        self._body = None
 
     def seek(self, position):
         """Seek to the specified position (byte offset) in the GCS key.
@@ -173,9 +174,9 @@ class BufferedInputBase(io.BufferedIOBase):
         if not client:
             client = google.cloud.storage.Client()
 
-        bucket = client.get_bucket(bucket)  # type: storage.Bucket
+        bucket = client.get_bucket(bucket)  # type: google.cloud.storage.Bucket
 
-        self._blob = bucket.get_blob(key)   # type: storage.Blob
+        self._blob = bucket.get_blob(key)   # type: google.cloud.storage.Blob
         self._size = self._blob.size if self._blob.size else 0
 
         self._raw_reader = RawReader(self._blob)
@@ -316,7 +317,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
     ):
         if not client:
             client = google.cloud.storage.Client()
-        bucket = client.get_bucket(bucket)
+        bucket = client.get_bucket(bucket)  # type: google.cloud.storage.Bucket
 
         self._blob = bucket.get_blob(key)
         if self._blob is None:
@@ -392,8 +393,8 @@ class BufferedOutputBase(io.BufferedIOBase):
             client = google.cloud.storage.Client()
         self._client = client
         self._credentials = self._client._credentials
-        self._bucket = self._client.bucket(bucket)  # type: storage.Bucket
-        self._blob = self._bucket.blob(blob)  # type: storage.Blob
+        self._bucket = self._client.bucket(bucket)  # type: google.cloud.storage.Bucket
+        self._blob = self._bucket.blob(blob)  # type: google.cloud.storage.Blob
         assert min_part_size % MIN_MIN_PART_SIZE == 0, 'min part size must be a multiple of 256KB'
         self._min_part_size = min_part_size
 
