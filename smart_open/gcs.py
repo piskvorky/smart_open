@@ -110,9 +110,8 @@ def open(
 
 class RawReader(object):
     """Read an GCS blob."""
-    def __init__(self,
-                 gcs_blob,  # type: storage.Blob
-                 ):
+    def __init__(self, gcs_blob):
+        # type: (storage.Blob) -> None
         self.position = 0
         self._blob = gcs_blob
         self._body = gcs_blob.download_as_string()
@@ -128,11 +127,8 @@ class RawReader(object):
 class SeekableRawReader(object):
     """Read an GCS object."""
 
-    def __init__(
-        self,
-        gcs_blob,  # type: storage.Blob
-        size,
-     ):
+    def __init__(self, gcs_blob, size):
+        # type: (storage.Blob, int) -> None
         self._blob = gcs_blob
         self._size = size
         self.seek(0)
