@@ -109,21 +109,6 @@ def open(
         raise NotImplementedError('GCS support for mode %r not implemented' % mode)
 
 
-class RawReader(object):
-    """Read an GCS blob."""
-    def __init__(self, gcs_blob):
-        # type: (google.cloud.storage.Blob) -> None
-        self.position = 0
-        self._blob = gcs_blob
-
-    def read(self, size=-1):
-        if size == -1:
-            return self._blob.download_as_string()
-        start, end = self.position, self.position + size
-        self.position = end
-        return self._blob.download_as_string(start=start, end=end)
-
-
 class SeekableRawReader(object):
     """Read an GCS object."""
 
@@ -132,7 +117,6 @@ class SeekableRawReader(object):
         self._blob = gcs_blob
         self._size = size
         self._position = 0
-        self._body = None
 
     def seek(self, position):
         """Seek to the specified position (byte offset) in the GCS key.
@@ -141,28 +125,34 @@ class SeekableRawReader(object):
         """
         self._position = position
 
-        if position == self._size == 0 or position == self._size:
+    def read(self, size=-1):
+        if self._position >= self._size:
+            return b''
+        binary = self._download_blob_chunk(size)
+        self._position += len(binary)
+        return binary
+
+    def _download_blob_chunk(self, size):
+        position = self._position
+        if position == self._size:
             #
             # When reading, we can't seek to the first byte of an empty file.
             # Similarly, we can't seek past the last byte.  Do nothing here.
             #
-            self._body = io.BytesIO()
+            binary = b''
+        elif size == -1:
+            binary = self._blob.download_as_string(start=position)
         else:
-            start, end = position, position + self._size
-            self._body = self._blob.download_as_string(start=start, end=end)
-
-    def read(self, size=-1):
-        if self._position >= self._size:
-            return b''
-        if size == -1:
-            binary = self._body
-        else:
-            binary = self._body[:size]
-        self._position += len(binary)
+            start, end = position, position + size
+            binary = self._blob.download_as_string(start=start, end=end)
         return binary
 
 
-class BufferedInputBase(io.BufferedIOBase):
+class SeekableBufferedInputBase(io.BufferedIOBase):
+    """Reads bytes from GCS.
+
+    Implements the io.BufferedIOBase interface of the standard library."""
+
     def __init__(
             self,
             bucket,
@@ -173,13 +163,14 @@ class BufferedInputBase(io.BufferedIOBase):
     ):
         if not client:
             client = google.cloud.storage.Client()
-
         bucket = client.get_bucket(bucket)  # type: google.cloud.storage.Bucket
 
-        self._blob = bucket.get_blob(key)   # type: google.cloud.storage.Blob
-        self._size = self._blob.size if self._blob.size else 0
+        self._blob = bucket.get_blob(key)
+        if self._blob is None:
+            raise google.cloud.exceptions.NotFound('blob {} not found in {}'.format(key, bucket))
+        self._size = self._blob.size if self._blob.size is not None else 0
 
-        self._raw_reader = RawReader(self._blob)
+        self._raw_reader = SeekableRawReader(self._blob, self._size)
         self._current_pos = 0
         self._buffer_size = buffering
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffering)
@@ -204,12 +195,48 @@ class BufferedInputBase(io.BufferedIOBase):
         return True
 
     def seekable(self):
-        return False
+        """If False, seek(), tell() and truncate() will raise IOError.
+
+        We offer only seek support, and no truncate support."""
+        return True
 
     #
     # io.BufferedIOBase methods.
     #
     def detach(self):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def seek(self, offset, whence=START):
+        """Seek to the specified position.
+
+        :param int offset: The offset in bytes.
+        :param int whence: Where the offset is from.
+
+        Returns the position after seeking."""
+        logger.debug('seeking to offset: %r whence: %r', offset, whence)
+        if whence not in WHENCE_CHOICES:
+            raise ValueError('invalid whence, expected one of %r' % WHENCE_CHOICES)
+
+        if whence == START:
+            new_position = offset
+        elif whence == CURRENT:
+            new_position = self._current_pos + offset
+        else:
+            new_position = self._size + offset
+        new_position = clamp(new_position, 0, self._size)
+        self._current_pos = new_position
+        self._raw_reader.seek(new_position)
+        logger.debug('new_position: %r', self._current_pos)
+
+        self._eof = self._current_pos == self._size
+        return self._current_pos
+
+    def tell(self):
+        """Return the current position within the file."""
+        return self._current_pos
+
+    def truncate(self, size=None):
         """Unsupported."""
         raise io.UnsupportedOperation
 
@@ -300,81 +327,6 @@ class BufferedInputBase(io.BufferedIOBase):
             if bytes_read == 0:
                 logger.debug('reached EOF while filling buffer')
                 self._eof = True
-
-
-class SeekableBufferedInputBase(BufferedInputBase):
-    """Reads bytes from GCS.
-
-    Implements the io.BufferedIOBase interface of the standard library."""
-
-    def __init__(
-            self,
-            bucket,
-            key,
-            buffering=DEFAULT_BUFFER_SIZE,
-            line_terminator=BINARY_NEWLINE,
-            client=None,  # type: google.cloud.storage.Client
-    ):
-        if not client:
-            client = google.cloud.storage.Client()
-        bucket = client.get_bucket(bucket)  # type: google.cloud.storage.Bucket
-
-        self._blob = bucket.get_blob(key)
-        if self._blob is None:
-            raise google.cloud.exceptions.NotFound('blob {} not found in {}'.format(key, bucket))
-        self._size = self._blob.size if self._blob.size is not None else 0
-
-        self._raw_reader = SeekableRawReader(self._blob, self._size)
-        self._current_pos = 0
-        self._buffer_size = buffering
-        self._buffer = smart_open.bytebuffer.ByteBuffer(buffering)
-        self._eof = False
-        self._line_terminator = line_terminator
-
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
-
-    def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError.
-
-        We offer only seek support, and no truncate support."""
-        return True
-
-    def seek(self, offset, whence=START):
-        """Seek to the specified position.
-
-        :param int offset: The offset in bytes.
-        :param int whence: Where the offset is from.
-
-        Returns the position after seeking."""
-        logger.debug('seeking to offset: %r whence: %r', offset, whence)
-        if whence not in WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % WHENCE_CHOICES)
-
-        if whence == START:
-            new_position = offset
-        elif whence == CURRENT:
-            new_position = self._current_pos + offset
-        else:
-            new_position = self._size + offset
-        new_position = clamp(new_position, 0, self._size)
-        self._current_pos = new_position
-        self._raw_reader.seek(new_position)
-        logger.debug('new_position: %r', self._current_pos)
-
-        self._buffer.empty()
-        self._eof = self._current_pos == self._size
-        return self._current_pos
-
-    def tell(self):
-        """Return the current position within the file."""
-        return self._current_pos
-
-    def truncate(self, size=None):
-        """Unsupported."""
-        raise io.UnsupportedOperation
 
 
 class BufferedOutputBase(io.BufferedIOBase):
