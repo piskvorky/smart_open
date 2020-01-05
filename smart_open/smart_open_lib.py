@@ -705,7 +705,7 @@ def _parse_uri(uri_as_string):
       * webhdfs
 
     .s3, s3a and s3n are treated the same way.  s3u is s3 but without SSL.
-    .gcs and gcs are treated the same way.
+    .gs and gcs are treated the same way.
 
     Valid URI examples::
 
