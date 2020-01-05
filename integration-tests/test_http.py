@@ -1,22 +1,20 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+#
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
+#
+# This code is distributed under the terms and conditions
+# from the MIT License (MIT).
 #
 from __future__ import unicode_literals
 
 import logging
-import subprocess
 import unittest
-import os.path as P
-import time
-
-import six
 
 import smart_open
 
 GZIP_MAGIC = b'\x1f\x8b'
 BASE_URL = ('https://raw.githubusercontent.com/RaRe-Technologies/smart_open/'
-           'master/smart_open/tests/test_data/')
-
+            'master/smart_open/tests/test_data/')
 
 
 class ReadTest(unittest.TestCase):

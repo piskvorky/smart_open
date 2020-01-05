@@ -53,14 +53,14 @@ git branch -D release-"$version"
 set -e
 
 git checkout upstream/master -b release-"$version"
-echo "$version" > smart_open/VERSION
-git commit smart_open/VERSION -m "bump version to $version"
+echo "__version__ = '$version'" > smart_open/version.py
+git commit smart_open/version.py -m "bump version to $version"
 
 echo "Next, update CHANGELOG.md."
 echo "Consider running summarize_pr.sh for each PR merged since the last release."
 read -p "Press Enter to continue..."
 
-$EDITOR CHANGELOG.md
+${EDITOR:-vim} CHANGELOG.md
 set +e
 git commit CHANGELOG.md -m "updated CHANGELOG.md for version $version"
 set -e
