@@ -14,9 +14,9 @@ import smart_open.bytebuffer
 
 logger = logging.getLogger(__name__)
 
-READ_BINARY = 'rb'
-WRITE_BINARY = 'wb'
-MODES = (READ_BINARY, WRITE_BINARY)
+_READ_BINARY = 'rb'
+_WRITE_BINARY = 'wb'
+_MODES = (_READ_BINARY, _WRITE_BINARY)
 """Allowed I/O modes for working with GCS."""
 
 _BINARY_TYPES = (six.binary_type, bytearray)
@@ -26,23 +26,29 @@ if sys.version_info >= (2, 7):
 
 _UNKNOWN_FILE_SIZE = '*'
 
-BINARY_NEWLINE = b'\n'
+_BINARY_NEWLINE = b'\n'
 
 SUPPORTED_SCHEMES = ("gcs", "gs")
+"""Supported schemes for GCS"""
 
-REQUIRED_CHUNK_MULTIPLE = 256 * 1024
+_MIN_MIN_PART_SIZE = _REQUIRED_CHUNK_MULTIPLE = 256 * 1024
 """Google requires you to upload in multiples of 256 KB, except for the last part."""
 
-MIN_MIN_PART_SIZE = 256 * 1024
-"""The absolute minimum permitted by Google."""
+_DEFAULT_MIN_PART_SIZE = 50 * 1024**2
+"""Default minimum part size for GCS multipart uploads"""
+
 DEFAULT_BUFFER_SIZE = 256 * 1024
+"""Default buffer size for working with GCS"""
 
 START = 0
+"""Seek to the absolute start of a GCS file"""
 CURRENT = 1
+"""Seek relative to the current positive of a GCS file"""
 END = 2
-WHENCE_CHOICES = (START, CURRENT, END)
+"""Seek relative to the end of a GCS file"""
+_WHENCE_CHOICES = (START, CURRENT, END)
 
-SUCCESSFUL_STATUS_CODES = (200, 201)
+_SUCCESSFUL_STATUS_CODES = (200, 201)
 _RESUME_INCOMPLETE = 308
 
 
@@ -68,7 +74,7 @@ def open(
         blob_id,
         mode,
         buffering=DEFAULT_BUFFER_SIZE,
-        min_part_size=MIN_MIN_PART_SIZE,
+        min_part_size=_MIN_MIN_PART_SIZE,
         client=None,  # type: google.cloud.storage.Client
         ):
     """Open an GCS blob for reading or writing.
@@ -89,15 +95,15 @@ def open(
         The GCS client to use when working with google-cloud-storage.
 
     """
-    if mode == READ_BINARY:
+    if mode == _READ_BINARY:
         return SeekableBufferedInputBase(
             bucket_id,
             blob_id,
             buffering=buffering,
-            line_terminator=BINARY_NEWLINE,
+            line_terminator=_BINARY_NEWLINE,
             client=client,
         )
-    elif mode == WRITE_BINARY:
+    elif mode == _WRITE_BINARY:
         return BufferedOutputBase(
             bucket_id,
             blob_id,
@@ -157,7 +163,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
             bucket,
             key,
             buffering=DEFAULT_BUFFER_SIZE,
-            line_terminator=BINARY_NEWLINE,
+            line_terminator=_BINARY_NEWLINE,
             client=None,  # type: google.cloud.storage.Client
     ):
         if not client:
@@ -214,8 +220,8 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
 
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
-        if whence not in WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % WHENCE_CHOICES)
+        if whence not in _WHENCE_CHOICES:
+            raise ValueError('invalid whence, expected one of %r' % _WHENCE_CHOICES)
 
         if whence == START:
             new_position = offset
@@ -337,7 +343,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             self,
             bucket,
             blob,
-            min_part_size=MIN_MIN_PART_SIZE,
+            min_part_size=_DEFAULT_MIN_PART_SIZE,
             client=None,  # type: google.cloud.storage.Client
     ):
         if client is None:
@@ -346,7 +352,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._credentials = self._client._credentials
         self._bucket = self._client.bucket(bucket)  # type: google.cloud.storage.Bucket
         self._blob = self._bucket.blob(blob)  # type: google.cloud.storage.Blob
-        assert min_part_size % MIN_MIN_PART_SIZE == 0, 'min part size must be a multiple of 256KB'
+        assert min_part_size % _MIN_MIN_PART_SIZE == 0, 'min part size must be a multiple of 256KB'
         self._min_part_size = min_part_size
 
         self._total_size = 0
@@ -431,8 +437,8 @@ class BufferedOutputBase(io.BufferedIOBase):
             end = content_length
         else:
             end = _UNKNOWN_FILE_SIZE
-            if content_length != REQUIRED_CHUNK_MULTIPLE:
-                stop = content_length // REQUIRED_CHUNK_MULTIPLE * REQUIRED_CHUNK_MULTIPLE - 1
+            if content_length != _REQUIRED_CHUNK_MULTIPLE:
+                stop = content_length // _REQUIRED_CHUNK_MULTIPLE * _REQUIRED_CHUNK_MULTIPLE - 1
 
         self._buf.seek(0)
 
@@ -448,7 +454,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             end = content_length
             headers['Content-Range'] = make_range_string(start, stop, end)
             response = self._session.put(self._resumeable_upload_url, data=data, headers=headers)
-        if response.status_code not in SUCCESSFUL_STATUS_CODES:
+        if response.status_code not in _SUCCESSFUL_STATUS_CODES:
             logger.error("upload failed with status %s", response.status_code)
             logger.error("response message: %s", str(response.json()))
             raise UploadFailedError
