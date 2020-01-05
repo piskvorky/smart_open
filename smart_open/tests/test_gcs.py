@@ -34,7 +34,7 @@ class FakeBucket(object):
         self.client = client  # type: FakeClient
         self.name = name
         self.blobs = []
-        self.exists = True
+        self._exists = True
 
     def blob(self, blob_id):
         blob = next((x for x in self.blobs if x.name == blob_id), None)
