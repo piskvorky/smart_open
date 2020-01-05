@@ -490,10 +490,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         # is a multiple of the min part size
         if response.status_code == _RESUME_INCOMPLETE:
             end = content_length
-            headers = {
-                'Content-Length': str(content_length),
-                'Content-Range': make_range_string(start, stop, end)
-            }
+            headers['Content-Range'] = make_range_string(start, stop, end)
             response = self._session.put(self._resumeable_upload_url, data=data, headers=headers)
         if response.status_code not in SUCCESSFUL_STATUS_CODES:
             logger.error("upload failed with status %s", response.status_code)

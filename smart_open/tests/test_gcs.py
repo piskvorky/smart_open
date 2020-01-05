@@ -505,23 +505,23 @@ class BufferedOutputBaseTest(unittest.TestCase):
         """Does gcs multipart chunking work correctly?"""
         # write
         smart_open_write = smart_open.gcs.BufferedOutputBase(
-            BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=10
+            BUCKET_NAME, WRITE_BLOB_NAME, buffer_size=256 * 1024
         )
         with smart_open_write as fout:
-            fout.write(b"test")
-            self.assertEqual(fout._buf.tell(), 4)
+            fout.write(b"t" * 262141)
+            self.assertEqual(fout._buf.tell(), 262141)
 
-            fout.write(b"test\n")
-            self.assertEqual(fout._buf.tell(), 9)
+            fout.write(b"t\n")
+            self.assertEqual(fout._buf.tell(), 262143)
             self.assertEqual(fout._total_parts, 0)
 
-            fout.write(b"test")
+            fout.write(b"t")
             self.assertEqual(fout._buf.tell(), 0)
             self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content
         output = list(smart_open.open("gcs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
-        self.assertEqual(output, ["testtest\n", "test"])
+        self.assertEqual(output, ["t" * 262142 + '\n', "t"])
 
     @maybe_mock_gcs
     def test_write_04(self):
