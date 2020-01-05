@@ -20,15 +20,15 @@ def initialize_bucket():
 
 
 def write_read(key, content, write_mode, read_mode, encoding=None, **kwargs):
-    with smart_open.smart_open(key, write_mode, encoding=encoding, **kwargs) as fout:
+    with smart_open.open(key, write_mode, encoding=encoding, **kwargs) as fout:
         fout.write(content)
-    with smart_open.smart_open(key, read_mode, encoding=encoding, **kwargs) as fin:
+    with smart_open.open(key, read_mode, encoding=encoding, **kwargs) as fin:
         actual = fin.read()
     return actual
 
 
 def read_length_prefixed_messages(key, read_mode, encoding=None, **kwargs):
-    with smart_open.smart_open(key, read_mode, encoding=encoding, **kwargs) as fin:
+    with smart_open.open(key, read_mode, encoding=encoding, **kwargs) as fin:
         actual = b''
         length_byte = fin.read(1);
         while len(length_byte):
@@ -113,7 +113,7 @@ def test_gcs_performance_small_reads(benchmark):
 
     key = _GCS_URL + '/many_reads_performance.bin'
 
-    with smart_open.smart_open(key, 'wb') as fout:
+    with smart_open.open(key, 'wb') as fout:
         fout.write(one_megabyte_of_msgs)
 
     actual = benchmark(read_length_prefixed_messages, key, 'rb', buffer_size=ONE_MIB)

@@ -560,7 +560,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
             with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 
-        with smart_open.smart_open("gcs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)) as fin:
+        with smart_open.open("gcs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)) as fin:
             with io.TextIOWrapper(fin, encoding='utf-8') as text:
                 actual = text.read()
 
