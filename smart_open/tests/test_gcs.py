@@ -505,7 +505,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
         """Does gcs multipart chunking work correctly?"""
         # write
         smart_open_write = smart_open.gcs.BufferedOutputBase(
-            BUCKET_NAME, WRITE_BLOB_NAME, buffer_size=256 * 1024
+            BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=256 * 1024
         )
         with smart_open_write as fout:
             fout.write(b"t" * 262141)

@@ -68,6 +68,7 @@ def open(
         blob_id,
         mode,
         buffer_size=DEFAULT_BUFFER_SIZE,
+        min_part_size=MIN_MIN_PART_SIZE,
         client=None,  # type: storage.Client
         ):
     """Open an GCS blob for reading or writing.
@@ -82,6 +83,8 @@ def open(
         The mode for opening the object.  Must be either "rb" or "wb".
     buffer_size: int, optional
         The buffer size to use when performing I/O.
+    min_part_size: int, optional
+        The minimum part size for multipart uploads.  For writing only.
     client: object, optional
         The GCS client to use when working with google-cloud-storage.
 
@@ -98,7 +101,7 @@ def open(
         return BufferedOutputBase(
             bucket_id,
             blob_id,
-            buffer_size=buffer_size,
+            min_part_size=min_part_size,
             client=client,
         )
     else:
@@ -386,7 +389,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             self,
             bucket,
             blob,
-            buffer_size=DEFAULT_BUFFER_SIZE,
+            min_part_size=MIN_MIN_PART_SIZE,
             client=None,  # type: storage.Client
     ):
         if client is None:
@@ -395,8 +398,8 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._credentials = self._client._credentials
         self._bucket = self._client.bucket(bucket)  # type: storage.Bucket
         self._blob = self._bucket.blob(blob)  # type: storage.Blob
-        assert buffer_size % MIN_MIN_PART_SIZE == 0, 'buffer size must be a multiple of 256KB'
-        self._buffer_size = buffer_size
+        assert min_part_mize % MIN_MIN_PART_SIZE == 0, 'buffer size must be a multiple of 256KB'
+        self._min_part_size = min_part_size
 
         self._total_size = 0
         self._total_parts = 0
