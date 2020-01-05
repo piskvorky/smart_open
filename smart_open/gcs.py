@@ -474,7 +474,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         content_length = self._buf.tell()
         start = self._total_size - content_length
         stop = self._total_size - 1
-        if content_length != self._buffer_size:
+        if content_length != self._min_part_size:
             end = content_length
         else:
             end = _UNKNOWN_FILE_SIZE
