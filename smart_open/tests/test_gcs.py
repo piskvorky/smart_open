@@ -245,9 +245,9 @@ def mock_gcs(func):
             return_value=FakeAuthorizedSession(storage_client._credentials),
         ) as mocked_session:
             assert callable(func), 'you didn\'t provide a function!'
-            try:  # is it a method that needs a self arg and mock args?
+            try:  # is it a method that needs a self arg?
                 self_arg = inspect.signature(func).self
-                func(self_arg, mocked_client, mocked_session, *args, **kwargs)
+                func(self_arg, *args, **kwargs)
             except AttributeError:
                 func(*args, **kwargs)
     return inner
@@ -290,11 +290,12 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
         ignore_resource_warnings()
 
+    @maybe_mock_gcs
     def tearDown(self):
         cleanup_bucket()
 
     @maybe_mock_gcs
-    def test_iter(self, *args):
+    def test_iter(self):
         """Are GCS files iterated over correctly?"""
         # a list of strings to test with
         expected = u"hello wořld\nhow are you?".encode('utf8')
@@ -306,7 +307,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         self.assertEqual(output, expected.split(b'\n'))
 
     @maybe_mock_gcs
-    def test_iter_context_manager(self, *args):
+    def test_iter_context_manager(self):
         # same thing but using a context manager
         expected = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=expected)
@@ -315,7 +316,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
             self.assertEqual(output, expected.split(b'\n'))
 
     @maybe_mock_gcs
-    def test_read(self, *args):
+    def test_read(self):
         """Are GCS files read correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
@@ -327,7 +328,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         self.assertEqual(content[14:], fin.read())  # read the rest
 
     @maybe_mock_gcs
-    def test_seek_beginning(self, *args):
+    def test_seek_beginning(self):
         """Does seeking to the beginning of GCS files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
@@ -343,7 +344,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         self.assertEqual(content, fin.read(-1))  # same thing
 
     @maybe_mock_gcs
-    def test_seek_start(self, *args):
+    def test_seek_start(self):
         """Does seeking from the start of GCS files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
@@ -355,7 +356,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
     @maybe_mock_gcs
-    def test_seek_current(self, *args):
+    def test_seek_current(self):
         """Does seeking from the middle of GCS files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
@@ -367,7 +368,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
     @maybe_mock_gcs
-    def test_seek_end(self, *args):
+    def test_seek_end(self):
         """Does seeking from the end of GCS files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
@@ -378,7 +379,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         self.assertEqual(fin.read(), b'you?')
 
     @maybe_mock_gcs
-    def test_detect_eof(self, *args):
+    def test_detect_eof(self):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
@@ -390,7 +391,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         self.assertEqual(eof, fin.tell())
 
     @maybe_mock_gcs
-    def test_read_gzip(self, *args):
+    def test_read_gzip(self):
         expected = u'раcцветали яблони и груши, поплыли туманы над рекой...'.encode('utf-8')
         buf = io.BytesIO()
         buf.close = lambda: None  # keep buffer open so that we can .getvalue()
@@ -419,7 +420,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         self.assertEqual(expected, actual)
 
     @maybe_mock_gcs
-    def test_readline(self, *args):
+    def test_readline(self):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
@@ -435,22 +436,22 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         self.assertEqual(expected, actual)
 
     @maybe_mock_gcs
-    def test_readline_tiny_buffer(self, *args):
+    def test_readline_tiny_buffer(self):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.gcs.BufferedInputBase(BUCKET_NAME, BLOB_NAME, buffer_size=8) as fin:
+        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME, buffering=8) as fin:
             actual = list(fin)
 
         expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
         self.assertEqual(expected, actual)
 
     @maybe_mock_gcs
-    def test_read0_does_not_return_data(self, *args):
+    def test_read0_does_not_return_data(self):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.gcs.BufferedInputBase(BUCKET_NAME, BLOB_NAME) as fin:
+        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME) as fin:
             data = fin.read(0)
 
         self.assertEqual(data, b'')
@@ -464,6 +465,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
 
+    @maybe_mock_gcs
     def tearDown(self):
         cleanup_bucket()
 
@@ -619,6 +621,7 @@ class OpenTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
 
+    @maybe_mock_gcs
     def tearDown(self):
         cleanup_bucket()
 
