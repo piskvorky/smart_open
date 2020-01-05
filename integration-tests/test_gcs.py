@@ -118,13 +118,3 @@ def test_gcs_performance_small_reads(benchmark):
 
     actual = benchmark(read_length_prefixed_messages, key, 'rb', buffer_size=ONE_MIB)
     assert actual == one_megabyte_of_msgs
-
-# def test_gcs_encrypted_file(benchmark):
-#     initialize_bucket()
-#
-#     key = _GCS_URL + '/sanity.txt'
-#     text = 'с гранатою в кармане, с чекою в руке'
-#     actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8', s3_upload={
-#         'ServerSideEncryption': 'AES256'
-#     })
-#     assert actual == text
