@@ -848,12 +848,9 @@ def _unquote(text):
 
 def _parse_uri_gcs(parsed_uri):
     assert parsed_uri.scheme in smart_open_gcs.SUPPORTED_SCHEMES
-
     bucket_id, blob_id = parsed_uri.netloc, parsed_uri.path[1:]
 
-    return Uri(
-        scheme=parsed_uri.scheme, bucket_id=bucket_id, blob_id=blob_id,
-    )
+    return Uri(scheme=parsed_uri.scheme, bucket_id=bucket_id, blob_id=blob_id)
 
 
 def _need_to_buffer(file_obj, mode, ext):
