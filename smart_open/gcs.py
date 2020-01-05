@@ -455,7 +455,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._buf.write(b)
         self._total_size += len(b)
 
-        if self._buf.tell() >= self._buffer_size:
+        if self._buf.tell() >= self._min_part_size:
             self._upload_next_part()
 
         return len(b)
