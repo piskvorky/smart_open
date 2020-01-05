@@ -180,7 +180,7 @@ More examples
         print(line)
 
     # stream content *into* GCS (write mode):
-    with open('gs://my_bucket/my_file.txt') as fout:
+    with open('gs://my_bucket/my_file.txt', 'wb') as fout:
         fout.write(b'hello world')
 
 Supported Compression Formats
