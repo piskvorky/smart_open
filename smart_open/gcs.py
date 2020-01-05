@@ -115,14 +115,13 @@ class RawReader(object):
         # type: (storage.Blob) -> None
         self.position = 0
         self._blob = gcs_blob
-        self._body = gcs_blob.download_as_string()
 
     def read(self, size=-1):
         if size == -1:
-            return self._body
+            return self._blob.download_as_string()
         start, end = self.position, self.position + size
         self.position = end
-        return self._body[start:end]
+        return self._blob.download_as_string(start=start, end=end)
 
 
 class SeekableRawReader(object):
