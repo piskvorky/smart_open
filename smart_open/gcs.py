@@ -24,9 +24,9 @@ _BINARY_TYPES = (six.binary_type, bytearray)
 if sys.version_info >= (2, 7):
     _BINARY_TYPES = (six.binary_type, bytearray, memoryview)
 
-_UNKNOWN_FILE_SIZE = '*'
-
 _BINARY_NEWLINE = b'\n'
+
+_UNKNOWN_FILE_SIZE = '*'
 
 SUPPORTED_SCHEMES = ("gcs", "gs")
 """Supported schemes for GCS"""
@@ -53,10 +53,22 @@ _RESUME_INCOMPLETE = 308
 
 
 def clamp(value, minval, maxval):
+    """Restrict a value to a range within specified min and max values
+
+    Parameters
+    ----------
+    value: int
+        The value to clamp
+    minval: int
+        The minimum value within the range to clamp to
+    maxval: int
+        The maxiumum value within the range to clamp to
+
+    Returns the clamped value"""
     return max(min(value, maxval), minval)
 
 
-def make_range_string(start, stop=None, end=_UNKNOWN_FILE_SIZE):
+def _make_range_string(start, stop=None, end=_UNKNOWN_FILE_SIZE):
     #
     # https://cloud.google.com/storage/docs/xml-api/resumable-upload#step_3upload_the_file_blocks
     #
@@ -65,7 +77,7 @@ def make_range_string(start, stop=None, end=_UNKNOWN_FILE_SIZE):
     return 'bytes %d-%d/%s' % (start, stop, end)
 
 
-class UploadFailedError(Exception):
+class _UploadFailedError(Exception):
     """Raised when a multi-part upload to GCS returns a failed response status code."""
 
 
@@ -444,7 +456,7 @@ class BufferedOutputBase(io.BufferedIOBase):
 
         headers = {
             'Content-Length': str(content_length),
-            'Content-Range': make_range_string(start, stop, end)
+            'Content-Range': _make_range_string(start, stop, end)
         }
         data = self._buf
         response = self._session.put(self._resumeable_upload_url, data=data, headers=headers)
@@ -452,12 +464,12 @@ class BufferedOutputBase(io.BufferedIOBase):
         # is a multiple of the min part size
         if response.status_code == _RESUME_INCOMPLETE:
             end = content_length
-            headers['Content-Range'] = make_range_string(start, stop, end)
+            headers['Content-Range'] = _make_range_string(start, stop, end)
             response = self._session.put(self._resumeable_upload_url, data=data, headers=headers)
         if response.status_code not in _SUCCESSFUL_STATUS_CODES:
             logger.error("upload failed with status %s", response.status_code)
             logger.error("response message: %s", str(response.json()))
-            raise UploadFailedError
+            raise _UploadFailedError
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
