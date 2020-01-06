@@ -345,6 +345,22 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
                 logger.debug('reached EOF while filling buffer')
                 self._eof = True
 
+    def __str__(self):
+        return "(%s, %r, %r)" % \
+              (self.__class__.__name__, self._bucket.name, self._blob.name)
+
+    def __repr__(self):
+        return (
+            "%s("
+            "bucket=%r, "
+            "blob=%r, "
+            "buffer_size=%r)"
+        ) % (
+            self._bucket.name,
+            self._blob.name,
+            self._buffer_size,
+        )
+
 
 class BufferedOutputBase(io.BufferedIOBase):
     """Writes bytes to GCS.
@@ -445,11 +461,11 @@ class BufferedOutputBase(io.BufferedIOBase):
         content_length = self._buf.tell()
         start = self._total_size - content_length
         stop = self._total_size - 1
-        if content_length != self._min_part_size:
+        if stop - start + 1 == content_length:
             end = content_length
         else:
             end = _UNKNOWN_FILE_SIZE
-            if content_length != _REQUIRED_CHUNK_MULTIPLE:
+            if content_length % _REQUIRED_CHUNK_MULTIPLE != 0:
                 stop = content_length // _REQUIRED_CHUNK_MULTIPLE * _REQUIRED_CHUNK_MULTIPLE - 1
 
         self._buf.seek(0)
@@ -460,15 +476,10 @@ class BufferedOutputBase(io.BufferedIOBase):
         }
         data = self._buf
         response = self._session.put(self._resumeable_upload_url, data=data, headers=headers)
-        # TODO: Figure out a way to avoid sending another request when the last upload part
-        # is a multiple of the min part size
-        if response.status_code == _RESUME_INCOMPLETE:
-            end = content_length
-            headers['Content-Range'] = _make_range_string(start, stop, end)
-            response = self._session.put(self._resumeable_upload_url, data=data, headers=headers)
+
         if response.status_code not in _SUCCESSFUL_STATUS_CODES:
             logger.error("upload failed with status %s", response.status_code)
-            logger.error("response message: %s", str(response.json()))
+            logger.error("response message: %s", response.text)
             raise _UploadFailedError
         logger.debug("upload of part #%i finished" % part_num)
 
@@ -481,7 +492,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             'Content-Length': '0'
         }
         response = self._session.put(self._resumeable_upload_url, headers=headers)
-        assert response.status_code in (200, 201)
+        assert response.status_code in _SUCCESSFUL_STATUS_CODES
 
         self._total_parts += 1
 
@@ -493,3 +504,19 @@ class BufferedOutputBase(io.BufferedIOBase):
             self.terminate()
         else:
             self.close()
+
+    def __str__(self):
+        return "(%s, %r, %r)" % \
+              (self.__class__.__name__, self._bucket.name, self._blob.name)
+
+    def __repr__(self):
+        return (
+            "%s("
+            "bucket=%r, "
+            "blob=%r, "
+            "min_part_size=%r)"
+        ) % (
+            self._bucket.name,
+            self._blob.name,
+            self._min_part_size,
+        )
