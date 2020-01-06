@@ -269,7 +269,7 @@ def maybe_mock_gcs(func):
 
 @maybe_mock_gcs
 def setUpModule():  # noqa
-    """Called once by unittest when initializing this module.  Sets up the
+    """Called once by unittest when initializing this module.  Set up the
     test GCS bucket.
     """
     storage_client.create_bucket(BUCKET_NAME)
@@ -277,7 +277,7 @@ def setUpModule():  # noqa
 
 @maybe_mock_gcs
 def tearDownModule():  # noqa
-    """Called once by unittest when tearing down this module.  Empties and
+    """Called once by unittest when tearing down this module.  Empty and
     removes the test GCS bucket.
     """
     try:
