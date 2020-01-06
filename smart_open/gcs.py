@@ -49,7 +49,6 @@ END = 2
 _WHENCE_CHOICES = (START, CURRENT, END)
 
 _SUCCESSFUL_STATUS_CODES = (200, 201)
-_RESUME_INCOMPLETE = 308
 
 
 def clamp(value, minval, maxval):
@@ -466,7 +465,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         else:
             end = _UNKNOWN_FILE_SIZE
             if content_length % _REQUIRED_CHUNK_MULTIPLE != 0:
-                stop = content_length // _REQUIRED_CHUNK_MULTIPLE * _REQUIRED_CHUNK_MULTIPLE - 1
+                stop = content_length % _REQUIRED_CHUNK_MULTIPLE - 1
 
         self._buf.seek(0)
 
