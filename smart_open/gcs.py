@@ -28,8 +28,8 @@ _BINARY_NEWLINE = b'\n'
 
 _UNKNOWN_FILE_SIZE = '*'
 
-SUPPORTED_SCHEMES = ("gcs", "gs")
-"""Supported schemes for GCS"""
+SUPPORTED_SCHEME = "gs"
+"""Supported scheme for GCS"""
 
 _MIN_MIN_PART_SIZE = _REQUIRED_CHUNK_MULTIPLE = 256 * 1024
 """Google requires you to upload in multiples of 256 KB, except for the last part."""
