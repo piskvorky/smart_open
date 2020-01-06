@@ -241,7 +241,7 @@ def put_to_bucket(contents, num_attempts=12, sleep_time=5):
 
 
 def mock_gcs(func):
-    '''Mocks the function and provides additional required arguments.'''
+    """Mock the function and provide additional required arguments."""
     def inner(*args, **kwargs):
         with mock.patch(
             'google.cloud.storage.Client',
