@@ -526,7 +526,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
             self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content
-        output = list(smart_open.open("gcs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
+        output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
         self.assertEqual(output, ["t" * 262142 + '\n', "t"])
 
     @maybe_mock_gcs
@@ -537,7 +537,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
             pass
 
         # read back the same key and check its content
-        output = list(smart_open.open("gcs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
+        output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
 
         self.assertEqual(output, [])
 
@@ -566,7 +566,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
             with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 
-        with smart_open.open("gcs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), 'rb') as fin:
+        with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), 'rb') as fin:
             with io.TextIOWrapper(fin, encoding='utf-8') as text:
                 actual = text.read()
 

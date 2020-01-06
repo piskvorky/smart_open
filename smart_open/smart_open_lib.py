@@ -746,7 +746,7 @@ def _parse_uri(uri_as_string):
         return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
     elif parsed_uri.scheme in smart_open_ssh.SCHEMES:
         return _parse_uri_ssh(parsed_uri)
-    elif parsed_uri.scheme in smart_open_gcs.SUPPORTED_SCHEMES:
+    elif parsed_uri.scheme in smart_open_gcs.SUPPORTED_SCHEME:
         return _parse_uri_gcs(parsed_uri)
     else:
         raise NotImplementedError(
@@ -845,7 +845,7 @@ def _unquote(text):
 
 
 def _parse_uri_gcs(parsed_uri):
-    assert parsed_uri.scheme in smart_open_gcs.SUPPORTED_SCHEMES
+    assert parsed_uri.scheme in smart_open_gcs.SUPPORTED_SCHEME
     bucket_id, blob_id = parsed_uri.netloc, parsed_uri.path[1:]
 
     return Uri(scheme=parsed_uri.scheme, bucket_id=bucket_id, blob_id=blob_id)
