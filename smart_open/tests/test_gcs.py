@@ -647,11 +647,11 @@ class ClampTest(unittest.TestCase):
 
 class MakeRangeStringTest(unittest.TestCase):
     def test_no_stop(self):
-        start, stop, end = 1, None, 2
+        start, stop = 1, None
         self.assertEqual(smart_open.gcs._make_range_string(start, stop), 'bytes 1-/*')
 
     def test_stop(self):
-        start, stop, end = 1, 2, smart_open.gcs._UNKNOWN_FILE_SIZE
+        start, stop = 1, 2
         self.assertEqual(smart_open.gcs._make_range_string(start, stop), 'bytes 1-2/*')
 
 

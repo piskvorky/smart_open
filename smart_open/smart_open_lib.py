@@ -582,7 +582,7 @@ def _open_binary_stream(uri, mode, transport_params):
             kw = _check_kwargs(smart_open_http.open, transport_params)
             return smart_open_http.open(uri, mode, **kw), filename
         elif parsed_uri.scheme in smart_open_gcs.SUPPORTED_SCHEMES:
-            kw =_check_kwargs(smart_open_gcs.open, transport_params)
+            kw = _check_kwargs(smart_open_gcs.open, transport_params)
             return smart_open_gcs.open(parsed_uri.bucket_id, parsed_uri.blob_id, mode, **kw), filename
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)

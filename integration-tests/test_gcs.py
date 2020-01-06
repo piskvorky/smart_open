@@ -30,7 +30,7 @@ def write_read(key, content, write_mode, read_mode, encoding=None, **kwargs):
 def read_length_prefixed_messages(key, read_mode, encoding=None, **kwargs):
     with smart_open.open(key, read_mode, encoding=encoding, **kwargs) as fin:
         actual = b''
-        length_byte = fin.read(1);
+        length_byte = fin.read(1)
         while len(length_byte):
             actual += length_byte
             msg = fin.read(ord(length_byte))
@@ -106,9 +106,9 @@ def test_gcs_performance_small_reads(benchmark):
 
     ONE_MIB = 1024**2
     one_megabyte_of_msgs = io.BytesIO()
-    msg = b'\x0f' + b'0123456789abcde' # a length-prefixed "message"
+    msg = b'\x0f' + b'0123456789abcde'  # a length-prefixed "message"
     for _ in range(0, ONE_MIB, len(msg)):
-            one_megabyte_of_msgs.write(msg)
+        one_megabyte_of_msgs.write(msg)
     one_megabyte_of_msgs = one_megabyte_of_msgs.getvalue()
 
     key = _GCS_URL + '/many_reads_performance.bin'
