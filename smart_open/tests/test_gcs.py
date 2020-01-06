@@ -268,20 +268,18 @@ def maybe_mock_gcs(func):
 
 
 @maybe_mock_gcs
-def setUpModule():
-    '''Called once by unittest when initializing this module.  Sets up the
+def setUpModule():  # noqa
+    """Called once by unittest when initializing this module.  Sets up the
     test GCS bucket.
-
-    '''
+    """
     storage_client.create_bucket(BUCKET_NAME)
 
 
 @maybe_mock_gcs
-def tearDownModule():
-    '''Called once by unittest when tearing down this module.  Empties and
+def tearDownModule():  # noqa
+    """Called once by unittest when tearing down this module.  Empties and
     removes the test GCS bucket.
-
-    '''
+    """
     try:
         bucket = get_bucket()
         bucket.delete()
