@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 def ignore_resource_warnings():
     if six.PY2:
         return
-    warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")
+    warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
 class FakeBucket(object):
@@ -239,11 +239,11 @@ def mock_gcs(func):
         with mock.patch(
             'google.cloud.storage.Client',
             return_value=storage_client,
-        ) as mocked_client, \
+        ), \
             mock.patch(
             'smart_open.gcs.google_requests.AuthorizedSession',
             return_value=FakeAuthorizedSession(storage_client._credentials),
-        ) as mocked_session:
+        ):
             assert callable(func), 'you didn\'t provide a function!'
             try:  # is it a method that needs a self arg?
                 self_arg = inspect.signature(func).self
