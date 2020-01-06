@@ -460,6 +460,16 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
         self.assertEqual(data, b'')
 
+    @maybe_mock_gcs
+    def test_read_past_end(self):
+        content = b'englishman\nin\nnew\nyork\n'
+        put_to_bucket(contents=content)
+
+        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME) as fin:
+            data = fin.read(100)
+
+        self.assertEqual(data, content)
+
 
 class BufferedOutputBaseTest(unittest.TestCase):
     """
