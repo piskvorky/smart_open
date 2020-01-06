@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
+#
+# This code is distributed under the terms and conditions
+# from the MIT License (MIT).
+#
 import gzip
 import inspect
 import io
@@ -297,7 +304,6 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
     @maybe_mock_gcs
     def test_iter(self):
         """Are GCS files iterated over correctly?"""
-        # a list of strings to test with
         expected = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=expected)
 
