@@ -15,7 +15,7 @@ import uuid
 import unittest
 try:
     from unittest import mock
-except:
+except ImportError:
     import mock
 import warnings
 
