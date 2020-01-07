@@ -355,6 +355,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
             "blob=%r, "
             "buffer_size=%r)"
         ) % (
+            self.__class__.__name__,
             self._bucket.name,
             self._blob.name,
             self._buffer_size,
@@ -515,6 +516,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             "blob=%r, "
             "min_part_size=%r)"
         ) % (
+            self.__class__.__name__,
             self._bucket.name,
             self._blob.name,
             self._min_part_size,

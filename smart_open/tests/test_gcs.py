@@ -13,7 +13,10 @@ import os
 import time
 import uuid
 import unittest
-from unittest import mock
+try:
+    from unittest import mock
+except:
+    import mock
 import warnings
 
 import google.cloud
