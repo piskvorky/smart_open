@@ -238,15 +238,6 @@ def put_to_bucket(contents, num_attempts=12, sleep_time=5):
     assert False, 'failed to create bucket %s after %d attempts' % (BUCKET_NAME, num_attempts)
 
 
-def for_all_methods(decorator):
-    def decorate(cls):
-        for attr in cls.__dict__: # there's propably a better way to do this
-            if callable(getattr(cls, attr)):
-                setattr(cls, attr, decorator(getattr(cls, attr)))
-        return cls
-    return decorate
-
-
 def mock_gcs(class_or_func):
     """Mock all methods of a class or a function."""
     if inspect.isclass(class_or_func):
