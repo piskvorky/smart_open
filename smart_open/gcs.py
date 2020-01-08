@@ -110,7 +110,7 @@ def open(
         raise NotImplementedError('GCS support for mode %r not implemented' % mode)
 
 
-class SeekableRawReader(object):
+class _SeekableRawReader(object):
     """Read an GCS object."""
 
     def __init__(self, gcs_blob, size):
@@ -171,7 +171,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
             raise google.cloud.exceptions.NotFound('blob {} not found in {}'.format(key, bucket))
         self._size = self._blob.size if self._blob.size is not None else 0
 
-        self._raw_reader = SeekableRawReader(self._blob, self._size)
+        self._raw_reader = _SeekableRawReader(self._blob, self._size)
         self._current_pos = 0
         self._buffer_size = buffering
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffering)
