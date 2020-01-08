@@ -380,7 +380,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._credentials = self._client._credentials
         self._bucket = self._client.bucket(bucket)  # type: google.cloud.storage.Bucket
         self._blob = self._bucket.blob(blob)  # type: google.cloud.storage.Blob
-        assert min_part_size % _MIN_MIN_PART_SIZE == 0, 'min part size must be a multiple of 256KB'
+        assert min_part_size % _REQUIRED_CHUNK_MULTIPLE == 0, 'min part size must be a multiple of 256KB'
         self._min_part_size = min_part_size
 
         self._total_size = 0
