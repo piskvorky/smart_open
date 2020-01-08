@@ -475,7 +475,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             'Content-Range': _make_range_string(start, stop, end)
         }
         data = self._buf
-        response = self._session.put(self._resumeable_upload_url, data=data, headers=headers)
+        response = self._session.put(self._resumeable_upload_url, data=self._buf, headers=headers)
 
         if response.status_code not in _SUCCESSFUL_STATUS_CODES:
             logger.error("upload failed with status %s", response.status_code)
