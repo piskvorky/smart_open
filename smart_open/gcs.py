@@ -87,7 +87,7 @@ def open(
         The buffer size to use when performing I/O. For reading only.
     min_part_size: int, optional
         The minimum part size for multipart uploads.  For writing only.
-    client: google.cloud.google.cloud.storage.Client, optional
+    client: google.cloud.storage.Client, optional
         The GCS client to use when working with google-cloud-storage.
 
     """
