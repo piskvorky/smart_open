@@ -67,8 +67,6 @@ script:
     fi
   - pip install numpy
   - py.test integration-tests/test_207.py
-  - python -m doctest README.rst
-  - python -m doctest howto.md
 
 
 cache:
