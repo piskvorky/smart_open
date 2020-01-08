@@ -234,7 +234,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         new_position = smart_open.s3.clamp(new_position, 0, self._size)
         self._current_pos = new_position
         self._raw_reader.seek(new_position)
-        logger.debug('new_position: %r', self._current_pos)
+        logger.debug('current_pos: %r', self._current_pos)
 
         self._buffer.empty()
         self._eof = self._current_pos == self._size
