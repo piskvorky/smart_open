@@ -520,14 +520,14 @@ class BufferedOutputBaseTest(unittest.TestCase):
         )
         with smart_open_write as fout:
             fout.write(b"t" * 262141)
-            self.assertEqual(fout._buf.tell(), 262141)
+            self.assertEqual(fout._current_part.tell(), 262141)
 
             fout.write(b"t\n")
-            self.assertEqual(fout._buf.tell(), 262143)
+            self.assertEqual(fout._current_part.tell(), 262143)
             self.assertEqual(fout._total_parts, 0)
 
             fout.write(b"t")
-            self.assertEqual(fout._buf.tell(), 0)
+            self.assertEqual(fout._current_part.tell(), 0)
             self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content

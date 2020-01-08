@@ -179,8 +179,8 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
 
         self._raw_reader = _SeekableRawReader(self._blob, self._size)
         self._current_pos = 0
-        self._buffer_size = buffering
-        self._buffer = smart_open.bytebuffer.ByteBuffer(buffering)
+        self._current_part_size = buffering
+        self._current_part = smart_open.bytebuffer.ByteBuffer(buffering)
         self._eof = False
         self._line_terminator = line_terminator
 
@@ -236,7 +236,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         self._raw_reader.seek(new_position)
         logger.debug('current_pos: %r', self._current_pos)
 
-        self._buffer.empty()
+        self._current_part.empty()
         self._eof = self._current_pos == self._size
         return self._current_pos
 
@@ -259,7 +259,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         #
         # Return unused data first
         #
-        if len(self._buffer) >= size:
+        if len(self._current_part) >= size:
             return self._read_from_buffer(size)
 
         #
@@ -292,15 +292,15 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         if limit != -1:
             raise NotImplementedError('limits other than -1 not implemented yet')
         the_line = io.BytesIO()
-        while not (self._eof and len(self._buffer) == 0):
+        while not (self._eof and len(self._current_part) == 0):
             #
-            # In the worst case, we're reading the unread part of self._buffer
+            # In the worst case, we're reading the unread part of self._current_part
             # twice here, once in the if condition and once when calling index.
             #
             # This is sub-optimal, but better than the alternative: wrapping
             # .index in a try..except, because that is slower.
             #
-            remaining_buffer = self._buffer.peek()
+            remaining_buffer = self._current_part.peek()
             if self._line_terminator in remaining_buffer:
                 next_newline = remaining_buffer.index(self._line_terminator)
                 the_line.write(self._read_from_buffer(next_newline + 1))
@@ -319,24 +319,23 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
     #
     def _read_from_buffer(self, size=-1):
         """Remove at most size bytes from our buffer and return them."""
-        # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
-        size = size if size >= 0 else len(self._buffer)
-        part = self._buffer.read(size)
+        # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._current_part))
+        size = size if size >= 0 else len(self._current_part)
+        part = self._current_part.read(size)
         self._current_pos += len(part)
         # logger.debug('part: %r', part)
         return part
 
     def _fill_buffer(self, size=-1):
-        size = size if size >= 0 else self._buffer._chunk_size
-        while len(self._buffer) < size and not self._eof:
-            bytes_read = self._buffer.fill(self._raw_reader)
+        size = size if size >= 0 else self._current_part._chunk_size
+        while len(self._current_part) < size and not self._eof:
+            bytes_read = self._current_part.fill(self._raw_reader)
             if bytes_read == 0:
                 logger.debug('reached EOF while filling buffer')
                 self._eof = True
 
     def __str__(self):
-        return "(%s, %r, %r)" % \
-              (self.__class__.__name__, self._bucket.name, self._blob.name)
+        return "(%s, %r, %r)" % (self.__class__.__name__, self._bucket.name, self._blob.name)
 
     def __repr__(self):
         return (
@@ -348,7 +347,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
             self.__class__.__name__,
             self._bucket.name,
             self._blob.name,
-            self._buffer_size,
+            self._current_part_size,
         )
 
 
@@ -375,14 +374,14 @@ class BufferedOutputBase(io.BufferedIOBase):
 
         self._total_size = 0
         self._total_parts = 0
-        self._buf = io.BytesIO()
+        self._current_part = io.BytesIO()
 
         self._session = google_requests.AuthorizedSession(self._credentials)
 
         #
         # https://cloud.google.com/storage/docs/json_api/v1/how-tos/resumable-upload#start-resumable
         #
-        self._resumeable_upload_url = self._blob.create_resumable_upload_session()
+        self._resumable_upload_url = self._blob.create_resumable_upload_session()
 
         #
         # This member is part of the io.BufferedIOBase interface.
@@ -399,7 +398,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         logger.debug("closing")
         if self._total_size == 0:  # empty files
             self._upload_empty_part()
-        if self._buf.tell():
+        if self._current_part.tell():
             self._upload_next_part()
         logger.debug("successfully closed")
 
@@ -424,13 +423,12 @@ class BufferedOutputBase(io.BufferedIOBase):
         do any HTTP transfer right away."""
 
         if not isinstance(b, _BINARY_TYPES):
-            raise TypeError(
-                "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b)))
+            raise TypeError("input must be one of %r, got: %r" % (_BINARY_TYPES, type(b)))
 
-        self._buf.write(b)
+        self._current_part.write(b)
         self._total_size += len(b)
 
-        if self._buf.tell() >= self._min_part_size:
+        if self._current_part.tell() >= self._min_part_size:
             self._upload_next_part()
 
         return len(b)
@@ -439,7 +437,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         #
         # https://cloud.google.com/storage/docs/xml-api/resumable-upload#example_cancelling_an_upload
         #
-        self._session.delete(self._resumeable_upload_url)
+        self._session.delete(self._resumable_upload_url)
 
     #
     # Internal methods.
@@ -447,8 +445,10 @@ class BufferedOutputBase(io.BufferedIOBase):
     def _upload_next_part(self):
         part_num = self._total_parts + 1
         logger.info("uploading part #%i, %i bytes (total %.3fGB)",
-                    part_num, self._buf.tell(), self._total_size / 1024.0 ** 3)
-        content_length = self._buf.tell()
+                    part_num,
+                    self._current_part.tell(),
+                    self._total_size / 1024.0 ** 3)
+        content_length = self._current_part.tell()
         start = self._total_size - content_length
         stop = self._total_size - 1
         if stop - start + 1 == content_length:
@@ -458,13 +458,13 @@ class BufferedOutputBase(io.BufferedIOBase):
             if content_length % _REQUIRED_CHUNK_MULTIPLE != 0:
                 stop = content_length % _REQUIRED_CHUNK_MULTIPLE - 1
 
-        self._buf.seek(0)
+        self._current_part.seek(0)
 
         headers = {
             'Content-Length': str(content_length),
             'Content-Range': _make_range_string(start, stop, end)
         }
-        response = self._session.put(self._resumeable_upload_url, data=self._buf, headers=headers)
+        response = self._session.put(self._resumable_upload_url, data=self._current_part, headers=headers)
 
         if response.status_code not in _SUCCESSFUL_STATUS_CODES:
             logger.error("upload failed with status %s", response.status_code)
@@ -473,14 +473,12 @@ class BufferedOutputBase(io.BufferedIOBase):
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
-        self._buf = io.BytesIO()
+        self._current_part = io.BytesIO()
 
     def _upload_empty_part(self):
         logger.info("creating empty file")
-        headers = {
-            'Content-Length': '0'
-        }
-        response = self._session.put(self._resumeable_upload_url, headers=headers)
+        headers = {'Content-Length': '0'}
+        response = self._session.put(self._resumable_upload_url, headers=headers)
         assert response.status_code in _SUCCESSFUL_STATUS_CODES
 
         self._total_parts += 1
@@ -495,8 +493,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             self.close()
 
     def __str__(self):
-        return "(%s, %r, %r)" % \
-              (self.__class__.__name__, self._bucket.name, self._blob.name)
+        return "(%s, %r, %r)" % (self.__class__.__name__, self._bucket.name, self._blob.name)
 
     def __repr__(self):
         return (
