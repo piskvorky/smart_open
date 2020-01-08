@@ -449,15 +449,9 @@ class BufferedOutputBase(io.BufferedIOBase):
                     part_num,
                     self._current_part.tell(),
                     self._total_size / 1024.0 ** 3)
-        content_length = self._current_part.tell()
+        content_length = end = self._current_part.tell()
         start = self._total_size - content_length
         stop = self._total_size - 1
-        if stop - start + 1 == content_length:
-            end = content_length
-        else:
-            end = _UNKNOWN_FILE_SIZE
-            if content_length % _REQUIRED_CHUNK_MULTIPLE != 0:
-                stop = content_length % _REQUIRED_CHUNK_MULTIPLE - 1
 
         self._current_part.seek(0)
 
