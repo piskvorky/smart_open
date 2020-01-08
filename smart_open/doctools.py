@@ -63,6 +63,9 @@ def extract_kwargs(docstring):
     ('bar', 'str, optional', ['This parameter is the bar.'])
 
     """
+    if not docstring:
+        return []
+
     lines = inspect.cleandoc(docstring).split('\n')
     retval = []
 

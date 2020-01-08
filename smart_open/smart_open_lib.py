@@ -363,7 +363,10 @@ def open(
     return decoded
 
 
-open.__doc__ = open.__doc__ % {
+#
+# The docstring can be None if -OO was passed to the interpreter.
+#
+open.__doc__ = None if open.__doc__ is None else open.__doc__ % {
     's3': doctools.to_docstring(
         doctools.extract_kwargs(smart_open_s3.open.__doc__),
         lpad=u'    ',
