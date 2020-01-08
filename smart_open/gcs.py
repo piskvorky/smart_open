@@ -264,7 +264,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         elif size < 0:
             from_buf = self._read_from_buffer()
             self._current_pos = self._size
-            return from_buf + self._raw_reader.read()
+            return self._read_from_buffer() + self._raw_reader.read()
 
         #
         # Return unused data first
