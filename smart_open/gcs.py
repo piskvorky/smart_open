@@ -155,8 +155,11 @@ class _SeekableRawReader(object):
 class SeekableBufferedInputBase(io.BufferedIOBase):
     """Reads bytes from GCS.
 
-    Implements the io.BufferedIOBase interface of the standard library."""
+    Implements the io.BufferedIOBase interface of the standard library.
 
+    :raises google.cloud.exceptions.NotFound: Raised when the blob to read from does not exist.
+
+    """
     def __init__(
             self,
             bucket,
