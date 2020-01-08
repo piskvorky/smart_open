@@ -123,8 +123,11 @@ class _SeekableRawReader(object):
         """Seek to the specified position (byte offset) in the GCS key.
 
         :param int position: The byte offset from the beginning of the key.
+
+        Returns the position after seeking.
         """
         self._position = position
+        return self._position
 
     def read(self, size=-1):
         if self._position >= self._size:
