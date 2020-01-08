@@ -61,8 +61,23 @@ def _make_range_string(start, stop=None, end=_UNKNOWN_FILE_SIZE):
     return 'bytes %d-%d/%s' % (start, stop, end)
 
 
-class _UploadFailedError(Exception):
-    """Raised when a multi-part upload to GCS returns a failed response status code."""
+class UploadFailedError(Exception):
+    def __init__(self, message, status_code, text):
+        """Raise when a multi-part upload to GCS returns a failed response status code.
+
+        Parameters
+        ----------
+        message: str
+            The error message to display.
+        status_code: str
+            The status code returned from the upload response.
+        text: str
+            The text returned from the upload response.
+
+        """
+        super(UploadFailedError, self).__init__(message)
+        self.status_code = status_code
+        self.text = text
 
 
 def open(
@@ -462,9 +477,10 @@ class BufferedOutputBase(io.BufferedIOBase):
         response = self._session.put(self._resumable_upload_url, data=self._current_part, headers=headers)
 
         if response.status_code not in _SUCCESSFUL_STATUS_CODES:
-            logger.error("upload failed with status %s", response.status_code)
-            logger.error("response message: %s", response.text)
-            raise _UploadFailedError
+            status_code, text = response.status_code, response.text
+            msg = "upload failed with status code: %s, response text: %s, part #%i, %i bytes (total %.3fGB)" % \
+                  status_code, text, part_num, self._current_part.tell(), self._total_size / 1024.0 ** 3
+            raise UploadFailedError(msg, status_code, text)
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
