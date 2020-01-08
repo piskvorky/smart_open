@@ -29,14 +29,14 @@ def write_read(key, content, write_mode, read_mode, encoding=None, **kwargs):
 
 def read_length_prefixed_messages(key, read_mode, encoding=None, **kwargs):
     with smart_open.open(key, read_mode, encoding=encoding, **kwargs) as fin:
-        actual = b''
+        result = io.BytesIO()
         length_byte = fin.read(1)
         while len(length_byte):
-            actual += length_byte
+            result.write(length_byte)
             msg = fin.read(ord(length_byte))
-            actual += msg
+            result.write(msg)
             length_byte = fin.read(1)
-    return actual
+    return result.getvalue()
 
 
 def test_gcs_readwrite_text(benchmark):
