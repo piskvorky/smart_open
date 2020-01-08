@@ -112,7 +112,7 @@ class SeekableRawReaderTest(unittest.TestCase):
         self._body = b'123456'
         self._local_resource = boto3.resource('s3', endpoint_url='http://localhost:5000')
         self._local_resource.Bucket(BUCKET_NAME).create()
-        self._local_resource.Object(BUCKET_NAME, KEY_NAME).put(Body=self.body)
+        self._local_resource.Object(BUCKET_NAME, KEY_NAME).put(Body=self._body)
 
     def tearDown(self):
         self._local_resource.Object(BUCKET_NAME, KEY_NAME).delete()
