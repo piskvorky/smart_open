@@ -19,7 +19,7 @@ def initialize_bucket():
         blob.delete()
 
 
-def write_read(key, content, write_mode, read_mode, encoding=None, **kwargs):
+def write_read(key, content, write_mode, read_mode, **kwargs):
     with smart_open.open(key, write_mode, encoding=encoding, **kwargs) as fout:
         fout.write(content)
     with smart_open.open(key, read_mode, encoding=encoding, **kwargs) as fin:
