@@ -90,7 +90,7 @@ class FakeBlob(object):
             self._create_if_not_exists()
 
     def create_resumable_upload_session(self):
-        resumeable_upload_url = self.RESUMABLE_SESSION_URI_TEMPLATE.format(
+        resumeable_upload_url = self.RESUMABLE_SESSION_URI_TEMPLATE % dict(
             bucket=self._bucket.name,
             upload_id=uuid.uuid4().hex,
         )
