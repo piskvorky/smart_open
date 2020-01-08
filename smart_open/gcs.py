@@ -11,6 +11,7 @@ import google.auth.transport.requests as google_requests
 import six
 
 import smart_open.bytebuffer
+import smart_open.s3
 
 logger = logging.getLogger(__name__)
 
@@ -49,22 +50,6 @@ END = 2
 _WHENCE_CHOICES = (START, CURRENT, END)
 
 _SUCCESSFUL_STATUS_CODES = (200, 201)
-
-
-def clamp(value, minval, maxval):
-    """Restrict a value to a range within specified min and max values
-
-    Parameters
-    ----------
-    value: int
-        The value to clamp
-    minval: int
-        The minimum value within the range to clamp to
-    maxval: int
-        The maxiumum value within the range to clamp to
-
-    Returns the clamped value"""
-    return max(min(value, maxval), minval)
 
 
 def _make_range_string(start, stop=None, end=_UNKNOWN_FILE_SIZE):
@@ -240,7 +225,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
             new_position = self._current_pos + offset
         else:
             new_position = self._size + offset
-        new_position = clamp(new_position, 0, self._size)
+        new_position = smart_open.s3.clamp(new_position, 0, self._size)
         self._current_pos = new_position
         self._raw_reader.seek(new_position)
         logger.debug('new_position: %r', self._current_pos)
@@ -262,7 +247,6 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         if size == 0:
             return b''
         elif size < 0:
-            from_buf = self._read_from_buffer()
             self._current_pos = self._size
             return self._read_from_buffer() + self._raw_reader.read()
 
@@ -474,7 +458,6 @@ class BufferedOutputBase(io.BufferedIOBase):
             'Content-Length': str(content_length),
             'Content-Range': _make_range_string(start, stop, end)
         }
-        data = self._buf
         response = self._session.put(self._resumeable_upload_url, data=self._buf, headers=headers)
 
         if response.status_code not in _SUCCESSFUL_STATUS_CODES:

@@ -20,15 +20,14 @@ def initialize_bucket():
 
 
 def write_read(key, content, write_mode, read_mode, **kwargs):
-    with smart_open.open(key, write_mode, encoding=encoding, **kwargs) as fout:
+    with smart_open.open(key, write_mode, **kwargs) as fout:
         fout.write(content)
-    with smart_open.open(key, read_mode, encoding=encoding, **kwargs) as fin:
+    with smart_open.open(key, read_mode, **kwargs) as fin:
         return fin.read()
-    return actual
 
 
-def read_length_prefixed_messages(key, read_mode, encoding=None, **kwargs):
-    with smart_open.open(key, read_mode, encoding=encoding, **kwargs) as fin:
+def read_length_prefixed_messages(key, read_mode, **kwargs):
+    with smart_open.open(key, read_mode, **kwargs) as fin:
         result = io.BytesIO()
         length_byte = fin.read(1)
         while len(length_byte):

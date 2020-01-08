@@ -637,13 +637,6 @@ class OpenTest(unittest.TestCase):
         self.assertEqual(r.read(), b"")
 
 
-class ClampTest(unittest.TestCase):
-    def test(self):
-        self.assertEqual(smart_open.gcs.clamp(5, 0, 10), 5)
-        self.assertEqual(smart_open.gcs.clamp(11, 0, 10), 10)
-        self.assertEqual(smart_open.gcs.clamp(-1, 0, 10), 0)
-
-
 class MakeRangeStringTest(unittest.TestCase):
     def test_no_stop(self):
         start, stop = 1, None
