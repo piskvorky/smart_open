@@ -84,7 +84,7 @@ def open(
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
     buffering: int, optional
-        The buffer size to use when performing I/O.
+        The buffer size to use when performing I/O. For reading only.
     min_part_size: int, optional
         The minimum part size for multipart uploads.  For writing only.
     client: google.cloud.google.cloud.storage.Client, optional
