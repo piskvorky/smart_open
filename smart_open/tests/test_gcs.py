@@ -30,6 +30,13 @@ BLOB_NAME = 'test-blob'
 WRITE_BLOB_NAME = 'test-write-blob'
 DISABLE_MOCKS = os.environ.get('SO_DISABLE_MOCKS') == "1"
 
+RESUMABLE_SESSION_URI_TEMPLATE = (
+    'https://www.googleapis.com/upload/storage/v1/b/'
+    '{bucket}'
+    '/o?uploadType=resumable&upload_id='
+    '{upload_id}'
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,13 +80,6 @@ class FakeBucket(object):
 
 
 class FakeBlob(object):
-    RESUMABLE_SESSION_URI_TEMPLATE = (
-        'https://www.googleapis.com/upload/storage/v1/b/'
-        '{bucket}'
-        '/o?uploadType=resumable&upload_id='
-        '{upload_id}'
-    )
-
     def __init__(self, name, bucket, create=True):
         self.name = name
         self._bucket = bucket  # type: FakeBucket
@@ -90,7 +90,7 @@ class FakeBlob(object):
             self._create_if_not_exists()
 
     def create_resumable_upload_session(self):
-        resumeable_upload_url = self.RESUMABLE_SESSION_URI_TEMPLATE % dict(
+        resumeable_upload_url = RESUMABLE_SESSION_URI_TEMPLATE % dict(
             bucket=self._bucket.name,
             upload_id=uuid.uuid4().hex,
         )
