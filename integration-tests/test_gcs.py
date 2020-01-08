@@ -1,22 +1,16 @@
 # -*- coding: utf-8 -*-
 import io
 import os
-
-import google.cloud.storage
+import subprocess
 
 import smart_open
 
-_GCS_BUCKET = os.environ.get('SO_GCS_BUCKET')
-_GCS_URL = 'gs://' + _GCS_BUCKET
-assert _GCS_BUCKET is not None, 'please set the SO_GCS_BUCKET environment variable'
+_GCS_URL = os.environ.get('SO_GCS_URL')
+assert _GCS_URL is not None, 'please set the SO_GCS_URL environment variable'
 
 
 def initialize_bucket():
-    storage_client = google.cloud.storage.Client()
-    bucket = storage_client.get_bucket(_GCS_BUCKET)
-    blobs = bucket.list_blobs()
-    for blob in blobs:
-        blob.delete()
+    subprocess.check_call(['gsutil' 'rm', '-r', _GCS_URL])
 
 
 def write_read(key, content, write_mode, read_mode, **kwargs):
