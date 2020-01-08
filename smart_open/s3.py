@@ -101,7 +101,8 @@ def open(
         Additional parameters to pass to boto3's initiate_multipart_upload function.
         For writing only.
     version_id: str, optional
-        Version of the object, used when reading object. If None, will fetch the most recent version.
+        Version of the object, used when reading object.
+        If None, will fetch the most recent version.
 
     """
     logger.debug('%r', locals())
@@ -237,6 +238,9 @@ class BufferedInputBase(io.BufferedIOBase):
         if resource_kwargs is None:
             resource_kwargs = {}
 
+        self._session = session
+        self._resource_kwargs = resource_kwargs
+
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
         self._version_id = version_id
@@ -343,6 +347,18 @@ class BufferedInputBase(io.BufferedIOBase):
         """Do nothing."""
         pass
 
+    def to_boto3(self):
+        """Create a **independent** `boto3.s3.Object` instance that points to
+        the same resource as this instance.
+
+        The created instance will re-use the session and resource parameters of
+        the current instance, but it will be independent: changes to the
+        `boto3.s3.Object` may not necessary affect the current instance.
+
+        """
+        s3 = self._session.resource('s3', **self._resource_kwargs)
+        return s3.Object(self._object.bucket_name, self._object.key)
+
     #
     # Internal methods.
     #
@@ -373,13 +389,14 @@ class SeekableBufferedInputBase(BufferedInputBase):
                  line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None):
 
         self._buffer_size = buffer_size
-        self._session = session
-        self._resource_kwargs = resource_kwargs
 
         if session is None:
             session = boto3.Session()
         if resource_kwargs is None:
             resource_kwargs = {}
+
+        self._session = session
+        self._resource_kwargs = resource_kwargs
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
         self._version_id = version_id
@@ -477,8 +494,6 @@ class BufferedOutputBase(io.BufferedIOBase):
             multipart_upload_kwargs=None,
             ):
 
-        self._session = session
-        self._resource_kwargs = resource_kwargs
         self._multipart_upload_kwargs = multipart_upload_kwargs
 
         if min_part_size < MIN_MIN_PART_SIZE:
@@ -491,6 +506,9 @@ multipart upload may fail")
             resource_kwargs = {}
         if multipart_upload_kwargs is None:
             multipart_upload_kwargs = {}
+
+        self._session = session
+        self._resource_kwargs = resource_kwargs
 
         s3 = session.resource('s3', **resource_kwargs)
         try:
@@ -580,6 +598,18 @@ multipart upload may fail")
         assert self._mp, "no multipart upload in progress"
         self._mp.abort()
         self._mp = None
+
+    def to_boto3(self):
+        """Create a **independent** `boto3.s3.Object` instance that points to
+        the same resource as this instance.
+
+        The created instance will re-use the session and resource parameters of
+        the current instance, but it will be independent: changes to the
+        `boto3.s3.Object` may not necessary affect the current instance.
+
+        """
+        s3 = self._session.resource('s3', **self._resource_kwargs)
+        return s3.Object(self._object.bucket_name, self._object.key)
 
     #
     # Internal methods.

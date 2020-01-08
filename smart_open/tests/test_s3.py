@@ -109,9 +109,10 @@ def ignore_resource_warnings():
 class SeekableRawReaderTest(unittest.TestCase):
 
     def setUp(self):
+        self._body = b'123456'
         self._local_resource = boto3.resource('s3', endpoint_url='http://localhost:5000')
         self._local_resource.Bucket(BUCKET_NAME).create()
-        self._local_resource.Object(BUCKET_NAME, KEY_NAME).put(Body=b'123456')
+        self._local_resource.Object(BUCKET_NAME, KEY_NAME).put(Body=self.body)
 
     def tearDown(self):
         self._local_resource.Object(BUCKET_NAME, KEY_NAME).delete()
@@ -289,6 +290,16 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
         self.assertEqual(data, b'')
 
+    def test_to_boto3(self):
+        contents = b'the spice melange\n'
+        put_to_bucket(contents=contents)
+
+        with smart_open.s3.BufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+            returned_obj = fin.to_boto3()
+
+        boto3_body = returned_obj.get()['Body'].read()
+        self.assertEqual(contents, boto3_body)
+
 
 @maybe_mock_s3
 class BufferedOutputBaseTest(unittest.TestCase):
@@ -427,6 +438,16 @@ class BufferedOutputBaseTest(unittest.TestCase):
         fout.write(text)
         fout.flush()
         fout.close()
+
+    def test_to_boto3(self):
+        contents = b'the spice melange\n'
+
+        with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'wb') as fout:
+            fout.write(contents)
+            returned_obj = fout.to_boto3()
+
+        boto3_body = returned_obj.get()['Body'].read()
+        self.assertEqual(contents, boto3_body)
 
 
 class ClampTest(unittest.TestCase):
