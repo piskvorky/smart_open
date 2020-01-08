@@ -44,7 +44,7 @@ def test_gcs_readwrite_text(benchmark):
 
     key = _GCS_URL + '/sanity.txt'
     text = 'с гранатою в кармане, с чекою в руке'
-    actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8')
+    actual = benchmark(write_read, key, text, 'w', 'r', encoding='utf-8')
     assert actual == text
 
 
@@ -53,7 +53,7 @@ def test_gcs_readwrite_text_gzip(benchmark):
 
     key = _GCS_URL + '/sanity.txt.gz'
     text = 'не чайки здесь запели на знакомом языке'
-    actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8')
+    actual = benchmark(write_read, key, text, 'w', 'r', encoding='utf-8')
     assert actual == text
 
 
