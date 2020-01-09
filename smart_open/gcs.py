@@ -69,7 +69,7 @@ class UploadFailedError(Exception):
         ----------
         message: str
             The error message to display.
-        status_code: str
+        status_code: int
             The status code returned from the upload response.
         text: str
             The text returned from the upload response.
