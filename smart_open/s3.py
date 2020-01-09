@@ -348,7 +348,7 @@ class BufferedInputBase(io.BufferedIOBase):
         pass
 
     def to_boto3(self):
-        """Create a **independent** `boto3.s3.Object` instance that points to
+        """Create an **independent** `boto3.s3.Object` instance that points to
         the same resource as this instance.
 
         The created instance will re-use the session and resource parameters of
