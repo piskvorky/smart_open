@@ -327,10 +327,6 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
                 self._fill_buffer()
         return the_line.getvalue()
 
-    def terminate(self):
-        """Do nothing."""
-        pass
-
     #
     # Internal methods.
     #
