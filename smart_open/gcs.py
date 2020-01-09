@@ -477,8 +477,19 @@ class BufferedOutputBase(io.BufferedIOBase):
 
         if response.status_code not in _SUCCESSFUL_STATUS_CODES:
             status_code, text = response.status_code, response.text
-            msg = "upload failed with status code: %s, response text: %s, part #%i, %i bytes (total %.3fGB)" % \
-                  status_code, text, part_num, self._current_part.tell(), self._total_size / 1024.0 ** 3
+            msg = (
+                "upload failed ("
+                "status code: %i"
+                "response text=%s, "
+                "part #%i, "
+                "%i bytes (total %.3fGB)"
+            ) % (
+                status_code,
+                text,
+                part_num,
+                self._current_part.tell(),
+                self._total_size / 1024.0 ** 3,
+            )
             raise UploadFailedError(msg, status_code, text)
         logger.debug("upload of part #%i finished" % part_num)
 
