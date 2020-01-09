@@ -450,6 +450,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         return len(b)
 
     def terminate(self):
+        """Cancel the underlying resumable upload."""
         #
         # https://cloud.google.com/storage/docs/xml-api/resumable-upload#example_cancelling_an_upload
         #
