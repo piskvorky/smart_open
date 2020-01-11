@@ -26,6 +26,10 @@ import getpass
 import logging
 import warnings
 
+from six.moves.urllib import parse as urlparse
+
+import smart_open.uri
+
 logger = logging.getLogger(__name__)
 
 #
@@ -33,10 +37,27 @@ logger = logging.getLogger(__name__)
 #
 _SSH = {}
 
-SCHEMES = ("ssh", "scp", "sftp")
+SUPPORTED_SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""
 
 DEFAULT_PORT = 22
+
+
+def _unquote(text):
+    return text and urlparse.unquote(text)
+
+
+def parse_uri(uri_as_string):
+    split_uri = urlparse.urlsplit(uri_as_string)
+    assert split_uri.scheme in SUPPORTED_SCHEMES
+    return smart_open.uri.Uri(
+        scheme=split_uri.scheme,
+        uri_path=_unquote(split_uri.path),
+        user=_unquote(split_uri.username),
+        host=split_uri.hostname,
+        port=int(split_uri.port or DEFAULT_PORT),
+        password=_unquote(split_uri.password),
+    )
 
 
 def _connect(hostname, username, port, password, transport_params):

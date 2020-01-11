@@ -13,13 +13,17 @@ import functools
 import logging
 import warnings
 
+import boto
 import boto3
 import botocore.client
 import six
 
-import smart_open.bytebuffer
-
+from six.moves.urllib import parse as urlparse
 from botocore.exceptions import IncompleteReadError
+
+import smart_open.bytebuffer
+import smart_open.uri
+
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +50,8 @@ MODES = (READ_BINARY, WRITE_BINARY)
 BINARY_NEWLINE = b'\n'
 
 SUPPORTED_SCHEMES = ("s3", "s3n", 's3u', "s3a")
+DEFAULT_PORT = 443
+DEFAULT_HOST = 's3.amazonaws.com'
 
 DEFAULT_BUFFER_SIZE = 128 * 1024
 
@@ -53,6 +59,140 @@ START = 0
 CURRENT = 1
 END = 2
 WHENCE_CHOICES = [START, CURRENT, END]
+
+
+def _my_urlsplit(url):
+    """This is a hack to prevent the regular urlsplit from splitting around question marks.
+
+    A question mark (?) in a URL typically indicates the start of a
+    querystring, and the standard library's urlparse function handles the
+    querystring separately.  Unfortunately, question marks can also appear
+    _inside_ the actual URL for some schemas like S3.
+
+    Replaces question marks with newlines prior to splitting.  This is safe because:
+
+    1. The standard library's urlsplit completely ignores newlines
+    2. Raw newlines will never occur in innocuous URLs.  They are always URL-encoded.
+
+    See Also
+    --------
+    https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
+    https://github.com/RaRe-Technologies/smart_open/issues/285
+    """
+    sr = urlparse.urlsplit(url.replace('?', '\n'), allow_fragments=False)
+    return urlparse.SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
+
+
+def parse_uri(uri_as_string):
+    #
+    # Restrictions on bucket names and labels:
+    #
+    # - Bucket names must be at least 3 and no more than 63 characters long.
+    # - Bucket names must be a series of one or more labels.
+    # - Adjacent labels are separated by a single period (.).
+    # - Bucket names can contain lowercase letters, numbers, and hyphens.
+    # - Each label must start and end with a lowercase letter or a number.
+    #
+    # We use the above as a guide only, and do not perform any validation.  We
+    # let boto3 take care of that for us.
+    #
+    split_uri = _my_urlsplit(uri_as_string)
+    assert split_uri.scheme in SUPPORTED_SCHEMES
+
+    port = DEFAULT_PORT
+    host = boto.config.get('s3', 'host', DEFAULT_HOST)
+    ordinary_calling_format = False
+    #
+    # These defaults tell boto3 to look for credentials elsewhere
+    #
+    access_id, access_secret = None, None
+
+    #
+    # Common URI template [secret:key@][host[:port]@]bucket/object
+    #
+    # The urlparse function doesn't handle the above schema, so we have to do
+    # it ourselves.
+    #
+    uri = split_uri.netloc + split_uri.path
+
+    if '@' in uri and ':' in uri.split('@')[0]:
+        auth, uri = uri.split('@', 1)
+        access_id, access_secret = auth.split(':')
+
+    head, key_id = uri.split('/', 1)
+    if '@' in head and ':' in head:
+        ordinary_calling_format = True
+        host_port, bucket_id = head.split('@')
+        host, port = host_port.split(':', 1)
+        port = int(port)
+    elif '@' in head:
+        ordinary_calling_format = True
+        host, bucket_id = head.split('@')
+    else:
+        bucket_id = head
+
+    return smart_open.uri.Uri(
+        scheme=split_uri.scheme,
+        bucket_id=bucket_id,
+        key_id=key_id,
+        port=port,
+        host=host,
+        ordinary_calling_format=ordinary_calling_format,
+        access_id=access_id,
+        access_secret=access_secret,
+    )
+
+
+def consolidate_params(uri, transport_params):
+    """Consolidates the parsed Uri with the additional parameters.
+
+    This is necessary because the user can pass some of the parameters can in
+    two different ways:
+
+    1) Via the URI itself
+    2) Via the transport parameters 
+
+    These are not mutually exclusive, but we have to pick one over the other
+    in a sensible way in order to proceed.
+
+    """
+    transport_params = dict(transport_params)
+
+    session = transport_params.get('session')
+    if session is not None and (uri.access_id or uri.access_secret):
+        logger.warning(
+            'ignoring credentials parsed from URL because they conflict with '
+            'transport_params.session. Set transport_params.session to None '
+            'to suppress this warning.'
+        )
+        uri = uri._replace(access_id=None, access_secret=None)
+    elif (uri.access_id and uri.access_secret):
+        transport_params['session'] = boto3.Session(
+            aws_access_key_id=uri.access_id,
+            aws_secret_access_key=uri.access_secret,
+        )
+        uri = uri._replace(access_id=None, access_secret=None)
+
+    if uri.host != DEFAULT_HOST:
+        endpoint_url = 'https://%s:%d' % (uri.host, uri.port)
+        _override_endpoint_url(transport_params, endpoint_url)
+
+    return uri, transport_params
+
+
+def _override_endpoint_url(transport_params, url):
+    try:
+        resource_kwargs = transport_params['resource_kwargs']
+    except KeyError:
+        resource_kwargs = transport_params['resource_kwargs'] = {}
+
+    if resource_kwargs.get('endpoint_url'):
+        logger.warning(
+            'ignoring endpoint_url parsed from URL because it conflicts '
+            'with transport_params.resource_kwargs.endpoint_url. '
+        )
+    else:
+        resource_kwargs.update(endpoint_url=url)
 
 
 def clamp(value, minval, maxval):

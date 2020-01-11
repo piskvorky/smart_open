@@ -26,6 +26,8 @@ else:
 
 logger = logging.getLogger(__name__)
 
+WEBHDFS_SCHEME = 'webhdfs'
+
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 
@@ -39,6 +41,9 @@ def open(http_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
         For writing only.
 
     """
+    if http_uri.startswith(WEBHDFS_SCHEME):
+        http_uri = _convert_to_http_uri(http_uri)
+
     if mode == 'rb':
         return BufferedInputBase(http_uri)
     elif mode == 'wb':
@@ -47,27 +52,35 @@ def open(http_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
         raise NotImplementedError("webhdfs support for mode %r not implemented" % mode)
 
 
-def convert_to_http_uri(parsed_uri):
+def _convert_to_http_uri(webhdfs_url):
     """
     Convert webhdfs uri to http url and return it as text
 
     Parameters
     ----------
-    parsed_uri: str
-        result of urlsplit of webhdfs url
+    webhdfs_url: str
+        A URL starting with webhdfs://
     """
-    netloc = parsed_uri.hostname
-    if parsed_uri.port:
-        netloc += ":{}".format(parsed_uri.port)
-    query = parsed_uri.query
-    if parsed_uri.username:
+    split_uri = urlparse.urlsplit(webhdfs_url)
+    netloc = split_uri.hostname
+    if split_uri.port:
+        netloc += ":{}".format(split_uri.port)
+    query = split_uri.query
+    if split_uri.username:
         query += (
-            ("&" if query else "") + "user.name=" + urlparse.quote(parsed_uri.username)
+            ("&" if query else "") + "user.name=" + urlparse.quote(split_uri.username)
         )
 
     return urlparse.urlunsplit(
-        ("http", netloc, "/webhdfs/v1" + parsed_uri.path, query, "")
+        ("http", netloc, "/webhdfs/v1" + split_uri.path, query, "")
     )
+
+
+#
+# For old unit tests.
+#
+def convert_to_http_uri(parsed_uri):
+    return _convert_to_http_uri(parsed_uri.uri_path)
 
 
 class BufferedInputBase(io.BufferedIOBase):
