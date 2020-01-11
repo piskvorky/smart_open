@@ -18,9 +18,9 @@ import io
 import logging
 import subprocess
 
-import smart_open.uri
-
 from six.moves.urllib import parse as urlparse
+
+from smart_open import utils
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +34,18 @@ def parse_uri(uri_as_string):
     uri_path = split_uri.netloc + split_uri.path
     uri_path = "/" + uri_path.lstrip("/")
     if not uri_path:
-        raise RuntimeError("invalid HDFS URI: %s" % str(parsed_uri))
+        raise RuntimeError("invalid HDFS URI: %r" % uri_as_string)
 
-    return smart_open.uri.Uri(scheme=HDFS_SCHEME, uri_path=uri_path)
+    return dict(scheme=HDFS_SCHEME, uri_path=uri_path)
+
+
+def open_uri(uri, mode, transport_params):
+    utils.check_kwargs(open, transport_params)
+
+    parsed_uri = parse_uri(uri)
+    fobj = open(parsed_uri['uri_path'], mode)
+    fobj.name = parsed_uri['uri_path'].split('/')[-1]
+    return fobj
 
 
 def open(uri, mode):

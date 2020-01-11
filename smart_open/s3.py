@@ -22,7 +22,7 @@ from six.moves.urllib import parse as urlparse
 from botocore.exceptions import IncompleteReadError
 
 import smart_open.bytebuffer
-import smart_open.uri
+import smart_open.utils
 
 
 logger = logging.getLogger(__name__)
@@ -131,7 +131,7 @@ def parse_uri(uri_as_string):
     else:
         bucket_id = head
 
-    return smart_open.uri.Uri(
+    return dict(
         scheme=split_uri.scheme,
         bucket_id=bucket_id,
         key_id=key_id,
@@ -143,14 +143,14 @@ def parse_uri(uri_as_string):
     )
 
 
-def consolidate_params(uri, transport_params):
+def _consolidate_params(uri, transport_params):
     """Consolidates the parsed Uri with the additional parameters.
 
     This is necessary because the user can pass some of the parameters can in
     two different ways:
 
     1) Via the URI itself
-    2) Via the transport parameters 
+    2) Via the transport parameters
 
     These are not mutually exclusive, but we have to pick one over the other
     in a sensible way in order to proceed.
@@ -159,22 +159,22 @@ def consolidate_params(uri, transport_params):
     transport_params = dict(transport_params)
 
     session = transport_params.get('session')
-    if session is not None and (uri.access_id or uri.access_secret):
+    if session is not None and (uri['access_id'] or uri['access_secret']):
         logger.warning(
             'ignoring credentials parsed from URL because they conflict with '
             'transport_params.session. Set transport_params.session to None '
             'to suppress this warning.'
         )
-        uri = uri._replace(access_id=None, access_secret=None)
-    elif (uri.access_id and uri.access_secret):
+        uri.update(access_id=None, access_secret=None)
+    elif (uri['access_id'] and uri['access_secret']):
         transport_params['session'] = boto3.Session(
-            aws_access_key_id=uri.access_id,
-            aws_secret_access_key=uri.access_secret,
+            aws_access_key_id=uri['access_id'],
+            aws_secret_access_key=uri['access_secret'],
         )
-        uri = uri._replace(access_id=None, access_secret=None)
+        uri.update(access_id=None, access_secret=None)
 
-    if uri.host != DEFAULT_HOST:
-        endpoint_url = 'https://%s:%d' % (uri.host, uri.port)
+    if uri['host'] != DEFAULT_HOST:
+        endpoint_url = 'https://%(host)s:%(port)d' % uri
         _override_endpoint_url(transport_params, endpoint_url)
 
     return uri, transport_params
@@ -206,6 +206,13 @@ def make_range_string(start, stop=None):
     if stop is None:
         return 'bytes=%d-' % start
     return 'bytes=%d-%d' % (start, stop)
+
+
+def open_uri(uri, mode, transport_params):
+    parsed_uri = parse_uri(uri)
+    parsed_uri, transport_params = _consolidate_params(parsed_uri, transport_params)
+    kwargs = smart_open.utils.check_kwargs(open, transport_params)
+    return open(parsed_uri['bucket_id'], parsed_uri['key_id'], mode, **kwargs)
 
 
 def open(
@@ -277,6 +284,8 @@ def open(
         )
     else:
         assert False, 'unexpected mode: %r' % mode
+
+    fileobj.name = key_id
     return fileobj
 
 

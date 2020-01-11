@@ -19,6 +19,8 @@ import requests
 import six
 from six.moves.urllib import parse as urlparse
 
+from smart_open import utils
+
 if six.PY2:
     import httplib
 else:
@@ -29,6 +31,15 @@ logger = logging.getLogger(__name__)
 WEBHDFS_SCHEME = 'webhdfs'
 
 WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
+
+
+def parse_uri(uri_as_str):
+    return dict(scheme=WEBHDFS_SCHEME, uri=uri_as_str)
+
+
+def open_uri(uri, mode, transport_params):
+    kwargs = utils.check_kwargs(open, transport_params)
+    return open(uri, mode, **kwargs)
 
 
 def open(http_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
@@ -45,11 +56,14 @@ def open(http_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
         http_uri = _convert_to_http_uri(http_uri)
 
     if mode == 'rb':
-        return BufferedInputBase(http_uri)
+        fobj = BufferedInputBase(http_uri)
     elif mode == 'wb':
-        return BufferedOutputBase(http_uri, min_part_size=min_part_size)
+        fobj = BufferedOutputBase(http_uri, min_part_size=min_part_size)
     else:
         raise NotImplementedError("webhdfs support for mode %r not implemented" % mode)
+
+    fobj.name = http_uri.split('/')[-1]
+    return fobj
 
 
 def _convert_to_http_uri(webhdfs_url):
@@ -80,7 +94,7 @@ def _convert_to_http_uri(webhdfs_url):
 # For old unit tests.
 #
 def convert_to_http_uri(parsed_uri):
-    return _convert_to_http_uri(parsed_uri.uri_path)
+    return _convert_to_http_uri(parsed_uri.uri)
 
 
 class BufferedInputBase(io.BufferedIOBase):

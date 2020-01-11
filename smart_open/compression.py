@@ -5,16 +5,23 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
+"""Implements the compression layer of the ``smart_open`` library."""
 import io
+import logging
 import os.path
+import warnings
 
 import six
 
+logger = logging.getLogger(__name__)
+
 
 _COMPRESSOR_REGISTRY = {}
+_ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
 
 
 def get_supported_extensions():
+    """Return the list of file extensions for which we have registered compressors."""
     return sorted(_COMPRESSOR_REGISTRY.keys())
 
 
@@ -31,7 +38,7 @@ def register_compressor(ext, callback):
     Examples
     --------
 
-    Instruct smart_open to use the identity function whenever opening a file
+    Instruct smart_open to use the `lzma` module whenever opening a file
     with a .xz extension (see README.rst for the complete example showing I/O):
 
     >>> def _handle_xz(file_obj, mode):

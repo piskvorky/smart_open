@@ -10,8 +10,9 @@
 
 The main functions are:
 
-  * `open()`
-  * `register_compressor()`
+  * ``parse_uri()``
+  * ``open()``
+  * ``register_compressor()``
 
 """
 
@@ -20,7 +21,6 @@ import collections
 import logging
 import io
 import importlib
-import inspect
 import os
 import os.path as P
 import warnings
@@ -35,18 +35,23 @@ from six.moves.urllib import parse as urlparse
 # This module defines a function called smart_open so we cannot use
 # smart_open.submodule to reference to the submodules.
 #
-import smart_open.s3 as smart_open_s3
-import smart_open.hdfs as smart_open_hdfs
-import smart_open.webhdfs as smart_open_webhdfs
-import smart_open.http as smart_open_http
-import smart_open.ssh as smart_open_ssh
-
-from smart_open.uri import Uri
+import smart_open.file as so_file
+import smart_open.s3 as so_s3
+import smart_open.hdfs as so_hdfs
+import smart_open.webhdfs as so_webhdfs
+import smart_open.http as so_http
+import smart_open.ssh as so_ssh
 
 from smart_open import compression
-from smart_open.compression import register_compressor
-
 from smart_open import doctools
+from smart_open import utils
+
+#
+# For backwards compatibility and keeping old unit tests happy.
+#
+from smart_open.compression import register_compressor  # noqa: F401
+from smart_open.utils import check_kwargs as _check_kwargs  # noqa: F401
+from smart_open.utils import inspect_kwargs as _inspect_kwargs  # noqa: F401
 
 # Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
 # available. The builtin ``pathlib`` will be imported with higher precedence.
@@ -62,50 +67,38 @@ logger = logging.getLogger(__name__)
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
-_ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
-
-
 NO_SCHEME = ''
-FILE_SCHEME = 'file'
+
+_TO_BINARY_LUT = {
+    'r': 'rb', 'r+': 'rb+', 'rt': 'rb', 'rt+': 'rb+',
+    'w': 'wb', 'w+': 'wb+', 'wt': 'wb', "wt+": 'wb+',
+    'a': 'ab', 'a+': 'ab+', 'at': 'ab', 'at+': 'ab+',
+}
 
 
-def _parse_uri_file(uri_as_string):
-    if uri_as_string.startswith('file://'):
-        local_path = uri_as_string.replace('file://', '', 1)
-    else:
-        local_path = uri_as_string
-
-    local_path = os.path.expanduser(local_path)
-    return Uri(scheme=FILE_SCHEME, uri_path=local_path)
-
-
-def _generate_parsers():
-    yield NO_SCHEME, _parse_uri_file
-    yield FILE_SCHEME, _parse_uri_file
-    yield smart_open_hdfs.HDFS_SCHEME, smart_open_hdfs.parse_uri
-    yield (
-        smart_open_webhdfs.WEBHDFS_SCHEME,
-        lambda x: Uri(scheme=smart_open_webhdfs.WEBHDFS_SCHEME, uri_path=x),
-    )
-    for scheme in smart_open_s3.SUPPORTED_SCHEMES:
-        yield scheme, smart_open_s3.parse_uri
-    for scheme in smart_open_ssh.SUPPORTED_SCHEMES:
-        yield scheme, smart_open_ssh.parse_uri
-    for scheme in smart_open_http.SUPPORTED_SCHEMES:
-        yield scheme, smart_open_http.parse_uri
+def _generate_transport():
+    yield NO_SCHEME, so_file
+    yield so_file.FILE_SCHEME, so_file
+    yield so_hdfs.HDFS_SCHEME, so_hdfs
+    yield so_webhdfs.WEBHDFS_SCHEME, so_webhdfs
+    for scheme in so_s3.SUPPORTED_SCHEMES:
+        yield scheme, so_s3
+    for scheme in so_ssh.SUPPORTED_SCHEMES:
+        yield scheme, so_ssh
+    for scheme in so_http.SUPPORTED_SCHEMES:
+        yield scheme, so_http
 
 
-#
-# A mapping of schemes (e.g. hdfs, s3) to functions that parse URLs of that shcheme.
-# Each function should accept a single argument: the URL as a string.
-#
-_PARSERS = dict(_generate_parsers())
+_TRANSPORT = dict(_generate_transport())
+for schema, transport in _TRANSPORT.items():
+    assert hasattr(transport, 'open_uri'), '%r is missing open_uri' % schema
+    assert hasattr(transport, 'parse_uri'), '%r is missing parse_uri' % schema
 
-SUPPORTED_SCHEMES = tuple(sorted(_PARSERS.keys()))
+SUPPORTED_SCHEMES = tuple(sorted(_TRANSPORT.keys()))
 """The transport schemes that ``smart_open`` supports."""
 
 
-def _sniff_scheme(url_as_string):
+def _sniff_scheme(uri_as_string):
     """Returns the scheme of the URL only, as a string."""
     #
     # urlsplit doesn't work on Windows -- it parses the drive as the scheme...
@@ -114,7 +107,7 @@ def _sniff_scheme(url_as_string):
     if os.name == 'nt' and '://' not in uri_as_string:
         uri_as_string = 'file://' + uri_as_string
 
-    return urlparse.urlsplit(url_as_string).scheme
+    return urlparse.urlsplit(uri_as_string).scheme
 
 
 def parse_uri(uri_as_string):
@@ -128,7 +121,7 @@ def parse_uri(uri_as_string):
 
     Returns
     -------
-    smart_open.uri.Uri
+    collections.namedtuple
         The parsed URI.
 
     Notes
@@ -169,67 +162,29 @@ def parse_uri(uri_as_string):
     scheme = _sniff_scheme(uri_as_string)
 
     try:
-        parser = _PARSERS[scheme]
+        transport = _TRANSPORT[scheme]
     except KeyError:
         raise NotImplementedError("unknown URI scheme %r in %r" % (scheme, uri_as_string))
 
-    return parser(uri_as_string)
+    try:
+        parse_uri = getattr(transport, 'parse_uri')
+    except AttributeError:
+        raise NotImplementedError('%r transport does not implement parse_uri', scheme)
+
+    as_dict = parse_uri(uri_as_string)
+
+    #
+    # The conversion to a namedtuple is just to keep the old tests happy while
+    # I'm still refactoring.
+    #
+    Uri = collections.namedtuple('Uri', sorted(as_dict.keys()))
+    return Uri(**as_dict)
 
 
 #
 # To keep old unit tests happy while I'm refactoring.
 #
 _parse_uri = parse_uri
-
-
-def _inspect_kwargs(kallable):
-    #
-    # inspect.getargspec got deprecated in Py3.4, and calling it spews
-    # deprecation warnings that we'd prefer to avoid.  Unfortunately, older
-    # versions of Python (<3.3) did not have inspect.signature, so we need to
-    # handle them the old-fashioned getargspec way.
-    #
-    try:
-        signature = inspect.signature(kallable)
-    except AttributeError:
-        args, varargs, keywords, defaults = inspect.getargspec(kallable)
-        if not defaults:
-            return {}
-        supported_keywords = args[-len(defaults):]
-        return dict(zip(supported_keywords, defaults))
-    else:
-        return {
-            name: param.default
-            for name, param in signature.parameters.items()
-            if param.default != inspect.Parameter.empty
-        }
-
-
-def _check_kwargs(kallable, kwargs):
-    """Check which keyword arguments the callable supports.
-
-    Parameters
-    ----------
-    kallable: callable
-        A function or method to test
-    kwargs: dict
-        The keyword arguments to check.  If the callable doesn't support any
-        of these, a warning message will get printed.
-
-    Returns
-    -------
-    dict
-        A dictionary of argument names and values supported by the callable.
-    """
-    supported_keywords = sorted(_inspect_kwargs(kallable))
-    unsupported_keywords = [k for k in sorted(kwargs) if k not in supported_keywords]
-    supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
-
-    if unsupported_keywords:
-        logger.warning('ignoring unsupported keyword arguments: %r', unsupported_keywords)
-
-    return supported_kwargs
-
 
 _builtin_open = open
 
@@ -377,20 +332,12 @@ def open(
     # filename ---------------> bytes -------------> bytes ---------> text
     #                          binary             decompressed       decode
     #
-    try:
-        binary_mode = {'r': 'rb', 'r+': 'rb+',
-                       'rt': 'rb', 'rt+': 'rb+',
-                       'w': 'wb', 'w+': 'wb+',
-                       'wt': 'wb', "wt+": 'wb+',
-                       'a': 'ab', 'a+': 'ab+',
-                       'at': 'ab', 'at+': 'ab+'}[mode]
-    except KeyError:
-        binary_mode = mode
-    binary, filename = _open_binary_stream(uri, binary_mode, transport_params)
+    binary_mode = _TO_BINARY_LUT.get(mode, mode)
+    binary = _open_binary_stream(uri, binary_mode, transport_params)
     if ignore_ext:
         decompressed = binary
     else:
-        decompressed = compression.compression_wrapper(binary, filename, mode)
+        decompressed = compression.compression_wrapper(binary, binary.name, mode)
 
     if 'b' not in mode or explicit_encoding is not None:
         decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
@@ -405,19 +352,19 @@ def open(
 #
 open.__doc__ = None if open.__doc__ is None else open.__doc__ % {
     's3': doctools.to_docstring(
-        doctools.extract_kwargs(smart_open_s3.open.__doc__),
+        doctools.extract_kwargs(so_s3.open.__doc__),
         lpad=u'    ',
     ),
     'http': doctools.to_docstring(
-        doctools.extract_kwargs(smart_open_http.open.__doc__),
+        doctools.extract_kwargs(so_http.open.__doc__),
         lpad=u'    ',
     ),
     'webhdfs': doctools.to_docstring(
-        doctools.extract_kwargs(smart_open_webhdfs.open.__doc__),
+        doctools.extract_kwargs(so_webhdfs.open.__doc__),
         lpad=u'    ',
     ),
     'ssh': doctools.to_docstring(
-        doctools.extract_kwargs(smart_open_ssh.open.__doc__),
+        doctools.extract_kwargs(so_ssh.open.__doc__),
         lpad=u'    ',
     ),
     'examples': doctools.extract_examples_from_readme_rst(),
@@ -447,7 +394,7 @@ def smart_open(uri, mode="rb", **kw):
     #
     ignore_extension = kw.pop('ignore_extension', False)
 
-    expected_kwargs = _inspect_kwargs(open)
+    expected_kwargs = utils.inspect_kwargs(open)
     scrubbed_kwargs = {}
     transport_params = {}
 
@@ -527,11 +474,12 @@ def _shortcut_open(
     if not isinstance(uri, six.string_types):
         return None
 
-    parsed_uri = parse_uri(uri)
-    if parsed_uri.scheme != FILE_SCHEME:
+    scheme = _sniff_scheme(uri)
+    if scheme not in (NO_SCHEME, so_file.FILE_SCHEME):
         return None
 
-    _, extension = P.splitext(parsed_uri.uri_path)
+    local_path = so_file.extract_local_path(uri)
+    _, extension = P.splitext(local_path)
     if extension in compression.get_supported_extensions() and not ignore_ext:
         return None
 
@@ -554,10 +502,10 @@ def _shortcut_open(
     # kwargs, then we have no option other to use io.open.
     #
     if six.PY3:
-        return _builtin_open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
+        return _builtin_open(local_path, mode, buffering=buffering, **open_kwargs)
     elif not open_kwargs:
-        return _builtin_open(parsed_uri.uri_path, mode, buffering=buffering)
-    return io.open(parsed_uri.uri_path, mode, buffering=buffering, **open_kwargs)
+        return _builtin_open(local_path, mode, buffering=buffering)
+    return io.open(local_path, mode, buffering=buffering, **open_kwargs)
 
 
 def _open_binary_stream(uri, mode, transport_params):
@@ -568,8 +516,8 @@ def _open_binary_stream(uri, mode, transport_params):
     :arg uri: The URI to open.  May be a string, or something else.
     :arg str mode: The mode to open with.  Must be rb, wb or ab.
     :arg transport_params: Keyword argumens for the transport layer.
-    :returns: A file object and the filename
-    :rtype: tuple
+    :returns: A named file object
+    :rtype: file-like object with a .name attribute
     """
     if mode not in ('rb', 'rb+', 'wb', 'wb+', 'ab', 'ab+'):
         #
@@ -585,63 +533,37 @@ def _open_binary_stream(uri, mode, transport_params):
         # if the value ends with COMPRESSED_EXT, we will note it in compression_wrapper()
         # if there is no such an attribute, we return "unknown" - this
         # effectively disables any compression
-        filename = getattr(uri, 'name', 'unknown')
-        return uri, filename
+        if not hasattr(uri, 'name'):
+            uri.name = getattr(uri, 'name', 'unknown')
+        return uri
 
     if not isinstance(uri, six.string_types):
         raise TypeError("don't know how to handle uri %r" % uri)
 
-    filename = uri.split('/')[-1]
-    parsed_uri = parse_uri(uri)
+    scheme = _sniff_scheme(uri)
 
     bad_scheme = NotImplementedError(
         "scheme %r is not supported, expected one of %r" % (
-            parsed_uri.scheme, SUPPORTED_SCHEMES,
+            scheme, SUPPORTED_SCHEMES,
         )
     )
-    if parsed_uri.scheme not in SUPPORTED_SCHEMES:
+
+    try:
+        transport = _TRANSPORT[scheme]
+    except KeyError:
         raise bad_scheme
 
-    if parsed_uri.scheme == FILE_SCHEME:
-        fobj = io.open(parsed_uri.uri_path, mode)
-        return fobj, filename
+    try:
+        open_uri = getattr(transport, 'open_uri')
+    except AttributeError:
+        raise bad_scheme
 
-    if parsed_uri.scheme in smart_open_ssh.SUPPORTED_SCHEMES:
-        fobj = smart_open_ssh.open(
-            parsed_uri.uri_path,
-            mode,
-            host=parsed_uri.host,
-            user=parsed_uri.user,
-            port=parsed_uri.port,
-            password=parsed_uri.password,
-            transport_params=transport_params,
-        )
-        return fobj, filename
+    fobj = open_uri(uri, mode, transport_params)
+    if not hasattr(fobj, 'name'):
+        logger.critical('TODO')
+        fobj.name = 'unknown'
 
-    if parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
-        parsed_uri, transport_params = smart_open_s3.consolidate_params(parsed_uri, transport_params)
-        kw = _check_kwargs(smart_open_s3.open, transport_params)
-        fobj = smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kw)
-        return fobj, filename
-
-    if parsed_uri.scheme == smart_open_hdfs.HDFS_SCHEME:
-        _check_kwargs(smart_open_hdfs.open, transport_params)
-        return smart_open_hdfs.open(parsed_uri.uri_path, mode), filename
-
-    if parsed_uri.scheme == smart_open_webhdfs.WEBHDFS_SCHEME:
-        kw = _check_kwargs(smart_open_webhdfs.open, transport_params)
-        return smart_open_webhdfs.open(uri, mode, **kw), filename
-
-    if parsed_uri.scheme in smart_open_http.SUPPORTED_SCHEMES:
-        #
-        # The URI may contain a query string and fragments, which interfere
-        # with our compressed/uncompressed estimation, so we strip them.
-        #
-        filename = P.basename(urlparse.urlparse(uri).path)
-        kw = _check_kwargs(smart_open_http.open, transport_params)
-        return smart_open_http.open(uri, mode, **kw), filename
-
-    raise bad_scheme
+    return fobj
 
 
 def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):

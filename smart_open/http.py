@@ -9,12 +9,13 @@
 
 import io
 import logging
+import os.path
 
 from six.moves.urllib import parse as urlparse
 import requests
 
 from smart_open import bytebuffer, s3
-import smart_open.uri
+import smart_open.utils
 
 DEFAULT_BUFFER_SIZE = 128 * 1024
 SUPPORTED_SCHEMES = ('http', 'https')
@@ -37,7 +38,12 @@ def parse_uri(uri_as_string):
 
     uri_path = split_uri.netloc + split_uri.path
     uri_path = "/" + uri_path.lstrip("/")
-    return smart_open.uri.Uri(scheme=split_uri.scheme, uri_path=uri_path)
+    return dict(scheme=split_uri.scheme, uri_path=uri_path)
+
+
+def open_uri(uri, mode, transport_params):
+    kwargs = smart_open.utils.check_kwargs(open, transport_params)
+    return open(uri, mode, **kwargs)
 
 
 def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
@@ -69,10 +75,12 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
 
     """
     if mode == 'rb':
-        return SeekableBufferedInputBase(
+        fobj = SeekableBufferedInputBase(
             uri, mode, kerberos=kerberos,
             user=user, password=password, headers=headers
         )
+        fobj.name = os.path.basename(urlparse.urlparse(uri).path)
+        return fobj
     else:
         raise NotImplementedError('http support for mode %r not implemented' % mode)
 
