@@ -552,7 +552,6 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
 
 
 def _tweak_docstrings():
-    seen = set()
     substrings = {}
     schemes = io.StringIO()
     seen_examples = set()
