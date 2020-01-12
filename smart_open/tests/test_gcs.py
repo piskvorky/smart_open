@@ -18,6 +18,7 @@ try:
 except ImportError:
     import mock
 import warnings
+from collections import OrderedDict
 
 import google.cloud
 import google.api_core.exceptions
@@ -50,33 +51,76 @@ class FakeBucket(object):
     def __init__(self, client, name=None):
         self.client = client  # type: FakeClient
         self.name = name
-        self.blobs = []
+        self._blobs = OrderedDict()
         self._exists = True
 
+        self.client.add_bucket(self)
+
     def blob(self, blob_id):
-        blob = next((x for x in self.blobs if x.name == blob_id), None)
-        if blob is None:
-            blob = FakeBlob(blob_id, self)
-        return blob
+        return self._blobs.get(blob_id, FakeBlob(blob_id, self))
 
     def delete(self):
         self.client._delete_bucket(self)
         self._exists = False
+        for blob in list(self._blobs.values()):
+            blob.delete()
 
     def exists(self):
         return self._exists
 
     def get_blob(self, blob_id):
-        blob = next((x for x in self.blobs if x.name == blob_id), None)
-        if blob is None:
+        try:
+            return self._blobs[blob_id]
+        except KeyError:
             raise google.cloud.exceptions.NotFound('Blob {} not found'.format(blob_id))
-        return blob
 
     def list_blobs(self):
-        return self.blobs
+        return list(self._blobs.values())
 
     def _delete_blob(self, blob):
-        self.blobs.remove(blob)
+        del self._blobs[blob.name]
+
+
+class FakeBucketTest(unittest.TestCase):
+    def setUp(self):
+        self.client = FakeClient()
+        self.bucket = FakeBucket(self.client, 'test-bucket')
+
+    def test_blob(self):
+        blob_id = 'blob.txt'
+        expected = FakeBlob(blob_id, self.bucket)
+        actual = self.bucket.blob(blob_id)
+        self.assertEqual(actual, expected)
+
+    def test_create_blob(self):
+        blob_id = 'blob.txt'
+        expected = self.bucket.blob(blob_id)
+        actual = self.bucket.list_blobs()[0]
+        self.assertEqual(actual, expected)
+
+    def test_delete(self):
+        blob_id = 'blob.txt'
+        blob = FakeBlob(blob_id, self.bucket)
+        self.bucket.delete()
+        self.assertFalse(self.bucket.exists())
+        self.assertFalse(blob.exists())
+
+    def test_get_blob(self):
+        blob_one_id = 'blob_one.avro'
+        blob_two_id = 'blob_two.parquet'
+        blob_one = self.bucket.blob(blob_one_id)
+        blob_two = self.bucket.blob(blob_two_id)
+        actual_first_blob = self.bucket.get_blob(blob_one_id)
+        actual_second_blob = self.bucket.get_blob(blob_two_id)
+        self.assertEqual(actual_first_blob, blob_one)
+        self.assertEqual(actual_second_blob, blob_two)
+
+    def test_list_blobs(self):
+        blob_one = self.bucket.blob('blob_one.avro')
+        blob_two = self.bucket.blob('blob_two.parquet')
+        actual = self.bucket.list_blobs()
+        expected = [blob_one, blob_two]
+        self.assertEqual(actual, expected)
 
 
 class FakeBlob(object):
@@ -99,7 +143,7 @@ class FakeBlob(object):
 
     def delete(self):
         self._bucket._delete_blob(self)
-        self._created = False
+        self._exists = False
 
     def download_as_string(self, start=None, end=None):
         if start is None:
@@ -112,11 +156,11 @@ class FakeBlob(object):
     def exists(self, client=None):
         return self._exists
 
-    def upload_from_string(self, str):
-        self.__contents.write(str)
+    def upload_from_string(self, str_):
+        self.__contents.write(str_)
 
     def write(self, data):
-        self.__contents.write(data)
+        self.upload_from_string(data)
 
     @property
     def bucket(self):
@@ -129,8 +173,8 @@ class FakeBlob(object):
         return self.__contents.tell()
 
     def _create_if_not_exists(self):
-        if self not in self._bucket.blobs:
-            self._bucket.blobs.append(self)
+        if self.name not in self._bucket._blobs.keys():
+            self._bucket._blobs[self.name] = self
         self._exists = True
 
 
@@ -147,25 +191,28 @@ class FakeClient(object):
         if credentials is None:
             credentials = FakeCredentials(self)
         self._credentials = credentials  # type: FakeCredentials
-        self._uploads = {}
-        self.__buckets = []
+        self._uploads = OrderedDict()
+        self.__buckets = OrderedDict()
 
     def bucket(self, bucket_id):
-        bucket = next((x for x in self.__buckets if x.name == bucket_id), None)
-        if bucket is None:
+        try:
+            return self.__buckets[bucket_id]
+        except KeyError:
             raise google.cloud.exceptions.NotFound('Bucket {} not found'.format(bucket_id))
-        return bucket
 
     def create_bucket(self, bucket_id):
         bucket = FakeBucket(self, bucket_id)
-        self.__buckets.append(bucket)
+        self.__buckets[bucket_id] = bucket
         return bucket
 
     def get_bucket(self, bucket_id):
         return self.bucket(bucket_id)
 
+    def add_bucket(self, bucket):
+        self.__buckets[bucket.name] = bucket
+
     def _delete_bucket(self, bucket):
-        self.__buckets.remove(bucket)
+        del self.__buckets[bucket.name]
 
 
 class FakeBlobUpload(object):
@@ -194,7 +241,7 @@ class FakeAuthorizedSession(object):
         return FakeResponse()
 
     def _blob_with_url(self, url, client):
-        # type: (str, FakeClient) -> None
+        # type: (str, FakeClient) -> FakeBlobUpload
         return client._uploads.get(url)
 
 
