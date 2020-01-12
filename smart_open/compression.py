@@ -70,18 +70,26 @@ def _handle_gzip(file_obj, mode):
     return gzip.GzipFile(fileobj=file_obj, mode=mode)
 
 
-def compression_wrapper(file_obj, filename, mode):
+def compression_wrapper(file_obj, mode):
     """
     This function will wrap the file_obj with an appropriate
     [de]compression mechanism based on the extension of the filename.
 
     file_obj must either be a filehandle object, or a class which behaves
-        like one.
+        like one.  It must have a .name attribute.
 
     If the filename extension isn't recognized, will simply return the original
     file_obj.
     """
-    _, ext = os.path.splitext(filename)
+
+    try:
+        _, ext = os.path.splitext(file_obj.name)
+    except (AttributeError, TypeError):
+        logger.warning(
+            'unable to transparently decompress %r because it '
+            'seems to lack a string-like .name', file_obj
+        )
+        return file_obj
 
     if _need_to_buffer(file_obj, mode, ext):
         warnings.warn('streaming gzip support unavailable, see %s' % _ISSUE_189_URL)

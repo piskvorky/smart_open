@@ -309,7 +309,7 @@ def open(
     if ignore_ext:
         decompressed = binary
     else:
-        decompressed = compression.compression_wrapper(binary, binary.name, mode)
+        decompressed = compression.compression_wrapper(binary, mode)
 
     if 'b' not in mode or explicit_encoding is not None:
         decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
