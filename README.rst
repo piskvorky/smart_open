@@ -333,6 +333,11 @@ If your file object doesn't have one, set the ``.name`` attribute to an appropri
 Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
 Otherwise, the transparent decompression will not occur.
 
+Extending ``smart_open``
+========================
+
+See `this document <extending.md>`__.
+
 Comments, bug reports
 =====================
 
