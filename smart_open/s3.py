@@ -67,7 +67,7 @@ URI_EXAMPLES = (
 )
 
 
-def _my_urlsplit(url):
+def _safe_urlsplit(url):
     """This is a hack to prevent the regular urlsplit from splitting around question marks.
 
     A question mark (?) in a URL typically indicates the start of a
@@ -102,7 +102,7 @@ def parse_uri(uri_as_string):
     # We use the above as a guide only, and do not perform any validation.  We
     # let boto3 take care of that for us.
     #
-    split_uri = _my_urlsplit(uri_as_string)
+    split_uri = _safe_urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
 
     port = DEFAULT_PORT
