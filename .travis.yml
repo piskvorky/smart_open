@@ -48,7 +48,7 @@ matrix:
       dist: xenial
 
 install:
-  - pip install tox==3.6.0
+  - pip install tox
 
 script:
   - if [[ ${TRAVIS_SECURE_ENV_VARS} = false ]]; then
