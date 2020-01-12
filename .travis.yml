@@ -50,8 +50,14 @@ matrix:
 install:
   - pip install tox
 
-script: tox -vv
-
+script:
+  - if [[ ${TRAVIS_SECURE_ENV_VARS} = false ]]; then
+      echo "DISABLE INTEGRATION TESTING FOR S3";
+      unset SO_DISABLE_MOCKS;
+      unset SO_S3_URL;
+      unset SO_S3_RESULT_URL;
+    fi
+  - tox -vv
 
 cache:
   directories:
