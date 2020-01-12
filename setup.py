@@ -45,7 +45,7 @@ tests_require = [
     'pytest-rerunfailures',
     'pytest_benchmark',
     'mock',
-    'moto',
+    'moto[server]',
     'pathlib2',
     'responses',
     'boto3',
