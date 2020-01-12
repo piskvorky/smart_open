@@ -1,9 +1,9 @@
-#
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
-# This code is distributed under the terms and conditions from the MIT License (MIT).
+# This code is distributed under the terms and conditions
+# from the MIT License (MIT).
 #
 
 """Common functions for working with docstrings.
@@ -63,6 +63,9 @@ def extract_kwargs(docstring):
     ('bar', 'str, optional', ['This parameter is the bar.'])
 
     """
+    if not docstring:
+        return []
+
     lines = inspect.cleandoc(docstring).split('\n')
     retval = []
 

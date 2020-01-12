@@ -11,6 +11,7 @@ matrix:
     - python: '2.7'
       env:
         - SO_DISABLE_MOCKS: "1"
+        - SO_DISABLE_MOTO_SERVER: "1"
         - SO_S3_URL: "s3://smart-open-py27-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py27-benchmark-results"
         - TOXENV: py27
@@ -22,6 +23,7 @@ matrix:
     - python: '3.6'
       env:
         - SO_DISABLE_MOCKS: "1"
+        - SO_DISABLE_MOTO_SERVER: "1"
         - SO_S3_URL: "s3://smart-open-py36-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
         - TOXENV: py36
@@ -29,6 +31,7 @@ matrix:
     - python: '3.7'
       env:
         - SO_DISABLE_MOCKS: "1"
+        - SO_DISABLE_MOTO_SERVER: "1"
         - SO_S3_URL: "s3://smart-open-py37-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
@@ -37,7 +40,9 @@ matrix:
 
 install:
   - pip install --upgrade setuptools tox
+  - pip install flask
   - pip install .[test]
+  - pip install flake8
   - pip freeze
 
 script:
@@ -47,6 +52,10 @@ script:
       unset SO_S3_URL;
       unset SO_S3_RESULT_URL;
     fi
+  - if [[ ${SO_DISABLE_MOTO_SERVER} -ne 1 ]]; then
+      sh -c "moto_server -p5000 2> /dev/null &";
+    fi
+  - flake8 --max-line-length=110
   - tox -vv
   - export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())')
   - py.test integration-tests/test_http.py

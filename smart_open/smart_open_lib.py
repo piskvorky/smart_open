@@ -1,7 +1,6 @@
-#
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2015 Radim Rehurek <me@radimrehurek.com>
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
@@ -19,30 +18,19 @@ The main functions are:
 import codecs
 import collections
 import logging
+import io
+import importlib
 import inspect
 import os
 import os.path as P
-import importlib
-import io
 import warnings
-
-# Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
-# available. The builtin ``pathlib`` will be imported with higher precedence.
-for pathlib_module in ('pathlib', 'pathlib2'):
-    try:
-        pathlib = importlib.import_module(pathlib_module)
-        PATHLIB_SUPPORT = True
-        break
-    except ImportError:
-        PATHLIB_SUPPORT = False
+import sys
 
 import boto
 import boto3
-from boto.compat import BytesIO, urlsplit, six
 import six
-from six.moves.urllib import parse as urlparse
-import sys
 
+from six.moves.urllib import parse as urlparse
 
 #
 # This module defines a function called smart_open so we cannot use
@@ -55,6 +43,16 @@ import smart_open.http as smart_open_http
 import smart_open.ssh as smart_open_ssh
 
 from smart_open import doctools
+
+# Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
+# available. The builtin ``pathlib`` will be imported with higher precedence.
+for pathlib_module in ('pathlib', 'pathlib2'):
+    try:
+        pathlib = importlib.import_module(pathlib_module)
+        PATHLIB_SUPPORT = True
+        break
+    except ImportError:
+        PATHLIB_SUPPORT = False
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +128,7 @@ Uri = collections.namedtuple(
         'access_id',
         'access_secret',
         'user',
+        'password',
     )
 )
 """Represents all the options that we parse from user input.
@@ -214,7 +213,8 @@ def open(
 
     The URI is usually a string in a variety of formats:
 
-    1. a URI for the local filesystem: `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
+    1. a URI for the local filesystem: `./lines.txt`, `/home/joe/lines.txt.gz`,
+       `file:///home/joe/lines.txt.bz2`
     2. a URI for HDFS: `hdfs:///some/path/lines.txt`
     3. a URI for Amazon's S3 (can also supply credentials inside the URI):
        `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
@@ -287,7 +287,8 @@ def open(
     See Also
     --------
     - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
-    - `smart_open README.rst <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
+    - `smart_open README.rst
+      <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
 
     """
     logger.debug('%r', locals())
@@ -362,7 +363,10 @@ def open(
     return decoded
 
 
-open.__doc__ = open.__doc__ % {
+#
+# The docstring can be None if -OO was passed to the interpreter.
+#
+open.__doc__ = None if open.__doc__ is None else open.__doc__ % {
     's3': doctools.to_docstring(
         doctools.extract_kwargs(smart_open_s3.open.__doc__),
         lpad=u'    ',
@@ -453,7 +457,8 @@ def smart_open(uri, mode="rb", **kw):
             #
             transport_params[key] = value
 
-    return open(uri, mode, ignore_ext=ignore_extension, transport_params=transport_params, **scrubbed_kwargs)
+    return open(uri, mode, ignore_ext=ignore_extension,
+                transport_params=transport_params, **scrubbed_kwargs)
 
 
 def _shortcut_open(
@@ -541,7 +546,6 @@ def _open_binary_stream(uri, mode, transport_params):
         # schemes, depending on the URI protocol in `uri`
         filename = uri.split('/')[-1]
         parsed_uri = _parse_uri(uri)
-        unsupported = "%r mode not supported for %r scheme" % (mode, parsed_uri.scheme)
 
         if parsed_uri.scheme == "file":
             fobj = io.open(parsed_uri.uri_path, mode)
@@ -553,6 +557,8 @@ def _open_binary_stream(uri, mode, transport_params):
                 host=parsed_uri.host,
                 user=parsed_uri.user,
                 port=parsed_uri.port,
+                password=parsed_uri.password,
+                transport_params=transport_params,
             )
             return fobj, filename
         elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
@@ -562,7 +568,8 @@ def _open_binary_stream(uri, mode, transport_params):
             return smart_open_hdfs.open(parsed_uri.uri_path, mode), filename
         elif parsed_uri.scheme == "webhdfs":
             kw = _check_kwargs(smart_open_webhdfs.open, transport_params)
-            return smart_open_webhdfs.open(parsed_uri.uri_path, mode, **kw), filename
+            http_uri = smart_open_webhdfs.convert_to_http_uri(parsed_uri)
+            return smart_open_webhdfs.open(http_uri, mode, **kw), filename
         elif parsed_uri.scheme.startswith('http'):
             #
             # The URI may contain a query string and fragments, which interfere
@@ -578,14 +585,15 @@ def _open_binary_stream(uri, mode, transport_params):
         # we need to return something as the file name, but we don't know what
         # so we probe for uri.name (e.g., this works with open() or tempfile.NamedTemporaryFile)
         # if the value ends with COMPRESSED_EXT, we will note it in _compression_wrapper()
-        # if there is no such an attribute, we return "unknown" - this effectively disables any compression
+        # if there is no such an attribute, we return "unknown" - this
+        # effectively disables any compression
         filename = getattr(uri, 'name', 'unknown')
         return uri, filename
     else:
         raise TypeError("don't know how to handle uri %r" % uri)
 
 
-def _s3_open_uri(parsed_uri, mode, transport_params):
+def _s3_open_uri(uri, mode, transport_params):
     logger.debug('s3_open_uri: %r', locals())
     if mode in ('r', 'w'):
         raise ValueError('this function can only open binary streams. '
@@ -602,16 +610,16 @@ def _s3_open_uri(parsed_uri, mode, transport_params):
     # They are not mutually exclusive, but we have to pick one of the two.
     # Go with 1).
     #
-    if transport_params.get('session') is not None and (parsed_uri.access_id or parsed_uri.access_secret):
+    if transport_params.get('session') is not None and (uri.access_id or uri.access_secret):
         logger.warning(
             'ignoring credentials parsed from URL because they conflict with '
             'transport_params.session. Set transport_params.session to None '
             'to suppress this warning.'
         )
-    elif (parsed_uri.access_id and parsed_uri.access_secret):
+    elif (uri.access_id and uri.access_secret):
         transport_params['session'] = boto3.Session(
-            aws_access_key_id=parsed_uri.access_id,
-            aws_secret_access_key=parsed_uri.access_secret,
+            aws_access_key_id=uri.access_id,
+            aws_secret_access_key=uri.access_secret,
         )
 
     #
@@ -623,12 +631,12 @@ def _s3_open_uri(parsed_uri, mode, transport_params):
     # Again, these are not mutually exclusive: the user can specify both.  We
     # have to pick one to proceed, however, and we go with 2.
     #
-    if parsed_uri.host != _DEFAULT_S3_HOST:
-        endpoint_url = 'https://%s:%d' % (parsed_uri.host, parsed_uri.port)
+    if uri.host != _DEFAULT_S3_HOST:
+        endpoint_url = 'https://%s:%d' % (uri.host, uri.port)
         _override_endpoint_url(transport_params, endpoint_url)
 
     kwargs = _check_kwargs(smart_open_s3.open, transport_params)
-    return smart_open_s3.open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
+    return smart_open_s3.open(uri.bucket_id, uri.key_id, mode, **kwargs)
 
 
 def _override_endpoint_url(tp, url):
@@ -664,12 +672,12 @@ def _my_urlsplit(url):
     https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
     https://github.com/RaRe-Technologies/smart_open/issues/285
     """
-    if '?' not in url:
-        return urlsplit(url, allow_fragments=False)
+    parsed_url = urlparse.urlsplit(url, allow_fragments=False)
+    if parsed_url.scheme not in smart_open_s3.SUPPORTED_SCHEMES or '?' not in url:
+        return parsed_url
 
-    sr = urlsplit(url.replace('?', '\n'), allow_fragments=False)
-    SplitResult = collections.namedtuple('SplitResult', 'scheme netloc path query fragment')
-    return SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
+    sr = urlparse.urlsplit(url.replace('?', '\n'), allow_fragments=False)
+    return urlparse.SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
 
 
 def _parse_uri(uri_as_string):
@@ -719,7 +727,7 @@ def _parse_uri(uri_as_string):
     if parsed_uri.scheme == "hdfs":
         return _parse_uri_hdfs(parsed_uri)
     elif parsed_uri.scheme == "webhdfs":
-        return _parse_uri_webhdfs(parsed_uri)
+        return parsed_uri
     elif parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES:
         return _parse_uri_s3x(parsed_uri)
     elif parsed_uri.scheme == 'file':
@@ -744,17 +752,6 @@ def _parse_uri_hdfs(parsed_uri):
         raise RuntimeError("invalid HDFS URI: %s" % str(parsed_uri))
 
     return Uri(scheme='hdfs', uri_path=uri_path)
-
-
-def _parse_uri_webhdfs(parsed_uri):
-    assert parsed_uri.scheme == 'webhdfs'
-    uri_path = parsed_uri.netloc + "/webhdfs/v1" + parsed_uri.path
-    if parsed_uri.query:
-        uri_path += "?" + parsed_uri.query
-    if not uri_path:
-        raise RuntimeError("invalid WebHDFS URI: %s" % str(parsed_uri))
-
-    return Uri(scheme='webhdfs', uri_path=uri_path)
 
 
 def _parse_uri_s3x(parsed_uri):
@@ -823,24 +820,18 @@ def _parse_uri_file(input_path):
 
 def _parse_uri_ssh(unt):
     """Parse a Uri from a urllib namedtuple."""
-    if '@' in unt.netloc:
-        user, host_port = unt.netloc.split('@', 1)
-    else:
-        user, host_port = None, unt.netloc
+    return Uri(
+        scheme=unt.scheme,
+        uri_path=_unquote(unt.path),
+        user=_unquote(unt.username),
+        host=unt.hostname,
+        port=int(unt.port or smart_open_ssh.DEFAULT_PORT),
+        password=_unquote(unt.password),
+    )
 
-    if ':' in host_port:
-        host, port = host_port.split(':', 1)
-    else:
-        host, port = host_port, None
 
-    if not user:
-        user = None
-    if not port:
-        port = smart_open_ssh.DEFAULT_PORT
-    else:
-        port = int(port)
-
-    return Uri(scheme=unt.scheme, uri_path=unt.path, user=user, host=host, port=port)
+def _unquote(text):
+    return text and urlparse.unquote(text)
 
 
 def _need_to_buffer(file_obj, mode, ext):

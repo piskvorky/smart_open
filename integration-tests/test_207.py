@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
+#
+# This code is distributed under the terms and conditions
+# from the MIT License (MIT).
+#
 import os
 import sys
 import tempfile
@@ -25,6 +32,7 @@ def test():
         path = tofile()
         with smart_open.smart_open(path, 'rb') as fin:
             loaded = np.fromfile(fin)
+            del loaded
         return 0
     finally:
         os.unlink(path)

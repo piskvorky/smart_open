@@ -60,7 +60,7 @@ echo "Next, update CHANGELOG.md."
 echo "Consider running summarize_pr.sh for each PR merged since the last release."
 read -p "Press Enter to continue..."
 
-$EDITOR CHANGELOG.md
+${EDITOR:-vim} CHANGELOG.md
 set +e
 git commit CHANGELOG.md -m "updated CHANGELOG.md for version $version"
 set -e

@@ -1,10 +1,10 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2015 Radim Rehurek <me@radimrehurek.com>
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
+#
 
 import bz2
 import io
@@ -23,6 +23,7 @@ import six
 
 import smart_open
 from smart_open import smart_open_lib
+from smart_open import webhdfs
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,9 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_secret, "access/secret")
 
     def test_s3_uri_has_atmark_in_key_name2(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y")
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y"
+        )
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.key_id, "dir/my@ke@y")
@@ -123,25 +126,44 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.key_id, "folder/picture1.jpg?bar")
 
     def test_s3_invalid_url_atmark_in_bucket_name(self):
-        self.assertRaises(ValueError, smart_open_lib._parse_uri, "s3://access_id:access_secret@my@bucket@port/mykey")
+        self.assertRaises(
+            ValueError, smart_open_lib._parse_uri,
+            "s3://access_id:access_secret@my@bucket@port/mykey",
+        )
 
     def test_s3_invalid_uri_missing_colon(self):
-        self.assertRaises(ValueError, smart_open_lib._parse_uri, "s3://access_id@access_secret@mybucket@port/mykey")
+        self.assertRaises(
+            ValueError, smart_open_lib._parse_uri,
+            "s3://access_id@access_secret@mybucket@port/mykey",
+        )
 
-    def test_webhdfs_uri(self):
-        """Do webhdfs URIs parse correctly"""
-        # valid uri, no query
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:port/path/file")
-        self.assertEqual(parsed_uri.scheme, "webhdfs")
-        self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file")
+    def test_webhdfs_uri_to_http(self):
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path/file"
+        self.assertEqual(actual, expected)
 
-        # valid uri, with query
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:port/path/file?query_part_1&query_part2")
-        self.assertEqual(parsed_uri.scheme, "webhdfs")
-        self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file?query_part_1&query_part2")
+    def test_webhdfs_uri_to_http_with_query(self):
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file?a=1")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path/file?a=1"
+        self.assertEqual(actual, expected)
+
+    def test_webhdfs_uri_to_http_with_user(self):
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path?user.name=user"
+        self.assertEqual(actual, expected)
+
+    def test_webhdfs_uri_to_http_with_user_and_query(self):
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path?a=1")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path?a=1&user.name=user"
+        self.assertEqual(actual, expected)
 
     def test_uri_from_issue_223_works(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://:@omax-mis/twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6")
+        uri = "s3://:@omax-mis/twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6"
+        parsed_uri = smart_open_lib._parse_uri(uri)
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "omax-mis")
         self.assertEqual(parsed_uri.key_id, "twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6")
@@ -194,6 +216,17 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(uri.user, 'user')
         self.assertEqual(uri.host, 'host')
         self.assertEqual(uri.port, 1234)
+        self.assertEqual(uri.password, None)
+
+    def test_ssh_with_pass(self):
+        as_string = 'ssh://user:pass@host:1234/path/to/file'
+        uri = smart_open_lib._parse_uri(as_string)
+        self.assertEqual(uri.scheme, 'ssh')
+        self.assertEqual(uri.uri_path, '/path/to/file')
+        self.assertEqual(uri.user, 'user')
+        self.assertEqual(uri.host, 'host')
+        self.assertEqual(uri.port, 1234)
+        self.assertEqual(uri.password, 'pass')
 
     def test_scp(self):
         as_string = 'scp://user@host:/path/to/file'
@@ -203,6 +236,17 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(uri.user, 'user')
         self.assertEqual(uri.host, 'host')
         self.assertEqual(uri.port, 22)
+        self.assertEqual(uri.password, None)
+
+    def test_scp_with_pass(self):
+        as_string = 'scp://user:pass@host:/path/to/file'
+        uri = smart_open_lib._parse_uri(as_string)
+        self.assertEqual(uri.scheme, 'scp')
+        self.assertEqual(uri.uri_path, '/path/to/file')
+        self.assertEqual(uri.user, 'user')
+        self.assertEqual(uri.host, 'host')
+        self.assertEqual(uri.port, 22)
+        self.assertEqual(uri.password, 'pass')
 
     def test_sftp(self):
         as_string = 'sftp://host/path/to/file'
@@ -212,6 +256,22 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(uri.user, None)
         self.assertEqual(uri.host, 'host')
         self.assertEqual(uri.port, 22)
+        self.assertEqual(uri.password, None)
+
+    def test_sftp_with_user_and_pass(self):
+        as_string = 'sftp://user:pass@host:2222/path/to/file'
+        uri = smart_open_lib._parse_uri(as_string)
+        self.assertEqual(uri.scheme, 'sftp')
+        self.assertEqual(uri.uri_path, '/path/to/file')
+        self.assertEqual(uri.user, 'user')
+        self.assertEqual(uri.host, 'host')
+        self.assertEqual(uri.port, 2222)
+        self.assertEqual(uri.password, 'pass')
+
+    def test_ssh_complex_password_with_colon(self):
+        as_string = 'sftp://user:some:complex@password$$@host:2222/path/to/file'
+        uri = smart_open_lib._parse_uri(as_string)
+        self.assertEqual(uri.password, 'some:complex@password$$')
 
 
 class SmartOpenHttpTest(unittest.TestCase):
@@ -222,14 +282,19 @@ class SmartOpenHttpTest(unittest.TestCase):
     @mock.patch('smart_open.ssh.open')
     def test_read_ssh(self, mock_open):
         """Is SSH line iterator called correctly?"""
-        obj = smart_open.smart_open("ssh://ubuntu@ip_address:1022/some/path/lines.txt")
+        obj = smart_open.smart_open(
+            "ssh://ubuntu:pass@ip_address:1022/some/path/lines.txt",
+            hello='world',
+        )
         obj.__iter__()
         mock_open.assert_called_with(
             '/some/path/lines.txt',
             'rb',
             host='ip_address',
             user='ubuntu',
-            port=1022
+            password='pass',
+            port=1022,
+            transport_params={'hello': 'world'},
         )
 
     @responses.activate
@@ -489,6 +554,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
         finally:
             os.unlink(tmpf.name)
 
+
 #
 # What exactly to patch here differs on _how_ we're opening the file.
 # See the _shortcut_open function for details.
@@ -678,12 +744,18 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.smart_open("hdfs:///tmp/test.txt")
         smart_open_object.__iter__()
         # called with the correct params?
-        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+        mock_subprocess.Popen.assert_called_with(
+            ["hdfs", "dfs", "-cat", "/tmp/test.txt"],
+            stdout=mock_subprocess.PIPE,
+        )
 
         # second possibility of schema
         smart_open_object = smart_open.smart_open("hdfs://tmp/test.txt")
         smart_open_object.__iter__()
-        mock_subprocess.Popen.assert_called_with(["hdfs", "dfs", "-cat", "/tmp/test.txt"], stdout=mock_subprocess.PIPE)
+        mock_subprocess.Popen.assert_called_with(
+            ["hdfs", "dfs", "-cat", "/tmp/test.txt"],
+            stdout=mock_subprocess.PIPE,
+        )
 
     @responses.activate
     def test_webhdfs(self):
@@ -892,7 +964,7 @@ class SmartOpenTest(unittest.TestCase):
         short_path = "~/blah"
         full_path = os.path.expanduser(short_path)
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.smart_open(short_path, "rb") as fin:
+            with smart_open.smart_open(short_path, "rb"):
                 mock_open.assert_called_with(full_path, "rb", buffering=-1)
 
     def test_incorrect(self):
@@ -1048,8 +1120,16 @@ class WebHdfsWriteTest(unittest.TestCase):
             headers = {'location': 'http://127.0.0.1:8440/file'}
             return 307, headers, resp_body
 
-        responses.add_callback(responses.PUT, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
-        responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
+        responses.add_callback(
+            responses.PUT,
+            "http://127.0.0.1:8440/webhdfs/v1/path/file",
+            callback=request_callback,
+        )
+        responses.add(
+            responses.PUT,
+            "http://127.0.0.1:8440/file",
+            status=201,
+        )
         smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file", 'wb')
 
         assert len(responses.calls) == 2
@@ -1065,7 +1145,11 @@ class WebHdfsWriteTest(unittest.TestCase):
             headers = {'location': 'http://127.0.0.1:8440/file'}
             return 307, headers, resp_body
 
-        responses.add_callback(responses.PUT, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
+        responses.add_callback(
+            responses.PUT,
+            "http://127.0.0.1:8440/webhdfs/v1/path/file",
+            callback=request_callback,
+        )
         responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
         smart_open_object = smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file", 'wb')
 
@@ -1075,13 +1159,21 @@ class WebHdfsWriteTest(unittest.TestCase):
             return 200, headers, ""
 
         test_string = u"žluťoučký koníček".encode('utf8')
-        responses.add_callback(responses.POST, "http://127.0.0.1:8440/webhdfs/v1/path/file", callback=request_callback)
-        responses.add_callback(responses.POST, "http://127.0.0.1:8440/file", callback=write_callback)
+        responses.add_callback(
+            responses.POST,
+            "http://127.0.0.1:8440/webhdfs/v1/path/file",
+            callback=request_callback,
+        )
+        responses.add_callback(
+            responses.POST,
+            "http://127.0.0.1:8440/file",
+            callback=write_callback,
+        )
         smart_open_object.write(test_string)
         smart_open_object.close()
 
         assert len(responses.calls) == 4
-        assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"
+        assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"  # noqa
         assert responses.calls[3].request.url == "http://127.0.0.1:8440/file"
 
 
@@ -1152,20 +1244,21 @@ class MultistreamsBZ2Test(unittest.TestCase):
 
     TEXT = b''.join(TEXT_LINES)
 
-    DATA = \
-        b'BZh91AY&SY.\xc8N\x18\x00\x01>_\x80\x00\x10@\x02\xff\xf0\x01\x07n\x00?\xe7\xff\xe00\x01\x99\xaa\x00' \
-        b'\xc0\x03F\x86\x8c#&\x83F\x9a\x03\x06\xa6\xd0\xa6\x93M\x0fQ\xa7\xa8\x06\x804hh\x12$\x11\xa4i4\xf14S' \
-        b'\xd2<Q\xb5\x0fH\xd3\xd4\xdd\xd5\x87\xbb\xf8\x94\r\x8f\xafI\x12\xe1\xc9\xf8/E\x00pu\x89\x12]\xc9' \
-        b'\xbbDL\nQ\x0e\t1\x12\xdf\xa0\xc0\x97\xac2O9\x89\x13\x94\x0e\x1c7\x0ed\x95I\x0c\xaaJ\xa4\x18L\x10' \
-        b'\x05#\x9c\xaf\xba\xbc/\x97\x8a#C\xc8\xe1\x8cW\xf9\xe2\xd0\xd6M\xa7\x8bXa<e\x84t\xcbL\xb3\xa7\xd9' \
-        b'\xcd\xd1\xcb\x84.\xaf\xb3\xab\xab\xad`n}\xa0lh\tE,\x8eZ\x15\x17VH>\x88\xe5\xcd9gd6\x0b\n\xe9\x9b' \
-        b'\xd5\x8a\x99\xf7\x08.K\x8ev\xfb\xf7xw\xbb\xdf\xa1\x92\xf1\xdd|/";\xa2\xba\x9f\xd5\xb1#A\xb6\xf6' \
-        b'\xb3o\xc9\xc5y\\\xebO\xe7\x85\x9a\xbc\xb6f8\x952\xd5\xd7"%\x89>V,\xf7\xa6z\xe2\x9f\xa3\xdf\x11' \
-        b'\x11"\xd6E)I\xa9\x13^\xca\xf3r\xd0\x03U\x922\xf26\xec\xb6\xed\x8b\xc3U\x13\x9d\xc5\x170\xa4\xfa^' \
-        b'\x92\xacDF\x8a\x97\xd6\x19\xfe\xdd\xb8\xbd\x1a\x9a\x19\xa3\x80ankR\x8b\xe5\xd83]\xa9\xc6\x08' \
-        b'\x82f\xf6\xb9"6l$\xb8j@\xc0\x8a\xb0l1..\xbak\x83ls\x15\xbc\xf4\xc1\x13\xbe\xf8E\xb8\x9d\r\xa8\x9dk' \
-        b'\x84\xd3n\xfa\xacQ\x07\xb1%y\xaav\xb4\x08\xe0z\x1b\x16\xf5\x04\xe9\xcc\xb9\x08z\x1en7.G\xfc]\xc9\x14' \
-        b'\xe1B@\xbb!8`'
+    DATA = (
+        b'BZh91AY&SY.\xc8N\x18\x00\x01>_\x80\x00\x10@\x02\xff\xf0\x01\x07n\x00?\xe7\xff\xe00\x01\x99\xaa\x00'
+        b'\xc0\x03F\x86\x8c#&\x83F\x9a\x03\x06\xa6\xd0\xa6\x93M\x0fQ\xa7\xa8\x06\x804hh\x12$\x11\xa4i4\xf14S'
+        b'\xd2<Q\xb5\x0fH\xd3\xd4\xdd\xd5\x87\xbb\xf8\x94\r\x8f\xafI\x12\xe1\xc9\xf8/E\x00pu\x89\x12]\xc9'
+        b'\xbbDL\nQ\x0e\t1\x12\xdf\xa0\xc0\x97\xac2O9\x89\x13\x94\x0e\x1c7\x0ed\x95I\x0c\xaaJ\xa4\x18L\x10'
+        b'\x05#\x9c\xaf\xba\xbc/\x97\x8a#C\xc8\xe1\x8cW\xf9\xe2\xd0\xd6M\xa7\x8bXa<e\x84t\xcbL\xb3\xa7\xd9'
+        b'\xcd\xd1\xcb\x84.\xaf\xb3\xab\xab\xad`n}\xa0lh\tE,\x8eZ\x15\x17VH>\x88\xe5\xcd9gd6\x0b\n\xe9\x9b'
+        b'\xd5\x8a\x99\xf7\x08.K\x8ev\xfb\xf7xw\xbb\xdf\xa1\x92\xf1\xdd|/";\xa2\xba\x9f\xd5\xb1#A\xb6\xf6'
+        b'\xb3o\xc9\xc5y\\\xebO\xe7\x85\x9a\xbc\xb6f8\x952\xd5\xd7"%\x89>V,\xf7\xa6z\xe2\x9f\xa3\xdf\x11'
+        b'\x11"\xd6E)I\xa9\x13^\xca\xf3r\xd0\x03U\x922\xf26\xec\xb6\xed\x8b\xc3U\x13\x9d\xc5\x170\xa4\xfa^'
+        b'\x92\xacDF\x8a\x97\xd6\x19\xfe\xdd\xb8\xbd\x1a\x9a\x19\xa3\x80ankR\x8b\xe5\xd83]\xa9\xc6\x08'
+        b'\x82f\xf6\xb9"6l$\xb8j@\xc0\x8a\xb0l1..\xbak\x83ls\x15\xbc\xf4\xc1\x13\xbe\xf8E\xb8\x9d\r\xa8\x9dk'
+        b'\x84\xd3n\xfa\xacQ\x07\xb1%y\xaav\xb4\x08\xe0z\x1b\x16\xf5\x04\xe9\xcc\xb9\x08z\x1en7.G\xfc]\xc9'
+        b'\x14\xe1B@\xbb!8`'
+    )
 
     def create_temp_bz2(self, streams=1):
         f = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False)
@@ -1285,7 +1378,6 @@ class S3OpenTest(unittest.TestCase):
         """Should always open in binary mode when writing through a codec."""
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='bucket')
-        uri = smart_open_lib._parse_uri("s3://bucket/key.gz")
 
         with mock.patch('smart_open.s3.open') as mock_open:
             smart_open.smart_open("s3://bucket/key.gz", "wb")

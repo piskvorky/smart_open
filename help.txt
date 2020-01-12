@@ -25,6 +25,7 @@ PACKAGE CONTENTS
     smart_open_lib
     ssh
     tests (package)
+    version
     webhdfs
 
 FUNCTIONS
@@ -33,7 +34,8 @@ FUNCTIONS
         
         The URI is usually a string in a variety of formats:
         
-        1. a URI for the local filesystem: `./lines.txt`, `/home/joe/lines.txt.gz`, `file:///home/joe/lines.txt.bz2`
+        1. a URI for the local filesystem: `./lines.txt`, `/home/joe/lines.txt.gz`,
+           `file:///home/joe/lines.txt.bz2`
         2. a URI for HDFS: `hdfs:///some/path/lines.txt`
         3. a URI for Amazon's S3 (can also supply credentials inside the URI):
            `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
@@ -193,7 +195,8 @@ FUNCTIONS
         See Also
         --------
         - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
-        - `smart_open README.rst <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
+        - `smart_open README.rst
+          <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
     
     register_compressor(ext, callback)
         Register a callback for transparently decompressing files with a specific extension.
@@ -254,7 +257,9 @@ FUNCTIONS
         --------
         
           >>> # get all JSON files under "mybucket/foo/"
-          >>> for key, content in iter_bucket(bucket_name, prefix='foo/', accept_key=lambda key: key.endswith('.json')):
+          >>> for key, content in iter_bucket(
+          ...         bucket_name, prefix='foo/',
+          ...         accept_key=lambda key: key.endswith('.json')):
           ...     print key, len(content)
         
           >>> # limit to 10k files, using 32 parallel workers (default is 16)
@@ -267,9 +272,9 @@ DATA
     __all__ = ['open', 'smart_open', 's3_iter_bucket', 'register_compresso...
 
 VERSION
-    1.8.4
+    1.9.0
 
 FILE
-    /home/misha/git/smart_open/smart_open/__init__.py
+    /Users/misha/git/smart_open/smart_open/__init__.py
 
 

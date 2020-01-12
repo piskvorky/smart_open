@@ -1,4 +1,3 @@
-#
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
@@ -24,7 +23,6 @@ The main functions are:
 
 import logging
 from smart_open import version
-import os.path
 
 from .smart_open_lib import open, smart_open, register_compressor
 from .s3 import iter_bucket as s3_iter_bucket

@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+#
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
+#
+# This code is distributed under the terms and conditions
+# from the MIT License (MIT).
+#
 """Implements file-like objects for reading from http."""
 
 import io
@@ -131,7 +137,10 @@ class BufferedInputBase(io.BufferedIOBase):
             retval = self._read_buffer.read() + self.response.raw.read()
         else:
             while len(self._read_buffer) < size:
-                logger.debug("http reading more content at current_pos: %d with size: %d", self._current_pos, size)
+                logger.debug(
+                    "http reading more content at current_pos: %d with size: %d",
+                    self._current_pos, size,
+                )
                 bytes_read = self._read_buffer.fill(self._read_iter)
                 if bytes_read == 0:
                     # Oops, ran out of data early.
