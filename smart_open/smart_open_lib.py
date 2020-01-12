@@ -423,7 +423,7 @@ def _shortcut_open(
         return None
 
     scheme = _sniff_scheme(uri)
-    if scheme not in (NO_SCHEME, so_file.FILE_SCHEME):
+    if scheme not in (NO_SCHEME, so_file.SCHEME):
         return None
 
     local_path = so_file.extract_local_path(uri)

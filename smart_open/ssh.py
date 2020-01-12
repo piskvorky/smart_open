@@ -54,7 +54,7 @@ def _unquote(text):
 
 def parse_uri(uri_as_string):
     split_uri = urlparse.urlsplit(uri_as_string)
-    assert split_uri.scheme in SUPPORTED_SCHEMES
+    assert split_uri.scheme in SCHEMES
     return dict(
         scheme=split_uri.scheme,
         uri_path=_unquote(split_uri.path),
