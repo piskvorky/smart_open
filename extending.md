@@ -89,6 +89,22 @@ You can confirm the documentation changes by running:
 
     python -c 'help("smart_open")'
 
+### What's the difference between the `open_uri` and `open` functions?
+
+There are several key differences between the two.
+
+First, the parameters to `open_uri` are the same for _all transports_.
+On the other hand, the parameters to the `open` function can differ from transport to transport.
+
+Second, the responsibilities of the two functions are also different.
+The `open` function opens the remote object.
+The `open_uri` function deals with parsing transport-specific details out of the URI, and then delegates to `open`.
+
+The `open` function contains documentation for transport parameters.
+This documentation gets parsed by the `doctools` module and appears in various docstrings.
+
+Some of these differences are by design; others as a consequence of evolution.
+
 ## New compression mechanisms
 
 The compression layer is self-contained in the `smart_open.compression` submodule.
