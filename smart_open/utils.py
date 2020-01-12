@@ -14,7 +14,14 @@ def inspect_kwargs(kallable):
     try:
         signature = inspect.signature(kallable)
     except AttributeError:
-        args, varargs, keywords, defaults = inspect.getargspec(kallable)
+        try:
+            args, varargs, keywords, defaults = inspect.getargspec(kallable)
+        except TypeError:
+            #
+            # Happens under Py2.7 with mocking.
+            #
+            return {}
+
         if not defaults:
             return {}
         supported_keywords = args[-len(defaults):]
