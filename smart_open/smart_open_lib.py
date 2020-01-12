@@ -599,4 +599,9 @@ def _tweak_docstrings():
         )
 
 
-_tweak_docstrings()
+#
+# The code below doesn't work on Py2.  We _could_ make it work, but given that
+# it's 2020 and Py2 is on it's way out, I'm just going to disable it.
+#
+if not six.PY2:
+    _tweak_docstrings()
