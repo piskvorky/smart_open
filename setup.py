@@ -45,16 +45,10 @@ tests_require = [
     'pytest-rerunfailures',
     'pytest_benchmark',
     'mock',
-    'moto==1.3.4',
+    'moto',
     'pathlib2',
     'responses',
-    # Temporary pin boto3 & botocore, because moto doesn't work with new version
-    # See https://github.com/spulec/moto/issues/1793 and
-    # https://github.com/RaRe-Technologies/smart_open/issues/227
-    'boto3 < 1.8.0',
-    # 'botocore < 1.11.0'
-    # Not used directly but allows boto GCE plugins to load.
-    # https://github.com/GoogleCloudPlatform/compute-image-packages/issues/262
+    'boto3',
     'google-compute-engine==2.8.12',
     'paramiko',
 ]
