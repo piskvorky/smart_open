@@ -49,7 +49,7 @@ MODES = (READ_BINARY, WRITE_BINARY)
 
 BINARY_NEWLINE = b'\n'
 
-SUPPORTED_SCHEMES = ("s3", "s3n", 's3u', "s3a")
+SCHEMES = ("s3", "s3n", 's3u', "s3a")
 DEFAULT_PORT = 443
 DEFAULT_HOST = 's3.amazonaws.com'
 
@@ -59,6 +59,12 @@ START = 0
 CURRENT = 1
 END = 2
 WHENCE_CHOICES = [START, CURRENT, END]
+
+URI_EXAMPLES = (
+    's3://my_bucket/my_key',
+    's3://my_key:my_secret@my_bucket/my_key',
+    's3://my_key:my_secret@my_server:my_port@my_bucket/my_key',
+)
 
 
 def _my_urlsplit(url):
@@ -97,7 +103,7 @@ def parse_uri(uri_as_string):
     # let boto3 take care of that for us.
     #
     split_uri = _my_urlsplit(uri_as_string)
-    assert split_uri.scheme in SUPPORTED_SCHEMES
+    assert split_uri.scheme in SCHEMES
 
     port = DEFAULT_PORT
     host = boto.config.get('s3', 'host', DEFAULT_HOST)

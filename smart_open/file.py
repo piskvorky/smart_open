@@ -9,12 +9,21 @@
 import io
 import os.path
 
-FILE_SCHEME = 'file'
+SCHEME = 'file'
+
+URI_EXAMPLES = (
+    './local/path/file',
+    '~/local/path/file',
+    'local/path/file',
+    './local/path/file.gz',
+    'file:///home/user/file',
+    'file:///home/user/file.bz2',
+)
 
 
 def parse_uri(uri_as_string):
     local_path = extract_local_path(uri_as_string)
-    return dict(scheme=FILE_SCHEME, uri_path=local_path)
+    return dict(scheme=SCHEME, uri_path=local_path)
 
 
 def open_uri(uri_as_string, mode, transport_params):

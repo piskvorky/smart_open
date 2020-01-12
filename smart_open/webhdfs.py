@@ -28,13 +28,17 @@ else:
 
 logger = logging.getLogger(__name__)
 
-WEBHDFS_SCHEME = 'webhdfs'
+SCHEME = 'webhdfs'
 
-WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
+URI_EXAMPLES = (
+    'webhdfs://host:port/path/file',
+)
+
+MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 
 def parse_uri(uri_as_str):
-    return dict(scheme=WEBHDFS_SCHEME, uri=uri_as_str)
+    return dict(scheme=SCHEME, uri=uri_as_str)
 
 
 def open_uri(uri, mode, transport_params):
@@ -42,7 +46,7 @@ def open_uri(uri, mode, transport_params):
     return open(uri, mode, **kwargs)
 
 
-def open(http_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
+def open(http_uri, mode, min_part_size=MIN_PART_SIZE):
     """
     Parameters
     ----------
@@ -52,7 +56,7 @@ def open(http_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
         For writing only.
 
     """
-    if http_uri.startswith(WEBHDFS_SCHEME):
+    if http_uri.startswith(SCHEME):
         http_uri = _convert_to_http_uri(http_uri)
 
     if mode == 'rb':
@@ -167,7 +171,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
 
 class BufferedOutputBase(io.BufferedIOBase):
-    def __init__(self, uri, min_part_size=WEBHDFS_MIN_PART_SIZE):
+    def __init__(self, uri, min_part_size=MIN_PART_SIZE):
         """
         Parameters
         ----------

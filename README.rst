@@ -75,6 +75,8 @@ How?
   ...     break
   '<!doctype html>\n'
 
+.. _doctools_after_examples:
+
 Other examples of URLs that ``smart_open`` accepts::
 
     s3://my_bucket/my_key
@@ -92,8 +94,6 @@ Other examples of URLs that ``smart_open`` accepts::
     [ssh|scp|sftp]://username@host//path/file
     [ssh|scp|sftp]://username@host/path/file
     [ssh|scp|sftp]://username:password@host/path/file
-
-.. _doctools_after_examples:
 
 
 Documentation

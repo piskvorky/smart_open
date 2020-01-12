@@ -18,7 +18,7 @@ from smart_open import bytebuffer, s3
 import smart_open.utils
 
 DEFAULT_BUFFER_SIZE = 128 * 1024
-SUPPORTED_SCHEMES = ('http', 'https')
+SCHEMES = ('http', 'https')
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ the client (us) has to decompress them with the appropriate algorithm.
 
 def parse_uri(uri_as_string):
     split_uri = urlparse.urlsplit(uri_as_string)
-    assert split_uri.scheme in SUPPORTED_SCHEMES
+    assert split_uri.scheme in SCHEMES
 
     uri_path = split_uri.netloc + split_uri.path
     uri_path = "/" + uri_path.lstrip("/")

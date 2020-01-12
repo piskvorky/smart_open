@@ -12,7 +12,6 @@ The main functions are:
 
   * ``parse_uri()``
   * ``open()``
-  * ``register_compressor()``
 
 """
 
@@ -78,14 +77,14 @@ _TO_BINARY_LUT = {
 
 def _generate_transport():
     yield NO_SCHEME, so_file
-    yield so_file.FILE_SCHEME, so_file
-    yield so_hdfs.HDFS_SCHEME, so_hdfs
-    yield so_webhdfs.WEBHDFS_SCHEME, so_webhdfs
-    for scheme in so_s3.SUPPORTED_SCHEMES:
+    yield so_file.SCHEME, so_file
+    yield so_hdfs.SCHEME, so_hdfs
+    yield so_webhdfs.SCHEME, so_webhdfs
+    for scheme in so_s3.SCHEMES:
         yield scheme, so_s3
-    for scheme in so_ssh.SUPPORTED_SCHEMES:
+    for scheme in so_ssh.SCHEMES:
         yield scheme, so_ssh
-    for scheme in so_http.SUPPORTED_SCHEMES:
+    for scheme in so_http.SCHEMES:
         yield scheme, so_http
 
 
@@ -129,34 +128,13 @@ def parse_uri(uri_as_string):
 
     Supported URI schemes are:
 
-      * file
-      * hdfs
-      * http
-      * https
-      * s3
-      * s3a
-      * s3n
-      * s3u
-      * webhdfs
-
-    .s3, s3a and s3n are treated the same way.  s3u is s3 but without SSL.
+%(schemes)s
+    s3, s3a and s3n are treated the same way.  s3u is s3 but without SSL.
 
     Valid URI examples::
 
-      * s3://my_bucket/my_key
-      * s3://my_key:my_secret@my_bucket/my_key
-      * s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
-      * hdfs:///path/file
-      * hdfs://path/file
-      * webhdfs://host:port/path/file
-      * ./local/path/file
-      * ~/local/path/file
-      * local/path/file
-      * ./local/path/file.gz
-      * file:///home/user/file
-      * file:///home/user/file.bz2
-      * [ssh|scp|sftp]://username@host//path/file
-      * [ssh|scp|sftp]://username@host/path/file
+%(uri_examples)s
+
 
     """
     scheme = _sniff_scheme(uri_as_string)
@@ -203,13 +181,8 @@ def open(
         ):
     r"""Open the URI object, returning a file-like object.
 
-    The URI is usually a string in a variety of formats:
-
-    1. a URI for the local filesystem: `./lines.txt`, `/home/joe/lines.txt.gz`,
-       `file:///home/joe/lines.txt.bz2`
-    2. a URI for HDFS: `hdfs:///some/path/lines.txt`
-    3. a URI for Amazon's S3 (can also supply credentials inside the URI):
-       `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
+    The URI is usually a string in a variety of formats.
+    For a full list of examples, see the :func:`parse_uri` function.
 
     The URI may also be one of:
 
@@ -217,10 +190,9 @@ def open(
     - a stream (anything that implements io.IOBase-like functionality)
 
     This function supports transparent compression and decompression using the
-    following codec:
+    following codecs:
 
-    - ``.gz``
-    - ``.bz2``
+%(codecs)s
 
     The function depends on the file extension to determine the appropriate codec.
 
@@ -345,30 +317,6 @@ def open(
         decoded = decompressed
 
     return decoded
-
-
-#
-# The docstring can be None if -OO was passed to the interpreter.
-#
-open.__doc__ = None if open.__doc__ is None else open.__doc__ % {
-    's3': doctools.to_docstring(
-        doctools.extract_kwargs(so_s3.open.__doc__),
-        lpad=u'    ',
-    ),
-    'http': doctools.to_docstring(
-        doctools.extract_kwargs(so_http.open.__doc__),
-        lpad=u'    ',
-    ),
-    'webhdfs': doctools.to_docstring(
-        doctools.extract_kwargs(so_webhdfs.open.__doc__),
-        lpad=u'    ',
-    ),
-    'ssh': doctools.to_docstring(
-        doctools.extract_kwargs(so_ssh.open.__doc__),
-        lpad=u'    ',
-    ),
-    'examples': doctools.extract_examples_from_readme_rst(),
-}
 
 
 _MIGRATION_NOTES_URL = (
@@ -601,3 +549,55 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
     if mode[0] in ('w', 'a') or mode.endswith('+'):
         fileobj = codecs.getwriter(encoding)(fileobj, **kw)
     return fileobj
+
+
+def _tweak_docstrings():
+    seen = set()
+    substrings = {}
+    schemes = io.StringIO()
+    seen_examples = set()
+    uri_examples = io.StringIO()
+
+    for scheme, transport in sorted(_TRANSPORT.items()):
+        if scheme == NO_SCHEME:
+            continue
+
+        schemes.write('    * %s\n' % scheme)
+
+        try:
+            fn = transport.open
+        except AttributeError:
+            substrings[scheme] = ''
+        else:
+            kwargs = doctools.extract_kwargs(fn.__doc__)
+            substrings[scheme] = doctools.to_docstring(kwargs, lpad=u'    ')
+
+        try:
+            examples = transport.URI_EXAMPLES
+        except AttributeError:
+            continue
+        else:
+            for e in examples:
+                if e not in seen_examples:
+                    uri_examples.write('    * %s\n' % e)
+                seen_examples.add(e)
+
+    substrings['codecs'] = '\n'.join(
+        ['    * %s' % e for e in compression.get_supported_extensions()]
+    )
+    substrings['examples'] = doctools.extract_examples_from_readme_rst()
+
+    #
+    # The docstring can be None if -OO was passed to the interpreter.
+    #
+    if open.__doc__:
+        open.__doc__ = open.__doc__ % substrings
+
+    if parse_uri.__doc__:
+        parse_uri.__doc__ = parse_uri.__doc__ % dict(
+            schemes=schemes.getvalue(),
+            uri_examples=uri_examples.getvalue(),
+        )
+
+
+_tweak_docstrings()

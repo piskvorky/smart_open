@@ -37,10 +37,15 @@ logger = logging.getLogger(__name__)
 #
 _SSH = {}
 
-SUPPORTED_SCHEMES = ("ssh", "scp", "sftp")
+SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""
 
 DEFAULT_PORT = 22
+
+URI_EXAMPLES = (
+    '[ssh|scp|sftp]://username@host//path/file',
+    '[ssh|scp|sftp]://username@host/path/file',
+)
 
 
 def _unquote(text):
