@@ -15,7 +15,7 @@ matrix:
         - SO_DISABLE_MOTO_SERVER: "1"
         - SO_S3_URL: "s3://smart-open-py27-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py27-benchmark-results"
-        - TOXENV: py27
+        - TOXENV: py27-test,py27-integration,py27-benchmark
 
     - python: '3.5'
       name: 'flake8'
@@ -25,7 +25,7 @@ matrix:
     - python: '3.5'
       name: 'python3.5 test (mocked)'
       env:
-        - TOXENV: py35
+        - TOXENV: py35-test,py35-integration,py35-benchmark
 
     - python: '3.6'
       name: 'python3.6 test'
@@ -34,7 +34,7 @@ matrix:
         - SO_DISABLE_MOTO_SERVER: "1"
         - SO_S3_URL: "s3://smart-open-py36-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
-        - TOXENV: py36
+        - TOXENV: py36-test,py36-integration,py36-benchmark
 
     - python: '3.7'
       name: 'python3.7 test'
@@ -44,7 +44,7 @@ matrix:
         - SO_S3_URL: "s3://smart-open-py37-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
-        - TOXENV: py37
+        - TOXENV: py37-test,py37-integration,py37-benchmark
       dist: xenial
 
 install:
