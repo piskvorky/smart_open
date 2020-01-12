@@ -31,9 +31,11 @@ def register_compressor(ext, callback):
     Parameters
     ----------
     ext: str
-        The extension.
+        The extension.  Must include the leading period, e.g. ``.gz``.
     callback: callable
         The callback.  It must accept two position arguments, file_obj and mode.
+        This function will be called when ``smart_open`` is opening a file with
+        the specified extension.
 
     Examples
     --------
