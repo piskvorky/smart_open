@@ -9,6 +9,7 @@ env:
 matrix:
   include:
     - python: '2.7'
+      name: 'python2.7 test'
       env:
         - SO_DISABLE_MOCKS: "1"
         - SO_DISABLE_MOTO_SERVER: "1"
@@ -17,10 +18,17 @@ matrix:
         - TOXENV: py27
 
     - python: '3.5'
+      name: 'flake8'
+      env:
+        - TOXENV: flake8
+
+    - python: '3.5'
+      name: 'python3.5 test (mocked)'
       env:
         - TOXENV: py35
 
     - python: '3.6'
+      name: 'python3.6 test'
       env:
         - SO_DISABLE_MOCKS: "1"
         - SO_DISABLE_MOTO_SERVER: "1"
@@ -29,6 +37,7 @@ matrix:
         - TOXENV: py36
 
     - python: '3.7'
+      name: 'python3.7 test'
       env:
         - SO_DISABLE_MOCKS: "1"
         - SO_DISABLE_MOTO_SERVER: "1"
@@ -40,10 +49,6 @@ matrix:
 
 install:
   - pip install --upgrade setuptools tox
-  - pip install flask
-  - pip install .[test]
-  - pip install flake8
-  - pip freeze
 
 script:
   - if [[ ${TRAVIS_SECURE_ENV_VARS} = false ]]; then
@@ -52,10 +57,6 @@ script:
       unset SO_S3_URL;
       unset SO_S3_RESULT_URL;
     fi
-  - if [[ ${SO_DISABLE_MOTO_SERVER} -ne 1 ]]; then
-      sh -c "moto_server -p5000 2> /dev/null &";
-    fi
-  - flake8 --max-line-length=110
   - tox -vv
   - export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())')
   - py.test integration-tests/test_http.py
