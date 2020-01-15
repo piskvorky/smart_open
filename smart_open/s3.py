@@ -613,10 +613,14 @@ def _accept_all(key):
     return True
 
 
-def iter_bucket(bucket_name, prefix='', accept_key=None,
-                key_limit=None, workers=16, retries=3,
-                aws_access_key_id=None, aws_secret_access_key=None,
-                aws_session_token=None):
+def iter_bucket(
+        bucket_name,
+        prefix='',
+        accept_key=None,
+        key_limit=None,
+        workers=16,
+        retries=3,
+        **session_kwargs):
     """
     Iterate and download all S3 objects under `s3://bucket_name/prefix`.
 
@@ -636,12 +640,10 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
         The number of subprocesses to use.
     retries: int, optional
         The number of time to retry a failed download.
-    aws_access_key_id: str, optional
-        The access key to use when creating the AWS client.
-    aws_secret_access_key: str, optional
-        The secret key to use when creating the AWS client.
-    aws_session_token: str, optional
-        The session token to use when creating the AWS client.
+    session_kwargs: dict, optional
+        Keyword arguments to pass when creating a new session.
+        For a list of available names and values, see:
+        https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html#boto3.session.Session
 
 
     Yields
@@ -683,14 +685,16 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
         pass
 
     total_size, key_no = 0, -1
-    key_iterator = _list_bucket(bucket_name, prefix=prefix, accept_key=accept_key,
-                                aws_access_key_id=aws_access_key_id,
-                                aws_secret_access_key=aws_secret_access_key,
-                                aws_session_token=aws_session_token)
-    download_key = functools.partial(_download_key, bucket_name=bucket_name, retries=retries,
-                                     aws_access_key_id=aws_access_key_id,
-                                     aws_secret_access_key=aws_secret_access_key,
-                                     aws_session_token=aws_session_token)
+    key_iterator = _list_bucket(
+            bucket_name,
+            prefix=prefix,
+            accept_key=accept_key,
+            **session_kwargs)
+    download_key = functools.partial(
+        _download_key,
+        bucket_name=bucket_name,
+        retries=retries,
+        **session_kwargs)
 
     with _create_process_pool(processes=workers) as pool:
         result_iterator = pool.imap_unordered(download_key, key_iterator)
@@ -709,13 +713,12 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
     logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
 
 
-def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True,
-                 aws_access_key_id=None, aws_secret_access_key=None,
-                 aws_session_token=None):
-    client = boto3.client('s3',
-                          aws_access_key_id=aws_access_key_id,
-                          aws_secret_access_key=aws_secret_access_key,
-                          aws_session_token=aws_session_token)
+def _list_bucket(
+        bucket_name,
+        prefix='',
+        accept_key=lambda k: True,
+        **session_kwargs):
+    client = boto3.client('s3', **session_kwargs)
     ctoken = None
 
     while True:
@@ -740,18 +743,14 @@ def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True,
             break
 
 
-def _download_key(key_name, bucket_name=None, retries=3,
-                  aws_access_key_id=None, aws_secret_access_key=None,
-                  aws_session_token=None):
+def _download_key(key_name, bucket_name=None, retries=3, **session_kwargs):
     if bucket_name is None:
         raise ValueError('bucket_name may not be None')
 
     #
     # https://geekpete.com/blog/multithreading-boto3/
     #
-    session = boto3.session.Session(aws_access_key_id=aws_access_key_id,
-                                    aws_secret_access_key=aws_secret_access_key,
-                                    aws_session_token=aws_session_token)
+    session = boto3.session.Session(**session_kwargs)
     s3 = session.resource('s3')
     bucket = s3.Bucket(bucket_name)
 
