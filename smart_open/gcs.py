@@ -183,7 +183,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
             line_terminator=_BINARY_NEWLINE,
             client=None,  # type: google.cloud.storage.Client
     ):
-        if not client:
+        if client is None:
             client = google.cloud.storage.Client()
         bucket = client.get_bucket(bucket)  # type: google.cloud.storage.Bucket
 
@@ -379,7 +379,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         if client is None:
             client = google.cloud.storage.Client()
         self._client = client
-        self._credentials = self._client._credentials
+        self._credentials = self._client._credentials  # noqa
         self._bucket = self._client.bucket(bucket)  # type: google.cloud.storage.Bucket
         self._blob = self._bucket.blob(blob)  # type: google.cloud.storage.Blob
         assert min_part_size % _REQUIRED_CHUNK_MULTIPLE == 0, 'min part size must be a multiple of 256KB'
