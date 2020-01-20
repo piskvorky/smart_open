@@ -83,19 +83,26 @@ class FakeBucket(object):
     def delete_blob(self, blob):
         del self.blobs[blob.name]
 
+    def register_blob(self, blob):
+        if blob.name not in self.blobs.keys():
+            self.blobs[blob.name] = blob
+
+    def register_upload(self, upload):
+        self.client.register_upload(upload)
+
 
 class FakeBucketTest(unittest.TestCase):
     def setUp(self):
         self.client = FakeClient()
         self.bucket = FakeBucket(self.client, 'test-bucket')
 
-    def test_blob(self):
+    def test_blob_registers_with_bucket(self):
         blob_id = 'blob.txt'
         expected = FakeBlob(blob_id, self.bucket)
         actual = self.bucket.blob(blob_id)
         self.assertEqual(actual, expected)
 
-    def test_create_blob(self):
+    def test_blob_alternate_constuctor(self):
         blob_id = 'blob.txt'
         expected = self.bucket.blob(blob_id)
         actual = self.bucket.list_blobs()[0]
@@ -108,7 +115,7 @@ class FakeBucketTest(unittest.TestCase):
         self.assertFalse(self.bucket.exists())
         self.assertFalse(blob.exists())
 
-    def test_get_blob(self):
+    def test_get_multiple_blobs(self):
         blob_one_id = 'blob_one.avro'
         blob_two_id = 'blob_two.parquet'
         blob_one = self.bucket.blob(blob_one_id)
@@ -120,7 +127,7 @@ class FakeBucketTest(unittest.TestCase):
 
     def test_get_nonexistent_blob(self):
         with self.assertRaises(google.cloud.exceptions.NotFound):
-            self.bucket.get_blob('test-blob ')
+            self.bucket.get_blob('test-blob')
 
     def test_list_blobs(self):
         blob_one = self.bucket.blob('blob_one.avro')
@@ -145,7 +152,8 @@ class FakeBlob(object):
             bucket=self._bucket.name,
             upload_id=str(uuid.uuid4()),
         )
-        self._bucket.client.uploads[resumeable_upload_url] = FakeBlobUpload(resumeable_upload_url, self)
+        upload = FakeBlobUpload(resumeable_upload_url, self)
+        self._bucket.register_upload(upload)
         return resumeable_upload_url
 
     def delete(self):
@@ -180,8 +188,7 @@ class FakeBlob(object):
         return self.__contents.tell()
 
     def _create_if_not_exists(self):
-        if self.name not in self._bucket.blobs.keys():
-            self._bucket.blobs[self.name] = self
+        self._bucket.register_blob(self)
         self._exists = True
 
 
@@ -253,6 +260,9 @@ class FakeClient(object):
 
     def delete_bucket(self, bucket):
         del self.__buckets[bucket.name]
+
+    def register_upload(self, upload):
+        self.uploads[upload.url] = upload
 
 
 class FakeClientTest(unittest.TestCase):
