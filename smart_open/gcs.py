@@ -504,7 +504,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._current_part = io.BytesIO()
 
     def _upload_empty_part(self):
-        logger.info("creating empty file")
+        logger.debug("creating empty file")
         headers = {'Content-Length': '0'}
         response = self._session.put(self._resumable_upload_url, headers=headers)
         assert response.status_code in _SUCCESSFUL_STATUS_CODES
