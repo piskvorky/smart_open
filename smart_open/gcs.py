@@ -84,7 +84,7 @@ def open(
         bucket_id,
         blob_id,
         mode,
-        buffering=DEFAULT_BUFFER_SIZE,
+        buffer_size=DEFAULT_BUFFER_SIZE,
         min_part_size=_MIN_MIN_PART_SIZE,
         client=None,  # type: google.cloud.storage.Client
         ):
@@ -98,7 +98,7 @@ def open(
         The name of the blob within the bucket.
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
-    buffering: int, optional
+    buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
     min_part_size: int, optional
         The minimum part size for multipart uploads.  For writing only.
@@ -110,7 +110,7 @@ def open(
         return SeekableBufferedInputBase(
             bucket_id,
             blob_id,
-            buffering=buffering,
+            buffer_size=buffer_size,
             line_terminator=_BINARY_NEWLINE,
             client=client,
         )
@@ -179,7 +179,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
             self,
             bucket,
             key,
-            buffering=DEFAULT_BUFFER_SIZE,
+            buffer_size=DEFAULT_BUFFER_SIZE,
             line_terminator=_BINARY_NEWLINE,
             client=None,  # type: google.cloud.storage.Client
     ):
@@ -194,8 +194,8 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
 
         self._raw_reader = _SeekableRawReader(self._blob, self._size)
         self._current_pos = 0
-        self._current_part_size = buffering
-        self._current_part = smart_open.bytebuffer.ByteBuffer(buffering)
+        self._current_part_size = buffer_size
+        self._current_part = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
         self._line_terminator = line_terminator
 

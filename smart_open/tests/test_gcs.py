@@ -625,7 +625,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME, buffering=8) as fin:
+        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME, buffer_size=8) as fin:
             actual = list(fin)
 
         expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
