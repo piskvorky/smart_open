@@ -435,13 +435,10 @@ def mock_gcs(class_or_func):
 def mock_gcs_func(func):
     """Mock the function and provide additional required arguments."""
     def inner(*args, **kwargs):
-        with mock.patch(
-            'google.cloud.storage.Client',
-            return_value=storage_client,
-        ), \
+        with mock.patch('google.cloud.storage.Client', return_value=storage_client), \
             mock.patch(
-            'smart_open.gcs.google_requests.AuthorizedSession',
-            return_value=FakeAuthorizedSession(storage_client._credentials),
+                'smart_open.gcs.google_requests.AuthorizedSession',
+                return_value=FakeAuthorizedSession(storage_client._credentials),
         ):
             assert callable(func), 'you didn\'t provide a function!'
             try:  # is it a method that needs a self arg?
