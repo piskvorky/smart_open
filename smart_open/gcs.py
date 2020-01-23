@@ -23,11 +23,13 @@ logger = logging.getLogger(__name__)
 
 _READ_BINARY = 'rb'
 _WRITE_BINARY = 'wb'
+
 _MODES = (_READ_BINARY, _WRITE_BINARY)
 """Allowed I/O modes for working with GCS."""
 
 _BINARY_TYPES = (six.binary_type, bytearray)
 """Allowed binary buffer types for writing to the underlying GCS stream"""
+
 if sys.version_info >= (2, 7):
     _BINARY_TYPES = (six.binary_type, bytearray, memoryview)
 
@@ -49,10 +51,13 @@ DEFAULT_BUFFER_SIZE = 256 * 1024
 
 START = 0
 """Seek to the absolute start of a GCS file"""
+
 CURRENT = 1
 """Seek relative to the current positive of a GCS file"""
+
 END = 2
 """Seek relative to the end of a GCS file"""
+
 _WHENCE_CHOICES = (START, CURRENT, END)
 
 _SUCCESSFUL_STATUS_CODES = (200, 201)
