@@ -40,7 +40,7 @@ class ParseUriTest(unittest.TestCase):
     def test_scheme(self):
         """Do URIs schemes parse correctly?"""
         # supported schemes
-        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https"):
+        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs"):
             parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
             self.assertEqual(parsed_uri.scheme, scheme)
 
@@ -272,6 +272,24 @@ class ParseUriTest(unittest.TestCase):
         as_string = 'sftp://user:some:complex@password$$@host:2222/path/to/file'
         uri = smart_open_lib._parse_uri(as_string)
         self.assertEqual(uri.password, 'some:complex@password$$')
+
+    def test_gs_uri(self):
+        """Do GCS URIs parse correctly?"""
+        # correct uri without credentials
+        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/myblob")
+        self.assertEqual(parsed_uri.scheme, "gs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "myblob")
+        self.assertEqual(parsed_uri.access_id, None)
+        self.assertEqual(parsed_uri.access_secret, None)
+
+    def test_gs_uri_contains_slash(self):
+        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob")
+        self.assertEqual(parsed_uri.scheme, "gs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
+        self.assertEqual(parsed_uri.access_id, None)
+        self.assertEqual(parsed_uri.access_secret, None)
 
 
 class SmartOpenHttpTest(unittest.TestCase):
