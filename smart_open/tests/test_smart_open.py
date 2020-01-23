@@ -280,16 +280,12 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "gs")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "myblob")
-        self.assertEqual(parsed_uri.access_id, None)
-        self.assertEqual(parsed_uri.access_secret, None)
 
     def test_gs_uri_contains_slash(self):
         parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob")
         self.assertEqual(parsed_uri.scheme, "gs")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
-        self.assertEqual(parsed_uri.access_id, None)
-        self.assertEqual(parsed_uri.access_secret, None)
 
 
 class SmartOpenHttpTest(unittest.TestCase):
