@@ -261,7 +261,7 @@ class Reader(io.BufferedIOBase):
         self._content_length = _get(
             self._object,
             version=self._version_id,
-            **self._object_kwargs,
+            **self._object_kwargs
         )['ContentLength']
 
         self._raw_reader = _SeekableRawReader(
