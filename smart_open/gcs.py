@@ -223,7 +223,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         logger.debug("close: called")
         self._blob = None
         self._current_part = None
-        self._raw_reader
+        self._raw_reader = None
 
     def readable(self):
         """Return True if the stream can be read from."""
