@@ -78,6 +78,7 @@ def open(
         session=None,
         resource_kwargs=None,
         multipart_upload_kwargs=None,
+        object_kwargs=None,
         ):
     """Open an S3 object for reading or writing.
 
@@ -103,6 +104,9 @@ def open(
     version_id: str, optional
         Version of the object, used when reading object.
         If None, will fetch the most recent version.
+    object_kwargs: dict, optional
+        Additional parameters to pass to boto3's object.get function.
+        Used during reading only.
 
     """
     logger.debug('%r', locals())
@@ -113,6 +117,8 @@ def open(
         resource_kwargs = {}
     if multipart_upload_kwargs is None:
         multipart_upload_kwargs = {}
+    if object_kwargs is None:
+        object_kwargs = {}
 
     if (mode == WRITE_BINARY) and (version_id is not None):
         raise ValueError("version_id must be None when writing")
@@ -125,6 +131,7 @@ def open(
             buffer_size=buffer_size,
             session=session,
             resource_kwargs=resource_kwargs,
+            object_kwargs=object_kwargs,
         )
     elif mode == WRITE_BINARY:
         fileobj = Writer(
@@ -153,15 +160,19 @@ def _get(s3_object, version=None, **kwargs):
         )
 
 
-class SeekableRawReader(object):
-    """Read an S3 object."""
+class _SeekableRawReader(object):
+    """Read an S3 object.
 
-    def __init__(self, s3_object, content_length, version_id=None):
+    This class is internal to the S3 submodule.
+    """
+
+    def __init__(self, s3_object, content_length, version_id=None, object_kwargs=None):
         self._object = s3_object
         self._content_length = content_length
         self._version_id = version_id
         self._position = 0
         self._body = None
+        self._object_kwargs = object_kwargs if object_kwargs else {}
 
     def seek(self, position):
         """Seek to the specified position (byte offset) in the S3 key.
@@ -190,7 +201,12 @@ class SeekableRawReader(object):
             #
             self._body = io.BytesIO()
         else:
-            self._body = _get(self._object, self._version_id, Range=range_string)['Body']
+            self._body = _get(
+                self._object,
+                version=self._version_id,
+                Range=range_string,
+                **self._object_kwargs,
+            )['Body']
 
     def _read_from_body(self, size=-1):
         if size == -1:
@@ -223,7 +239,8 @@ class Reader(io.BufferedIOBase):
     Implements the io.BufferedIOBase interface of the standard library."""
 
     def __init__(self, bucket, key, version_id=None, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None):
+                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None,
+                 object_kwargs=None):
 
         self._buffer_size = buffer_size
 
@@ -231,15 +248,28 @@ class Reader(io.BufferedIOBase):
             session = boto3.Session()
         if resource_kwargs is None:
             resource_kwargs = {}
+        if object_kwargs is None:
+            object_kwargs = {}
 
         self._session = session
         self._resource_kwargs = resource_kwargs
+        self._object_kwargs = object_kwargs
+
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
         self._version_id = version_id
-        self._content_length = _get(self._object, self._version_id)['ContentLength']
+        self._content_length = _get(
+            self._object,
+            version=self._version_id,
+            **self._object_kwargs,
+        )['ContentLength']
 
-        self._raw_reader = SeekableRawReader(self._object, self._content_length, self._version_id)
+        self._raw_reader = _SeekableRawReader(
+            self._object,
+            self._content_length,
+            self._version_id,
+            self._object_kwargs,
+        )
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False

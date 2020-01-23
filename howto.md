@@ -99,3 +99,18 @@ text/plain
 ```
 
 This works only when reading and writing via S3.
+
+## How to Specify the Request Payer (S3 only)
+
+Some public buckets require you to [pay for S3 requests for the data in the bucket](https://docs.aws.amazon.com/AmazonS3/latest/dev/RequesterPaysBuckets.html).
+This relieves the bucket owner of the data transfer costs, and spreads them among the consumers of the data.
+
+To access such buckets, you need to pass some special transport parameters:
+
+```python
+from smart_open import open
+
+p = {'object_kwargs': {'RequestPayer': 'requester'}}
+with open('s3://arxiv/pdf/arXiv_pdf_manifest.xml', transport_params=p) as fin:
+    print(fin.read(1024))
+```
