@@ -275,7 +275,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.s3.BufferedInputBase(BUCKET_NAME, KEY_NAME, buffer_size=8) as fin:
+        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, buffer_size=8) as fin:
             actual = list(fin)
 
         expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
@@ -285,7 +285,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.s3.BufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
             data = fin.read(0)
 
         self.assertEqual(data, b'')
@@ -294,7 +294,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         contents = b'the spice melange\n'
         put_to_bucket(contents=contents)
 
-        with smart_open.s3.BufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
             returned_obj = fin.to_boto3()
 
         boto3_body = returned_obj.get()['Body'].read()
