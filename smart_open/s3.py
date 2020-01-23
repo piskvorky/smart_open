@@ -205,7 +205,7 @@ class _SeekableRawReader(object):
                 self._object,
                 version=self._version_id,
                 Range=range_string,
-                **self._object_kwargs,
+                **self._object_kwargs
             )['Body']
 
     def _read_from_body(self, size=-1):
