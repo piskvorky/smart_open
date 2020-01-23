@@ -106,7 +106,7 @@ def ignore_resource_warnings():
 
 
 @unittest.skipIf(DISABLE_MOTO_SERVER, 'The test case needs a Moto server running on the local 5000 port.')
-class ReaderTest(unittest.TestCase):
+class SeekableRawReaderTest(unittest.TestCase):
 
     def setUp(self):
         self._body = b'123456'
@@ -121,7 +121,7 @@ class ReaderTest(unittest.TestCase):
     def test_read_from_a_closed_body(self):
         obj = self._local_resource.Object(BUCKET_NAME, KEY_NAME)
         content_length = obj.content_length
-        reader = smart_open.s3.Reader(obj, content_length)
+        reader = smart_open.s3._SeekableRawReader(obj, content_length)
         self.assertEqual(reader.read(1), b'1')
         reader._body.close()
         self.assertEqual(reader.read(2), b'23')
