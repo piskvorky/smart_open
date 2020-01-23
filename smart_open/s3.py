@@ -134,7 +134,7 @@ def open(
             object_kwargs=object_kwargs,
         )
     elif mode == WRITE_BINARY:
-        fileobj = Writer(
+        fileobj = MultipartWriter(
             bucket_id,
             key_id,
             min_part_size=min_part_size,
@@ -463,7 +463,7 @@ class Reader(io.BufferedIOBase):
         )
 
 
-class Writer(io.BufferedIOBase):
+class MultipartWriter(io.BufferedIOBase):
     """Writes bytes to S3.
 
     Implements the io.BufferedIOBase interface of the standard library."""
@@ -621,11 +621,13 @@ multipart upload may fail")
             self.close()
 
     def __str__(self):
-        return "smart_open.s3.Writer(%r, %r)" % (self._object.bucket_name, self._object.key)
+        return "smart_open.s3.MultipartWriter(%r, %r)" % (
+            self._object.bucket_name, self._object.key,
+        )
 
     def __repr__(self):
         return (
-            "smart_open.s3.Writer("
+            "smart_open.s3.MultipartWriter("
             "bucket=%r, "
             "key=%r, "
             "min_part_size=%r, "
@@ -646,7 +648,7 @@ multipart upload may fail")
 # For backward compatibility
 #
 SeekableBufferedInputBase = Reader
-BufferedOutputBase = Writer
+BufferedOutputBase = MultipartWriter
 
 
 def _accept_all(key):
