@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+#
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
+#
+# This code is distributed under the terms and conditions
+# from the MIT License (MIT).
+#
 """Implements file-like objects for reading and writing to/from GCS."""
 
 import io
@@ -459,10 +465,12 @@ class BufferedOutputBase(io.BufferedIOBase):
     #
     def _upload_next_part(self):
         part_num = self._total_parts + 1
-        logger.info("uploading part #%i, %i bytes (total %.3fGB)",
-                    part_num,
-                    self._current_part.tell(),
-                    self._total_size / 1024.0 ** 3)
+        logger.info(
+            "uploading part #%i, %i bytes (total %.3fGB)",
+            part_num,
+            self._current_part.tell(),
+            self._total_size / 1024.0 ** 3
+        )
         content_length = end = self._current_part.tell()
         start = self._total_size - content_length
         stop = self._total_size - 1
@@ -476,7 +484,6 @@ class BufferedOutputBase(io.BufferedIOBase):
         response = self._session.put(self._resumable_upload_url, data=self._current_part, headers=headers)
 
         if response.status_code not in _SUCCESSFUL_STATUS_CODES:
-            status_code, text = response.status_code, response.text
             msg = (
                 "upload failed ("
                 "status code: %i"
@@ -484,13 +491,13 @@ class BufferedOutputBase(io.BufferedIOBase):
                 "part #%i, "
                 "%i bytes (total %.3fGB)"
             ) % (
-                status_code,
-                text,
+                response.status_code,
+                response.text,
                 part_num,
                 self._current_part.tell(),
                 self._total_size / 1024.0 ** 3,
             )
-            raise UploadFailedError(msg, status_code, text)
+            raise UploadFailedError(msg, response.status_code, response.text)
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1

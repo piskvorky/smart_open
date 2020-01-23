@@ -30,8 +30,9 @@ def write_read(key, content, write_mode, read_mode, **kwargs):
 
 
 def read_length_prefixed_messages(key, read_mode, **kwargs):
+    result = io.BytesIO()
+
     with smart_open.open(key, read_mode, **kwargs) as fin:
-        result = io.BytesIO()
         length_byte = fin.read(1)
         while len(length_byte):
             result.write(length_byte)
