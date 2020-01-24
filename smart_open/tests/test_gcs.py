@@ -29,7 +29,7 @@ import smart_open
 BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
 WRITE_BLOB_NAME = 'test-write-blob'
-DISABLE_MOCKS = os.environ.get('SO_DISABLE_MOCKS') == "1"
+DISABLE_MOCKS = os.environ.get('SO_DISABLE_GCS_MOCKS') == "1"
 
 RESUMABLE_SESSION_URI_TEMPLATE = (
     'https://www.googleapis.com/upload/storage/v1/b/'
