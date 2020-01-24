@@ -12,7 +12,7 @@ smart_open — utils for streaming large files in Python
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to storages such as S3, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
+``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to storages such as S3, GCS, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
@@ -80,6 +80,7 @@ Other examples of URLs that ``smart_open`` accepts::
     s3://my_bucket/my_key
     s3://my_key:my_secret@my_bucket/my_key
     s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
+    gs://my_bucket/my_blob
     hdfs:///path/file
     hdfs://path/file
     webhdfs://host:port/path/file
@@ -174,6 +175,14 @@ More examples
     with open('s3://bucket/key.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'here we stand')
 
+    # stream from GCS
+    for line in open('gs://my_bucket/my_file.txt'):
+        print(line)
+
+    # stream content *into* GCS (write mode):
+    with open('gs://my_bucket/my_file.txt', 'wb') as fout:
+        fout.write(b'hello world')
+
 Supported Compression Formats
 -----------------------------
 
@@ -212,6 +221,7 @@ Transport-specific Options
 - HTTP, HTTPS (read-only)
 - SSH, SCP and SFTP
 - WebHDFS
+- GCS
 
 Each option involves setting up its own set of parameters.
 For example, for accessing S3, you often need to set up authentication, like API keys or a profile name.

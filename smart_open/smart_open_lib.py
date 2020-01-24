@@ -41,6 +41,7 @@ import smart_open.hdfs as smart_open_hdfs
 import smart_open.webhdfs as smart_open_webhdfs
 import smart_open.http as smart_open_http
 import smart_open.ssh as smart_open_ssh
+import smart_open.gcs as smart_open_gcs
 
 from smart_open import doctools
 
@@ -122,6 +123,7 @@ Uri = collections.namedtuple(
         'uri_path',
         'bucket_id',
         'key_id',
+        'blob_id',
         'port',
         'host',
         'ordinary_calling_format',
@@ -134,7 +136,7 @@ Uri = collections.namedtuple(
 """Represents all the options that we parse from user input.
 
 Some of the above options only make sense for certain protocols, e.g.
-bucket_id is only for S3.
+bucket_id is only for S3 and GCS.
 """
 #
 # Set the default values for all Uri fields to be None.  This allows us to only
@@ -383,6 +385,10 @@ open.__doc__ = None if open.__doc__ is None else open.__doc__ % {
         doctools.extract_kwargs(smart_open_ssh.open.__doc__),
         lpad=u'    ',
     ),
+    'gcs': doctools.to_docstring(
+        doctools.extract_kwargs(smart_open_gcs.open.__doc__),
+        lpad=u'    ',
+    ),
     'examples': doctools.extract_examples_from_readme_rst(),
 }
 
@@ -578,6 +584,9 @@ def _open_binary_stream(uri, mode, transport_params):
             filename = P.basename(urlparse.urlparse(uri).path)
             kw = _check_kwargs(smart_open_http.open, transport_params)
             return smart_open_http.open(uri, mode, **kw), filename
+        elif parsed_uri.scheme == smart_open_gcs.SUPPORTED_SCHEME:
+            kw = _check_kwargs(smart_open_gcs.open, transport_params)
+            return smart_open_gcs.open(parsed_uri.bucket_id, parsed_uri.blob_id, mode, **kw), filename
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif hasattr(uri, 'read'):
@@ -687,6 +696,7 @@ def _parse_uri(uri_as_string):
     Supported URI schemes are:
 
       * file
+      * gs
       * hdfs
       * http
       * https
@@ -714,6 +724,7 @@ def _parse_uri(uri_as_string):
       * file:///home/user/file.bz2
       * [ssh|scp|sftp]://username@host//path/file
       * [ssh|scp|sftp]://username@host/path/file
+      * gs://my_bucket/my_blob
 
     """
     if os.name == 'nt':
@@ -738,6 +749,8 @@ def _parse_uri(uri_as_string):
         return Uri(scheme=parsed_uri.scheme, uri_path=uri_as_string)
     elif parsed_uri.scheme in smart_open_ssh.SCHEMES:
         return _parse_uri_ssh(parsed_uri)
+    elif parsed_uri.scheme == smart_open_gcs.SUPPORTED_SCHEME:
+        return _parse_uri_gcs(parsed_uri)
     else:
         raise NotImplementedError(
             "unknown URI scheme %r in %r" % (parsed_uri.scheme, uri_as_string)
@@ -832,6 +845,13 @@ def _parse_uri_ssh(unt):
 
 def _unquote(text):
     return text and urlparse.unquote(text)
+
+
+def _parse_uri_gcs(parsed_uri):
+    assert parsed_uri.scheme == smart_open_gcs.SUPPORTED_SCHEME
+    bucket_id, blob_id = parsed_uri.netloc, parsed_uri.path[1:]
+
+    return Uri(scheme=parsed_uri.scheme, bucket_id=bucket_id, blob_id=blob_id)
 
 
 def _need_to_buffer(file_obj, mode, ext):
