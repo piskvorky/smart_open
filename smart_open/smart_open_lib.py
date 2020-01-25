@@ -38,7 +38,7 @@ from six.moves.urllib import parse as urlparse
 import smart_open.s3 as smart_open_s3
 import smart_open.hdfs as smart_open_hdfs
 import smart_open.webhdfs as smart_open_webhdfs
-import smart_open.http_ as smart_open_http
+import smart_open.http as smart_open_http
 import smart_open.ssh as smart_open_ssh
 
 from smart_open import doctools
