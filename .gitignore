@@ -56,3 +56,9 @@ target/
 # vim
 *.swp
 *.swo
+
+# PyCharm
+.idea/
+
+# env files
+.env

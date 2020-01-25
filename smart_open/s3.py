@@ -19,6 +19,8 @@ import six
 
 import smart_open.bytebuffer
 
+from botocore.exceptions import IncompleteReadError
+
 logger = logging.getLogger(__name__)
 
 # Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
@@ -99,7 +101,8 @@ def open(
         Additional parameters to pass to boto3's initiate_multipart_upload function.
         For writing only.
     version_id: str, optional
-        Version of the object, used when reading object. If None, will fetch the most recent version.
+        Version of the object, used when reading object.
+        If None, will fetch the most recent version.
 
     """
     logger.debug('%r', locals())
@@ -170,27 +173,30 @@ class SeekableRawReader(object):
         self._object = s3_object
         self._content_length = content_length
         self._version_id = version_id
-        self.seek(0)
+        self._position = 0
+        self._body = None
 
     def seek(self, position):
         """Seek to the specified position (byte offset) in the S3 key.
 
         :param int position: The byte offset from the beginning of the key.
         """
+        #
+        # Close old body explicitly.
+        # When first seek() after __init__(), self._body is not exist.
+        #
+        if self._body is not None:
+            self._body.close()
+        self._body = None
         self._position = position
+
+    def _load_body(self):
+        """Build a continuous connection with the remote peer starts from the current postion.
+        """
         range_string = make_range_string(self._position)
         logger.debug('content_length: %r range_string: %r', self._content_length, range_string)
 
-        #
-        # Close old body explicitly.
-        # When first seek(), self._body is not exist. Catch the exception and do nothing.
-        #
-        try:
-            self._body.close()
-        except AttributeError:
-            pass
-
-        if position == self._content_length == 0 or position == self._content_length:
+        if self._position == self._content_length == 0 or self._position == self._content_length:
             #
             # When reading, we can't seek to the first byte of an empty file.
             # Similarly, we can't seek past the last byte.  Do nothing here.
@@ -199,13 +205,27 @@ class SeekableRawReader(object):
         else:
             self._body = _get(self._object, self._version_id, Range=range_string)['Body']
 
-    def read(self, size=-1):
-        if self._position >= self._content_length:
-            return b''
+    def _read_from_body(self, size=-1):
         if size == -1:
             binary = self._body.read()
         else:
             binary = self._body.read(size)
+        return binary
+
+    def read(self, size=-1):
+        """Read from the continuous connection with the remote peer."""
+        if self._position >= self._content_length:
+            return b''
+        if self._body is None:
+            # When the first read() after __init__() or seek(), self._body is not exist.
+            self._load_body()
+
+        try:
+            binary = self._read_from_body(size)
+        except IncompleteReadError:
+            # The underlying connection of the self._body was closed by the remote peer.
+            self._load_body()
+            binary = self._read_from_body(size)
         self._position += len(binary)
         return binary
 
@@ -217,6 +237,9 @@ class BufferedInputBase(io.BufferedIOBase):
             session = boto3.Session()
         if resource_kwargs is None:
             resource_kwargs = {}
+
+        self._session = session
+        self._resource_kwargs = resource_kwargs
 
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
@@ -324,6 +347,18 @@ class BufferedInputBase(io.BufferedIOBase):
         """Do nothing."""
         pass
 
+    def to_boto3(self):
+        """Create an **independent** `boto3.s3.Object` instance that points to
+        the same resource as this instance.
+
+        The created instance will re-use the session and resource parameters of
+        the current instance, but it will be independent: changes to the
+        `boto3.s3.Object` may not necessary affect the current instance.
+
+        """
+        s3 = self._session.resource('s3', **self._resource_kwargs)
+        return s3.Object(self._object.bucket_name, self._object.key)
+
     #
     # Internal methods.
     #
@@ -354,13 +389,14 @@ class SeekableBufferedInputBase(BufferedInputBase):
                  line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None):
 
         self._buffer_size = buffer_size
-        self._session = session
-        self._resource_kwargs = resource_kwargs
 
         if session is None:
             session = boto3.Session()
         if resource_kwargs is None:
             resource_kwargs = {}
+
+        self._session = session
+        self._resource_kwargs = resource_kwargs
         s3 = session.resource('s3', **resource_kwargs)
         self._object = s3.Object(bucket, key)
         self._version_id = version_id
@@ -458,8 +494,6 @@ class BufferedOutputBase(io.BufferedIOBase):
             multipart_upload_kwargs=None,
             ):
 
-        self._session = session
-        self._resource_kwargs = resource_kwargs
         self._multipart_upload_kwargs = multipart_upload_kwargs
 
         if min_part_size < MIN_MIN_PART_SIZE:
@@ -472,6 +506,9 @@ multipart upload may fail")
             resource_kwargs = {}
         if multipart_upload_kwargs is None:
             multipart_upload_kwargs = {}
+
+        self._session = session
+        self._resource_kwargs = resource_kwargs
 
         s3 = session.resource('s3', **resource_kwargs)
         try:
@@ -561,6 +598,18 @@ multipart upload may fail")
         assert self._mp, "no multipart upload in progress"
         self._mp.abort()
         self._mp = None
+
+    def to_boto3(self):
+        """Create an **independent** `boto3.s3.Object` instance that points to
+        the same resource as this instance.
+
+        The created instance will re-use the session and resource parameters of
+        the current instance, but it will be independent: changes to the
+        `boto3.s3.Object` may not necessary affect the current instance.
+
+        """
+        s3 = self._session.resource('s3', **self._resource_kwargs)
+        return s3.Object(self._object.bucket_name, self._object.key)
 
     #
     # Internal methods.

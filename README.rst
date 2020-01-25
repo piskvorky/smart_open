@@ -12,7 +12,7 @@ smart_open — utils for streaming large files in Python
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to storages such as S3, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
+``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to storages such as S3, GCS, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
@@ -80,6 +80,7 @@ Other examples of URLs that ``smart_open`` accepts::
     s3://my_bucket/my_key
     s3://my_key:my_secret@my_bucket/my_key
     s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
+    gs://my_bucket/my_blob
     hdfs:///path/file
     hdfs://path/file
     webhdfs://host:port/path/file
@@ -112,6 +113,8 @@ Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pyp
 
 To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>`_ (``pip install mock moto responses``).
 The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
+
+If you're upgrading from ``smart_open`` versions 1.8.0 and below, please check out the `Migration Guide <MIGRATING_FROM_OLDER_VERSIONS.rst>`_.
 
 
 Built-in help
@@ -172,6 +175,14 @@ More examples
     with open('s3://bucket/key.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'here we stand')
 
+    # stream from GCS
+    for line in open('gs://my_bucket/my_file.txt'):
+        print(line)
+
+    # stream content *into* GCS (write mode):
+    with open('gs://my_bucket/my_file.txt', 'wb') as fout:
+        fout.write(b'hello world')
+
 Supported Compression Formats
 -----------------------------
 
@@ -210,6 +221,7 @@ Transport-specific Options
 - HTTP, HTTPS (read-only)
 - SSH, SCP and SFTP
 - WebHDFS
+- GCS
 
 Each option involves setting up its own set of parameters.
 For example, for accessing S3, you often need to set up authentication, like API keys or a profile name.
@@ -330,111 +342,6 @@ In this case, ``smart_open`` relied on the ``.name`` attribute of our `binary I/
 If your file object doesn't have one, set the ``.name`` attribute to an appropriate value.
 Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
 Otherwise, the transparent decompression will not occur.
-
-
-Migrating to the new ``open`` function
---------------------------------------
-
-Since 1.8.1, there is a ``smart_open.open`` function that replaces ``smart_open.smart_open``.
-The new function offers several advantages over the old one:
-
-- 100% compatible with the built-in ``open`` function (aka ``io.open``): it accepts all
-  the parameters that the built-in ``open`` accepts.
-- The default open mode is now "r", the same as for the built-in ``open``.
-  The default for the old ``smart_open.smart_open`` function used to be "rb".
-- Fully documented keyword parameters (try ``help("smart_open.open")``)
-
-The instructions below will help you migrate to the new function painlessly.
-
-First, update your imports:
-
-.. code-block:: python
-
-  >>> from smart_open import smart_open  # before
-  >>> from smart_open import open  # after
-
-In general, ``smart_open`` uses ``io.open`` directly, where possible, so if your
-code already uses ``open`` for local file I/O, then it will continue to work.
-If you want to continue using the built-in ``open`` function for e.g. debugging,
-then you can ``import smart_open`` and use ``smart_open.open``.
-
-**The default read mode is now "r" (read text).**
-If your code was implicitly relying on the default mode being "rb" (read
-binary), you'll need to update it and pass "rb" explicitly.
-
-Before:
-
-.. code-block:: python
-
-  >>> import smart_open
-  >>> smart_open.smart_open('s3://commoncrawl/robots.txt').read(32)  # 'rb' used to be the default
-  b'User-Agent: *\nDisallow: /'
-
-After:
-
-.. code-block:: python
-
-  >>> import smart_open
-  >>> smart_open.open('s3://commoncrawl/robots.txt', 'rb').read(32)
-  b'User-Agent: *\nDisallow: /'
-
-The ``ignore_extension`` keyword parameter is now called ``ignore_ext``.
-It behaves identically otherwise.
-
-The most significant change is in the handling on keyword parameters for the
-transport layer, e.g. HTTP, S3, etc. The old function accepted these directly:
-
-.. code-block:: python
-
-  >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-  >>> session = boto3.Session(profile_name='smart_open')
-  >>> smart_open.smart_open(url, 'r', session=session).read(32)
-  'first line\nsecond line\nthird lin'
-
-The new function accepts a ``transport_params`` keyword argument.  It's a dict.
-Put your transport parameters in that dictionary.
-
-.. code-block:: python
-
-  >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-  >>> params = {'session': boto3.Session(profile_name='smart_open')}
-  >>> open(url, 'r', transport_params=params).read(32)
-  'first line\nsecond line\nthird lin'
-
-Renamed parameters:
-
-- ``s3_upload`` ->  ``multipart_upload_kwargs``
-- ``s3_session`` -> ``session``
-
-Removed parameters:
-
-- ``profile_name``
-
-**The profile_name parameter has been removed.**
-Pass an entire ``boto3.Session`` object instead.
-
-Before:
-
-.. code-block:: python
-
-  >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-  >>> smart_open.smart_open(url, 'r', profile_name='smart_open').read(32)
-  'first line\nsecond line\nthird lin'
-
-After:
-
-.. code-block:: python
-
-  >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-  >>> params = {'session': boto3.Session(profile_name='smart_open')}
-  >>> open(url, 'r', transport_params=params).read(32)
-  'first line\nsecond line\nthird lin'
-
-See ``help("smart_open.open")`` for the full list of acceptable parameter names,
-or view the help online `here <https://github.com/RaRe-Technologies/smart_open/blob/master/help.txt>`__.
-
-If you pass an invalid parameter name, the ``smart_open.open`` function will warn you about it.
-Keep an eye on your logs for WARNING messages from ``smart_open``.
 
 Comments, bug reports
 =====================

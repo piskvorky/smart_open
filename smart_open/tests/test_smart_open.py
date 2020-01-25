@@ -23,6 +23,7 @@ import six
 
 import smart_open
 from smart_open import smart_open_lib
+from smart_open import webhdfs
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class ParseUriTest(unittest.TestCase):
     def test_scheme(self):
         """Do URIs schemes parse correctly?"""
         # supported schemes
-        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https"):
+        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs"):
             parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
             self.assertEqual(parsed_uri.scheme, scheme)
 
@@ -136,17 +137,29 @@ class ParseUriTest(unittest.TestCase):
             "s3://access_id@access_secret@mybucket@port/mykey",
         )
 
-    def test_webhdfs_uri(self):
-        """Do webhdfs URIs parse correctly"""
-        # valid uri, no query
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:port/path/file")
-        self.assertEqual(parsed_uri.scheme, "webhdfs")
-        self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file")
+    def test_webhdfs_uri_to_http(self):
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path/file"
+        self.assertEqual(actual, expected)
 
-        # valid uri, with query
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:port/path/file?query_part_1&query_part2")
-        self.assertEqual(parsed_uri.scheme, "webhdfs")
-        self.assertEqual(parsed_uri.uri_path, "host:port/webhdfs/v1/path/file?query_part_1&query_part2")
+    def test_webhdfs_uri_to_http_with_query(self):
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file?a=1")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path/file?a=1"
+        self.assertEqual(actual, expected)
+
+    def test_webhdfs_uri_to_http_with_user(self):
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path?user.name=user"
+        self.assertEqual(actual, expected)
+
+    def test_webhdfs_uri_to_http_with_user_and_query(self):
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path?a=1")
+        actual = webhdfs.convert_to_http_uri(parsed_uri)
+        expected = "http://host:14000/webhdfs/v1/path?a=1&user.name=user"
+        self.assertEqual(actual, expected)
 
     def test_uri_from_issue_223_works(self):
         uri = "s3://:@omax-mis/twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6"
@@ -259,6 +272,20 @@ class ParseUriTest(unittest.TestCase):
         as_string = 'sftp://user:some:complex@password$$@host:2222/path/to/file'
         uri = smart_open_lib._parse_uri(as_string)
         self.assertEqual(uri.password, 'some:complex@password$$')
+
+    def test_gs_uri(self):
+        """Do GCS URIs parse correctly?"""
+        # correct uri without credentials
+        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/myblob")
+        self.assertEqual(parsed_uri.scheme, "gs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "myblob")
+
+    def test_gs_uri_contains_slash(self):
+        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob")
+        self.assertEqual(parsed_uri.scheme, "gs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
 
 
 class SmartOpenHttpTest(unittest.TestCase):

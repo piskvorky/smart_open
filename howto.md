@@ -80,3 +80,35 @@ Writing example:
 'User-Agent: *\n'
 
 ```
+## How to Access S3 Object Properties
+
+When working with AWS S3, you may want to look beyond the abstraction
+provided by `smart_open` and communicate with `boto3` directly in order to
+satisfy your use case.
+
+For example:
+
+- Access the object's properties, such as the content type, timestamp of the last change, etc.
+- Access version information for the object (versioned buckets only)
+- Copy the object to another location
+- Apply an ACL to the object
+- and anything else specified in the [boto3 S3 Object API](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#object).
+
+To enable such use cases, the file-like objects returned by `smart_open` have a special `to_boto3` method.
+This returns a `boto3.s3.Object` that you can work with directly.
+For example, let's get the content type of a publicly available file:
+
+```python
+>>> from smart_open import open
+>>> with open('s3://commoncrawl/robots.txt') as fin:
+...    print(fin.readline().rstrip())
+...    boto3_s3_object = fin.to_boto3()
+...    print(repr(boto3_s3_object))
+...    print(boto3_s3_object.content_type)  # Using the boto3 API here
+User-Agent: *
+s3.Object(bucket_name='commoncrawl', key='robots.txt')
+text/plain
+
+```
+
+This works only when reading and writing via S3.
