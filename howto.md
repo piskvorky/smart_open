@@ -66,3 +66,17 @@ Writing example:
 >>> os.unlink(tmp.name)  # comment this line to keep the file for later
 
 ```
+
+## How to access S3 anonymously
+
+```python
+>>> import botocore
+>>> import botocore.client
+>>> from smart_open import open
+>>> config = botocore.client.Config(signature_version=botocore.UNSIGNED)
+>>> params = {'resource_kwargs': {'config': config}}
+>>> with open('s3://commoncrawl/robots.txt', transport_params=params) as fin:
+...    fin.readline()
+'User-Agent: *\n'
+
+```
