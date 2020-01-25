@@ -69,6 +69,9 @@ Writing example:
 
 ## How to access S3 anonymously
 
+The `boto3` library that `smart_open` uses for accessing S3 signs each request using your `boto3` credentials.
+If you'd like to access S3 without using an S3 account, then you need disable this signing mechanism.
+
 ```python
 >>> import botocore
 >>> import botocore.client
