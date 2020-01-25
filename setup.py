@@ -56,7 +56,6 @@ tests_require = [
 ]
 
 install_requires = [
-    'boto >= 2.32',
     'requests',
     'boto3',
 ]

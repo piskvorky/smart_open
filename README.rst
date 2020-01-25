@@ -164,7 +164,7 @@ More examples
     for line in open('s3u://user:secret@host:port@mybucket/mykey.txt'):
         print(line)
 
-    # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
+    # Stream to Digital Ocean Spaces bucket providing credentials from boto3 profile
     transport_params = {
         'session': boto3.Session(profile_name='digitalocean'),
         'resource_kwargs': {
@@ -258,6 +258,9 @@ Your second option is to specify the credentials within the S3 URL itself:
     fin = open('s3://aws_access_key_id:aws_secret_access_key@bucket/key', ...)
 
 *Important*: The two methods above are **mutually exclusive**. If you pass an AWS session *and* the URL contains credentials, ``smart_open`` will ignore the latter.
+
+*Important*: ``smart_open`` ignores configuration files from the older ``boto`` library.
+Port your old ``boto`` settings to ``boto3`` in order to use them with ``smart_open``.
 
 Iterating Over an S3 Bucket's Contents
 --------------------------------------
