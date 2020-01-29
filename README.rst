@@ -327,9 +327,11 @@ when constructing the client. ``smart_open`` will then use the client when talki
 
 .. code-block:: python
 
+    >>> import os
     >>> from google.cloud.storage import Client
-    >>> client = Client.from_service_account_json('/path/to/keyfile.json')
-    >>> fin = open('gs://bucket/key', transport_params=dict(client=client), ...)
+    >>> service_account_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
+    >>> client = Client.from_service_account_json(service_account_path)
+    >>> fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
 If you need more credential options, you can create an explicit ``google.auth.credentials.Credentials`` object
 and pass it to the Client.
@@ -338,10 +340,11 @@ and pass it to the Client.
 
 	>>> import os
 	>>> from google.auth.credentials import Credentials
+	>>> from google.cloud.storage import Client
 	>>> token = os.environ['GOOGLE_API_TOKEN']
 	>>> credentials = Credentials(token=token)
 	>>> client = Client(credentials=credentials)
-	>>> fin = open('gs://bucket/key', transport_params=dict(client=client), ...)
+	>>> fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
 File-like Binary Streams
 ------------------------
