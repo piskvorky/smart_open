@@ -34,7 +34,7 @@ from six.moves.urllib import parse as urlparse
 # This module defines a function called smart_open so we cannot use
 # smart_open.submodule to reference to the submodules.
 #
-import smart_open.file as so_file
+import smart_open.local_file as so_file
 import smart_open.s3 as so_s3
 import smart_open.hdfs as so_hdfs
 import smart_open.webhdfs as so_webhdfs
@@ -75,25 +75,33 @@ _TO_BINARY_LUT = {
     'a': 'ab', 'a+': 'ab+', 'at': 'ab', 'at+': 'ab+',
 }
 
-
-def _generate_transport():
-    yield NO_SCHEME, so_file
-    yield so_file.SCHEME, so_file
-    yield so_hdfs.SCHEME, so_hdfs
-    yield so_webhdfs.SCHEME, so_webhdfs
-    yield so_gcs.SCHEME, so_gcs
-    for scheme in so_s3.SCHEMES:
-        yield scheme, so_s3
-    for scheme in so_ssh.SCHEMES:
-        yield scheme, so_ssh
-    for scheme in so_http.SCHEMES:
-        yield scheme, so_http
+_TRANSPORT = {NO_SCHEME: so_file}
 
 
-_TRANSPORT = dict(_generate_transport())
-for schema, transport in _TRANSPORT.items():
-    assert hasattr(transport, 'open_uri'), '%r is missing open_uri' % schema
-    assert hasattr(transport, 'parse_uri'), '%r is missing parse_uri' % schema
+def _register_transport(submodule):
+    global _TRANSPORT
+    if hasattr(submodule, 'SCHEME'):
+        schemes = [submodule.SCHEME]
+    elif hasattr(submodule, 'SCHEMES'):
+        schemes = submodule.SCHEMES
+    else:
+        raise ValueError('%r does not have a .SCHEME or .SCHEMES attribute' % submodule)
+
+    assert hasattr(submodule, 'open_uri'), '%r is missing open_uri' % submodule
+    assert hasattr(submodule, 'parse_uri'), '%r is missing parse_uri' % submodule
+
+    for scheme in schemes:
+        assert scheme not in _TRANSPORT
+        _TRANSPORT[scheme] = submodule
+
+
+_register_transport(so_file)
+_register_transport(so_gcs)
+_register_transport(so_hdfs)
+_register_transport(so_http)
+_register_transport(so_s3)
+_register_transport(so_ssh)
+_register_transport(so_webhdfs)
 
 SUPPORTED_SCHEMES = tuple(sorted(_TRANSPORT.keys()))
 """The transport schemes that ``smart_open`` supports."""
