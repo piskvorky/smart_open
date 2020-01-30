@@ -26,7 +26,6 @@ import os.path as P
 import warnings
 import sys
 
-import boto
 import boto3
 import six
 
@@ -783,7 +782,7 @@ def _parse_uri_s3x(parsed_uri):
     assert parsed_uri.scheme in smart_open_s3.SUPPORTED_SCHEMES
 
     port = 443
-    host = boto.config.get('s3', 'host', _DEFAULT_S3_HOST)
+    host = _DEFAULT_S3_HOST
     ordinary_calling_format = False
     #
     # These defaults tell boto3 to look for credentials elsewhere
