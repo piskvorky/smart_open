@@ -67,6 +67,22 @@ Writing example:
 
 ```
 
+## How to access S3 anonymously
+
+The `boto3` library that `smart_open` uses for accessing S3 signs each request using your `boto3` credentials.
+If you'd like to access S3 without using an S3 account, then you need disable this signing mechanism.
+
+```python
+>>> import botocore
+>>> import botocore.client
+>>> from smart_open import open
+>>> config = botocore.client.Config(signature_version=botocore.UNSIGNED)
+>>> params = {'resource_kwargs': {'config': config}}
+>>> with open('s3://commoncrawl/robots.txt', transport_params=params) as fin:
+...    fin.readline()
+'User-Agent: *\n'
+
+```
 ## How to Access S3 Object Properties
 
 When working with AWS S3, you may want to look beyond the abstraction
