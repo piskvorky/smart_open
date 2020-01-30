@@ -12,7 +12,7 @@ smart_open — utils for streaming large files in Python
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to storages such as S3, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
+``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to storages such as S3, GCS, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
@@ -82,6 +82,7 @@ Other examples of URLs that ``smart_open`` accepts::
     s3://my_bucket/my_key
     s3://my_key:my_secret@my_bucket/my_key
     s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
+    gs://my_bucket/my_blob
     hdfs:///path/file
     hdfs://path/file
     webhdfs://host:port/path/file
@@ -164,7 +165,7 @@ More examples
     for line in open('s3u://user:secret@host:port@mybucket/mykey.txt'):
         print(line)
 
-    # Stream to Digital Ocean Spaces bucket providing credentials from boto profile
+    # Stream to Digital Ocean Spaces bucket providing credentials from boto3 profile
     transport_params = {
         'session': boto3.Session(profile_name='digitalocean'),
         'resource_kwargs': {
@@ -173,6 +174,14 @@ More examples
     }
     with open('s3://bucket/key.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'here we stand')
+
+    # stream from GCS
+    for line in open('gs://my_bucket/my_file.txt'):
+        print(line)
+
+    # stream content *into* GCS (write mode):
+    with open('gs://my_bucket/my_file.txt', 'wb') as fout:
+        fout.write(b'hello world')
 
 Supported Compression Formats
 -----------------------------
@@ -212,6 +221,7 @@ Transport-specific Options
 - HTTP, HTTPS (read-only)
 - SSH, SCP and SFTP
 - WebHDFS
+- GCS
 
 Each option involves setting up its own set of parameters.
 For example, for accessing S3, you often need to set up authentication, like API keys or a profile name.
@@ -259,6 +269,9 @@ Your second option is to specify the credentials within the S3 URL itself:
 
 *Important*: The two methods above are **mutually exclusive**. If you pass an AWS session *and* the URL contains credentials, ``smart_open`` will ignore the latter.
 
+*Important*: ``smart_open`` ignores configuration files from the older ``boto`` library.
+Port your old ``boto`` settings to ``boto3`` in order to use them with ``smart_open``.
+
 Iterating Over an S3 Bucket's Contents
 --------------------------------------
 
@@ -302,6 +315,42 @@ The ``version_id`` transport parameter enables you to get the desired version of
   >>> with open('s3://%s/%s' % (bucket, key)) as fin:
   ...     print(repr(fin.read()))
   'second version\n'
+
+GCS Credentials
+---------------
+``smart_open`` uses the ``google-cloud-storage`` library to talk to GCS.
+``google-cloud-storage`` uses the ``google-cloud`` package under the hood to handle authentication.
+There are several `options <https://google-cloud-python.readthedocs.io/en/0.32.0/core/auth.html>`__ to provide
+credentials.
+By default, ``smart_open`` will defer to ``google-cloud-storage`` and let it take care of the credentials.
+
+To override this behavior, pass a ``google.cloud.storage.Client`` object as a transport parameter to the ``open`` function.
+You can `customize the credentials <https://google-cloud-python.readthedocs.io/en/0.32.0/core/client.html>`__
+when constructing the client. ``smart_open`` will then use the client when talking to GCS. To follow allow with
+the example below, `refer to Google's guide <https://cloud.google.com/storage/docs/reference/libraries#setting_up_authentication>`__
+to setting up GCS authentication with a service account.
+
+.. code-block:: python
+
+    >>> import os
+    >>> from google.cloud.storage import Client
+    >>> service_account_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
+    >>> client = Client.from_service_account_json(service_account_path)
+    >>> fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
+
+If you need more credential options, you can create an explicit ``google.auth.credentials.Credentials`` object
+and pass it to the Client. To create an API token for use in the example below, refer to the
+`GCS authentication guide <https://cloud.google.com/storage/docs/authentication#apiauth>`__.
+
+.. code-block:: python
+
+	>>> import os
+	>>> from google.auth.credentials import Credentials
+	>>> from google.cloud.storage import Client
+	>>> token = os.environ['GOOGLE_API_TOKEN']
+	>>> credentials = Credentials(token=token)
+	>>> client = Client(credentials=credentials)
+	>>> fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
 File-like Binary Streams
 ------------------------

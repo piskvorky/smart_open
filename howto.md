@@ -67,6 +67,22 @@ Writing example:
 
 ```
 
+## How to access S3 anonymously
+
+The `boto3` library that `smart_open` uses for accessing S3 signs each request using your `boto3` credentials.
+If you'd like to access S3 without using an S3 account, then you need disable this signing mechanism.
+
+```python
+>>> import botocore
+>>> import botocore.client
+>>> from smart_open import open
+>>> config = botocore.client.Config(signature_version=botocore.UNSIGNED)
+>>> params = {'resource_kwargs': {'config': config}}
+>>> with open('s3://commoncrawl/robots.txt', transport_params=params) as fin:
+...    fin.readline()
+'User-Agent: *\n'
+
+```
 ## How to Access S3 Object Properties
 
 When working with AWS S3, you may want to look beyond the abstraction
@@ -95,6 +111,24 @@ For example, let's get the content type of a publicly available file:
 User-Agent: *
 s3.Object(bucket_name='commoncrawl', key='robots.txt')
 text/plain
+
+```
+
+This works only when reading and writing via S3.
+
+## How to Specify the Request Payer (S3 only)
+
+Some public buckets require you to [pay for S3 requests for the data in the bucket](https://docs.aws.amazon.com/AmazonS3/latest/dev/RequesterPaysBuckets.html).
+This relieves the bucket owner of the data transfer costs, and spreads them among the consumers of the data.
+
+To access such buckets, you need to pass some special transport parameters:
+
+```python
+>>> from smart_open import open
+>>> p = {'object_kwargs': {'RequestPayer': 'requester'}}
+>>> with open('s3://arxiv/pdf/arXiv_pdf_manifest.xml', transport_params=p) as fin:
+...    print(fin.read(1024))
+<?xml version='1.0' standalone='yes'?>
 
 ```
 

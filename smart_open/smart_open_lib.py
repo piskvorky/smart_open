@@ -40,6 +40,7 @@ import smart_open.hdfs as so_hdfs
 import smart_open.webhdfs as so_webhdfs
 import smart_open.http as so_http
 import smart_open.ssh as so_ssh
+import smart_open.gcs as so_gcs
 
 from smart_open import compression
 from smart_open import doctools
@@ -80,6 +81,7 @@ def _generate_transport():
     yield so_file.SCHEME, so_file
     yield so_hdfs.SCHEME, so_hdfs
     yield so_webhdfs.SCHEME, so_webhdfs
+    yield so_gcs.SCHEME, so_gcs
     for scheme in so_s3.SCHEMES:
         yield scheme, so_s3
     for scheme in so_ssh.SCHEMES:
@@ -126,6 +128,7 @@ def parse_uri(uri_as_string):
     Notes
     -----
 
+<<<<<<< HEAD
     Supported URI schemes are:
 
 %(schemes)s

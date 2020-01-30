@@ -40,7 +40,7 @@ class ParseUriTest(unittest.TestCase):
     def test_scheme(self):
         """Do URIs schemes parse correctly?"""
         # supported schemes
-        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https"):
+        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs"):
             parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
             self.assertEqual(parsed_uri.scheme, scheme)
 
@@ -272,6 +272,20 @@ class ParseUriTest(unittest.TestCase):
         as_string = 'sftp://user:some:complex@password$$@host:2222/path/to/file'
         uri = smart_open_lib._parse_uri(as_string)
         self.assertEqual(uri.password, 'some:complex@password$$')
+
+    def test_gs_uri(self):
+        """Do GCS URIs parse correctly?"""
+        # correct uri without credentials
+        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/myblob")
+        self.assertEqual(parsed_uri.scheme, "gs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "myblob")
+
+    def test_gs_uri_contains_slash(self):
+        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob")
+        self.assertEqual(parsed_uri.scheme, "gs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
 
 
 class SmartOpenHttpTest(unittest.TestCase):
@@ -1480,7 +1494,7 @@ class S3OpenTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(text, actual)
 
-    @mock.patch('smart_open.s3.SeekableBufferedInputBase')
+    @mock.patch('smart_open.s3.Reader')
     def test_transport_params_is_not_mutable(self, mock_open):
         smart_open.open('s3://access_key:secret_key@host@bucket/key')
         smart_open.open('s3://bucket/key')
@@ -1493,7 +1507,7 @@ class S3OpenTest(unittest.TestCase):
         self.assertIsNone(mock_open.call_args_list[1][1]['session'])
         self.assertIsNotNone(mock_open.call_args_list[0][1]['session'])
 
-    @mock.patch('smart_open.s3.SeekableBufferedInputBase')
+    @mock.patch('smart_open.s3.Reader')
     def test_respects_endpoint_url_read(self, mock_open):
         url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
         smart_open.open(url)
@@ -1501,7 +1515,7 @@ class S3OpenTest(unittest.TestCase):
         expected = {'endpoint_url': 'https://play.min.io:9000'}
         self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
 
-    @mock.patch('smart_open.s3.BufferedOutputBase')
+    @mock.patch('smart_open.s3.MultipartWriter')
     def test_respects_endpoint_url_write(self, mock_open):
         url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
         smart_open.open(url, 'wb')
