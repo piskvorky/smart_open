@@ -313,6 +313,42 @@ The ``version_id`` transport parameter enables you to get the desired version of
   ...     print(repr(fin.read()))
   'second version\n'
 
+GCS Credentials
+---------------
+``smart_open`` uses the ``google-cloud-storage`` library to talk to GCS.
+``google-cloud-storage`` uses the ``google-cloud`` package under the hood to handle authentication.
+There are several `options <https://google-cloud-python.readthedocs.io/en/0.32.0/core/auth.html>`__ to provide
+credentials.
+By default, ``smart_open`` will defer to ``google-cloud-storage`` and let it take care of the credentials.
+
+To override this behavior, pass a ``google.cloud.storage.Client`` object as a transport parameter to the ``open`` function.
+You can `customize the credentials <https://google-cloud-python.readthedocs.io/en/0.32.0/core/client.html>`__
+when constructing the client. ``smart_open`` will then use the client when talking to GCS. To follow allow with
+the example below, `refer to Google's guide <https://cloud.google.com/storage/docs/reference/libraries#setting_up_authentication>`__
+to setting up GCS authentication with a service account.
+
+.. code-block:: python
+
+    >>> import os
+    >>> from google.cloud.storage import Client
+    >>> service_account_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
+    >>> client = Client.from_service_account_json(service_account_path)
+    >>> fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
+
+If you need more credential options, you can create an explicit ``google.auth.credentials.Credentials`` object
+and pass it to the Client. To create an API token for use in the example below, refer to the
+`GCS authentication guide <https://cloud.google.com/storage/docs/authentication#apiauth>`__.
+
+.. code-block:: python
+
+	>>> import os
+	>>> from google.auth.credentials import Credentials
+	>>> from google.cloud.storage import Client
+	>>> token = os.environ['GOOGLE_API_TOKEN']
+	>>> credentials = Credentials(token=token)
+	>>> client = Client(credentials=credentials)
+	>>> fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
+
 File-like Binary Streams
 ------------------------
 
