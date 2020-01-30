@@ -1494,7 +1494,7 @@ class S3OpenTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(text, actual)
 
-    @mock.patch('smart_open.s3.SeekableBufferedInputBase')
+    @mock.patch('smart_open.s3.Reader')
     def test_transport_params_is_not_mutable(self, mock_open):
         smart_open.open('s3://access_key:secret_key@host@bucket/key')
         smart_open.open('s3://bucket/key')
@@ -1507,7 +1507,7 @@ class S3OpenTest(unittest.TestCase):
         self.assertIsNone(mock_open.call_args_list[1][1]['session'])
         self.assertIsNotNone(mock_open.call_args_list[0][1]['session'])
 
-    @mock.patch('smart_open.s3.SeekableBufferedInputBase')
+    @mock.patch('smart_open.s3.Reader')
     def test_respects_endpoint_url_read(self, mock_open):
         url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
         smart_open.open(url)
@@ -1515,7 +1515,7 @@ class S3OpenTest(unittest.TestCase):
         expected = {'endpoint_url': 'https://play.min.io:9000'}
         self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
 
-    @mock.patch('smart_open.s3.BufferedOutputBase')
+    @mock.patch('smart_open.s3.MultipartWriter')
     def test_respects_endpoint_url_write(self, mock_open):
         url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
         smart_open.open(url, 'wb')
