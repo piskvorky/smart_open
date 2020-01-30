@@ -15,6 +15,7 @@ import google.cloud.exceptions
 import google.cloud.storage
 import google.auth.transport.requests as google_requests
 import six
+from six.moves.urllib import parse as urlparse
 
 import smart_open.bytebuffer
 import smart_open.s3
@@ -89,6 +90,20 @@ class UploadFailedError(Exception):
         super(UploadFailedError, self).__init__(message)
         self.status_code = status_code
         self.text = text
+
+
+def parse_uri(uri_as_string):
+    sr = urlparse.urlsplit(uri_as_string)
+    assert sr.scheme == SCHEME
+    bucket_id = sr.netloc
+    blob_id = sr.path.lstrip('/')
+    return dict(scheme=SCHEME, bucket_id=bucket_id, blob_id=blob_id)
+
+
+def open_uri(uri, mode, transport_params):
+    parsed_uri = parse_uri(uri)
+    kwargs = smart_open.utils.check_kwargs(open, transport_params)
+    return open(parsed_uri['bucket_id'], parsed_uri['blob_id'], mode, **kwargs)
 
 
 def open(

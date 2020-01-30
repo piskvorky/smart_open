@@ -434,18 +434,30 @@ def mock_gcs(class_or_func):
 
 def mock_gcs_func(func):
     """Mock the function and provide additional required arguments."""
+    assert callable(func), '%r is not a callable function' % func
+
     def inner(*args, **kwargs):
-        with mock.patch('google.cloud.storage.Client', return_value=storage_client), \
-            mock.patch(
-                'smart_open.gcs.google_requests.AuthorizedSession',
-                return_value=FakeAuthorizedSession(storage_client._credentials),
-        ):
-            assert callable(func), 'you didn\'t provide a function!'
-            try:  # is it a method that needs a self arg?
-                self_arg = inspect.signature(func).self
-                func(self_arg, *args, **kwargs)
-            except AttributeError:
-                func(*args, **kwargs)
+        #
+        # Is it a function or a method? The latter requires a self parameter.
+        #
+        signature = inspect.signature(func)
+
+        fake_session = FakeAuthorizedSession(storage_client._credentials)
+        patched_client = mock.patch(
+            'google.cloud.storage.Client',
+            return_value=storage_client,
+        )
+        patched_session = mock.patch(
+            'smart_open.gcs.google_requests.AuthorizedSession',
+            return_value=fake_session,
+        )
+
+        with patched_client, patched_session:
+            if not hasattr(signature, 'self'):
+                return func(*args, **kwargs)
+            else:
+                return func(signature.self, *args, **kwargs)
+
     return inner
 
 
@@ -666,11 +678,12 @@ class BufferedOutputBaseTest(unittest.TestCase):
         with smart_open.gcs.BufferedOutputBase(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
             fout.write(test_string)
 
-        output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), "rb"))
+        with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), "rb") as fin:
+            output = list(fin)
 
         self.assertEqual(output, [test_string])
 
-    def test_write_01a(self):
+    def test_incorrect_input(self):
         """Does gcs write fail on incorrect input?"""
         try:
             with smart_open.gcs.BufferedOutputBase(BUCKET_NAME, WRITE_BLOB_NAME) as fin:
