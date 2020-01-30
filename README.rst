@@ -323,7 +323,9 @@ By default, ``smart_open`` will defer to ``google-cloud-storage`` and let it tak
 
 To override this behavior, pass a ``google.cloud.storage.Client`` object as a transport parameter to the ``open`` function.
 You can `customize the credentials <https://google-cloud-python.readthedocs.io/en/0.32.0/core/client.html>`__
-when constructing the client. ``smart_open`` will then use the client when talking to GCS.
+when constructing the client. ``smart_open`` will then use the client when talking to GCS. To follow allow with
+the example below, `refer to Google's guide <https://cloud.google.com/storage/docs/reference/libraries#setting_up_authentication>`__
+to setting up GCS authentication with a service account.
 
 .. code-block:: python
 
@@ -334,7 +336,8 @@ when constructing the client. ``smart_open`` will then use the client when talki
     >>> fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
 If you need more credential options, you can create an explicit ``google.auth.credentials.Credentials`` object
-and pass it to the Client.
+and pass it to the Client. To create an API token for use in the example below, refer to the
+`GCS authentication guide <https://cloud.google.com/storage/docs/authentication#apiauth>`__.
 
 .. code-block:: python
 
