@@ -302,7 +302,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
 
 @maybe_mock_s3
-class BufferedMultiPartOutputBaseTest(unittest.TestCase):
+class MultipartWriterTest(unittest.TestCase):
     """
     Test writing into s3 files.
 
@@ -318,7 +318,7 @@ class BufferedMultiPartOutputBaseTest(unittest.TestCase):
         test_string = u"žluťoučký koníček".encode('utf8')
 
         # write into key
-        with smart_open.s3.BufferedMultiPartOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+        with smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
             fout.write(test_string)
 
         # read key and test content
@@ -329,7 +329,7 @@ class BufferedMultiPartOutputBaseTest(unittest.TestCase):
     def test_write_01a(self):
         """Does s3 write fail on incorrect input?"""
         try:
-            with smart_open.s3.BufferedMultiPartOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fin:
+            with smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fin:
                 fin.write(None)
         except TypeError:
             pass
@@ -338,7 +338,7 @@ class BufferedMultiPartOutputBaseTest(unittest.TestCase):
 
     def test_write_02(self):
         """Does s3 write unicode-utf8 conversion work?"""
-        smart_open_write = smart_open.s3.BufferedMultiPartOutputBase(BUCKET_NAME, WRITE_KEY_NAME)
+        smart_open_write = smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME)
         smart_open_write.tell()
         logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
@@ -348,7 +348,7 @@ class BufferedMultiPartOutputBaseTest(unittest.TestCase):
     def test_write_03(self):
         """Does s3 multipart chunking work correctly?"""
         # write
-        smart_open_write = smart_open.s3.BufferedMultiPartOutputBase(
+        smart_open_write = smart_open.s3.MultipartWriter(
             BUCKET_NAME, WRITE_KEY_NAME, min_part_size=10
         )
         with smart_open_write as fout:
@@ -369,7 +369,7 @@ class BufferedMultiPartOutputBaseTest(unittest.TestCase):
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
-        smart_open_write = smart_open.s3.BufferedMultiPartOutputBase(BUCKET_NAME, WRITE_KEY_NAME)
+        smart_open_write = smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME)
         with smart_open_write as fout:  # noqa
             pass
 
@@ -380,7 +380,7 @@ class BufferedMultiPartOutputBaseTest(unittest.TestCase):
 
     def test_gzip(self):
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
-        with smart_open.s3.BufferedMultiPartOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+        with smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
             with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
                 zipfile.write(expected)
 
@@ -397,7 +397,7 @@ class BufferedMultiPartOutputBaseTest(unittest.TestCase):
         """
         expected = u'не думай о секундах свысока'
 
-        with smart_open.s3.BufferedMultiPartOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+        with smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
             with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 
@@ -451,7 +451,7 @@ class BufferedMultiPartOutputBaseTest(unittest.TestCase):
 
 
 @maybe_mock_s3
-class BufferedSinglePartOutputBaseTest(unittest.TestCase):
+class SinglepartWriterTest(unittest.TestCase):
     """
     Test writing into s3 files using single part upload.
 
@@ -467,7 +467,7 @@ class BufferedSinglePartOutputBaseTest(unittest.TestCase):
         test_string = u"žluťoučký koníček".encode('utf8')
 
         # write into key
-        with smart_open.s3.BufferedSinglePartOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+        with smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
             fout.write(test_string)
 
         # read key and test content
@@ -478,7 +478,7 @@ class BufferedSinglePartOutputBaseTest(unittest.TestCase):
     def test_write_01a(self):
         """Does s3 write fail on incorrect input?"""
         try:
-            with smart_open.s3.BufferedSinglePartOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fin:
+            with smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fin:
                 fin.write(None)
         except TypeError:
             pass
@@ -489,7 +489,7 @@ class BufferedSinglePartOutputBaseTest(unittest.TestCase):
         """Does s3 write unicode-utf8 conversion work?"""
         test_string = u"testžížáč".encode("utf-8")
 
-        smart_open_write = smart_open.s3.BufferedSinglePartOutputBase(BUCKET_NAME, WRITE_KEY_NAME)
+        smart_open_write = smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME)
         smart_open_write.tell()
         logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
@@ -498,7 +498,7 @@ class BufferedSinglePartOutputBaseTest(unittest.TestCase):
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
-        smart_open_write = smart_open.s3.BufferedSinglePartOutputBase(BUCKET_NAME, WRITE_KEY_NAME)
+        smart_open_write = smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME)
         with smart_open_write as fout:  # noqa
             pass
 
@@ -514,7 +514,7 @@ class BufferedSinglePartOutputBaseTest(unittest.TestCase):
         """
         expected = u'не думай о секундах свысока'
 
-        with smart_open.s3.BufferedSinglePartOutputBase(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+        with smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
             with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 
