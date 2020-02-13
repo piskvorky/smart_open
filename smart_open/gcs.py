@@ -454,7 +454,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._current_part.write(b)
         self._total_size += len(b)
 
-        if self._current_part_size >= self._min_part_size:
+        while self._current_part_size >= self._min_part_size:
             self._upload_next_part()
 
         return len(b)
@@ -471,12 +471,10 @@ class BufferedOutputBase(io.BufferedIOBase):
     #
     def _upload_next_part(self):
         part_num = self._total_parts + 1
-        part_size = self._current_part_size
 
         # we can only upload chunks in multiples of 256kB, except for the final part
-        size_of_leftovers = self._total_size % self._min_part_size
-        total_size = self._total_size - size_of_leftovers
-        content_length = part_size - size_of_leftovers
+        content_length = self._min_part_size
+        total_size = self._total_size - (self._total_size % self._min_part_size)
 
         logger.info(
             "uploading part #%i, %i bytes (total %.3fGB)",
@@ -517,7 +515,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
-        # carry over the leftovers
+        # handle the leftovers
         self._current_part = io.BytesIO(self._current_part.read())
 
     def _upload_final_part(self):
