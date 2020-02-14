@@ -400,6 +400,7 @@ class BufferedOutputBase(io.BufferedIOBase):
 
         self._total_size = 0
         self._total_parts = 0
+        self._bytes_uploaded = 0
         self._current_part = io.BytesIO()
 
         self._session = google_requests.AuthorizedSession(self._credentials)
@@ -424,7 +425,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         logger.debug("closing")
         if self._total_size == 0:  # empty files
             self._upload_empty_part()
-        if self._current_part.tell():
+        else:
             self._upload_final_part()
         logger.debug("successfully closed")
 
@@ -454,6 +455,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._current_part.write(b)
         self._total_size += len(b)
 
+        # TODO: Change this back to if statement
         while self._current_part_size >= self._min_part_size:
             self._upload_next_part()
 
@@ -473,6 +475,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         part_num = self._total_parts + 1
 
         # we can only upload chunks in multiples of 256kB, except for the final part
+        # TODO: Upload the largest chunk possible
         content_length = self._min_part_size
         total_size = self._total_size - (self._total_size % self._min_part_size)
 
@@ -482,8 +485,8 @@ class BufferedOutputBase(io.BufferedIOBase):
             content_length,
             total_size / 1024.0 ** 3
         )
-        start = total_size - content_length
-        stop = total_size - 1
+        start = self._bytes_uploaded
+        stop = start + content_length - 1
 
         self._current_part.seek(0)
 
@@ -491,6 +494,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             'Content-Length': str(content_length),
             'Content-Range': _make_range_string(start, stop, _UNKNOWN_FILE_SIZE),
         }
+        logger.info('Sent headers ' + str(headers))
         response = self._session.put(
             self._resumable_upload_url,
             data=self._current_part.read(content_length),
@@ -500,21 +504,24 @@ class BufferedOutputBase(io.BufferedIOBase):
         if response.status_code != _UPLOAD_PART_STATUS_CODE:
             msg = (
                 "upload failed ("
-                "status code: %i"
-                "response text=%s, "
+                "status code: %i "
+                "response text=%s), "
                 "part #%i, "
-                "%i bytes (total %.3fGB)"
+                "%i bytes (total %.3fGB), "
+                "headers %r"
             ) % (
                 response.status_code,
                 response.text,
                 part_num,
                 content_length,
                 self._total_size / 1024.0 ** 3,
+                headers,
             )
             raise UploadFailedError(msg, response.status_code, response.text)
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
+        self._bytes_uploaded += content_length
         # handle the leftovers
         self._current_part = io.BytesIO(self._current_part.read())
 
@@ -528,13 +535,18 @@ class BufferedOutputBase(io.BufferedIOBase):
             self._total_size / 1024.0 ** 3
         )
 
-        start = self._total_size - self._current_part_size
         stop = self._total_size - 1
+
+        if self._current_part_size == 0:
+            start = stop
+        else:
+            start = self._bytes_uploaded
 
         headers = {
             'Content-Length': str(part_size),
             'Content-Range': _make_range_string(start, stop, self._total_size),
         }
+        logger.info('Sent headers' + str(headers))
 
         self._current_part.seek(0)
 
@@ -547,21 +559,24 @@ class BufferedOutputBase(io.BufferedIOBase):
         if response.status_code not in _UPLOAD_COMPLETE_STATUS_CODES:
             msg = (
                 "upload failed ("
-                "status code: %i"
-                "response text=%s, "
+                "status code: %i ,"
+                "response text=%s), "
                 "part #%i, "
-                "%i bytes (total %.3fGB)"
+                "%i bytes (total %.3fGB), "
+                "headers %r"
             ) % (
                 response.status_code,
                 response.text,
                 part_num,
                 part_size,
                 self._total_size / 1024.0 ** 3,
+                headers,
               )
             raise UploadFailedError(msg, response.status_code, response.text)
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
+        self._bytes_uploaded += part_size
         self._current_part = io.BytesIO()
 
     def _upload_empty_part(self):

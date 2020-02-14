@@ -326,8 +326,9 @@ class FakeAuthorizedSession(object):
         upload.terminate()
 
     def put(self, url, data=None, headers=None):
+        upload = self._credentials.client.uploads[url]
+
         if data is not None:
-            upload = self._credentials.client.uploads[url]
             if isinstance(data, bytes):
                 upload.write(data)
             else:
@@ -727,7 +728,8 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
         # read back the same key and check its content
         output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
-        self.assertEqual(output, list(local_write.read()))
+        local_write.seek(0)
+        self.assertEqual(output, list(local_write))
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
