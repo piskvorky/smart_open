@@ -88,7 +88,7 @@ def test_gcs_performance(benchmark):
 
     key = _GCS_URL + '/performance.txt'
     actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
-    assert actual == one_megabyte
+    assert actual == one_megabyte + b'\n'
 
 
 def test_gcs_performance_gz(benchmark):
@@ -120,4 +120,4 @@ def test_gcs_performance_small_reads(benchmark):
         fout.write(one_megabyte_of_msgs)
 
     actual = benchmark(read_length_prefixed_messages, key, 'rb', buffering=ONE_MIB)
-    assert actual == one_megabyte_of_msgs
+    assert actual == one_megabyte_of_msgs + b'\n'

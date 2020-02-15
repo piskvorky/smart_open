@@ -45,6 +45,7 @@ def ignore_resource_warnings():
     if six.PY2:
         return
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
+    warnings.filterwarnings("ignore", category=UserWarning, message="Additional newline character added to the end of gs://*")  # noqa
 
 
 class FakeBucket(object):
@@ -160,9 +161,7 @@ class FakeBlob(object):
         self._bucket.delete_blob(self)
         self._exists = False
 
-    def download_as_string(self, start=None, end=None):
-        if start is None:
-            start = 0
+    def download_as_string(self, start=0, end=None):
         if end is None:
             end = self.__contents.tell()
         self.__contents.seek(start)
@@ -720,16 +719,38 @@ class BufferedOutputBaseTest(unittest.TestCase):
             self.assertEqual(fout._current_part_size, 0)
             self.assertEqual(fout._total_parts, 1)
 
-            fourth_part = b"t" * 262144 * 6
+            fourth_part = b"t" * 100000 * 6
             fout.write(fourth_part)
             local_write.write(fourth_part)
-            self.assertEqual(fout._current_part_size, 0)
-            self.assertEqual(fout._total_parts, 7)
+            self.assertEqual(fout._current_part_size, 75712)
+            self.assertEqual(fout._total_parts, 2)
 
         # read back the same key and check its content
         output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
         local_write.seek(0)
-        self.assertEqual(output, list(local_write))
+        actual = [line.decode("utf-8") for line in list(local_write)]
+        self.assertEqual(output, actual)
+
+    def test_write_03a(self):
+        """Does gcs multipart chunking handle writing a last chunk equal to the min_part_size?"""
+        # write
+        smart_open_write = smart_open.gcs.BufferedOutputBase(
+            BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=256 * 1024
+        )
+        local_write = io.BytesIO()
+        with smart_open_write as fout:
+            first_part = b"t" * 256 * 1024
+            fout.write(first_part)
+            local_write.write(first_part)
+            self.assertEqual(fout._current_part_size, 0)
+            self.assertEqual(fout._total_parts, 1)
+
+        # read back the same key and check its content
+        output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
+        local_write.write(b'\n')
+        local_write.seek(0)
+        actual = [line.decode("utf-8") for line in list(local_write)]
+        self.assertEqual(output, actual)
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""

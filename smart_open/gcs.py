@@ -10,6 +10,7 @@
 import io
 import logging
 import sys
+import warnings
 
 import google.cloud.exceptions
 import google.cloud.storage
@@ -455,8 +456,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._current_part.write(b)
         self._total_size += len(b)
 
-        # TODO: Change this back to if statement
-        while self._current_part_size >= self._min_part_size:
+        if self._current_part_size >= self._min_part_size:
             self._upload_next_part()
 
         return len(b)
@@ -474,10 +474,10 @@ class BufferedOutputBase(io.BufferedIOBase):
     def _upload_next_part(self):
         part_num = self._total_parts + 1
 
-        # we can only upload chunks in multiples of 256kB, except for the final part
-        # TODO: Upload the largest chunk possible
-        content_length = self._min_part_size
-        total_size = self._total_size - (self._total_size % self._min_part_size)
+        # upload the largest multiple of 256kB
+        size_of_leftovers = self._total_size % self._min_part_size
+        total_size = self._total_size - size_of_leftovers
+        content_length = total_size - self._bytes_uploaded
 
         logger.info(
             "uploading part #%i, %i bytes (total %.3fGB)",
@@ -494,7 +494,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             'Content-Length': str(content_length),
             'Content-Range': _make_range_string(start, stop, _UNKNOWN_FILE_SIZE),
         }
-        logger.info('Sent headers ' + str(headers))
+
         response = self._session.put(
             self._resumable_upload_url,
             data=self._current_part.read(content_length),
@@ -527,7 +527,20 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     def _upload_final_part(self):
         part_num = self._total_parts + 1
+
+        #
+        # this is pretty intrusive, but I have no idea how else to work around this issue
+        # https://stackoverflow.com/questions/60230631/upload-zero-size-final-part-to-google-cloud-storage-resumable-upload
+        #
+        if self._current_part_size == 0:
+            warnings.warn('Additional newline character added to the end of gs://%s/%s due '
+                          'to being unable to upload a final empty part.' % (self._bucket.name, self._blob.name))
+            self.write(b'\n')
+
+        stop = self._total_size - 1
+        start = self._bytes_uploaded
         part_size = self._current_part_size
+
         logger.info(
             "uploading part #%i, %i bytes (total %.3fGB)",
             part_num,
@@ -535,18 +548,10 @@ class BufferedOutputBase(io.BufferedIOBase):
             self._total_size / 1024.0 ** 3
         )
 
-        stop = self._total_size - 1
-
-        if self._current_part_size == 0:
-            start = stop
-        else:
-            start = self._bytes_uploaded
-
         headers = {
             'Content-Length': str(part_size),
             'Content-Range': _make_range_string(start, stop, self._total_size),
         }
-        logger.info('Sent headers' + str(headers))
 
         self._current_part.seek(0)
 
