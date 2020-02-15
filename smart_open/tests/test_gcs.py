@@ -171,6 +171,7 @@ class FakeBlob(object):
         return self._exists
 
     def upload_from_string(self, str_):
+        self.__contents = io.BytesIO()
         self.__contents.write(str_)
 
     def write(self, data):
@@ -295,15 +296,18 @@ class FakeBlobUpload(object):
     def __init__(self, url, blob):
         self.url = url
         self.blob = blob  # type: FakeBlob
+        self._finished = False
         self.__contents = io.BytesIO()
 
     def write(self, data):
         self.__contents.write(data)
 
     def finish(self):
-        self.__contents.seek(0)
-        data = self.__contents.read()
-        self.blob.upload_from_string(data)
+        if not self._finished:
+            self.__contents.seek(0)
+            data = self.__contents.read()
+            self.blob.upload_from_string(data)
+            self._finished = True
 
     def terminate(self):
         self.blob.delete()
@@ -328,10 +332,10 @@ class FakeAuthorizedSession(object):
         upload = self._credentials.client.uploads[url]
 
         if data is not None:
-            if isinstance(data, bytes):
-                upload.write(data)
-            else:
+            if hasattr(data, 'read'):
                 upload.write(data.read())
+            else:
+                upload.write(data)
         if not headers.get('Content-Range', '').endswith(smart_open.gcs._UNKNOWN_FILE_SIZE):
             upload.finish()
             return FakeResponse(200)
@@ -364,7 +368,7 @@ class FakeAuthorizedSessionTest(unittest.TestCase):
             'Content-Length': str(4),
         }
         response = self.session.put(self.upload_url, data, headers=headers)
-        self.assertEqual(response.status_code, 308)
+        self.assertEqual(response.status_code, smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODE)
         self.session._blob_with_url(self.upload_url, self.client)
         blob_contents = self.blob.download_as_string()
         self.assertEqual(blob_contents, b'')
@@ -695,12 +699,14 @@ class BufferedOutputBaseTest(unittest.TestCase):
             self.assertEqual(fout.tell(), 14)
 
     def test_write_03(self):
-        """Does gcs multipart chunking work correctly?"""
+        """Do multiple writes of varying sizes work correctly?"""
         # write
+        min_part_size = 256 * 1024
         smart_open_write = smart_open.gcs.BufferedOutputBase(
-            BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=256 * 1024
+            BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
         )
         local_write = io.BytesIO()
+
         with smart_open_write as fout:
             first_part = b"t" * 262141
             fout.write(first_part)
@@ -722,7 +728,8 @@ class BufferedOutputBaseTest(unittest.TestCase):
             fourth_part = b"t" * 100000 * 6
             fout.write(fourth_part)
             local_write.write(fourth_part)
-            self.assertEqual(fout._current_part_size, 75712)
+            size_of_leftovers = (100000 * 6) % min_part_size
+            self.assertEqual(fout._current_part_size, size_of_leftovers)
             self.assertEqual(fout._total_parts, 2)
 
         # read back the same key and check its content
@@ -732,25 +739,24 @@ class BufferedOutputBaseTest(unittest.TestCase):
         self.assertEqual(output, actual)
 
     def test_write_03a(self):
-        """Does gcs multipart chunking handle writing a last chunk equal to the min_part_size?"""
+        """Does writing a last chunk equal to the min_part_size work?"""
         # write
+        min_part_size = 256 * 1024
         smart_open_write = smart_open.gcs.BufferedOutputBase(
-            BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=256 * 1024
+            BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
         )
-        local_write = io.BytesIO()
+        expected = b"t" * min_part_size
+
         with smart_open_write as fout:
-            first_part = b"t" * 256 * 1024
-            fout.write(first_part)
-            local_write.write(first_part)
+            fout.write(expected)
             self.assertEqual(fout._current_part_size, 0)
             self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content
-        output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
-        local_write.write(b'\n')
-        local_write.seek(0)
-        actual = [line.decode("utf-8") for line in list(local_write)]
-        self.assertEqual(output, actual)
+        with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)) as fin:
+            output = fin.read().encode('utf-8')
+
+        self.assertEqual(output, expected + b'\n')
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
