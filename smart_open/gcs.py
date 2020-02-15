@@ -61,7 +61,7 @@ END = 2
 
 _WHENCE_CHOICES = (START, CURRENT, END)
 
-_UPLOAD_PART_STATUS_CODE = 308
+_UPLOAD_INCOMPLETE_STATUS_CODE = 308
 _UPLOAD_COMPLETE_STATUS_CODES = (200, 201)
 
 
@@ -501,7 +501,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             headers=headers,
         )
 
-        if response.status_code != _UPLOAD_PART_STATUS_CODE:
+        if response.status_code != _UPLOAD_INCOMPLETE_STATUS_CODE:
             msg = (
                 "upload failed ("
                 "status code: %i "

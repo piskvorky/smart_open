@@ -335,7 +335,7 @@ class FakeAuthorizedSession(object):
         if not headers.get('Content-Range', '').endswith(smart_open.gcs._UNKNOWN_FILE_SIZE):
             upload.finish()
             return FakeResponse(200)
-        return FakeResponse(smart_open.gcs._UPLOAD_PART_STATUS_CODE)
+        return FakeResponse(smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODE)
 
     @staticmethod
     def _blob_with_url(url, client):
