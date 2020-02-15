@@ -529,12 +529,15 @@ class BufferedOutputBase(io.BufferedIOBase):
         part_num = self._total_parts + 1
 
         #
-        # this is pretty intrusive, but I have no idea how else to work around this issue
+        # this is pretty intrusive, but I don't think there is another way to work around this issue
         # https://stackoverflow.com/questions/60230631/upload-zero-size-final-part-to-google-cloud-storage-resumable-upload
         #
         if self._current_part_size == 0:
-            warnings.warn('Additional newline character added to the end of gs://%s/%s due '
-                          'to being unable to upload a final empty part.' % (self._bucket.name, self._blob.name))
+            warnings.warn(
+                'Additional newline character added to the end of gs://%s/%s due '
+                'to being unable to upload a final empty part.'
+                % (self._bucket.name, self._blob.name)
+            )
             self.write(b'\n')
 
         stop = self._total_size - 1
