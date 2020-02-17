@@ -698,7 +698,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
             self.assertEqual(fout.tell(), 14)
 
     def test_write_03(self):
-        """Do multiple writes of varying sizes work correctly?"""
+        """Do multiple writes less than the min_part_size work correctly?"""
         # write
         min_part_size = 256 * 1024
         smart_open_write = smart_open.gcs.BufferedOutputBase(
@@ -724,11 +724,10 @@ class BufferedOutputBaseTest(unittest.TestCase):
             self.assertEqual(fout._current_part_size, 262144)
             self.assertEqual(fout._total_parts, 0)
 
-            fourth_part = b"t" * 600000
+            fourth_part = b"t" * 1
             fout.write(fourth_part)
             local_write.write(fourth_part)
-            size_of_leftovers = 600000 % min_part_size
-            self.assertEqual(fout._current_part_size, size_of_leftovers)
+            self.assertEqual(fout._current_part_size, 1)
             self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content
@@ -738,18 +737,41 @@ class BufferedOutputBaseTest(unittest.TestCase):
         self.assertEqual(output, actual)
 
     def test_write_03a(self):
-        """Does writing a last chunk equal to the min_part_size work?"""
+        """Do multiple writes greater than the min_part_size work correctly?"""
         # write
         min_part_size = 256 * 1024
         smart_open_write = smart_open.gcs.BufferedOutputBase(
             BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
         )
-        expected = b"t" * min_part_size
+        local_write = io.BytesIO()
+
+        with smart_open_write as fout:
+            for i in range(1, 4):
+                part = b"t" * (min_part_size + 1)
+                fout.write(part)
+                local_write.write(part)
+                self.assertEqual(fout._current_part_size, i)
+                self.assertEqual(fout._total_parts, i)
+
+        # read back the same key and check its content
+        output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
+        local_write.seek(0)
+        actual = [line.decode("utf-8") for line in list(local_write)]
+        self.assertEqual(output, actual)
+
+    def test_write_03b(self):
+        """Does writing a last chunk size equal to a multiple of the min_part_size work?"""
+        # write
+        min_part_size = 256 * 1024
+        smart_open_write = smart_open.gcs.BufferedOutputBase(
+            BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
+        )
+        expected = b"t" * min_part_size * 2
 
         with smart_open_write as fout:
             fout.write(expected)
             self.assertEqual(fout._current_part_size, 262144)
-            self.assertEqual(fout._total_parts, 0)
+            self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content
         with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)) as fin:
