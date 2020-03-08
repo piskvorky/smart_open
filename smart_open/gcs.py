@@ -91,6 +91,25 @@ class UploadFailedError(Exception):
         self.status_code = status_code
         self.text = text
 
+    @classmethod
+    def from_response(cls, response, part_num, content_length, total_size, headers):
+        msg = (
+            "upload failed ("
+            "status code: %i "
+            "response text=%s), "
+            "part #%i, "
+            "%i bytes (total %.3fGB), "
+            "headers %r"
+        ) % (
+            response.status_code,
+            response.text,
+            part_num,
+            content_length,
+            total_size / 1024.0 ** 3,
+            headers,
+        )
+        return cls(msg, response.status_code, response.text)
+
 
 def open(
         bucket_id,
@@ -172,10 +191,10 @@ class _SeekableRawReader(object):
             #
             binary = b''
         elif size == -1:
-            binary = self._blob.download_as_string(start=start)
+            binary = self._blob.download_as_string(start=start).encode('utf-8')
         else:
             end = position + size
-            binary = self._blob.download_as_string(start=start, end=end)
+            binary = self._blob.download_as_string(start=start, end=end).encode('utf-8')
         return binary
 
 
@@ -521,22 +540,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         )
 
         if response.status_code != _UPLOAD_INCOMPLETE_STATUS_CODE:
-            msg = (
-                "upload failed ("
-                "status code: %i "
-                "response text=%s), "
-                "part #%i, "
-                "%i bytes (total %.3fGB), "
-                "headers %r"
-            ) % (
-                response.status_code,
-                response.text,
-                part_num,
-                content_length,
-                self._total_size / 1024.0 ** 3,
-                headers,
-            )
-            raise UploadFailedError(msg, response.status_code, response.text)
+            raise UploadFailedError.from_response(response, part_num, content_length, self._total_size, headers)
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
@@ -575,22 +579,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         )
 
         if response.status_code not in _UPLOAD_COMPLETE_STATUS_CODES:
-            msg = (
-                "upload failed ("
-                "status code: %i ,"
-                "response text=%s), "
-                "part #%i, "
-                "%i bytes (total %.3fGB), "
-                "headers %r"
-            ) % (
-                response.status_code,
-                response.text,
-                part_num,
-                part_size,
-                self._total_size / 1024.0 ** 3,
-                headers,
-              )
-            raise UploadFailedError(msg, response.status_code, response.text)
+            raise UploadFailedError.from_response(response, part_num, content_length, self._total_size, headers)
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
