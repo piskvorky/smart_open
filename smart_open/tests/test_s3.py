@@ -474,11 +474,7 @@ class IterBucketTest(unittest.TestCase):
             aws_secret_access_key='access_secret'
         ))
 
-        mock_client.assert_called_with(
-            's3',
-            aws_access_key_id='access_id',
-            aws_secret_access_key='access_secret'
-        )
+        mock_client.assert_called_with('s3')
         mock_session.assert_called_with(
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret'

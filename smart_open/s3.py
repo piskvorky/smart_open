@@ -686,10 +686,10 @@ def iter_bucket(
 
     total_size, key_no = 0, -1
     key_iterator = _list_bucket(
-            bucket_name,
-            prefix=prefix,
-            accept_key=accept_key,
-            **session_kwargs)
+        bucket_name,
+        prefix=prefix,
+        accept_key=accept_key,
+        **session_kwargs)
     download_key = functools.partial(
         _download_key,
         bucket_name=bucket_name,
@@ -718,7 +718,8 @@ def _list_bucket(
         prefix='',
         accept_key=lambda k: True,
         **session_kwargs):
-    client = boto3.client('s3', **session_kwargs)
+    session = boto3.session.Session(**session_kwargs)
+    client = boto3.client('s3')
     ctoken = None
 
     while True:
