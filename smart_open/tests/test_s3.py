@@ -512,26 +512,6 @@ class IterBucketTest(unittest.TestCase):
             self.assertEqual(result, expected)
 
 
-class IterBucketTestCredentials(unittest.TestCase):
-    @mock.patch('boto3.session.Session')
-    def test(self, mock_session):
-        mock_s3 = mock.Mock()
-        mock_session.client = mock.Mock(return_value=mock_s3)
-        mock_s3.list_objects_v2.return_value = {'Contents': [{'Key': 'test_key'}]}
-
-        list(smart_open.s3.iter_bucket(
-            'dummy_bucket',
-            workers=None,
-            aws_access_key_id='access_id',
-            aws_secret_access_key='access_secret'
-        ))
-
-        mock_session.assert_called_with(
-            aws_access_key_id='access_id',
-            aws_secret_access_key='access_secret'
-        )
-
-
 @maybe_mock_s3
 class IterBucketSingleProcessTest(unittest.TestCase):
     def setUp(self):
