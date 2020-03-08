@@ -719,7 +719,7 @@ def _list_bucket(
         accept_key=lambda k: True,
         **session_kwargs):
     session = boto3.session.Session(**session_kwargs)
-    client = boto3.client('s3')
+    client = session.client('s3')
     ctoken = None
 
     while True:

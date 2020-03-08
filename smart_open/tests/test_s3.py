@@ -460,25 +460,18 @@ class IterBucketTest(unittest.TestCase):
         expected = ['key_%d' % x for x in range(num_keys)]
         self.assertEqual(sorted(keys), sorted(expected))
 
-    @mock.patch('boto3.client')
-    @mock.patch('boto3.session.Session')
-    def test_credentials(self, mock_session, mock_client):
-        mock_s3 = mock.Mock()
-        mock_client.return_value = mock_s3
-        mock_s3.list_objects_v2.return_value = {'Contents': [{'Key': 'test_key'}]}
-
-        list(smart_open.s3.iter_bucket(
-            BUCKET_NAME,
-            workers=None,
-            aws_access_key_id='access_id',
-            aws_secret_access_key='access_secret'
-        ))
-
-        mock_client.assert_called_with('s3')
-        mock_session.assert_called_with(
-            aws_access_key_id='access_id',
-            aws_secret_access_key='access_secret'
+    def test_credentials(self):
+        num_keys = 10
+        populate_bucket(num_keys=num_keys)
+        result = list(
+            smart_open.s3.iter_bucket(
+                BUCKET_NAME,
+                workers=None,
+                aws_access_key_id='access_id',
+                aws_secret_access_key='access_secret'
+            )
         )
+        self.assertEqual(len(result), num_keys)
 
     def test_old(self):
         """Does s3_iter_bucket work correctly?"""
@@ -517,6 +510,26 @@ class IterBucketTest(unittest.TestCase):
             for k, c in smart_open.s3.iter_bucket(mybucket):
                 result[k] = c
             self.assertEqual(result, expected)
+
+
+class IterBucketTestCredentials(unittest.TestCase):
+    @mock.patch('boto3.session.Session')
+    def test(self, mock_session):
+        mock_s3 = mock.Mock()
+        mock_session.client = mock.Mock(return_value=mock_s3)
+        mock_s3.list_objects_v2.return_value = {'Contents': [{'Key': 'test_key'}]}
+
+        list(smart_open.s3.iter_bucket(
+            'dummy_bucket',
+            workers=None,
+            aws_access_key_id='access_id',
+            aws_secret_access_key='access_secret'
+        ))
+
+        mock_session.assert_called_with(
+            aws_access_key_id='access_id',
+            aws_secret_access_key='access_secret'
+        )
 
 
 @maybe_mock_s3
