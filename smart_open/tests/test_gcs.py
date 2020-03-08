@@ -169,9 +169,11 @@ class FakeBlob(object):
     def exists(self, client=None):
         return self._exists
 
-    def upload_from_string(self, str_):
-        self.__contents = io.BytesIO()
-        self.__contents.write(str_)
+    def upload_from_string(self, bytes_):
+        # Method name is misleading as this actually uploads bytes but we need to mimic
+        # Google's API and currently we only support the mode 'wb', not 'w'
+        self.__contents = io.BytesIO(bytes_)
+        self.__contents.seek(0, io.SEEK_END)
 
     def write(self, data):
         self.upload_from_string(data)
