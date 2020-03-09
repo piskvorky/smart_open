@@ -420,7 +420,6 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._total_size = 0
         self._total_parts = 0
         self._bytes_uploaded = 0
-        self._closed = False
         self._current_part = io.BytesIO()
 
         self._session = google_requests.AuthorizedSession(self._credentials)
@@ -448,12 +447,12 @@ class BufferedOutputBase(io.BufferedIOBase):
                 self._upload_empty_part()
             else:
                 self._upload_final_part()
-            self._closed = True
+            self._client = None
         logger.debug("successfully closed")
 
     @property
     def closed(self):
-        return self._closed
+        return self._client is None
 
     def writable(self):
         """Return True if the stream supports writing."""
