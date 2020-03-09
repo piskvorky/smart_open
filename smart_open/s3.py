@@ -314,10 +314,6 @@ class Reader(io.BufferedIOBase):
         if self._eof:
             return self._read_from_buffer()
 
-        #
-        # Fill our buffer to the required size.
-        #
-        # logger.debug('filling %r byte-long buffer up to %r bytes', len(self._buffer), size)
         self._fill_buffer(size)
         return self._read_from_buffer(size)
 
@@ -430,7 +426,7 @@ class Reader(io.BufferedIOBase):
         return part
 
     def _fill_buffer(self, size=-1):
-        size = size if size >= 0 else self._buffer._chunk_size
+        size = max(size, self._buffer._chunk_size)
         while len(self._buffer) < size and not self._eof:
             bytes_read = self._buffer.fill(self._raw_reader)
             if bytes_read == 0:
