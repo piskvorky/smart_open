@@ -10,7 +10,6 @@
 import io
 import logging
 import sys
-import warnings
 
 import google.cloud.exceptions
 import google.cloud.storage
@@ -91,6 +90,25 @@ class UploadFailedError(Exception):
         super(UploadFailedError, self).__init__(message)
         self.status_code = status_code
         self.text = text
+
+    @classmethod
+    def from_response(cls, response, part_num, content_length, total_size, headers):
+        msg = (
+            "upload failed ("
+            "status code: %i "
+            "response text=%s), "
+            "part #%i, "
+            "%i bytes (total %.3fGB), "
+            "headers %r"
+        ) % (
+            response.status_code,
+            response.text,
+            part_num,
+            content_length,
+            total_size / 1024.0 ** 3,
+            headers,
+        )
+        return cls(msg, response.status_code, response.text)
 
 
 def open(
@@ -424,11 +442,17 @@ class BufferedOutputBase(io.BufferedIOBase):
     #
     def close(self):
         logger.debug("closing")
-        if self._total_size == 0:  # empty files
-            self._upload_empty_part()
-        else:
-            self._upload_final_part()
+        if not self.closed:
+            if self._total_size == 0:  # empty files
+                self._upload_empty_part()
+            else:
+                self._upload_final_part()
+            self._client = None
         logger.debug("successfully closed")
+
+    @property
+    def closed(self):
+        return self._client is None
 
     def writable(self):
         """Return True if the stream supports writing."""
@@ -456,7 +480,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._current_part.write(b)
         self._total_size += len(b)
 
-        if self._current_part_size >= self._min_part_size:
+        if self._current_part.tell() > self._min_part_size:
             self._upload_next_part()
 
         return len(b)
@@ -474,19 +498,22 @@ class BufferedOutputBase(io.BufferedIOBase):
     def _upload_next_part(self):
         part_num = self._total_parts + 1
 
-        # upload the largest multiple of 256kB
-        size_of_leftovers = self._total_size % self._min_part_size
-        total_size = self._total_size - size_of_leftovers
-        content_length = total_size - self._bytes_uploaded
+        # upload the largest amount possible given GCS's restriction
+        # of parts being multiples of 256kB, except for the last one
+        size_of_leftovers = self._current_part.tell() % self._min_part_size
+        content_length = self._current_part.tell() - size_of_leftovers
 
-        logger.info(
-            "uploading part #%i, %i bytes (total %.3fGB)",
-            part_num,
-            content_length,
-            total_size / 1024.0 ** 3
-        )
+        # a final upload of 0 bytes does not work, so we need to guard against this edge case
+        # this results in occasionally keeping an additional 256kB in the buffer after uploading a part,
+        # but until this is fixed on Google's end there is no other option
+        # https://stackoverflow.com/questions/60230631/upload-zero-size-final-part-to-google-cloud-storage-resumable-upload
+        if size_of_leftovers == 0:
+            content_length -= _REQUIRED_CHUNK_MULTIPLE
+
+        total_size = self._bytes_uploaded + content_length
+
         start = self._bytes_uploaded
-        stop = start + content_length - 1
+        stop = total_size - 1
 
         self._current_part.seek(0)
 
@@ -495,6 +522,16 @@ class BufferedOutputBase(io.BufferedIOBase):
             'Content-Range': _make_range_string(start, stop, _UNKNOWN_FILE_SIZE),
         }
 
+        logger.info(
+          "uploading part #%i, "
+          "%i bytes (total %.3fGB)"
+          "headers %r",
+          part_num,
+          content_length,
+          total_size / 1024.0 ** 3,
+          headers,
+        )
+
         response = self._session.put(
             self._resumable_upload_url,
             data=self._current_part.read(content_length),
@@ -502,56 +539,41 @@ class BufferedOutputBase(io.BufferedIOBase):
         )
 
         if response.status_code != _UPLOAD_INCOMPLETE_STATUS_CODE:
-            msg = (
-                "upload failed ("
-                "status code: %i "
-                "response text=%s), "
-                "part #%i, "
-                "%i bytes (total %.3fGB), "
-                "headers %r"
-            ) % (
-                response.status_code,
-                response.text,
+            raise UploadFailedError.from_response(
+                response,
                 part_num,
                 content_length,
-                self._total_size / 1024.0 ** 3,
+                self._total_size,
                 headers,
             )
-            raise UploadFailedError(msg, response.status_code, response.text)
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
         self._bytes_uploaded += content_length
         # handle the leftovers
         self._current_part = io.BytesIO(self._current_part.read())
+        self._current_part.seek(0, io.SEEK_END)
 
     def _upload_final_part(self):
         part_num = self._total_parts + 1
-
-        #
-        # this is pretty intrusive, but I don't think there is another way to work around this issue
-        # https://stackoverflow.com/questions/60230631/upload-zero-size-final-part-to-google-cloud-storage-resumable-upload
-        #
-        if self._current_part_size == 0:
-            warnings.warn('Additional newline character added to the end of gs://%s/%s due '
-                          'to being unable to upload a final empty part.' % (self._bucket.name, self._blob.name))
-            self.write(b'\n')
-
+        content_length = self._current_part.tell()
         stop = self._total_size - 1
         start = self._bytes_uploaded
-        part_size = self._current_part_size
-
-        logger.info(
-            "uploading part #%i, %i bytes (total %.3fGB)",
-            part_num,
-            part_size,
-            self._total_size / 1024.0 ** 3
-        )
 
         headers = {
-            'Content-Length': str(part_size),
+            'Content-Length': str(content_length),
             'Content-Range': _make_range_string(start, stop, self._total_size),
         }
+
+        logger.info(
+          "uploading part #%i, "
+          "%i bytes (total %.3fGB)"
+          "headers %r",
+          part_num,
+          content_length,
+          self._total_size / 1024.0 ** 3,
+          headers,
+        )
 
         self._current_part.seek(0)
 
@@ -562,26 +584,17 @@ class BufferedOutputBase(io.BufferedIOBase):
         )
 
         if response.status_code not in _UPLOAD_COMPLETE_STATUS_CODES:
-            msg = (
-                "upload failed ("
-                "status code: %i ,"
-                "response text=%s), "
-                "part #%i, "
-                "%i bytes (total %.3fGB), "
-                "headers %r"
-            ) % (
-                response.status_code,
-                response.text,
+            raise UploadFailedError.from_response(
+                response,
                 part_num,
-                part_size,
-                self._total_size / 1024.0 ** 3,
+                content_length,
+                self._total_size,
                 headers,
-              )
-            raise UploadFailedError(msg, response.status_code, response.text)
+            )
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
-        self._bytes_uploaded += part_size
+        self._bytes_uploaded += content_length
         self._current_part = io.BytesIO()
 
     def _upload_empty_part(self):
@@ -591,10 +604,6 @@ class BufferedOutputBase(io.BufferedIOBase):
         assert response.status_code in _UPLOAD_COMPLETE_STATUS_CODES
 
         self._total_parts += 1
-
-    @property
-    def _current_part_size(self):
-        return self._current_part.seek(0, io.SEEK_END)
 
     def __enter__(self):
         return self
