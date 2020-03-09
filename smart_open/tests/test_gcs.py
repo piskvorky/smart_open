@@ -174,7 +174,7 @@ class FakeBlob(object):
     def upload_from_string(self, data):
         # mimics Google's API by accepting bytes or str, despite the method name
         # https://google-cloud-python.readthedocs.io/en/0.32.0/storage/blobs.html#google.cloud.storage.blob.Blob.upload_from_string
-        if isinstance(data, str):
+        if isinstance(data, six.string_types):
             data = data.encode('utf-8')
         self.__contents = io.BytesIO(data)
         self.__contents.seek(0, io.SEEK_END)
