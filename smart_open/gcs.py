@@ -539,7 +539,13 @@ class BufferedOutputBase(io.BufferedIOBase):
         )
 
         if response.status_code != _UPLOAD_INCOMPLETE_STATUS_CODE:
-            raise UploadFailedError.from_response(response, part_num, content_length, self._total_size, headers)
+            raise UploadFailedError.from_response(
+                response,
+                part_num,
+                content_length,
+                self._total_size,
+                headers,
+            )
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
@@ -578,7 +584,13 @@ class BufferedOutputBase(io.BufferedIOBase):
         )
 
         if response.status_code not in _UPLOAD_COMPLETE_STATUS_CODES:
-            raise UploadFailedError.from_response(response, part_num, content_length, self._total_size, headers)
+            raise UploadFailedError.from_response(
+                response,
+                part_num,
+                content_length,
+                self._total_size,
+                headers,
+            )
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
