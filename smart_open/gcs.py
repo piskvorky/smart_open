@@ -481,7 +481,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._current_part.write(b)
         self._total_size += len(b)
 
-        if self._current_part_size > self._min_part_size:
+        if self._current_part.tell() > self._min_part_size:
             self._upload_next_part()
 
         return len(b)
@@ -501,8 +501,8 @@ class BufferedOutputBase(io.BufferedIOBase):
 
         # upload the largest amount possible given GCS's restriction
         # of parts being multiples of 256kB, except for the last one
-        size_of_leftovers = self._current_part_size % self._min_part_size
-        content_length = self._current_part_size - size_of_leftovers
+        size_of_leftovers = self._current_part.tell() % self._min_part_size
+        content_length = self._current_part.tell() - size_of_leftovers
 
         # a final upload of 0 bytes does not work, so we need to guard against this edge case
         # this results in occasionally keeping an additional 256kB in the buffer after uploading a part,
@@ -551,12 +551,12 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     def _upload_final_part(self):
         part_num = self._total_parts + 1
-        part_size = self._current_part_size
+        content_length = self._current_part.tell()
         stop = self._total_size - 1
         start = self._bytes_uploaded
 
         headers = {
-            'Content-Length': str(part_size),
+            'Content-Length': str(content_length),
             'Content-Range': _make_range_string(start, stop, self._total_size),
         }
 
@@ -565,7 +565,7 @@ class BufferedOutputBase(io.BufferedIOBase):
           "%i bytes (total %.3fGB)"
           "headers %r",
           part_num,
-          part_size,
+          content_length,
           self._total_size / 1024.0 ** 3,
           headers,
         )
@@ -583,7 +583,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
-        self._bytes_uploaded += part_size
+        self._bytes_uploaded += content_length
         self._current_part = io.BytesIO()
 
     def _upload_empty_part(self):
@@ -593,10 +593,6 @@ class BufferedOutputBase(io.BufferedIOBase):
         assert response.status_code in _UPLOAD_COMPLETE_STATUS_CODES
 
         self._total_parts += 1
-
-    @property
-    def _current_part_size(self):
-        return self._current_part.seek(0, io.SEEK_END)
 
     def __enter__(self):
         return self
