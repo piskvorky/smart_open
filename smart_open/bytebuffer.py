@@ -161,7 +161,7 @@ class ByteBuffer(object):
         return len(new_bytes)
 
     def readline(self, terminator):
-        """Efficiently reads a line from this buffer.
+        """Read a line from this buffer efficiently.
 
         A line is a contiguous sequence of bytes that ends with either:
 
