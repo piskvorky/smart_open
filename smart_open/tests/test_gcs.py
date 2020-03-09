@@ -161,6 +161,8 @@ class FakeBlob(object):
         self._exists = False
 
     def download_as_string(self, start=0, end=None):
+        # mimics Google's API by returning bytes, despite the method name
+        # https://google-cloud-python.readthedocs.io/en/0.32.0/storage/blobs.html#google.cloud.storage.blob.Blob.download_as_string
         if end is None:
             end = self.__contents.tell()
         self.__contents.seek(start)
@@ -169,10 +171,12 @@ class FakeBlob(object):
     def exists(self, client=None):
         return self._exists
 
-    def upload_from_string(self, bytes_):
-        # Method name is misleading as this actually uploads bytes but we need to mimic
-        # Google's API and currently we only support the mode 'wb', not 'w'
-        self.__contents = io.BytesIO(bytes_)
+    def upload_from_string(self, data):
+        # mimics Google's API by accepting bytes or str, despite the method name
+        # https://google-cloud-python.readthedocs.io/en/0.32.0/storage/blobs.html#google.cloud.storage.blob.Blob.upload_from_string
+        if isinstance(data, str):
+            data = data.decode('utf-8')
+        self.__contents = io.BytesIO(data)
         self.__contents.seek(0, io.SEEK_END)
 
     def write(self, data):
@@ -712,24 +716,24 @@ class BufferedOutputBaseTest(unittest.TestCase):
             first_part = b"t" * 262141
             fout.write(first_part)
             local_write.write(first_part)
-            self.assertEqual(fout._current_part_size, 262141)
+            self.assertEqual(fout._current_part.tell(), 262141)
 
             second_part = b"t\n"
             fout.write(second_part)
             local_write.write(second_part)
-            self.assertEqual(fout._current_part_size, 262143)
+            self.assertEqual(fout._current_part.tell(), 262143)
             self.assertEqual(fout._total_parts, 0)
 
             third_part = b"t"
             fout.write(third_part)
             local_write.write(third_part)
-            self.assertEqual(fout._current_part_size, 262144)
+            self.assertEqual(fout._current_part.tell(), 262144)
             self.assertEqual(fout._total_parts, 0)
 
             fourth_part = b"t" * 1
             fout.write(fourth_part)
             local_write.write(fourth_part)
-            self.assertEqual(fout._current_part_size, 1)
+            self.assertEqual(fout._current_part.tell(), 1)
             self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content
@@ -752,7 +756,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
                 part = b"t" * (min_part_size + 1)
                 fout.write(part)
                 local_write.write(part)
-                self.assertEqual(fout._current_part_size, i)
+                self.assertEqual(fout._current_part.tell(), i)
                 self.assertEqual(fout._total_parts, i)
 
         # read back the same key and check its content
@@ -772,7 +776,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
         with smart_open_write as fout:
             fout.write(expected)
-            self.assertEqual(fout._current_part_size, 262144)
+            self.assertEqual(fout._current_part.tell(), 262144)
             self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content

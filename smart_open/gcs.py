@@ -191,10 +191,10 @@ class _SeekableRawReader(object):
             #
             binary = b''
         elif size == -1:
-            binary = self._blob.download_as_string(start=start).encode('utf-8')
+            binary = self._blob.download_as_string(start=start)
         else:
             end = position + size
-            binary = self._blob.download_as_string(start=start, end=end).encode('utf-8')
+            binary = self._blob.download_as_string(start=start, end=end)
         return binary
 
 
