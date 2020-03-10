@@ -375,16 +375,8 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         return "(%s, %r, %r)" % (self.__class__.__name__, self._bucket.name, self._blob.name)
 
     def __repr__(self):
-        return (
-            "%s("
-            "bucket=%r, "
-            "blob=%r, "
-            "buffer_size=%r)"
-        ) % (
-            self.__class__.__name__,
-            self._bucket.name,
-            self._blob.name,
-            self._current_part_size,
+        return "%s(bucket=%r, blob=%r, buffer_size=%r)" % (
+            self.__class__.__name__, self._bucket.name, self._blob.name, self._current_part_size,
         )
 
 
@@ -516,13 +508,8 @@ class BufferedOutputBase(io.BufferedIOBase):
         }
 
         logger.info(
-          "uploading part #%i, "
-          "%i bytes (total %.3fGB)"
-          "headers %r",
-          part_num,
-          content_length,
-          total_size / 1024.0 ** 3,
-          headers,
+            "uploading part #%i, %i bytes (total %.3fGB) headers %r",
+            part_num, content_length, total_size / 1024.0 ** 3, headers,
         )
 
         response = self._session.put(
@@ -560,10 +547,7 @@ class BufferedOutputBase(io.BufferedIOBase):
 
         logger.info(
             "uploading part #%i, %i bytes (total %.3fGB) headers %r",
-            part_num,
-            content_length,
-            self._total_size / 1024.0 ** 3,
-            headers,
+            part_num, content_length, self._total_size / 1024.0 ** 3, headers,
         )
 
         self._current_part.seek(0)
@@ -609,14 +593,6 @@ class BufferedOutputBase(io.BufferedIOBase):
         return "(%s, %r, %r)" % (self.__class__.__name__, self._bucket.name, self._blob.name)
 
     def __repr__(self):
-        return (
-            "%s("
-            "bucket=%r, "
-            "blob=%r, "
-            "min_part_size=%r)"
-        ) % (
-            self.__class__.__name__,
-            self._bucket.name,
-            self._blob.name,
-            self._min_part_size,
+        return "%s(bucket=%r, blob=%r, min_part_size=%r)" % (
+            self.__class__.__name__, self._bucket.name, self._blob.name, self._min_part_size,
         )
