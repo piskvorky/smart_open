@@ -93,21 +93,14 @@ class UploadFailedError(Exception):
 
     @classmethod
     def from_response(cls, response, part_num, content_length, total_size, headers):
+        status_code = response.status_code
+        response_text = response.text
+        total_size_gb = round(total_size / 1024.0 ** 3, 3)
+
         msg = (
-            "upload failed ("
-            "status code: %i "
-            "response text=%s), "
-            "part #%i, "
-            "%i bytes (total %.3fGB), "
-            "headers %r"
-        ) % (
-            response.status_code,
-            response.text,
-            part_num,
-            content_length,
-            total_size / 1024.0 ** 3,
-            headers,
-        )
+            "upload failed (status code: {status_code} response text={response_text}), "
+            "part #{part_num}, %i bytes (total {total_size_gb}GB), headers {headers}"
+        ).format(**locals())
         return cls(msg, response.status_code, response.text)
 
 
@@ -566,13 +559,11 @@ class BufferedOutputBase(io.BufferedIOBase):
         }
 
         logger.info(
-          "uploading part #%i, "
-          "%i bytes (total %.3fGB)"
-          "headers %r",
-          part_num,
-          content_length,
-          self._total_size / 1024.0 ** 3,
-          headers,
+            "uploading part #%i, %i bytes (total %.3fGB) headers %r",
+            part_num,
+            content_length,
+            self._total_size / 1024.0 ** 3,
+            headers,
         )
 
         self._current_part.seek(0)
