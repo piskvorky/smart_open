@@ -564,6 +564,27 @@ class IterBucketSingleProcessTest(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(expected))
 
 
+#
+# This has to be a separate test because we cannot run it against real S3
+# (we don't want to expose our real S3 credentials).
+#
+@moto.mock_s3
+class IterBucketCredentialsTest(unittest.TestCase):
+
+    def test(self):
+        num_keys = 10
+        populate_bucket(num_keys=num_keys)
+        result = list(
+            smart_open.s3.iter_bucket(
+                BUCKET_NAME,
+                workers=None,
+                aws_access_key_id='access_id',
+                aws_secret_access_key='access_secret'
+            )
+        )
+        self.assertEqual(len(result), num_keys)
+
+
 @maybe_mock_s3
 class DownloadKeyTest(unittest.TestCase):
     def setUp(self):
