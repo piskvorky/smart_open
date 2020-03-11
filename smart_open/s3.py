@@ -783,7 +783,8 @@ class ConcurrentFuturesPool(object):
 
     def imap_unordered(self, function, items):
         futures = [self.executor.submit(function, item) for item in items]
-        return (future.result() for future in concurrent.futures.as_completed(futures))
+        for future in concurrent.futures.as_completed(futures):
+            yield future.result()
 
     def terminate(self):
         self.executor.shutdown(wait=True)
