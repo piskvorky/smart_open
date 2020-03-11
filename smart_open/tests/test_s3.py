@@ -512,7 +512,7 @@ class IterBucketTest(unittest.TestCase):
 
         # first, create some keys in the bucket
         expected = {}
-        for key_no in range(200):
+        for key_no in range(42):
             key_name = "mykey%s" % key_no
             with smart_open.smart_open("s3://%s/%s" % (BUCKET_NAME, key_name), 'wb') as fout:
                 content = '\n'.join("line%i%i" % (key_no, line_no) for line_no in range(10)).encode('utf8')
@@ -543,15 +543,62 @@ class IterBucketTest(unittest.TestCase):
 
 
 @maybe_mock_s3
+@unittest.skipIf(not smart_open.s3._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
+class IterBucketConcurrentFuturesTest(unittest.TestCase):
+    def setUp(self):
+        self.old_flag_multi = smart_open.s3._MULTIPROCESSING
+        smart_open.s3._MULTIPROCESSING = False
+        ignore_resource_warnings()
+
+    def tearDown(self):
+        smart_open.s3._MULTIPROCESSING = self.old_flag_multi
+        cleanup_bucket()
+
+    def test(self):
+        num_keys = 101
+        populate_bucket(num_keys=num_keys)
+        keys = list(smart_open.s3.iter_bucket(BUCKET_NAME))
+        self.assertEqual(len(keys), num_keys)
+
+        expected = [('key_%d' % x, b'%d' % x) for x in range(num_keys)]
+        self.assertEqual(sorted(keys), sorted(expected))
+
+
+@maybe_mock_s3
+@unittest.skipIf(not smart_open.s3._MULTIPROCESSING, 'multiprocessing unavailable')
+class IterBucketMultiprocessingTest(unittest.TestCase):
+    def setUp(self):
+        self.old_flag_concurrent = smart_open.s3._CONCURRENT_FUTURES
+        smart_open.s3._CONCURRENT_FUTURES = False
+        ignore_resource_warnings()
+
+    def tearDown(self):
+        smart_open.s3._CONCURRENT_FUTURES = self.old_flag_concurrent
+        cleanup_bucket()
+
+    def test(self):
+        num_keys = 101
+        populate_bucket(num_keys=num_keys)
+        keys = list(smart_open.s3.iter_bucket(BUCKET_NAME))
+        self.assertEqual(len(keys), num_keys)
+
+        expected = [('key_%d' % x, b'%d' % x) for x in range(num_keys)]
+        self.assertEqual(sorted(keys), sorted(expected))
+
+
+@maybe_mock_s3
 class IterBucketSingleProcessTest(unittest.TestCase):
     def setUp(self):
-        self.old_flag = smart_open.s3._MULTIPROCESSING
+        self.old_flag_multi = smart_open.s3._MULTIPROCESSING
+        self.old_flag_concurrent = smart_open.s3._CONCURRENT_FUTURES
         smart_open.s3._MULTIPROCESSING = False
+        smart_open.s3._CONCURRENT_FUTURES = False
 
         ignore_resource_warnings()
 
     def tearDown(self):
-        smart_open.s3._MULTIPROCESSING = self.old_flag
+        smart_open.s3._MULTIPROCESSING = self.old_flag_multi
+        smart_open.s3._CONCURRENT_FUTURES = self.old_flag_concurrent
         cleanup_bucket()
 
     def test(self):
