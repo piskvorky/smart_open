@@ -1,4 +1,3 @@
-import sys
 from smart_open import open
 
 
