@@ -791,12 +791,12 @@ class ConcurrentFuturesPool(object):
 
 @contextlib.contextmanager
 def _create_process_pool(processes=1):
-    if _CONCURRENT_FUTURES and processes:
-        logger.info("creating concurrent futures pool with %i workers", processes)
-        pool = ConcurrentFuturesPool(max_workers=processes)
-    elif _MULTIPROCESSING and processes:
+    if _MULTIPROCESSING and processes:
         logger.info("creating multiprocessing pool with %i workers", processes)
         pool = multiprocessing.pool.Pool(processes=processes)
+    elif _CONCURRENT_FUTURES and processes:
+        logger.info("creating concurrent futures pool with %i workers", processes)
+        pool = ConcurrentFuturesPool(max_workers=processes)
     else:
         logger.info("creating dummy pool")
         pool = DummyPool()
