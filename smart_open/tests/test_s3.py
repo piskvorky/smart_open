@@ -501,13 +501,11 @@ class IterBucketTest(unittest.TestCase):
 
 
 @maybe_mock_s3
+@unittest.skipIf(not smart_open.s3._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
 class IterBucketConcurrentFuturesTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_multi = smart_open.s3._MULTIPROCESSING
         smart_open.s3._MULTIPROCESSING = False
-        if not smart_open.s3._CONCURRENT_FUTURES:
-            self.fail('Unable to test iter bucket concurrent futures since it is disabled on this machine.')
-
         ignore_resource_warnings()
 
     def tearDown(self):
@@ -525,13 +523,11 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
 
 
 @maybe_mock_s3
+@unittest.skipIf(not smart_open.s3._MULTIPROCESSING, 'multiprocessing unavailable')
 class IterBucketMultiprocessingTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_concurrent = smart_open.s3._CONCURRENT_FUTURES
         smart_open.s3._CONCURRENT_FUTURES = False
-        if not smart_open.s3._MULTIPROCESSING:
-            self.fail('Unable to test iter bucket multiprocessing since it is disabled on this machine.')
-
         ignore_resource_warnings()
 
     def tearDown(self):
