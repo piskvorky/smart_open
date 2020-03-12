@@ -7,6 +7,7 @@ import moto
 @moto.mock_s3()
 def setUpModule():
     bucket = boto3.resource('s3').create_bucket(Bucket='mybucket')
+
     bucket.wait_until_exists()
 
 
