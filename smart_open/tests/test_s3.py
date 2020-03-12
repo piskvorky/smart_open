@@ -42,6 +42,12 @@ logger = logging.getLogger(__name__)
 
 def maybe_mock_s3(func):
     if DISABLE_MOCKS:
+        #
+        # If mocks are disabled, then these keys must exist.  The tests won't
+        # work against them because they won't be able to connect to AWS.
+        #
+        assert 'AWS_ACCESS_KEY_ID' in os.environ
+        assert 'AWS_SECRET_ACCESS_KEY' in os.environ
         return func
     else:
         return moto.mock_s3(func)
