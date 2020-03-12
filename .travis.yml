@@ -2,8 +2,8 @@ language: python
 
 env:
   global:
-    - secure: "GH+DI7f9QenVtTZFEfn4B8wO5JJK65PkHDg8vY/npdW51y5PPAynTEf/++D0H4tjwqMuXwB5lrbWfYeskf29Xuq5MT5+FixajZFcbhscoSM9CGABeph2s2+Hm4kSIKmjnTlQLgJHVbwypnlU/W4sfMCbqeOmv2fYXCCt0GhtnWc="
-    - secure: "du3PQYEiDPw55TRzhk+Ocv1Gx1DuusbCSMVSQmccAoyOr7qxDqm+1jh2v13RmajNK7FnlKyC4xSTySVpSl70By2uhZlJT43EpenqIcpQWqUAm3nVr6etszdb1A6TfEGQrxZ8Y2j9KD6QAMNovsMZbl0bcDJDxTeFA4P/yU9UZcI="
+    - secure: uQDfh/Ic9MBSWi2NWzSyiZD63EQCjzvU0T3j/cOH8iTeyX4j3dkYouOpxEvTDEp3jj4f/gkIPTkgX9igJxJEmot2FgJUWTHRSlW3kTtGIW0Nyk+rcmcgS3gd1ZQ/YI2VdsikCfWNs2u2jdLhuE2Mbdlo2Y2v31WflGi8+2NUouqiS/bJ0UL068BWInblu73s9SxjApyBHe3V61SW9bMlRDwVD3457FHBN0BZNllxtMK6wy6ep3I7AHftNYChl2HIeKVTS9pFZKeEZjLynGWf9Y89CAfgyJ3NriPClxTc6x/o7PzYVsRj8c3h738rygaGujIYhple3PpU3Edu7FUPga76Yq5/h+fY0B3nEUNl+x6GqA7lYvZhniV1Mn/+mD2+OQomLa3ewlZWxCM41aPzGIoiI7Vtx+oYOUF6KXYfN9s0YRYKZS+V78Rk3JUhj/0QzhlAWqqN+DYebeynPmocV/r7ro7G4l8YVNwj0yOQ4BBBWMYpGJfgmzJTJ4OsJ4jjUejiDZxcut/K3q5+HI+R1C+eP+eP4pRuVPPILylLW+8JHgl6yxheI8ioXAcXnlEX6lJMNfMwbqqh85TVwSz1prVod7e7BjQi8mV4H6bSeIox2YfM2Jszt9oFqFpnQ1RVsKVwhLAitW6TqEHodt9Wps8oYFhNC4qAl3A0M2kclFw=
+    - secure: mnnx1Qal+OHJQYPY/EHp0pPkdLVmDaWr5GxQ+KlHCtw9YYjqD23pMUaMXGmO4ywj/HmNLAjTWLbcQj8iQqWZ6k0ufbC8YCgQ0NhrGGWotILBhvRSRBRmLBhlw8OVDhNCYcH9qq5yvbmOcVsObCbW8uvx2dWi1IvPLNAqWH9Mh4blajPo5AZWUEfWS/r/Siv1mJRlBNKCt+7vWsPS2l/Ef06IhMjoesp1pZCRgg5Us8NPjNd3+I7AdZ+1DwA5BO37F4KKoVrSni54xAEM4mpL2E5Mx6O6OKjOGtl3LqNTtxSQ/j7SZTNhEeMe2KuiMus44WKRIqIJgKeNIh6exhwEKsTLOUueM1Boho8hd0cQWDJ2sx4dEjhKD9tyHoN7rAcXLK31PLLpv/su2sgwFrMfuyfXbDOh9QlD4TsNjO02Tje6kqbrsLiyLCumQ8UQWad5Tw+j6JyhZcKIq080PC/4pf1eYCrrNJz6K352P8NtxFyT0Jhc8SrT0MmnnWAdYMMlDEzaeWMcdpoV/DXC5ebC/XT9KBXfpND/XqGdNsJRS4ZYfj7z7jt+pCyfPZp/pZCyY1Z9WoxjEeVTt0Essbu8M8H4KlS8f+/NLhhdwE2ckVIKQ9MozYfwgGQ5C/ZLrVEXjwodTbvCUhxY/xuw/kdlhCLCcNmMUpyvw/uUNpT3GSI=
 
 
 matrix:
@@ -61,6 +61,7 @@ script:
       sh -c "moto_server -p5000 2> /dev/null &";
     fi
   - flake8 --max-line-length=110
+  - python check_keys.py
   - python setup.py test
   - export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())')
   - pip install pytest
