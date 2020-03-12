@@ -2,17 +2,27 @@
 import logging
 import os
 import boto3
+import boto3.session
 
 
-def check_implicit():
-    client = boto3.client('s3')
+def check(session):
+    client = session.client('s3')
     try:
         response = client.list_buckets()
     except Exception as e:
         logging.exception(e)
+        return None
     else:
-        buckets = [b['Name'] for b in response['Buckets']]
+        return [b['Name'] for b in response['Buckets']]
+
+
+def check_implicit():
+    session = boto3.session.Session()
+    buckets = check(session)
+    if buckets:
         print('implicit check OK: %r' % buckets)
+    else:
+        print('implicit check failed')
 
 
 def check_explicit():
@@ -22,14 +32,13 @@ def check_explicit():
         print('no credentials found in os.environ, skipping explicit check')
         return
 
-    client = boto3.client('s3', aws_access_key_id=key_id, aws_secret_access_key=secret_key)
-    try:
-        response = client.list_buckets()
-    except Exception as e:
-        logging.exception(e)
-    else:
-        buckets = [b['Name'] for b in response['Buckets']]
+    session = boto3.session.Session(aws_access_key_id=key_id, aws_secret_access_key=secret_key)
+    buckets = check(session)
+    if buckets:
         print('explicit check OK: %r' % buckets)
+    else:
+        print('explicit check failed')
+
 
 
 def main():
