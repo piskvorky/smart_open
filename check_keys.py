@@ -40,7 +40,6 @@ def check_explicit():
         print('explicit check failed')
 
 
-
 def main():
     check_implicit()
     check_explicit()
