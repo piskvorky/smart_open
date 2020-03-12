@@ -34,7 +34,7 @@ BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 KEY_NAME = 'test-key'
 WRITE_KEY_NAME = 'test-write-key'
 DISABLE_MOCKS = os.environ.get('SO_DISABLE_MOCKS') == "1"
-DISABLE_MOTO_SERVER = os.environ.get("SO_DISABLE_MOTO_SERVER") == "1"
+ENABLE_MOTO_SERVER = os.environ.get("SO_ENABLE_MOTO_SERVER") == "1"
 
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,8 @@ def setUpModule():
     test S3 bucket.
 
     '''
-    boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
+    bucket = boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
+    bucket.wait_until_exists()
 
 
 @maybe_mock_s3
@@ -63,11 +64,13 @@ def tearDownModule():
 
     '''
     s3 = boto3.resource('s3')
+    bucket = s3.Bucket(BUCKET_NAME)
     try:
         cleanup_bucket()
-        s3.Bucket(BUCKET_NAME).delete()
+        bucket.delete()
     except s3.meta.client.exceptions.NoSuchBucket:
         pass
+    bucket.wait_until_not_exists()
 
 
 def cleanup_bucket():
@@ -105,7 +108,7 @@ def ignore_resource_warnings():
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
-@unittest.skipIf(DISABLE_MOTO_SERVER, 'The test case needs a Moto server running on the local 5000 port.')
+@unittest.skipIf(not ENABLE_MOTO_SERVER, 'The test case needs a Moto server running on the local 5000 port.')
 class SeekableRawReaderTest(unittest.TestCase):
 
     def setUp(self):
