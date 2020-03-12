@@ -11,8 +11,8 @@ def check_implicit():
     except Exception as e:
         logging.exception(e)
     else:
-        print([b['Name'] for b in response['Buckets']])
-        print('implicit check OK')
+        buckets = [b['Name'] for b in response['Buckets']]
+        print('implicit check OK: %r' % buckets)
 
 
 def check_explicit():
@@ -28,8 +28,8 @@ def check_explicit():
     except Exception as e:
         logging.exception(e)
     else:
-        print([b['Name'] for b in response['Buckets']])
-        print('explicit check OK')
+        buckets = [b['Name'] for b in response['Buckets']]
+        print('explicit check OK: %r' % buckets)
 
 
 def main():

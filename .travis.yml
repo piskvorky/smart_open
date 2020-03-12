@@ -41,6 +41,7 @@ install:
   - pip install flask
   - pip install .[test]
   - pip install flake8
+  - pip install pytest
   - pip freeze
 
 
@@ -56,9 +57,10 @@ script:
     fi
   - flake8 --max-line-length=110
   - python check_keys.py
-  - python setup.py test
+  - pytest smart_open/tests/test_s3.py
+  - python setup.py test  # I suspect something is trashing the keys in the environment
+  - python check_keys.py
   - export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())')
-  - pip install pytest
   - py.test integration-tests/test_http.py
   - if [[ ${SO_DISABLE_MOCKS} = "1" ]]; then
       pip install pytest_benchmark awscli;
