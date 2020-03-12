@@ -52,7 +52,7 @@ script:
       unset SO_S3_URL;
       unset SO_S3_RESULT_URL;
     fi
-  - if [[ ${SO_DISABLE_MOTO_SERVER} -ne 1 ]]; then
+  - if [[ ${SO_ENABLE_MOTO_SERVER} = 1 ]]; then
       sh -c "moto_server -p5000 2> /dev/null &";
     fi
   - flake8 --max-line-length=110
