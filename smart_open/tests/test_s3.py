@@ -284,16 +284,6 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
             actual = [line.rstrip() for line in fin]
         self.assertEqual(expected, actual)
 
-    def test_to_boto3(self):
-        contents = b'the spice melange\n'
-
-        with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'wb') as fout:
-            fout.write(contents)
-            returned_obj = fout.to_boto3()
-
-        boto3_body = returned_obj.get()['Body'].read()
-        self.assertEqual(contents, boto3_body)
-
 
 @moto.mock_s3
 class BufferedOutputBaseTest(unittest.TestCase):
@@ -425,6 +415,16 @@ class BufferedOutputBaseTest(unittest.TestCase):
         fout.write(text)
         fout.flush()
         fout.close()
+
+    def test_to_boto3(self):
+        contents = b'the spice melange\n'
+
+        with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'wb') as fout:
+            fout.write(contents)
+            returned_obj = fout.to_boto3()
+
+        boto3_body = returned_obj.get()['Body'].read()
+        self.assertEqual(contents, boto3_body)
 
 
 class ClampTest(unittest.TestCase):
