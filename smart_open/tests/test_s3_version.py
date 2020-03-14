@@ -9,36 +9,27 @@ import boto3
 import moto
 
 from smart_open import open
-from smart_open.tests.test_s3 import ensure_bucket_exists, cleanup_bucket
 
 
-BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
+BUCKET_NAME = 'test-smartopen'
 KEY_NAME = 'test-key'
-DISABLE_MOCKS = os.environ.get('SO_DISABLE_MOCKS') == "1"
 
 
 logger = logging.getLogger(__name__)
 
 
-def maybe_mock_s3(func):
-    if DISABLE_MOCKS:
-        return func
-    else:
-        return moto.mock_s3(func)
-
-
-@maybe_mock_s3
+@moto.mock_s3
 def setUpModule():
     '''Called once by unittest when initializing this module.  Sets up the
     test S3 bucket.
 
     '''
-    boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
-    ensure_bucket_exists(BUCKET_NAME)
+    bucket = boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
+    bucket.wait_until_exists()
     boto3.resource('s3').BucketVersioning(BUCKET_NAME).enable()
 
 
-@maybe_mock_s3
+@moto.mock_s3
 def tearDownModule():
     '''Called once by unittest when tearing down this module.  Empties and
     removes the test S3 bucket.
@@ -52,15 +43,7 @@ def tearDownModule():
     except s3.meta.client.exceptions.NoSuchBucket:
         pass
 
-    try:
-        bucket.wait_until_not_exists()
-    except Exception:
-        #
-        # This is bad, but not fatal, and should not cause the whole test run
-        # to explode.  Either the bucket will get deleted by AWS eventually,
-        # or we can clean it up later ourselves.
-        #
-        pass
+    bucket.wait_until_not_exists()
 
 
 def get_versions(bucket, key):
@@ -74,11 +57,10 @@ def get_versions(bucket, key):
     ]
 
 
-@maybe_mock_s3
+@moto.mock_s3
 class TestVersionId(unittest.TestCase):
 
     def setUp(self):
-        ensure_bucket_exists(BUCKET_NAME)
         #
         # Each run of this test reuses the BUCKET_NAME, but works with a
         # different key for isolation.
@@ -92,13 +74,6 @@ class TestVersionId(unittest.TestCase):
         bucket.put_object(Key=self.key, Body=self.test_ver1)
 
         logging.critical('versions after first write: %r', get_versions(BUCKET_NAME, self.key))
-
-        if DISABLE_MOCKS:
-            #
-            # I suspect there is a race condition that's messing up the
-            # order of the versions in the test.
-            #
-            time.sleep(5)
 
         bucket.put_object(Key=self.key, Body=self.test_ver2)
 
