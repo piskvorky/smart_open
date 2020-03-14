@@ -118,7 +118,7 @@ def ensure_bucket_exists(bucket_name):
                 obj.delete()
                 return
 
-    raise skip
+        raise skip
 
 
 def cleanup_bucket():
