@@ -9,7 +9,7 @@ import boto3
 import moto
 
 from smart_open import open
-from smart_open.tests.test_s3 import ensure_bucket_exists
+from smart_open.tests.test_s3 import ensure_bucket_exists, cleanup_bucket
 
 
 BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
@@ -63,8 +63,8 @@ class TestVersionId(unittest.TestCase):
         self.test_ver1 = u"String version 1.0".encode('utf8')
         self.test_ver2 = u"String version 2.0".encode('utf8')
 
-        with open(self.url, 'wb') as fout:
-            fout.write(self.test_ver1)
+        bucket = boto3.resource('s3').Bucket(BUCKET_NAME)
+        bucket.put_object(Key=self.key, Body=self.test_ver1)
 
         logging.critical('versions after first write: %r', get_versions(BUCKET_NAME, self.key))
 
@@ -75,11 +75,12 @@ class TestVersionId(unittest.TestCase):
             #
             time.sleep(5)
 
-        with open(self.url, 'wb') as fout:
-            fout.write(self.test_ver2)
+        bucket.put_object(Key=self.key, Body=self.test_ver2)
 
         self.versions = get_versions(BUCKET_NAME, self.key)
         logging.critical('versions after second write: %r', get_versions(BUCKET_NAME, self.key))
+
+        assert len(self.versions) == 2
 
     def test_good_id(self):
         """Does passing the version_id parameter into the s3 submodule work correctly when reading?"""
