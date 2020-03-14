@@ -635,6 +635,14 @@ class IterBucketSingleProcessTest(unittest.TestCase):
 #
 @moto.mock_s3
 class IterBucketCredentialsTest(unittest.TestCase):
+    def setUp(self):
+        #
+        # The setUpModule function "should" take care of this, but we really
+        # want to be sure that the bucket exists before we start the test.
+        # This seems to be a particular problem when we're working with real
+        # AWS instead of mocks.
+        #
+        boto3.resource('s3').Bucket(BUCKET_NAME).wait_until_exists()
 
     def test(self):
         num_keys = 10
@@ -705,6 +713,7 @@ class DownloadKeyTest(unittest.TestCase):
 class OpenTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
+        boto3.resource('s3').Bucket(BUCKET_NAME).wait_until_exists()
 
     def tearDown(self):
         cleanup_bucket()
