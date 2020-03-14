@@ -49,6 +49,7 @@ tests_require = [
     # https://github.com/GoogleCloudPlatform/compute-image-packages/issues/262
     'google-compute-engine==2.8.12',
     'paramiko',
+    'parameterizedtestcase',
 ]
 
 install_requires = [

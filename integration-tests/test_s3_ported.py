@@ -14,7 +14,6 @@ import uuid
 import warnings
 
 import boto3
-import moto
 from parameterizedtestcase import ParameterizedTestCase as PTestCase
 
 import smart_open
