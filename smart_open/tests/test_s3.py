@@ -59,8 +59,8 @@ def setUpModule():
     test S3 bucket.
 
     '''
-    bucket = boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
-    bucket.wait_until_exists()
+    boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
+    ensure_bucket_exists(BUCKET_NAME)
 
 
 @maybe_mock_s3
@@ -86,6 +86,20 @@ def tearDownModule():
         # or we can clean it up later ourselves.
         #
         pass
+
+
+def ensure_bucket_exists(bucket_name):
+    bucket = boto3.resource('s3').Bucket(bucket_name)
+    if not DISABLE_MOCKS:
+        bucket.wait_until_exists()
+    else:
+        try:
+            bucket.wait_until_exists()
+        except Exception:
+            raise unittest.SkipTest(
+                'This test requires an existing real S3 bucket, but one could '
+                'not be created in time (approx. 100 seconds).'
+            )
 
 
 def cleanup_bucket():
@@ -153,6 +167,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024**2
 
         ignore_resource_warnings()
+        ensure_bucket_exists(BUCKET_NAME)
 
     def tearDown(self):
         smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
@@ -327,6 +342,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
     """
     def setUp(self):
         ignore_resource_warnings()
+        ensure_bucket_exists(BUCKET_NAME)
 
     def tearDown(self):
         cleanup_bucket()
@@ -482,6 +498,7 @@ ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operatio
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
+        ensure_bucket_exists(BUCKET_NAME)
 
     def tearDown(self):
         cleanup_bucket()
@@ -567,6 +584,7 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
         self.old_flag_multi = smart_open.s3._MULTIPROCESSING
         smart_open.s3._MULTIPROCESSING = False
         ignore_resource_warnings()
+        ensure_bucket_exists(BUCKET_NAME)
 
     def tearDown(self):
         smart_open.s3._MULTIPROCESSING = self.old_flag_multi
@@ -589,6 +607,7 @@ class IterBucketMultiprocessingTest(unittest.TestCase):
         self.old_flag_concurrent = smart_open.s3._CONCURRENT_FUTURES
         smart_open.s3._CONCURRENT_FUTURES = False
         ignore_resource_warnings()
+        ensure_bucket_exists(BUCKET_NAME)
 
     def tearDown(self):
         smart_open.s3._CONCURRENT_FUTURES = self.old_flag_concurrent
@@ -613,6 +632,7 @@ class IterBucketSingleProcessTest(unittest.TestCase):
         smart_open.s3._CONCURRENT_FUTURES = False
 
         ignore_resource_warnings()
+        ensure_bucket_exists(BUCKET_NAME)
 
     def tearDown(self):
         smart_open.s3._MULTIPROCESSING = self.old_flag_multi
@@ -636,13 +656,7 @@ class IterBucketSingleProcessTest(unittest.TestCase):
 @moto.mock_s3
 class IterBucketCredentialsTest(unittest.TestCase):
     def setUp(self):
-        #
-        # The setUpModule function "should" take care of this, but we really
-        # want to be sure that the bucket exists before we start the test.
-        # This seems to be a particular problem when we're working with real
-        # AWS instead of mocks.
-        #
-        boto3.resource('s3').Bucket(BUCKET_NAME).wait_until_exists()
+        ensure_bucket_exists(BUCKET_NAME)
 
     def test(self):
         num_keys = 10
@@ -662,6 +676,7 @@ class IterBucketCredentialsTest(unittest.TestCase):
 class DownloadKeyTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
+        ensure_bucket_exists(BUCKET_NAME)
 
     def tearDown(self):
         cleanup_bucket()
@@ -713,7 +728,7 @@ class DownloadKeyTest(unittest.TestCase):
 class OpenTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
-        boto3.resource('s3').Bucket(BUCKET_NAME).wait_until_exists()
+        ensure_bucket_exists(BUCKET_NAME)
 
     def tearDown(self):
         cleanup_bucket()

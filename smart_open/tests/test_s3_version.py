@@ -10,6 +10,7 @@ import botocore.client
 import moto
 
 from smart_open import open
+from smart_open.tests.test_s3 import ensure_bucket_exists
 
 
 BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
@@ -34,26 +35,8 @@ def setUpModule():
 
     '''
     boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
-
-    sleep_time = 5
-    num_attempts = 12
-
-    #
-    # In real life, it can take a few seconds for the bucket to become ready.
-    # If we try to enable versioning while the bucket isn't ready, we will get
-    # a ClientError: NoSuchBucket.
-    #
-    for attempt in range(num_attempts):
-        try:
-            boto3.resource('s3').BucketVersioning(BUCKET_NAME).enable()
-        except botocore.exceptions.ClientError as err:
-            logger.error('caught %r, retrying', err)
-            time.sleep(sleep_time)
-        else:
-            return
-
-    m = 'failed to enable versioning for %r after %d attempts' % (BUCKET_NAME, num_attempts)
-    assert False, m
+    ensure_bucket_exists(BUCKET_NAME)
+    boto3.resource('s3').BucketVersioning(BUCKET_NAME).enable()
 
 
 def get_versions(bucket, key):
@@ -71,6 +54,7 @@ def get_versions(bucket, key):
 class TestVersionId(unittest.TestCase):
 
     def setUp(self):
+        ensure_bucket_exists(BUCKET_NAME)
         #
         # Each run of this test reuses the BUCKET_NAME, but works with a
         # different key for isolation.
