@@ -6,7 +6,6 @@ import unittest
 import uuid
 
 import boto3
-import botocore.client
 import moto
 
 from smart_open import open
