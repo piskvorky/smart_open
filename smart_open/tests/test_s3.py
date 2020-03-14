@@ -76,7 +76,16 @@ def tearDownModule():
         bucket.delete()
     except s3.meta.client.exceptions.NoSuchBucket:
         pass
-    bucket.wait_until_not_exists()
+
+    try:
+        bucket.wait_until_not_exists()
+    except Exception:
+        #
+        # This is bad, but not fatal, and should not cause the whole test run
+        # to explode.  Either the bucket will get deleted by AWS eventually,
+        # or we can clean it up later ourselves.
+        #
+        pass
 
 
 def cleanup_bucket():
