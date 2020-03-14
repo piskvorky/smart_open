@@ -90,16 +90,35 @@ def tearDownModule():
 
 def ensure_bucket_exists(bucket_name):
     bucket = boto3.resource('s3').Bucket(bucket_name)
+
     if not DISABLE_MOCKS:
         bucket.wait_until_exists()
     else:
+        skip = unittest.SkipTest(
+            'This test requires an existing real S3 bucket, but one could '
+            'not be created in time.'
+        )
         try:
             bucket.wait_until_exists()
         except Exception:
-            raise unittest.SkipTest(
-                'This test requires an existing real S3 bucket, but one could '
-                'not be created in time (approx. 100 seconds).'
-            )
+            raise skip
+
+        #
+        # Strangely, even after wait_until_exists exits, the bucket may
+        # _still_ not be ready for use.  Try writing to it to be sure.
+        #
+        num_attempts = 5
+        sleep_time = 20
+        for attempt in range(num_attempts):
+            try:
+                obj = bucket.put_object(Key='does_bucket_exist', Body=b'yes')
+            except botocore.exceptions.ClientError:
+                time.sleep(sleep_time)
+            else:
+                obj.delete()
+                return
+
+    raise skip
 
 
 def cleanup_bucket():
