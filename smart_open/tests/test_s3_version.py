@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 import logging
-import os
-import time
 import unittest
 import uuid
 

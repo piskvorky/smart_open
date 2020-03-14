@@ -52,11 +52,8 @@ script:
   # The creds won't be available unless this is a branch belonging to the
   # RaRe-Technologies organization.
   #
-  - if [[ ${TRAVIS_SECURE_ENV_VARS} = false ]]; then
-      unset RUN_BENCHMARKS
-    fi
-  - if [[ ${RUN_BENCHMARKS} ]]; then
-      export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())')
+  - if [[ ${TRAVIS_SECURE_ENV_VARS} && ${RUN_BENCHMARKS} ]]; then
+      export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())');
       pip install pytest_benchmark awscli;
       set -e;
       py.test integration-tests/test_s3.py --benchmark-save=`git rev-parse HEAD`;
@@ -72,7 +69,7 @@ script:
   # These integration tests require AWS creds and an initialized S3 bucket
   #
   - if [[ ${TRAVIS_SECURE_ENV_VARS} ]]; then
-      pytest integration-tests/test_s3_ported.py
+      pytest integration-tests/test_s3_ported.py;
     fi
 
 
