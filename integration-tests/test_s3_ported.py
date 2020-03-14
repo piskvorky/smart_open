@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2020 Radim Rehurek <me@radimrehurek.com>
+#
+# This code is distributed under the terms and conditions
+# from the MIT License (MIT).
+#
 """Integration tests ported from our old unit tests.
 
 Before running these tests against a real bucket, make sure its initialized

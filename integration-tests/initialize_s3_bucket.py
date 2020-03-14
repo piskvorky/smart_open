@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2020 Radim Rehurek <me@radimrehurek.com>
+#
+# This code is distributed under the terms and conditions
+# from the MIT License (MIT).
+#
 """Prepare an S3 bucket for our integration tests.
 
 Once the bucket is initialized, the tests in test_s3_ported.py should pass.
