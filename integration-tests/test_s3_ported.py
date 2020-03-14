@@ -129,16 +129,15 @@ class ReaderTest(unittest.TestCase):
 
     def test_read_gzip(self):
         key_name = 'hello.txt.gz'
-        expected = CONTENTS[key_name]
 
-        with smart_open.s3.Reader(BUCKET_NAME, key_name) as fin:
-            actual = fin.read()
-        # self.assertEqual(expected, actual)
+        with gzip.GzipFile(fileobj=io.BytesIO(CONTENTS[key_name])) as fin:
+            expected = fin.read()
 
         with smart_open.s3.Reader(BUCKET_NAME, key_name) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
-        self.assertEqual(gzip.decompress(expected), actual)
+
+        self.assertEqual(expected, actual)
 
     def test_readline(self):
         key_name = 'multiline.txt'
