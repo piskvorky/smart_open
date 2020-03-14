@@ -38,6 +38,31 @@ def setUpModule():
     boto3.resource('s3').BucketVersioning(BUCKET_NAME).enable()
 
 
+@maybe_mock_s3
+def tearDownModule():
+    '''Called once by unittest when tearing down this module.  Empties and
+    removes the test S3 bucket.
+
+    '''
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket(BUCKET_NAME)
+    try:
+        bucket.object_versions.delete()
+        bucket.delete()
+    except s3.meta.client.exceptions.NoSuchBucket:
+        pass
+
+    try:
+        bucket.wait_until_not_exists()
+    except Exception:
+        #
+        # This is bad, but not fatal, and should not cause the whole test run
+        # to explode.  Either the bucket will get deleted by AWS eventually,
+        # or we can clean it up later ourselves.
+        #
+        pass
+
+
 def get_versions(bucket, key):
     """Return object versions in chronological order."""
     return [
