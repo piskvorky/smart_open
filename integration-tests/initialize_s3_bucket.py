@@ -11,16 +11,27 @@ Once the bucket is initialized, the tests in test_s3_ported.py should pass.
 """
 
 import gzip
+import io
 import sys
 
 import boto3
+
+
+def gzip_compress(data):
+    #
+    # gzip.compress does not exist under Py2
+    #
+    buf = io.BytesIO()
+    with gzip.GzipFile(fileobj=buf, mode='wb') as fout:
+        fout.write(data)
+    return buf.getvalue()
 
 
 def _build_contents():
     hello_bytes = u"hello wořld\nhow are you?".encode('utf8')
     yield 'hello.txt', hello_bytes
     yield 'multiline.txt', b'englishman\nin\nnew\nyork\n'
-    yield 'hello.txt.gz', gzip.compress(hello_bytes)
+    yield 'hello.txt.gz', gzip_compress(hello_bytes)
 
     for i in range(100):
         key = 'iter_bucket/%02d.txt' % i
