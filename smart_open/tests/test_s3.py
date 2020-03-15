@@ -427,7 +427,7 @@ class MultipartWriterTest(unittest.TestCase):
         self.assertEqual(contents, boto3_body)
 
 
-@maybe_mock_s3
+@moto.mock_s3
 class SinglepartWriterTest(unittest.TestCase):
     """
     Test writing into s3 files using single part upload.
