@@ -495,8 +495,6 @@ class MultipartWriter(io.BufferedIOBase):
             resource_kwargs=None,
             upload_kwargs=None,
             ):
-
-
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
