@@ -159,3 +159,22 @@ class ByteBuffer(object):
 
         self._bytes += new_bytes
         return len(new_bytes)
+
+    def readline(self, terminator):
+        """Read a line from this buffer efficiently.
+
+        A line is a contiguous sequence of bytes that ends with either:
+
+        1. The ``terminator`` character
+        2. The end of the buffer itself
+
+        :param byte terminator: The line terminator character.
+        :rtype: bytes
+
+        """
+        index = self._bytes.find(terminator, self._pos)
+        if index == -1:
+            size = len(self)
+        else:
+            size = index - self._pos + 1
+        return self.read(size)

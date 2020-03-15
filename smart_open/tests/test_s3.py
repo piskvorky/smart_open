@@ -11,7 +11,6 @@ import logging
 import os
 import time
 import unittest
-import uuid
 import warnings
 
 import boto.s3.bucket
@@ -30,44 +29,23 @@ import smart_open.s3
 # can run multiple instances of this suite in parallel and not have
 # them conflict with one another. Travis, for example, runs the Python
 # 2.7, 3.6, and 3.7 suites concurrently.
-BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
+BUCKET_NAME = 'test-smartopen'
 KEY_NAME = 'test-key'
 WRITE_KEY_NAME = 'test-write-key'
-DISABLE_MOCKS = os.environ.get('SO_DISABLE_MOCKS') == "1"
-DISABLE_MOTO_SERVER = os.environ.get("SO_DISABLE_MOTO_SERVER") == "1"
+ENABLE_MOTO_SERVER = os.environ.get("SO_ENABLE_MOTO_SERVER") == "1"
 
 
 logger = logging.getLogger(__name__)
 
 
-def maybe_mock_s3(func):
-    if DISABLE_MOCKS:
-        return func
-    else:
-        return moto.mock_s3(func)
-
-
-@maybe_mock_s3
+@moto.mock_s3
 def setUpModule():
     '''Called once by unittest when initializing this module.  Sets up the
     test S3 bucket.
 
     '''
-    boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
-
-
-@maybe_mock_s3
-def tearDownModule():
-    '''Called once by unittest when tearing down this module.  Empties and
-    removes the test S3 bucket.
-
-    '''
-    s3 = boto3.resource('s3')
-    try:
-        cleanup_bucket()
-        s3.Bucket(BUCKET_NAME).delete()
-    except s3.meta.client.exceptions.NoSuchBucket:
-        pass
+    bucket = boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
+    bucket.wait_until_exists()
 
 
 def cleanup_bucket():
@@ -76,7 +54,6 @@ def cleanup_bucket():
 
 
 def put_to_bucket(contents, num_attempts=12, sleep_time=5):
-    # fake (or not) connection, bucket and key
     logger.debug('%r', locals())
 
     #
@@ -92,7 +69,7 @@ def put_to_bucket(contents, num_attempts=12, sleep_time=5):
             logger.error('caught %r, retrying', err)
             time.sleep(sleep_time)
 
-    assert False, 'failed to create bucket %s after %d attempts' % (BUCKET_NAME, num_attempts)
+    assert False, 'failed to write to bucket %s after %d attempts' % (BUCKET_NAME, num_attempts)
 
 
 def ignore_resource_warnings():
@@ -105,7 +82,7 @@ def ignore_resource_warnings():
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
-@unittest.skipIf(DISABLE_MOTO_SERVER, 'The test case needs a Moto server running on the local 5000 port.')
+@unittest.skipIf(not ENABLE_MOTO_SERVER, 'The test case needs a Moto server running on the local 5000 port.')
 class SeekableRawReaderTest(unittest.TestCase):
 
     def setUp(self):
@@ -127,7 +104,7 @@ class SeekableRawReaderTest(unittest.TestCase):
         self.assertEqual(reader.read(2), b'23')
 
 
-@maybe_mock_s3
+@moto.mock_s3
 class SeekableBufferedInputBaseTest(unittest.TestCase):
     def setUp(self):
         # lower the multipart upload size, to speed up these tests
@@ -300,8 +277,15 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         boto3_body = returned_obj.get()['Body'].read()
         self.assertEqual(contents, boto3_body)
 
+    def test_binary_iterator(self):
+        expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
+        put_to_bucket(contents=b"\n".join(expected))
+        with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'rb') as fin:
+            actual = [line.rstrip() for line in fin]
+        self.assertEqual(expected, actual)
 
-@maybe_mock_s3
+
+@moto.mock_s3
 class MultipartWriterTest(unittest.TestCase):
     """
     Test writing into s3 files.
@@ -405,13 +389,6 @@ class MultipartWriterTest(unittest.TestCase):
             with io.TextIOWrapper(fin, encoding='utf-8') as text:
                 actual = text.read()
 
-        self.assertEqual(expected, actual)
-
-    def test_binary_iterator(self):
-        expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
-        put_to_bucket(contents=b"\n".join(expected))
-        with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'rb') as fin:
-            actual = [line.rstrip() for line in fin]
         self.assertEqual(expected, actual)
 
     def test_nonexisting_bucket(self):
@@ -555,7 +532,7 @@ class ClampTest(unittest.TestCase):
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
 
 
-@maybe_mock_s3
+@moto.mock_s3
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
@@ -607,7 +584,7 @@ class IterBucketTest(unittest.TestCase):
 
         # first, create some keys in the bucket
         expected = {}
-        for key_no in range(200):
+        for key_no in range(42):
             key_name = "mykey%s" % key_no
             with smart_open.smart_open("s3://%s/%s" % (BUCKET_NAME, key_name), 'wb') as fout:
                 content = '\n'.join("line%i%i" % (key_no, line_no) for line_no in range(10)).encode('utf8')
@@ -637,16 +614,16 @@ class IterBucketTest(unittest.TestCase):
             self.assertEqual(result, expected)
 
 
-@maybe_mock_s3
-class IterBucketSingleProcessTest(unittest.TestCase):
+@moto.mock_s3
+@unittest.skipIf(not smart_open.s3._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
+class IterBucketConcurrentFuturesTest(unittest.TestCase):
     def setUp(self):
-        self.old_flag = smart_open.s3._MULTIPROCESSING
+        self.old_flag_multi = smart_open.s3._MULTIPROCESSING
         smart_open.s3._MULTIPROCESSING = False
-
         ignore_resource_warnings()
 
     def tearDown(self):
-        smart_open.s3._MULTIPROCESSING = self.old_flag
+        smart_open.s3._MULTIPROCESSING = self.old_flag_multi
         cleanup_bucket()
 
     def test(self):
@@ -659,7 +636,74 @@ class IterBucketSingleProcessTest(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(expected))
 
 
-@maybe_mock_s3
+@moto.mock_s3
+@unittest.skipIf(not smart_open.s3._MULTIPROCESSING, 'multiprocessing unavailable')
+class IterBucketMultiprocessingTest(unittest.TestCase):
+    def setUp(self):
+        self.old_flag_concurrent = smart_open.s3._CONCURRENT_FUTURES
+        smart_open.s3._CONCURRENT_FUTURES = False
+        ignore_resource_warnings()
+
+    def tearDown(self):
+        smart_open.s3._CONCURRENT_FUTURES = self.old_flag_concurrent
+        cleanup_bucket()
+
+    def test(self):
+        num_keys = 101
+        populate_bucket(num_keys=num_keys)
+        keys = list(smart_open.s3.iter_bucket(BUCKET_NAME))
+        self.assertEqual(len(keys), num_keys)
+
+        expected = [('key_%d' % x, b'%d' % x) for x in range(num_keys)]
+        self.assertEqual(sorted(keys), sorted(expected))
+
+
+@moto.mock_s3
+class IterBucketSingleProcessTest(unittest.TestCase):
+    def setUp(self):
+        self.old_flag_multi = smart_open.s3._MULTIPROCESSING
+        self.old_flag_concurrent = smart_open.s3._CONCURRENT_FUTURES
+        smart_open.s3._MULTIPROCESSING = False
+        smart_open.s3._CONCURRENT_FUTURES = False
+
+        ignore_resource_warnings()
+
+    def tearDown(self):
+        smart_open.s3._MULTIPROCESSING = self.old_flag_multi
+        smart_open.s3._CONCURRENT_FUTURES = self.old_flag_concurrent
+        cleanup_bucket()
+
+    def test(self):
+        num_keys = 101
+        populate_bucket(num_keys=num_keys)
+        keys = list(smart_open.s3.iter_bucket(BUCKET_NAME))
+        self.assertEqual(len(keys), num_keys)
+
+        expected = [('key_%d' % x, b'%d' % x) for x in range(num_keys)]
+        self.assertEqual(sorted(keys), sorted(expected))
+
+
+#
+# This has to be a separate test because we cannot run it against real S3
+# (we don't want to expose our real S3 credentials).
+#
+@moto.mock_s3
+class IterBucketCredentialsTest(unittest.TestCase):
+    def test(self):
+        num_keys = 10
+        populate_bucket(num_keys=num_keys)
+        result = list(
+            smart_open.s3.iter_bucket(
+                BUCKET_NAME,
+                workers=None,
+                aws_access_key_id='access_id',
+                aws_secret_access_key='access_secret'
+            )
+        )
+        self.assertEqual(len(result), num_keys)
+
+
+@moto.mock_s3
 class DownloadKeyTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
@@ -710,7 +754,7 @@ class DownloadKeyTest(unittest.TestCase):
                               KEY_NAME, bucket_name=BUCKET_NAME)
 
 
-@maybe_mock_s3
+@moto.mock_s3
 class OpenTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()

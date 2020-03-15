@@ -5,6 +5,7 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
+import io
 import random
 import unittest
 
@@ -152,3 +153,37 @@ class ByteBufferTest(unittest.TestCase):
 
         self.assertEqual(buf.read(CHUNK_SIZE*2), contents[read_size:])
         self.assertEqual(len(buf), 0)
+
+    def test_readline(self):
+        """Does the readline function work as expected in the simple case?"""
+        expected = (b'this is the very first line\n', b'and this the second')
+        buf = smart_open.bytebuffer.ByteBuffer()
+        buf.fill(io.BytesIO(b''.join(expected)))
+
+        first_line = buf.readline(b'\n')
+        self.assertEqual(expected[0], first_line)
+
+        second_line = buf.readline(b'\n')
+        self.assertEqual(expected[1], second_line)
+
+    def test_readline_middle(self):
+        """Does the readline function work when we're in the middle of the buffer?"""
+        expected = (b'this is the very first line\n', b'and this the second')
+        buf = smart_open.bytebuffer.ByteBuffer()
+        buf.fill(io.BytesIO(b''.join(expected)))
+
+        buf.read(5)
+        first_line = buf.readline(b'\n')
+        self.assertEqual(expected[0][5:], first_line)
+
+        buf.read(5)
+        second_line = buf.readline(b'\n')
+        self.assertEqual(expected[1][5:], second_line)
+
+    def test_readline_terminator(self):
+        """Does the readline function respect the terminator parameter?"""
+        buf = smart_open.bytebuffer.ByteBuffer()
+        buf.fill(io.BytesIO(b'one!two.three,'))
+        expected = [b'one!', b'two.', b'three,']
+        actual = [buf.readline(b'!'), buf.readline(b'.'), buf.readline(b',')]
+        self.assertEqual(expected, actual)

@@ -1,59 +1,47 @@
 # -*- coding: utf-8 -*-
 import logging
-import os
-import time
 import unittest
 import uuid
 
 import boto3
-import botocore.client
 import moto
 
 from smart_open import open
 
 
-BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
+BUCKET_NAME = 'test-smartopen'
 KEY_NAME = 'test-key'
-DISABLE_MOCKS = os.environ.get('SO_DISABLE_MOCKS') == "1"
 
 
 logger = logging.getLogger(__name__)
 
 
-def maybe_mock_s3(func):
-    if DISABLE_MOCKS:
-        return func
-    else:
-        return moto.mock_s3(func)
-
-
-@maybe_mock_s3
+@moto.mock_s3
 def setUpModule():
     '''Called once by unittest when initializing this module.  Sets up the
     test S3 bucket.
 
     '''
-    boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
+    bucket = boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
+    bucket.wait_until_exists()
+    boto3.resource('s3').BucketVersioning(BUCKET_NAME).enable()
 
-    sleep_time = 5
-    num_attempts = 12
 
-    #
-    # In real life, it can take a few seconds for the bucket to become ready.
-    # If we try to enable versioning while the bucket isn't ready, we will get
-    # a ClientError: NoSuchBucket.
-    #
-    for attempt in range(num_attempts):
-        try:
-            boto3.resource('s3').BucketVersioning(BUCKET_NAME).enable()
-        except botocore.exceptions.ClientError as err:
-            logger.error('caught %r, retrying', err)
-            time.sleep(sleep_time)
-        else:
-            return
+@moto.mock_s3
+def tearDownModule():
+    '''Called once by unittest when tearing down this module.  Empties and
+    removes the test S3 bucket.
 
-    m = 'failed to enable versioning for %r after %d attempts' % (BUCKET_NAME, num_attempts)
-    assert False, m
+    '''
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket(BUCKET_NAME)
+    try:
+        bucket.object_versions.delete()
+        bucket.delete()
+    except s3.meta.client.exceptions.NoSuchBucket:
+        pass
+
+    bucket.wait_until_not_exists()
 
 
 def get_versions(bucket, key):
@@ -67,7 +55,7 @@ def get_versions(bucket, key):
     ]
 
 
-@maybe_mock_s3
+@moto.mock_s3
 class TestVersionId(unittest.TestCase):
 
     def setUp(self):
@@ -80,23 +68,17 @@ class TestVersionId(unittest.TestCase):
         self.test_ver1 = u"String version 1.0".encode('utf8')
         self.test_ver2 = u"String version 2.0".encode('utf8')
 
-        with open(self.url, 'wb') as fout:
-            fout.write(self.test_ver1)
+        bucket = boto3.resource('s3').Bucket(BUCKET_NAME)
+        bucket.put_object(Key=self.key, Body=self.test_ver1)
 
         logging.critical('versions after first write: %r', get_versions(BUCKET_NAME, self.key))
 
-        if DISABLE_MOCKS:
-            #
-            # I suspect there is a race condition that's messing up the
-            # order of the versions in the test.
-            #
-            time.sleep(5)
-
-        with open(self.url, 'wb') as fout:
-            fout.write(self.test_ver2)
+        bucket.put_object(Key=self.key, Body=self.test_ver2)
 
         self.versions = get_versions(BUCKET_NAME, self.key)
         logging.critical('versions after second write: %r', get_versions(BUCKET_NAME, self.key))
+
+        assert len(self.versions) == 2
 
     def test_good_id(self):
         """Does passing the version_id parameter into the s3 submodule work correctly when reading?"""

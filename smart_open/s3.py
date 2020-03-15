@@ -23,6 +23,16 @@ from botocore.exceptions import IncompleteReadError
 
 logger = logging.getLogger(__name__)
 
+# AWS Lambda environments do not support multiprocessing.Queue or multiprocessing.Pool.
+# However they do support Threads and therefore concurrent.futures's ThreadPoolExecutor.
+# We use this flag to allow python 2 backward compatibility, where concurrent.futures doesn't exist.
+_CONCURRENT_FUTURES = False
+try:
+    import concurrent.futures
+    _CONCURRENT_FUTURES = True
+except ImportError:
+    warnings.warn("concurrent.futures could not be imported and won't be used")
+
 # Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
 # The only method currently relying on it is iter_bucket, which is instructed
 # whether to use it by the MULTIPROCESSING flag.
@@ -328,10 +338,6 @@ class Reader(io.BufferedIOBase):
         if self._eof:
             return self._read_from_buffer()
 
-        #
-        # Fill our buffer to the required size.
-        #
-        # logger.debug('filling %r byte-long buffer up to %r bytes', len(self._buffer), size)
         self._fill_buffer(size)
         return self._read_from_buffer(size)
 
@@ -352,24 +358,22 @@ class Reader(io.BufferedIOBase):
         """Read up to and including the next newline.  Returns the bytes read."""
         if limit != -1:
             raise NotImplementedError('limits other than -1 not implemented yet')
-        the_line = io.BytesIO()
+
+        #
+        # A single line may span multiple buffers.
+        #
+        line = io.BytesIO()
         while not (self._eof and len(self._buffer) == 0):
-            #
-            # In the worst case, we're reading the unread part of self._buffer
-            # twice here, once in the if condition and once when calling index.
-            #
-            # This is sub-optimal, but better than the alternative: wrapping
-            # .index in a try..except, because that is slower.
-            #
-            remaining_buffer = self._buffer.peek()
-            if self._line_terminator in remaining_buffer:
-                next_newline = remaining_buffer.index(self._line_terminator)
-                the_line.write(self._read_from_buffer(next_newline + 1))
+            line_part = self._buffer.readline(self._line_terminator)
+            line.write(line_part)
+            self._current_pos += len(line_part)
+
+            if line_part.endswith(self._line_terminator):
                 break
             else:
-                the_line.write(self._read_from_buffer())
                 self._fill_buffer()
-        return the_line.getvalue()
+
+        return line.getvalue()
 
     def seekable(self):
         """If False, seek(), tell() and truncate() will raise IOError.
@@ -444,7 +448,7 @@ class Reader(io.BufferedIOBase):
         return part
 
     def _fill_buffer(self, size=-1):
-        size = size if size >= 0 else self._buffer._chunk_size
+        size = max(size, self._buffer._chunk_size)
         while len(self._buffer) < size and not self._eof:
             bytes_read = self._buffer.fill(self._raw_reader)
             if bytes_read == 0:
@@ -790,8 +794,14 @@ def _accept_all(key):
     return True
 
 
-def iter_bucket(bucket_name, prefix='', accept_key=None,
-                key_limit=None, workers=16, retries=3):
+def iter_bucket(
+        bucket_name,
+        prefix='',
+        accept_key=None,
+        key_limit=None,
+        workers=16,
+        retries=3,
+        **session_kwargs):
     """
     Iterate and download all S3 objects under `s3://bucket_name/prefix`.
 
@@ -811,6 +821,11 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
         The number of subprocesses to use.
     retries: int, optional
         The number of time to retry a failed download.
+    session_kwargs: dict, optional
+        Keyword arguments to pass when creating a new session.
+        For a list of available names and values, see:
+        https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html#boto3.session.Session
+
 
     Yields
     ------
@@ -851,8 +866,16 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
         pass
 
     total_size, key_no = 0, -1
-    key_iterator = _list_bucket(bucket_name, prefix=prefix, accept_key=accept_key)
-    download_key = functools.partial(_download_key, bucket_name=bucket_name, retries=retries)
+    key_iterator = _list_bucket(
+        bucket_name,
+        prefix=prefix,
+        accept_key=accept_key,
+        **session_kwargs)
+    download_key = functools.partial(
+        _download_key,
+        bucket_name=bucket_name,
+        retries=retries,
+        **session_kwargs)
 
     with _create_process_pool(processes=workers) as pool:
         result_iterator = pool.imap_unordered(download_key, key_iterator)
@@ -871,8 +894,13 @@ def iter_bucket(bucket_name, prefix='', accept_key=None,
     logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
 
 
-def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True):
-    client = boto3.client('s3')
+def _list_bucket(
+        bucket_name,
+        prefix='',
+        accept_key=lambda k: True,
+        **session_kwargs):
+    session = boto3.session.Session(**session_kwargs)
+    client = session.client('s3')
     ctoken = None
 
     while True:
@@ -897,14 +925,14 @@ def _list_bucket(bucket_name, prefix='', accept_key=lambda k: True):
             break
 
 
-def _download_key(key_name, bucket_name=None, retries=3):
+def _download_key(key_name, bucket_name=None, retries=3, **session_kwargs):
     if bucket_name is None:
         raise ValueError('bucket_name may not be None')
 
     #
     # https://geekpete.com/blog/multithreading-boto3/
     #
-    session = boto3.session.Session()
+    session = boto3.session.Session(**session_kwargs)
     s3 = session.resource('s3')
     bucket = s3.Bucket(bucket_name)
 
@@ -943,11 +971,28 @@ class DummyPool(object):
         pass
 
 
+class ConcurrentFuturesPool(object):
+    """A class that mimics multiprocessing.pool.Pool but uses concurrent futures instead of processes."""
+    def __init__(self, max_workers):
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers)
+
+    def imap_unordered(self, function, items):
+        futures = [self.executor.submit(function, item) for item in items]
+        for future in concurrent.futures.as_completed(futures):
+            yield future.result()
+
+    def terminate(self):
+        self.executor.shutdown(wait=True)
+
+
 @contextlib.contextmanager
 def _create_process_pool(processes=1):
     if _MULTIPROCESSING and processes:
-        logger.info("creating pool with %i workers", processes)
+        logger.info("creating multiprocessing pool with %i workers", processes)
         pool = multiprocessing.pool.Pool(processes=processes)
+    elif _CONCURRENT_FUTURES and processes:
+        logger.info("creating concurrent futures pool with %i workers", processes)
+        pool = ConcurrentFuturesPool(max_workers=processes)
     else:
         logger.info("creating dummy pool")
         pool = DummyPool()
