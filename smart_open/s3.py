@@ -125,13 +125,6 @@ def open(
     if mode not in MODES:
         raise NotImplementedError('bad mode: %r expected one of %r' % (mode, MODES))
 
-    if resource_kwargs is None:
-        resource_kwargs = {}
-    if multipart_upload_kwargs is None:
-        multipart_upload_kwargs = {}
-    if object_kwargs is None:
-        object_kwargs = {}
-
     if (mode == WRITE_BINARY) and (version_id is not None):
         raise ValueError("version_id must be None when writing")
 
@@ -152,7 +145,7 @@ def open(
                 key_id,
                 min_part_size=min_part_size,
                 session=session,
-                multipart_upload_kwargs=multipart_upload_kwargs,
+                upload_kwargs=multipart_upload_kwargs,
                 resource_kwargs=resource_kwargs,
             )
         else:
@@ -160,7 +153,7 @@ def open(
                 bucket_id,
                 key_id,
                 session=session,
-                singlepart_upload_kwargs=singlepart_upload_kwargs,
+                upload_kwargs=singlepart_upload_kwargs,
                 resource_kwargs=resource_kwargs,
             )
     else:
@@ -496,10 +489,9 @@ class MultipartWriter(io.BufferedIOBase):
             min_part_size=DEFAULT_MIN_PART_SIZE,
             session=None,
             resource_kwargs=None,
-            multipart_upload_kwargs=None,
+            upload_kwargs=None,
             ):
 
-        self._multipart_upload_kwargs = multipart_upload_kwargs
 
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
@@ -509,17 +501,18 @@ multipart upload may fail")
             session = boto3.Session()
         if resource_kwargs is None:
             resource_kwargs = {}
-        if multipart_upload_kwargs is None:
-            multipart_upload_kwargs = {}
+        if upload_kwargs is None:
+            upload_kwargs = {}
 
         self._session = session
         self._resource_kwargs = resource_kwargs
+        self._upload_kwargs = upload_kwargs
 
         s3 = session.resource('s3', **resource_kwargs)
         try:
             self._object = s3.Object(bucket, key)
             self._min_part_size = min_part_size
-            self._mp = self._object.initiate_multipart_upload(**multipart_upload_kwargs)
+            self._mp = self._object.initiate_multipart_upload(**self._upload_kwargs)
         except botocore.client.ClientError:
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
 
@@ -648,20 +641,15 @@ multipart upload may fail")
 
     def __repr__(self):
         return (
-            "smart_open.s3.MultipartWriter("
-            "bucket=%r, "
-            "key=%r, "
-            "min_part_size=%r, "
-            "session=%r, "
-            "resource_kwargs=%r, "
-            "multipart_upload_kwargs=%r)"
+            "smart_open.s3.MultipartWriter(bucket=%r, key=%r, "
+            "min_part_size=%r, session=%r, resource_kwargs=%r, upload_kwargs=%r)"
         ) % (
             self._object.bucket_name,
             self._object.key,
             self._min_part_size,
             self._session,
             self._resource_kwargs,
-            self._multipart_upload_kwargs,
+            self._upload_kwargs,
         )
 
 
@@ -679,7 +667,7 @@ class SinglepartWriter(io.BufferedIOBase):
             key,
             session=None,
             resource_kwargs=None,
-            singlepart_upload_kwargs=None,
+            upload_kwargs=None,
             ):
 
         self._session = session
@@ -689,10 +677,10 @@ class SinglepartWriter(io.BufferedIOBase):
             session = boto3.Session()
         if resource_kwargs is None:
             resource_kwargs = {}
-        if singlepart_upload_kwargs is None:
-            singlepart_upload_kwargs = {}
+        if upload_kwargs is None:
+            upload_kwargs = {}
 
-        self._singlepart_upload_kwargs = singlepart_upload_kwargs
+        self._upload_kwargs = upload_kwargs
 
         s3 = session.resource('s3', **resource_kwargs)
         try:
@@ -703,7 +691,6 @@ class SinglepartWriter(io.BufferedIOBase):
 
         self._buf = io.BytesIO()
         self._total_bytes = 0
-        self._closed = False
 
         #
         # This member is part of the io.BufferedIOBase interface.
@@ -717,20 +704,23 @@ class SinglepartWriter(io.BufferedIOBase):
     # Override some methods from io.IOBase.
     #
     def close(self):
+        if self._buf is None:
+            return
+
         self._buf.seek(0)
 
         try:
-            self._object.put(Body=self._buf, **self._singlepart_upload_kwargs)
+            self._object.put(Body=self._buf, **self._upload_kwargs)
         except botocore.client.ClientError:
             raise ValueError(
                 'the bucket %r does not exist, or is forbidden for access' % self._object.bucket_name)
 
         logger.debug("direct upload finished")
-        self._closed = True
+        self._buf = None
 
     @property
     def closed(self):
-        return self._closed
+        return self._buf is None
 
     def writable(self):
         """Return True if the stream supports writing."""
@@ -778,18 +768,14 @@ class SinglepartWriter(io.BufferedIOBase):
 
     def __repr__(self):
         return (
-            "smart_open.s3.SinglepartWriter("
-            "bucket=%r, "
-            "key=%r, "
-            "session=%r, "
-            "resource_kwargs=%r, "
-            "singlepart_upload_kwargs=%r)"
+            "smart_open.s3.SinglepartWriter(bucket=%r, key=%r, session=%r, "
+            "resource_kwargs=%r, upload_kwargs=%r)"
         ) % (
             self._object.bucket_name,
             self._object.key,
             self._session,
             self._resource_kwargs,
-            self._singlepart_upload_kwargs,
+            self._upload_kwargs,
         )
 
 
