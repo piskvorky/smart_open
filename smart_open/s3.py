@@ -344,24 +344,22 @@ class Reader(io.BufferedIOBase):
         """Read up to and including the next newline.  Returns the bytes read."""
         if limit != -1:
             raise NotImplementedError('limits other than -1 not implemented yet')
-        the_line = io.BytesIO()
+
+        #
+        # A single line may span multiple buffers.
+        #
+        line = io.BytesIO()
         while not (self._eof and len(self._buffer) == 0):
-            #
-            # In the worst case, we're reading the unread part of self._buffer
-            # twice here, once in the if condition and once when calling index.
-            #
-            # This is sub-optimal, but better than the alternative: wrapping
-            # .index in a try..except, because that is slower.
-            #
-            remaining_buffer = self._buffer.peek()
-            if self._line_terminator in remaining_buffer:
-                next_newline = remaining_buffer.index(self._line_terminator)
-                the_line.write(self._read_from_buffer(next_newline + 1))
+            line_part = self._buffer.readline(self._line_terminator)
+            line.write(line_part)
+            self._current_pos += len(line_part)
+
+            if line_part.endswith(self._line_terminator):
                 break
             else:
-                the_line.write(self._read_from_buffer())
                 self._fill_buffer()
-        return the_line.getvalue()
+
+        return line.getvalue()
 
     def seekable(self):
         """If False, seek(), tell() and truncate() will raise IOError.
