@@ -101,6 +101,16 @@ FUNCTIONS
         multipart_upload_kwargs: dict, optional
             Additional parameters to pass to boto3's initiate_multipart_upload function.
             For writing only.
+        singlepart_upload_kwargs: dict, optional
+            Additional parameters to pass to boto3's S3.Object.put function when using single
+            part upload.
+            For writing only.
+        multipart_upload: bool, optional
+            Default: `True`
+            If set to `True`, will use multipart upload for writing to S3. If set
+            to `False`, S3 upload will use the S3 Single-Part Upload API, which
+            is more ideal for small file sizes.
+            For writing only.
         version_id: str, optional
             Version of the object, used when reading object. If None, will fetch the most recent version.
         
