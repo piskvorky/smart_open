@@ -95,11 +95,11 @@ class UploadFailedError(Exception):
     def from_response(cls, response, part_num, content_length, total_size, headers):
         status_code = response.status_code
         response_text = response.text
-        total_size_gb = round(total_size / 1024.0 ** 3, 3)
+        total_size_gb = total_size / 1024.0 ** 3
 
         msg = (
-            "upload failed (status code: %(status_code)s, response text=%(response_text)s), "
-            "part #%(part_num)s, %(total_size)s bytes (total %(total_size_gb)sGB), headers %(headers)s"
+            "upload failed (status code: %(status_code)d, response text: %(response_text)s), "
+            "part #%(part_num)d, %(total_size)d bytes (total %(total_size_gb).3fGB), headers: %(headers)r"
         ) % locals()
         return cls(msg, response.status_code, response.text)
 
@@ -518,15 +518,15 @@ class BufferedOutputBase(io.BufferedIOBase):
             headers=headers,
         )
 
-        if response.status_code != _UPLOAD_INCOMPLETE_STATUS_CODE:
-            raise UploadFailedError.from_response(
-                response,
-                part_num,
-                content_length,
-                self._total_size,
-                headers,
-            )
-        logger.debug("upload of part #%i finished" % part_num)
+        # if response.status_code != _UPLOAD_INCOMPLETE_STATUS_CODE:
+        raise UploadFailedError.from_response(
+            response,
+            part_num,
+            content_length,
+            self._total_size,
+            headers,
+        )
+        # logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
         self._bytes_uploaded += content_length
