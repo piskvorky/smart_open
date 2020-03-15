@@ -515,8 +515,12 @@ multipart upload may fail")
             self._object = s3.Object(bucket, key)
             self._min_part_size = min_part_size
             self._mp = self._object.initiate_multipart_upload(**self._upload_kwargs)
-        except botocore.client.ClientError:
-            raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
+        except botocore.client.ClientError as error:
+            raise ValueError(
+                'the bucket %r does not exist, or is forbidden for access (%r)' % (
+                    bucket, error
+                )
+            )
 
         self._buf = io.BytesIO()
         self._total_bytes = 0
