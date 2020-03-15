@@ -11,15 +11,15 @@ import io
 import contextlib
 import functools
 import logging
+import time
 import warnings
 
 import boto3
 import botocore.client
+import botocore.exceptions
 import six
 
 import smart_open.bytebuffer
-
-from botocore.exceptions import IncompleteReadError
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,9 @@ START = 0
 CURRENT = 1
 END = 2
 WHENCE_CHOICES = [START, CURRENT, END]
+
+_UPLOAD_ATTEMPTS = 6
+_SLEEP_SECONDS = 10
 
 
 def clamp(value, minval, maxval):
@@ -235,7 +238,7 @@ class _SeekableRawReader(object):
 
         try:
             binary = self._read_from_body(size)
-        except IncompleteReadError:
+        except botocore.exceptions.IncompleteReadError:
             # The underlying connection of the self._body was closed by the remote peer.
             self._load_body()
             binary = self._read_from_body(size)
@@ -502,9 +505,17 @@ multipart upload may fail")
         try:
             self._object = s3.Object(bucket, key)
             self._min_part_size = min_part_size
-            self._mp = self._object.initiate_multipart_upload(**multipart_upload_kwargs)
-        except botocore.client.ClientError:
-            raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
+            partial = functools.partial(
+                self._object.initiate_multipart_upload,
+                **multipart_upload_kwargs
+            )
+            self._mp = _retry_if_failed(partial)
+        except botocore.client.ClientError as error:
+            raise ValueError(
+                'the bucket %r does not exist, or is forbidden for access (%r)' % (
+                    bucket, error
+                )
+            )
 
         self._buf = io.BytesIO()
         self._total_bytes = 0
@@ -528,7 +539,8 @@ multipart upload may fail")
             self._upload_next_part()
 
         if self._total_bytes and self._mp:
-            self._mp.complete(MultipartUpload={'Parts': self._parts})
+            partial = functools.partial(self._mp.complete, MultipartUpload={'Parts': self._parts})
+            _retry_if_failed(partial)
             logger.debug("completed multipart upload")
         elif self._mp:
             #
@@ -541,7 +553,6 @@ multipart upload may fail")
             logger.info("empty input, ignoring multipart upload")
             assert self._mp, "no multipart upload in progress"
             self._mp.abort()
-
             self._object.put(Body=b'')
         self._mp = None
         logger.debug("successfully closed")
@@ -608,7 +619,15 @@ multipart upload may fail")
                     part_num, self._buf.tell(), self._total_bytes / 1024.0 ** 3)
         self._buf.seek(0)
         part = self._mp.Part(part_num)
-        upload = part.upload(Body=self._buf)
+
+        #
+        # Network problems in the middle of an upload are particularly
+        # troublesome.  We don't want to abort the entire upload just because
+        # of a temporary connection problem, so this part needs to be
+        # especially robust.
+        #
+        upload = _retry_if_failed(functools.partial(part.upload, Body=self._buf))
+
         self._parts.append({'ETag': upload['ETag'], 'PartNumber': part_num})
         logger.debug("upload of part #%i finished" % part_num)
 
@@ -646,6 +665,26 @@ multipart upload may fail")
             self._resource_kwargs,
             self._multipart_upload_kwargs,
         )
+
+
+def _retry_if_failed(
+        partial,
+        attempts=_UPLOAD_ATTEMPTS,
+        sleep_seconds=_SLEEP_SECONDS,
+        exceptions=(botocore.exceptions.EndpointConnectionError, )):
+    for attempt in range(attempts):
+        try:
+            return partial()
+        except exceptions:
+            logger.critical(
+                'Unable to connect to the endpoint. Check your network connection. '
+                'Sleeping and retrying %d more times '
+                'before giving up.' % (attempts - attempt - 1)
+            )
+            time.sleep(sleep_seconds)
+    else:
+        logger.critical('Unable to connect to the endpoint. Giving up.')
+        raise IOError('Unable to connect to the endpoint after %d attempts' % attempts)
 
 
 #
