@@ -98,9 +98,9 @@ class UploadFailedError(Exception):
         total_size_gb = round(total_size / 1024.0 ** 3, 3)
 
         msg = (
-            "upload failed (status code: {status_code} response text={response_text}), "
-            "part #{part_num}, %i bytes (total {total_size_gb}GB), headers {headers}"
-        ).format(**locals())
+            "upload failed (status code: %(status_code)s, response text=%(response_text)s), "
+            "part #%(part_num)s, %(total_size)s bytes (total %(total_size_gb)sGB), headers %(headers)s"
+        ) % locals()
         return cls(msg, response.status_code, response.text)
 
 
