@@ -784,6 +784,23 @@ def populate_bucket(num_keys=10):
         s3.Object(BUCKET_NAME, key_name).put(Body=str(key_number))
 
 
+class RetryIfFailedTest(unittest.TestCase):
+    def test_success(self):
+        partial = mock.Mock(return_value=1)
+        result = smart_open.s3._retry_if_failed(partial, attempts=3, sleep_seconds=0)
+        self.assertEqual(result, 1)
+        self.assertEqual(partial.call_count, 1)
+
+    def test_failure(self):
+        partial = mock.Mock(side_effect=ValueError)
+        exceptions = (ValueError, )
+
+        with self.assertRaises(IOError):
+            smart_open.s3._retry_if_failed(partial, attempts=3, sleep_seconds=0, exceptions=exceptions)
+
+        self.assertEqual(partial.call_count, 3)
+
+
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
     unittest.main()
