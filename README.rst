@@ -332,11 +332,11 @@ to setting up GCS authentication with a service account.
 
 .. code-block:: python
 
-    >>> import os
-    >>> from google.cloud.storage import Client
-    >>> service_account_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
-    >>> client = Client.from_service_account_json(service_account_path)
-    >>> fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
+    import os
+    from google.cloud.storage import Client
+    service_account_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
+    client = Client.from_service_account_json(service_account_path)
+    fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
 If you need more credential options, you can create an explicit ``google.auth.credentials.Credentials`` object
 and pass it to the Client. To create an API token for use in the example below, refer to the
@@ -344,13 +344,13 @@ and pass it to the Client. To create an API token for use in the example below, 
 
 .. code-block:: python
 
-	>>> import os
-	>>> from google.auth.credentials import Credentials
-	>>> from google.cloud.storage import Client
-	>>> token = os.environ['GOOGLE_API_TOKEN']
-	>>> credentials = Credentials(token=token)
-	>>> client = Client(credentials=credentials)
-	>>> fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
+	import os
+	from google.auth.credentials import Credentials
+	from google.cloud.storage import Client
+	token = os.environ['GOOGLE_API_TOKEN']
+	credentials = Credentials(token=token)
+	client = Client(credentials=credentials)
+	fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
 File-like Binary Streams
 ------------------------
