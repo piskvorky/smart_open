@@ -114,11 +114,11 @@ class BufferedInputBase(io.BufferedIOBase):
 
         try:
             while len(self._buf) < size:
-                self._buf += self._response.raw.readline()
+                self._buf += self._response.raw.read(io.DEFAULT_BUFFER_SIZE)
         except StopIteration:
             pass
 
-        self._buf, retval = self._buf[size:], retval[:size]
+        self._buf, retval = self._buf[size:], self._buf[:size]
         return retval
 
     def read1(self, size=-1):
