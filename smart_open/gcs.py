@@ -465,6 +465,12 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._current_part.write(b)
         self._total_size += len(b)
 
+        #
+        # If the size of this part is precisely equal to the minimum part size,
+        # we don't perform the actual write now, and wait until we see more data.
+        # We do this because the very last part of the upload must be handled slightly
+        # differently (see comments in the _upload_next_part method).
+        #
         if self._current_part.tell() > self._min_part_size:
             self._upload_next_part()
 
