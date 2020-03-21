@@ -382,6 +382,25 @@ If your file object doesn't have one, set the ``.name`` attribute to an appropri
 Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
 Otherwise, the transparent decompression will not occur.
 
+Drop-in replacement of ``pathlib.Path.open``
+--------------------------------------------
+
+Now you can natively use ``smart_open.open`` with your ``Path`` objects.
+You can't transparently read text from compressed file with original ``Path.open``, but can after ``patch_pathlib``.
+
+.. code-block:: python
+
+  >>> from pathlib import Path
+  >>> from smart_open.smart_open_lib import patch_pathlib
+  >>>
+  >>> _ = patch_pathlib()  # replace `Path.open` with `smart_open.open`
+  >>>
+  >>> path = Path("smart_open/tests/test_data/crime-and-punishment.txt.gz")
+  >>>
+  >>> with path.open("r") as infile:
+  ...     print(infile.readline()[:41])
+  В начале июля, в чрезвычайно жаркое время
+
 Comments, bug reports
 =====================
 

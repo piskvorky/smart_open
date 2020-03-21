@@ -13,6 +13,7 @@ import logging
 import tempfile
 import os
 import hashlib
+import pathlib
 
 import boto3
 import mock
@@ -24,6 +25,7 @@ import six
 import smart_open
 from smart_open import smart_open_lib
 from smart_open import webhdfs
+from smart_open.smart_open_lib import patch_pathlib, _patch_pathlib
 
 logger = logging.getLogger(__name__)
 
@@ -286,6 +288,35 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "gs")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
+
+    def test_pathlib_monkeypath(self):
+        assert pathlib.Path.open != smart_open.open
+
+        with patch_pathlib():
+            assert pathlib.Path.open == smart_open.open
+
+        assert pathlib.Path.open != smart_open.open
+
+        obj = patch_pathlib()
+        assert pathlib.Path.open == smart_open.open
+
+        _patch_pathlib(obj.old_impl)
+        assert pathlib.Path.open != smart_open.open
+
+    def test_pathlib_monkeypath_read_gz(self):
+        path = pathlib.Path(CURR_DIR) / 'test_data' / 'crime-and-punishment.txt.gz'
+
+        # Check that standart implementation can't work with gzip
+        with path.open("r") as infile:
+            with self.assertRaises(Exception) as context:
+                lines = infile.readlines()
+
+        # Check that out implementation works with gzip
+        obj = patch_pathlib()
+        with path.open("r") as infile:
+            lines = infile.readlines()
+
+        _patch_pathlib(obj.old_impl)
 
 
 class SmartOpenHttpTest(unittest.TestCase):
