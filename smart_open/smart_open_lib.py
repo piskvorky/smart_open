@@ -930,11 +930,26 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
     return fileobj
 
 
-def patch_pathlib():
+class patch_pathlib(object):
     """Replace `Path.open` with `smart_open.open`"""
+
+    def __init__(self):
+        self.old_impl = _patch_pathlib(open)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        _patch_pathlib(self.old_impl)
+
+
+def _patch_pathlib(func):
+    """Replace `Path.open` with `func`"""
     pathlib = sys.modules.get("pathlib", None)
 
     if pathlib:
-        pathlib.Path.open = open
+        old_impl = pathlib.Path.open
+        pathlib.Path.open = func
+        return old_impl
     else:
-        warnings.warn("Can't patch 'pathlib.Path.open', you should import 'pathlib' first")
+        raise RuntimeError("Can't patch 'pathlib.Path.open', you should import 'pathlib' first")
