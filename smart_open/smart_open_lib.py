@@ -928,3 +928,13 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
     if mode[0] in ('w', 'a') or mode.endswith('+'):
         fileobj = codecs.getwriter(encoding)(fileobj, **kw)
     return fileobj
+
+
+def patch_pathlib():
+    """Replace `Path.open` with `smart_open.open`"""
+    pathlib = sys.modules.get("pathlib", None)
+
+    if pathlib:
+        pathlib.Path.open = open
+    else:
+        warnings.warn("Can't patch 'pathlib.Path.open', you should import 'pathlib' first")
