@@ -389,19 +389,19 @@ Now you can natively use ``smart_open.open`` with your ``Path`` objects
 
 .. code-block:: python
 
-  >> from pathlib import Path
-  >> from smart_open.smart_open_lib import patch_pathlib
-  >>
-  >> patch_pathlib()  # replace `Path.open` with `smart_open.open`
-  >>
-  >> path = Path("smart_open/tests/test_data/crime-and-punishment.txt.gz")
-  >>
-  >> with path.open("r") as infile:
-  ..     # not possible with standard `Path.open` (because gzipped),
-  ..     # but works perfectly with "patched" version by `smart_open`
-  ..     for line in infile:
-  ..         print(line)
-  ..         break
+  >>> from pathlib import Path
+  >>> from smart_open.smart_open_lib import patch_pathlib
+  >>>
+  >>> patch_pathlib()  # replace `Path.open` with `smart_open.open`
+  >>>
+  >>> path = Path("smart_open/tests/test_data/crime-and-punishment.txt.gz")
+  >>>
+  >>> with path.open("r") as infile:
+  ...     # not possible with standard `Path.open` (because gzipped),
+  ...     # but works perfectly with "patched" version by `smart_open`
+  ...     for line in infile:
+  ...         print(line)
+  ...         break
 
 Comments, bug reports
 =====================
