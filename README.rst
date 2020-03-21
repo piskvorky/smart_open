@@ -382,6 +382,26 @@ If your file object doesn't have one, set the ``.name`` attribute to an appropri
 Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
 Otherwise, the transparent decompression will not occur.
 
+Drop-in replacement of ``pathlib.Path.open``
+--------------------------------------------
+
+Now you can natively use ``smart_open.open`` with your ``Path`` objects
+
+.. code-block:: python
+
+  >> from pathlib import Path
+  >> from smart_open.smart_open_lib import patch_pathlib
+  >>
+  >> patch_pathlib()  # replace `Path.open` with `smart_open.open`
+  >>
+  >> path = Path("/path/to/my/fize.gz")
+  >> with path.open("r") as infile:
+  ..     # not possible with standard `Path.open` (because gzipped),
+  ..     # but works perfectly with "patching"
+  ..     for line in infile:
+  ..         print(line)
+
+
 Comments, bug reports
 =====================
 
