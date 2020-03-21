@@ -385,7 +385,8 @@ Otherwise, the transparent decompression will not occur.
 Drop-in replacement of ``pathlib.Path.open``
 --------------------------------------------
 
-Now you can natively use ``smart_open.open`` with your ``Path`` objects
+Now you can natively use ``smart_open.open`` with your ``Path`` objects.
+You can't transparently read text from compressed file with original ``Path.open``, but can after ``patch_pathlib``.
 
 .. code-block:: python
 
@@ -397,8 +398,6 @@ Now you can natively use ``smart_open.open`` with your ``Path`` objects
   >>> path = Path("smart_open/tests/test_data/crime-and-punishment.txt.gz")
   >>>
   >>> with path.open("r") as infile:
-  ...     # not possible with standard `Path.open` (because gzipped),
-  ...     # but works perfectly with "patched" version by `smart_open`
   ...     for line in infile:
   ...         print(repr(line))
   ...         break
