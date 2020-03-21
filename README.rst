@@ -392,7 +392,7 @@ Now you can natively use ``smart_open.open`` with your ``Path`` objects
   >>> from pathlib import Path
   >>> from smart_open.smart_open_lib import patch_pathlib
   >>>
-  >>> patch_pathlib()  # replace `Path.open` with `smart_open.open`
+  >>> _ = patch_pathlib()  # replace `Path.open` with `smart_open.open`
   >>>
   >>> path = Path("smart_open/tests/test_data/crime-and-punishment.txt.gz")
   >>>
@@ -400,8 +400,9 @@ Now you can natively use ``smart_open.open`` with your ``Path`` objects
   ...     # not possible with standard `Path.open` (because gzipped),
   ...     # but works perfectly with "patched" version by `smart_open`
   ...     for line in infile:
-  ...         print(line)
+  ...         print(repr(line))
   ...         break
+  'В начале июля, в чрезвычайно жаркое время, под вечер, один молодой человек вышел из своей каморки, которую нанимал от жильцов в С -- м переулке, на улицу и медленно, как бы в нерешимости, отправился к К -- ну мосту.\n'
 
 Comments, bug reports
 =====================
