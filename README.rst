@@ -398,10 +398,8 @@ You can't transparently read text from compressed file with original ``Path.open
   >>> path = Path("smart_open/tests/test_data/crime-and-punishment.txt.gz")
   >>>
   >>> with path.open("r") as infile:
-  ...     for line in infile:
-  ...         print(repr(line))
-  ...         break
-  'В начале июля, в чрезвычайно жаркое время, под вечер, один молодой человек вышел из своей каморки, которую нанимал от жильцов в С -- м переулке, на улицу и медленно, как бы в нерешимости, отправился к К -- ну мосту.\n'
+  ...     print(infile.readline()[:41])
+  В начале июля, в чрезвычайно жаркое время
 
 Comments, bug reports
 =====================
