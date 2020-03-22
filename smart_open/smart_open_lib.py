@@ -945,11 +945,10 @@ class patch_pathlib(object):
 
 def _patch_pathlib(func):
     """Replace `Path.open` with `func`"""
-    pathlib = sys.modules.get("pathlib", None)
-
-    if not pathlib:
-        raise RuntimeError("Can't patch 'pathlib.Path.open', you should import 'pathlib' first")
-
+    if not PATHLIB_SUPPORT:
+        raise RuntimeError('install pathlib (or pathlib2) before using this function')
+    if six.PY2:
+        raise RuntimeError('this monkey patch does not work on Py2')
     old_impl = pathlib.Path.open
     pathlib.Path.open = func
     return old_impl

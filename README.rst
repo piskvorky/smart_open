@@ -385,21 +385,22 @@ Otherwise, the transparent decompression will not occur.
 Drop-in replacement of ``pathlib.Path.open``
 --------------------------------------------
 
-Now you can natively use ``smart_open.open`` with your ``Path`` objects.
-You can't transparently read text from compressed file with original ``Path.open``, but can after ``patch_pathlib``.
+``smart_open.open`` can also be used with ``Path`` objects.
+The built-in `Path.open()` is not able to read text from compressed files, so use ``patch_pathlib`` to replace it with `smart_open.open()` instead.
+This can be helpful when e.g. working with compressed files.
 
 .. code-block:: python
 
-  >>> from pathlib import Path
-  >>> from smart_open.smart_open_lib import patch_pathlib
-  >>>
-  >>> _ = patch_pathlib()  # replace `Path.open` with `smart_open.open`
-  >>>
-  >>> path = Path("smart_open/tests/test_data/crime-and-punishment.txt.gz")
-  >>>
-  >>> with path.open("r") as infile:
-  ...     print(infile.readline()[:41])
-  В начале июля, в чрезвычайно жаркое время
+    >>> from pathlib import Path
+    >>> from smart_open.smart_open_lib import patch_pathlib
+    >>>
+    >>> _ = patch_pathlib()  # replace `Path.open` with `smart_open.open`
+    >>>
+    >>> path = Path("smart_open/tests/test_data/crime-and-punishment.txt.gz")
+    >>>
+    >>> with path.open("r") as infile:
+    ...     print(infile.readline()[:41])
+    В начале июля, в чрезвычайно жаркое время
 
 Comments, bug reports
 =====================

@@ -13,7 +13,6 @@ import logging
 import tempfile
 import os
 import hashlib
-import pathlib
 
 import boto3
 import mock
@@ -289,7 +288,10 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
 
-    def test_pathlib_monkeypath(self):
+    @unittest.skipUnless(smart_open_lib.six.PY3, "our monkey patch only works on Py3")
+    def test_pathlib_monkeypatch(self):
+        from smart_open.smart_open_lib import pathlib
+
         assert pathlib.Path.open != smart_open.open
 
         with patch_pathlib():
@@ -303,20 +305,30 @@ class ParseUriTest(unittest.TestCase):
         _patch_pathlib(obj.old_impl)
         assert pathlib.Path.open != smart_open.open
 
+    @unittest.skipUnless(smart_open_lib.six.PY3, "our monkey patch only works on Py3")
     def test_pathlib_monkeypath_read_gz(self):
+        from smart_open.smart_open_lib import pathlib
+
         path = pathlib.Path(CURR_DIR) / 'test_data' / 'crime-and-punishment.txt.gz'
 
-        # Check that standart implementation can't work with gzip
+        # Check that standard implementation can't work with gzip
         with path.open("r") as infile:
-            with self.assertRaises(Exception) as context:
+            with self.assertRaises(Exception):
                 lines = infile.readlines()
 
-        # Check that out implementation works with gzip
+        # Check that our implementation works with gzip
         obj = patch_pathlib()
-        with path.open("r") as infile:
-            lines = infile.readlines()
+        try:
+            with path.open("r") as infile:
+                lines = infile.readlines()
+            self.assertEqual(len(lines), 3)
+        finally:
+            _patch_pathlib(obj.old_impl)
 
-        _patch_pathlib(obj.old_impl)
+    @unittest.skipUnless(smart_open_lib.six.PY2, 'this test is for Py2 only')
+    def test_monkey_patch_raises_exception_py2(self):
+        with self.assertRaises(RuntimeError):
+            patch_pathlib()
 
 
 class SmartOpenHttpTest(unittest.TestCase):
@@ -637,9 +649,7 @@ class SmartOpenReadTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(expected, actual)
 
-    @unittest.skipUnless(
-        smart_open_lib.PATHLIB_SUPPORT,
-        "do not test pathlib support if pathlib or backport are not available")
+    @unittest.skipUnless(smart_open_lib.PATHLIB_SUPPORT, "this test requires pathlib")
     def test_open_and_read_pathlib_path(self):
         """If ``pathlib.Path`` is available we should be able to open and read."""
         from smart_open.smart_open_lib import pathlib
