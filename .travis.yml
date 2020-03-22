@@ -3,6 +3,15 @@ language: python
 matrix:
   include:
     - python: '2.7'
+      name: "py2.7-flake8"
+      env: TOXENV="flake8"
+
+    - python: '3.7'
+      name: "py3.7-flake8"
+      env: TOXENV="flake8"
+      dist: xenial
+
+    - python: '2.7'
       env:
         - RUN_BENCHMARKS: true
         - SO_S3_URL: "s3://smart-open-py27-benchmark"
