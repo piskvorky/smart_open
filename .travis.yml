@@ -19,7 +19,6 @@ jobs:
     - python: '3.5'
       env: TOXENV="check_keys,py35-test,py35-integration"
 
-
     - python: '3.6'
       env:
         - RUN_BENCHMARKS: true
@@ -27,7 +26,6 @@ jobs:
         - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
         - TOXENV: "check_keys,py36-test,py36-benchmark,py36-integration"
-
 
     - python: '3.7'
       env:
