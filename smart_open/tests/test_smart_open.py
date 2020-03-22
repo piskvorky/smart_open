@@ -306,12 +306,12 @@ class ParseUriTest(unittest.TestCase):
     def test_pathlib_monkeypath_read_gz(self):
         path = pathlib.Path(CURR_DIR) / 'test_data' / 'crime-and-punishment.txt.gz'
 
-        # Check that standart implementation can't work with gzip
+        # Check that standard implementation can't work with gzip
         with path.open("r") as infile:
             with self.assertRaises(Exception):
                 lines = infile.readlines()
 
-        # Check that out implementation works with gzip
+        # Check that our implementation works with gzip
         obj = patch_pathlib()
         with path.open("r") as infile:
             lines = infile.readlines()
