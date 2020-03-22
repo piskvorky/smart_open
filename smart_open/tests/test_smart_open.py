@@ -308,7 +308,7 @@ class ParseUriTest(unittest.TestCase):
 
         # Check that standart implementation can't work with gzip
         with path.open("r") as infile:
-            with self.assertRaises(Exception) as context:
+            with self.assertRaises(Exception):
                 lines = infile.readlines()
 
         # Check that out implementation works with gzip
@@ -316,6 +316,7 @@ class ParseUriTest(unittest.TestCase):
         with path.open("r") as infile:
             lines = infile.readlines()
 
+        self.assertEqual(len(lines), 3)
         _patch_pathlib(obj.old_impl)
 
 
