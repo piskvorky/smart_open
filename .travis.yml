@@ -14,10 +14,10 @@ jobs:
         - SO_S3_URL: "s3://smart-open-py27-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py27-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
-        - TOXENV: "check_keys,py27-integration"
+        - TOXENV: "check_keys,py27-test,py27-benchmark,py27-integration"
 
     - python: '3.5'
-      env: TOXENV="check_keys,py35-integration"
+      env: TOXENV="check_keys,py35-test,py35-integration"
 
 
     - python: '3.6'
@@ -26,7 +26,7 @@ jobs:
         - SO_S3_URL: "s3://smart-open-py36-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
-        - TOXENV: "check_keys,py36-integration"
+        - TOXENV: "check_keys,py36-test,py36-benchmark,py36-integration"
 
 
     - python: '3.7'
@@ -34,9 +34,8 @@ jobs:
         - RUN_BENCHMARKS: true
         - SO_S3_URL: "s3://smart-open-py37-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
-        - SO_ENABLE_MOTO_SERVER: "1"
         - BOTO_CONFIG: "/dev/null"
-        - TOXENV: "check_keys,enable_moto_server,py37-integration,disable_moto_server"
+        - TOXENV: "check_keys,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
 
 install:
   - pip install tox
