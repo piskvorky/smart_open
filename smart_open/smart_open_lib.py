@@ -945,11 +945,6 @@ class patch_pathlib(object):
 
 def _patch_pathlib(func):
     """Replace `Path.open` with `func`"""
-    pathlib = sys.modules.get("pathlib", None)
-
-    if not pathlib:
-        raise RuntimeError("Can't patch 'pathlib.Path.open', you should import 'pathlib' first")
-
     old_impl = pathlib.Path.open
     pathlib.Path.open = func
     return old_impl
