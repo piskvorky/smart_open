@@ -1,11 +1,12 @@
 language: python
+dist: xenial
+os: linux
 
-matrix:
+jobs:
   include:
     - python: '3.7'
       name: "flake8"
       env: TOXENV="flake8"
-      dist: xenial
 
     - python: '2.7'
       env:
@@ -29,7 +30,6 @@ matrix:
 
 
     - python: '3.7'
-      dist: xenial
       env:
         - RUN_BENCHMARKS: true
         - SO_S3_URL: "s3://smart-open-py37-benchmark"
@@ -37,8 +37,6 @@ matrix:
         - SO_ENABLE_MOTO_SERVER: "1"
         - BOTO_CONFIG: "/dev/null"
         - TOXENV: "check_keys"
-
-      dist: xenial
 
 install:
   - pip install tox
