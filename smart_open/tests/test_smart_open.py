@@ -13,7 +13,6 @@ import logging
 import tempfile
 import os
 import hashlib
-import pathlib
 
 import boto3
 import mock
@@ -289,7 +288,10 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
 
+    @unittest.skipUnless(smart_open_lib.PATHLIB_SUPPORT, "this test requires pathlib")
     def test_pathlib_monkeypath(self):
+        from smart_open.smart_open_lib import pathlib
+
         assert pathlib.Path.open != smart_open.open
 
         with patch_pathlib():
@@ -303,7 +305,10 @@ class ParseUriTest(unittest.TestCase):
         _patch_pathlib(obj.old_impl)
         assert pathlib.Path.open != smart_open.open
 
+    @unittest.skipUnless(smart_open_lib.PATHLIB_SUPPORT, "this test requires pathlib")
     def test_pathlib_monkeypath_read_gz(self):
+        from smart_open.smart_open_lib import pathlib
+
         path = pathlib.Path(CURR_DIR) / 'test_data' / 'crime-and-punishment.txt.gz'
 
         # Check that standard implementation can't work with gzip
@@ -638,9 +643,7 @@ class SmartOpenReadTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(expected, actual)
 
-    @unittest.skipUnless(
-        smart_open_lib.PATHLIB_SUPPORT,
-        "do not test pathlib support if pathlib or backport are not available")
+    @unittest.skipUnless(smart_open_lib.PATHLIB_SUPPORT, "this test requires pathlib")
     def test_open_and_read_pathlib_path(self):
         """If ``pathlib.Path`` is available we should be able to open and read."""
         from smart_open.smart_open_lib import pathlib
