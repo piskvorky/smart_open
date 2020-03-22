@@ -41,7 +41,7 @@ install:
 script:
   - flake8 --max-line-length=110
   - python check_keys.py
-  - python -m doctest README.rst
+  - python -m doctest README.rst -v
 
   - if [[ ${SO_ENABLE_MOTO_SERVER} = 1 ]]; then
       sh -c "moto_server -p5000 2> /dev/null &";
