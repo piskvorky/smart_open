@@ -24,6 +24,7 @@ import six
 import smart_open
 from smart_open import smart_open_lib
 from smart_open import webhdfs
+from smart_open.smart_open_lib import patch_pathlib, _patch_pathlib
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class ParseUriTest(unittest.TestCase):
     def test_scheme(self):
         """Do URIs schemes parse correctly?"""
         # supported schemes
-        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https"):
+        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs"):
             parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
             self.assertEqual(parsed_uri.scheme, scheme)
 
@@ -272,6 +273,62 @@ class ParseUriTest(unittest.TestCase):
         as_string = 'sftp://user:some:complex@password$$@host:2222/path/to/file'
         uri = smart_open_lib._parse_uri(as_string)
         self.assertEqual(uri.password, 'some:complex@password$$')
+
+    def test_gs_uri(self):
+        """Do GCS URIs parse correctly?"""
+        # correct uri without credentials
+        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/myblob")
+        self.assertEqual(parsed_uri.scheme, "gs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "myblob")
+
+    def test_gs_uri_contains_slash(self):
+        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob")
+        self.assertEqual(parsed_uri.scheme, "gs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
+
+    @unittest.skipUnless(smart_open_lib.six.PY3, "our monkey patch only works on Py3")
+    def test_pathlib_monkeypatch(self):
+        from smart_open.smart_open_lib import pathlib
+
+        assert pathlib.Path.open != smart_open.open
+
+        with patch_pathlib():
+            assert pathlib.Path.open == smart_open.open
+
+        assert pathlib.Path.open != smart_open.open
+
+        obj = patch_pathlib()
+        assert pathlib.Path.open == smart_open.open
+
+        _patch_pathlib(obj.old_impl)
+        assert pathlib.Path.open != smart_open.open
+
+    @unittest.skipUnless(smart_open_lib.six.PY3, "our monkey patch only works on Py3")
+    def test_pathlib_monkeypath_read_gz(self):
+        from smart_open.smart_open_lib import pathlib
+
+        path = pathlib.Path(CURR_DIR) / 'test_data' / 'crime-and-punishment.txt.gz'
+
+        # Check that standard implementation can't work with gzip
+        with path.open("r") as infile:
+            with self.assertRaises(Exception):
+                lines = infile.readlines()
+
+        # Check that our implementation works with gzip
+        obj = patch_pathlib()
+        try:
+            with path.open("r") as infile:
+                lines = infile.readlines()
+            self.assertEqual(len(lines), 3)
+        finally:
+            _patch_pathlib(obj.old_impl)
+
+    @unittest.skipUnless(smart_open_lib.six.PY2, 'this test is for Py2 only')
+    def test_monkey_patch_raises_exception_py2(self):
+        with self.assertRaises(RuntimeError):
+            patch_pathlib()
 
 
 class SmartOpenHttpTest(unittest.TestCase):
@@ -592,9 +649,7 @@ class SmartOpenReadTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(expected, actual)
 
-    @unittest.skipUnless(
-        smart_open_lib.PATHLIB_SUPPORT,
-        "do not test pathlib support if pathlib or backport are not available")
+    @unittest.skipUnless(smart_open_lib.PATHLIB_SUPPORT, "this test requires pathlib")
     def test_open_and_read_pathlib_path(self):
         """If ``pathlib.Path`` is available we should be able to open and read."""
         from smart_open.smart_open_lib import pathlib
@@ -1480,7 +1535,7 @@ class S3OpenTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(text, actual)
 
-    @mock.patch('smart_open.s3.SeekableBufferedInputBase')
+    @mock.patch('smart_open.s3.Reader')
     def test_transport_params_is_not_mutable(self, mock_open):
         smart_open.open('s3://access_key:secret_key@host@bucket/key')
         smart_open.open('s3://bucket/key')
@@ -1493,7 +1548,7 @@ class S3OpenTest(unittest.TestCase):
         self.assertIsNone(mock_open.call_args_list[1][1]['session'])
         self.assertIsNotNone(mock_open.call_args_list[0][1]['session'])
 
-    @mock.patch('smart_open.s3.SeekableBufferedInputBase')
+    @mock.patch('smart_open.s3.Reader')
     def test_respects_endpoint_url_read(self, mock_open):
         url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
         smart_open.open(url)
@@ -1501,7 +1556,7 @@ class S3OpenTest(unittest.TestCase):
         expected = {'endpoint_url': 'https://play.min.io:9000'}
         self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
 
-    @mock.patch('smart_open.s3.BufferedOutputBase')
+    @mock.patch('smart_open.s3.MultipartWriter')
     def test_respects_endpoint_url_write(self, mock_open):
         url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
         smart_open.open(url, 'wb')

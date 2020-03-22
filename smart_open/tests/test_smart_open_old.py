@@ -36,6 +36,7 @@ PY2 = sys.version_info[0] == 2
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 
 
+@mock.patch('warnings.warn', mock.Mock())
 class SmartOpenHttpTest(unittest.TestCase):
     """
     Test reading from HTTP connections in various ways.
@@ -140,6 +141,7 @@ _IO_OPEN = 'io.open'
 _BUILTIN_OPEN = 'smart_open.smart_open_lib._builtin_open'
 
 
+@mock.patch('warnings.warn', mock.Mock())
 class SmartOpenReadTest(unittest.TestCase):
     """
     Test reading from files under various schemes.
@@ -440,6 +442,7 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(content, smart_open_object.read(-1))  # same thing
 
 
+@mock.patch('warnings.warn', mock.Mock())
 class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.Session')
     def test_no_kwargs(self, mock_session):
@@ -520,6 +523,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         session.resource.assert_called_with('s3')
 
 
+@mock.patch('warnings.warn', mock.Mock())
 class SmartOpenTest(unittest.TestCase):
     """
     Test reading and writing from/into files.
@@ -698,6 +702,7 @@ class SmartOpenTest(unittest.TestCase):
         self.assertEqual(expected, actual)
 
 
+@mock.patch('warnings.warn', mock.Mock())
 class WebHdfsWriteTest(unittest.TestCase):
     """
     Test writing into webhdfs files.
@@ -764,6 +769,7 @@ class WebHdfsWriteTest(unittest.TestCase):
         assert responses.calls[3].request.url == "http://127.0.0.1:8440/file"
 
 
+@mock.patch('warnings.warn', mock.Mock())
 class CompressionFormatTest(unittest.TestCase):
     """
     Test that compression
@@ -803,6 +809,7 @@ class CompressionFormatTest(unittest.TestCase):
         self.write_read_assertion(test_file_name)
 
 
+@mock.patch('warnings.warn', mock.Mock())
 class MultistreamsBZ2Test(unittest.TestCase):
     """
     Test that multistream bzip2 compressed files can be read.
@@ -894,6 +901,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
         self.cleanup_temp_bz2(test_file)
 
 
+@mock.patch('warnings.warn', mock.Mock())
 class S3OpenTest(unittest.TestCase):
 
     @mock_s3

@@ -40,23 +40,22 @@ def read(fname):
 
 
 tests_require = [
-    'pytest',
-    'pytest-mock',
-    'pytest-rerunfailures',
-    'pytest_benchmark',
     'mock',
     'moto[server]',
     'pathlib2',
     'responses',
     'boto3',
+    # Not used directly but allows boto GCE plugins to load.
+    # https://github.com/GoogleCloudPlatform/compute-image-packages/issues/262
     'google-compute-engine==2.8.12',
     'paramiko',
+    'parameterizedtestcase',
 ]
 
 install_requires = [
-    'boto >= 2.32',
     'requests',
     'boto3',
+    'google-cloud-storage',
 ]
 if sys.version_info[0] == 2:
     install_requires.append('bz2file')
@@ -64,7 +63,7 @@ if sys.version_info[0] == 2:
 setup(
     name='smart_open',
     version=__version__,
-    description='Utils for streaming large files (S3, HDFS, gzip, bz2...)',
+    description='Utils for streaming large files (S3, HDFS, GCS, gzip, bz2...)',
     long_description=read('README.rst'),
 
     packages=find_packages(),
@@ -80,7 +79,7 @@ setup(
     url='https://github.com/piskvorky/smart_open',
     download_url='http://pypi.python.org/pypi/smart_open',
 
-    keywords='file streaming, s3, hdfs',
+    keywords='file streaming, s3, hdfs, gcs',
 
     license='MIT',
     platforms='any',
