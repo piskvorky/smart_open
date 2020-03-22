@@ -40,18 +40,12 @@ How?
   >>> from smart_open import open
   >>>
   >>> # stream lines from an S3 object
-  >>> for line in open('s3://commoncrawl/robots.txt'):
-  ...    print(repr(line))
-  ...    break
+  >>> open('s3://commoncrawl/robots.txt').readline()
   'User-Agent: *\n'
 
   >>> # stream from/to compressed files, with transparent (de)compression:
-  >>> for line in open('smart_open/tests/test_data/1984.txt.gz', encoding='utf-8'):
-  ...    print(repr(line))
+  >>> open('smart_open/tests/test_data/1984.txt.gz', encoding='utf-8').readline()
   'It was a bright cold day in April, and the clocks were striking thirteen.\n'
-  'Winston Smith, his chin nuzzled into his breast in an effort to escape the vile\n'
-  'wind, slipped quickly through the glass doors of Victory Mansions, though not\n'
-  'quickly enough to prevent a swirl of gritty dust from entering along with him.\n'
 
   >>> # can use context managers too:
   >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
@@ -61,18 +55,14 @@ How?
 
   >>> # can use any IOBase operations, like seek
   >>> with open('s3://commoncrawl/robots.txt', 'rb') as fin:
-  ...     for line in fin:
-  ...         print(repr(line.decode('utf-8')))
-  ...         break
+  ...     print(repr(fin.readline().decode('utf-8')))
   ...     offset = fin.seek(0)  # seek to the beginning
   ...     print(fin.read(4))
   'User-Agent: *\n'
   b'User'
 
   >>> # stream from HTTP
-  >>> for line in open('http://example.com/index.html'):
-  ...     print(repr(line))
-  ...     break
+  >>> open('http://example.com/index.html').readline()
   '<!doctype html>\n'
 
 Other examples of URLs that ``smart_open`` accepts::
@@ -320,7 +310,7 @@ The ``version_id`` transport parameter enables you to get the desired version of
 
   >>> # If you don't specify a version, smart_open will read the most recent one
   >>> with open('s3://%s/%s' % (bucket, key)) as fin:
-  ...     print(repr(fin.read()))
+  ...     fin.read()
   'second version\n'
 
 GCS Credentials
