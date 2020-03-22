@@ -945,6 +945,8 @@ class patch_pathlib(object):
 
 def _patch_pathlib(func):
     """Replace `Path.open` with `func`"""
+    if not PATHLIB_SUPPORT:
+        raise RuntimeError('install pathlib (or pathlib2) before using this function')
     old_impl = pathlib.Path.open
     pathlib.Path.open = func
     return old_impl
