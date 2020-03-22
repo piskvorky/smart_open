@@ -288,7 +288,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
 
-    @unittest.skipUnless(smart_open_lib.PATHLIB_SUPPORT, "this test requires pathlib")
+    @unittest.skipUnless(smart_open_lib.six.PY3, "our monkey patch only works on Py3")
     def test_pathlib_monkeypatch(self):
         from smart_open.smart_open_lib import pathlib
 
@@ -305,7 +305,7 @@ class ParseUriTest(unittest.TestCase):
         _patch_pathlib(obj.old_impl)
         assert pathlib.Path.open != smart_open.open
 
-    @unittest.skipUnless(smart_open_lib.PATHLIB_SUPPORT, "this test requires pathlib")
+    @unittest.skipUnless(smart_open_lib.six.PY3, "our monkey patch only works on Py3")
     def test_pathlib_monkeypath_read_gz(self):
         from smart_open.smart_open_lib import pathlib
 
@@ -324,6 +324,11 @@ class ParseUriTest(unittest.TestCase):
             self.assertEqual(len(lines), 3)
         finally:
             _patch_pathlib(obj.old_impl)
+
+    @unittest.skipUnless(smart_open_lib.six.PY2, 'this test is for Py2 only')
+    def test_monkey_patch_raises_exception_py2(self):
+        with self.assertRaises(RuntimeError):
+            patch_pathlib()
 
 
 class SmartOpenHttpTest(unittest.TestCase):
