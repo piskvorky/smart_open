@@ -133,15 +133,25 @@ More examples
 
 .. code-block:: python
 
+    >>> import os
     >>> import boto3
+    >>>
+    >>> def get_session():
+    ...     key = os.environ.get('AWS_ACCESS_KEY_ID')
+    ...     secret = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    ...     if key and secret:
+    ...         return boto3.Session(aws_access_key_id=key, aws_secret_access_key=secret)
+    ...     return None
     >>>
     >>> # stream content *into* S3 (write mode) using a custom session
     >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
     >>> lines = [b'first line\n', b'second line\n', b'third line\n']
-    >>> transport_params = {'session': boto3.Session(profile_name='smart_open')}
-    >>> with open(url, 'wb', transport_params=transport_params) as fout:
-    ...     for line in lines:
-    ...         bytes_written = fout.write(line)
+    >>> session = get_session()
+    >>> if session:
+    ...     # This example requires real AWS credentials
+    ...     with open(url, 'wb', transport_params={'session': session}) as fout:
+    ...         for line in lines:
+    ...             bytes_written = fout.write(line)
 
 .. code-block:: python
 
