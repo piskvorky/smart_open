@@ -289,7 +289,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
 
     @unittest.skipUnless(smart_open_lib.PATHLIB_SUPPORT, "this test requires pathlib")
-    def test_pathlib_monkeypath(self):
+    def test_pathlib_monkeypatch(self):
         from smart_open.smart_open_lib import pathlib
 
         assert pathlib.Path.open != smart_open.open
@@ -318,11 +318,12 @@ class ParseUriTest(unittest.TestCase):
 
         # Check that our implementation works with gzip
         obj = patch_pathlib()
-        with path.open("r") as infile:
-            lines = infile.readlines()
-
-        self.assertEqual(len(lines), 3)
-        _patch_pathlib(obj.old_impl)
+        try:
+            with path.open("r") as infile:
+                lines = infile.readlines()
+            self.assertEqual(len(lines), 3)
+        finally:
+            _patch_pathlib(obj.old_impl)
 
 
 class SmartOpenHttpTest(unittest.TestCase):
