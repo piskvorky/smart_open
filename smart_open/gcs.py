@@ -209,11 +209,11 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
     ):
         if client is None:
             client = google.cloud.storage.Client()
-        bucket = client.get_bucket(bucket)  # type: google.cloud.storage.Bucket
+        self._bucket = client.get_bucket(bucket)  # type: google.cloud.storage.Bucket
 
-        self._blob = bucket.get_blob(key)
+        self._blob = self._bucket.get_blob(key)
         if self._blob is None:
-            raise google.cloud.exceptions.NotFound('blob {} not found in {}'.format(key, bucket))
+            raise google.cloud.exceptions.NotFound('blob {} not found in {}'.format(key, self._bucket.name))
         self._size = self._blob.size if self._blob.size is not None else 0
 
         self._raw_reader = _SeekableRawReader(self._blob, self._size)
