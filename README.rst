@@ -123,22 +123,18 @@ More examples
 
 .. code-block:: python
 
-    >>> import os, sys, boto3
-    >>>
-    >>> def get_session():
-    ...     # This is here so we can doctest this example under TravisCI
-    ...     key = os.environ.get('AWS_ACCESS_KEY_ID')
-    ...     secret = os.environ.get('AWS_SECRET_ACCESS_KEY')
-    ...     if key and secret:
-    ...         return boto3.Session(aws_access_key_id=key, aws_secret_access_key=secret)
-    ...     print('AWS credentials not found in environ', file=sys.stderr)
+    >>> import os, boto3
     >>>
     >>> # stream content *into* S3 (write mode) using a custom session
+    >>> session = boto3.Session(
+    ...     aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+    ...     aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    ... )
     >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-    >>> session = get_session()
-    >>> if session:
-    ...     with open(url, 'wb', transport_params={'session': session}) as fout:
-    ...         bytes_written = fout.write(b'hello world!')
+    >>> with open(url, 'wb', transport_params={'session': session}) as fout:
+    ...     bytes_written = fout.write(b'hello world!')
+    ...     print(bytes_written)
+    12
 
 .. code-block:: python
 
