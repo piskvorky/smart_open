@@ -33,6 +33,7 @@ jobs:
         - SO_S3_URL: "s3://smart-open-py37-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
+        - SO_ENABLE_MOTO_SERVER: "1"
         - TOXENV: "check_keys,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
 
 install:
