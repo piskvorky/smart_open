@@ -209,11 +209,13 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
     ):
         if client is None:
             client = google.cloud.storage.Client()
-        self._bucket = client.get_bucket(bucket)  # type: google.cloud.storage.Bucket
 
-        self._blob = self._bucket.get_blob(key)
+        self._bucket_name = bucket
+        bucket = client.get_bucket(bucket)  # type: google.cloud.storage.Bucket
+
+        self._blob = bucket.get_blob(key)
         if self._blob is None:
-            raise google.cloud.exceptions.NotFound('blob {} not found in {}'.format(key, self._bucket.name))
+            raise google.cloud.exceptions.NotFound('blob {} not found in {}'.format(key, self._bucket_name))
         self._size = self._blob.size if self._blob.size is not None else 0
 
         self._raw_reader = _SeekableRawReader(self._blob, self._size)
@@ -372,11 +374,11 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
                 self._eof = True
 
     def __str__(self):
-        return "(%s, %r, %r)" % (self.__class__.__name__, self._bucket.name, self._blob.name)
+        return "(%s, %r, %r)" % (self.__class__.__name__, self._bucket_name, self._blob.name)
 
     def __repr__(self):
         return "%s(bucket=%r, blob=%r, buffer_size=%r)" % (
-            self.__class__.__name__, self._bucket.name, self._blob.name, self._current_part_size,
+            self.__class__.__name__, self._bucket_name, self._blob.name, self._current_part_size,
         )
 
 
@@ -396,8 +398,9 @@ class BufferedOutputBase(io.BufferedIOBase):
             client = google.cloud.storage.Client()
         self._client = client
         self._credentials = self._client._credentials  # noqa
-        self._bucket = self._client.bucket(bucket)  # type: google.cloud.storage.Bucket
-        self._blob = self._bucket.blob(blob)  # type: google.cloud.storage.Blob
+        self._bucket_name = bucket
+        bucket = self._client.bucket(bucket)  # type: google.cloud.storage.Bucket
+        self._blob = bucket.blob(blob)  # type: google.cloud.storage.Blob
         assert min_part_size % _REQUIRED_CHUNK_MULTIPLE == 0, 'min part size must be a multiple of 256KB'
         assert min_part_size >= _MIN_MIN_PART_SIZE, 'min part size must be greater than 256KB'
         self._min_part_size = min_part_size
@@ -596,9 +599,9 @@ class BufferedOutputBase(io.BufferedIOBase):
             self.close()
 
     def __str__(self):
-        return "(%s, %r, %r)" % (self.__class__.__name__, self._bucket.name, self._blob.name)
+        return "(%s, %r, %r)" % (self.__class__.__name__, self._bucket_name, self._blob.name)
 
     def __repr__(self):
         return "%s(bucket=%r, blob=%r, min_part_size=%r)" % (
-            self.__class__.__name__, self._bucket.name, self._blob.name, self._min_part_size,
+            self.__class__.__name__, self._bucket_name, self._blob.name, self._min_part_size,
         )
