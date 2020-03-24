@@ -54,7 +54,7 @@ script:
   # We only run doctests under Py3 because making them work with Py2 affects
   # the clarity and readability of the examples.
   #
-  - if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" && "${RUN_DOCTESTS}" == "true"]]; then
+  - if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" && "${RUN_DOCTESTS}" == "true" ]]; then
       python -m doctest README.rst -v;
     fi
 
@@ -68,7 +68,7 @@ script:
   # The creds won't be available unless this is a branch belonging to the
   # RaRe-Technologies organization.
   #
-  - if [[ "${TRAVIS_SECURE_ENV_VARS}" = "true" && "${RUN_BENCHMARKS}" = "true" ]]; then
+  - if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" && "${RUN_BENCHMARKS}" == "true" ]]; then
       export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())');
       pip install pytest_benchmark awscli;
       set -e;
@@ -84,7 +84,7 @@ script:
   #
   # These integration tests require AWS creds and an initialized S3 bucket
   #
-  - if [[ "${TRAVIS_SECURE_ENV_VARS}" = "true" ]]; then
+  - if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]]; then
       pytest integration-tests/test_s3_ported.py;
     fi
 
