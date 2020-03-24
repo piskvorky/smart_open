@@ -1,93 +1,42 @@
 language: python
+dist: xenial
+os: linux
 
-matrix:
+jobs:
   include:
+    - python: '3.7'
+      name: "flake8"
+      env: TOXENV="flake8"
+
     - python: '2.7'
       env:
-        - RUN_BENCHMARKS: true
         - SO_S3_URL: "s3://smart-open-py27-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py27-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
+        - TOXENV: "check_keys,py27-test,py27-benchmark,py27-integration"
 
     - python: '3.5'
-      env:
-        - RUN_DOCTESTS: true
+      env: TOXENV="check_keys,py35-test,py35-integration"
 
     - python: '3.6'
       env:
-        - RUN_BENCHMARKS: true
-        - RUN_DOCTESTS: true
         - SO_S3_URL: "s3://smart-open-py36-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
+        - TOXENV: "check_keys,py36-doctest,py36-test,py36-benchmark,py36-integration"
 
     - python: '3.7'
-      dist: xenial
       env:
-        - RUN_BENCHMARKS: true
-        - RUN_DOCTESTS: true
         - SO_S3_URL: "s3://smart-open-py37-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
-        - SO_ENABLE_MOTO_SERVER: "1"
         - BOTO_CONFIG: "/dev/null"
-      dist: xenial
+        - SO_ENABLE_MOTO_SERVER: "1"
+        - TOXENV: "check_keys,py37-doctest,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
 
 install:
-  - pip install --upgrade setuptools
-  - pip install flask
-  - pip install .[test]
-  - pip install flake8
-  - pip install pytest
-  - pip install numpy
-  - pip freeze
+  - pip install tox
 
-
-script:
-  - flake8 --max-line-length=110
-  - python check_keys.py
-
-  #
-  # Our doctests require valid boto3 credentials.  They won't work without them.
-  # This is by design: we don't want to cram our README.rst with programming
-  # logic to handle the absence of credentials.
-  #
-  # We only run doctests under Py3 because making them work with Py2 affects
-  # the clarity and readability of the examples.
-  #
-  - if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" && "${RUN_DOCTESTS}" == "true" ]]; then
-      python -m doctest README.rst -v;
-    fi
-
-  - if [[ ${SO_ENABLE_MOTO_SERVER} = 1 ]]; then
-      sh -c "moto_server -p5000 2> /dev/null &";
-    fi
-  - pytest smart_open/tests
-
-  #
-  # We cannot run benchmarks without AWS credentials.
-  # The creds won't be available unless this is a branch belonging to the
-  # RaRe-Technologies organization.
-  #
-  - if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" && "${RUN_BENCHMARKS}" == "true" ]]; then
-      export SO_S3_URL=$SO_S3_URL/$(python -c 'from uuid import uuid4;print(uuid4())');
-      pip install pytest_benchmark awscli;
-      set -e;
-      py.test integration-tests/test_s3.py --benchmark-save=`git rev-parse HEAD`;
-      set +e;
-      aws s3 cp .benchmarks/*/*.json ${SO_S3_RESULT_URL};
-      aws s3 rm --recursive $SO_S3_URL;
-    fi
-
-  - py.test integration-tests/test_http.py
-  - py.test integration-tests/test_207.py
-
-  #
-  # These integration tests require AWS creds and an initialized S3 bucket
-  #
-  - if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]]; then
-      pytest integration-tests/test_s3_ported.py;
-    fi
-
+script: tox -vv
 
 cache:
   directories:
