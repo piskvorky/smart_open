@@ -10,10 +10,13 @@ matrix:
         - BOTO_CONFIG: "/dev/null"
 
     - python: '3.5'
+      env:
+        - RUN_DOCTESTS: true
 
     - python: '3.6'
       env:
         - RUN_BENCHMARKS: true
+        - RUN_DOCTESTS: true
         - SO_S3_URL: "s3://smart-open-py36-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
@@ -22,6 +25,7 @@ matrix:
       dist: xenial
       env:
         - RUN_BENCHMARKS: true
+        - RUN_DOCTESTS: true
         - SO_S3_URL: "s3://smart-open-py37-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
         - SO_ENABLE_MOTO_SERVER: "1"
@@ -47,7 +51,10 @@ script:
   # This is by design: we don't want to cram our README.rst with programming
   # logic to handle the absence of credentials.
   #
-  - if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]]; then
+  # We only run doctests under Py3 because making them work with Py2 affects
+  # the clarity and readability of the examples.
+  #
+  - if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" && "${RUN_DOCTESTS}" == "true"]]; then
       python -m doctest README.rst -v;
     fi
 
