@@ -135,15 +135,18 @@ More examples
 
 .. code-block:: python
 
-    >>> import boto3
+    >>> import os, boto3
     >>>
     >>> # stream content *into* S3 (write mode) using a custom session
+    >>> session = boto3.Session(
+    ...     aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+    ...     aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    ... )
     >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-    >>> lines = [b'first line\n', b'second line\n', b'third line\n']
-    >>> transport_params = {'session': boto3.Session(profile_name='smart_open')}
-    >>> with open(url, 'wb', transport_params=transport_params) as fout:
-    ...     for line in lines:
-    ...         bytes_written = fout.write(line)
+    >>> with open(url, 'wb', transport_params={'session': session}) as fout:
+    ...     bytes_written = fout.write(b'hello world!')
+    ...     print(bytes_written)
+    12
 
 .. code-block:: python
 

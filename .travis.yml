@@ -42,6 +42,15 @@ script:
   - flake8 --max-line-length=110
   - python check_keys.py
 
+  #
+  # Our doctests require valid boto3 credentials.  They won't work without them.
+  # This is by design: we don't want to cram our README.rst with programming
+  # logic to handle the absence of credentials.
+  #
+  - if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]]; then
+      python -m doctest README.rst -v;
+    fi
+
   - if [[ ${SO_ENABLE_MOTO_SERVER} = 1 ]]; then
       sh -c "moto_server -p5000 2> /dev/null &";
     fi
