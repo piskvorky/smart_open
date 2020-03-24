@@ -5,14 +5,14 @@ set -x
 
 
 benchmark(){
-  if [[ "$TRAVIS_SECURE_ENV_VARS" == "true" && "$RUN_BENCHMARKS" == "true" ]]; then
-    SO_S3_URL="$SO_S3_URL"/`python -c "from uuid import uuid4;print(uuid4())"`;
+  if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]]; then
+    SO_S3_URL="${SO_S3_URL}"/`python -c "from uuid import uuid4;print(uuid4())"`;
     COMMIT_HASH=`git rev-parse HEAD`;
 
-    pytest integration-tests/test_s3.py --benchmark-save="$COMMIT_HASH";
+    pytest integration-tests/test_s3.py --benchmark-save="${COMMIT_HASH}";
 
-    aws s3 cp .benchmarks/*/*.json "$SO_S3_RESULT_URL";
-    aws s3 rm --recursive $SO_S3_URL;
+    aws s3 cp .benchmarks/*/*.json "${SO_S3_RESULT_URL}";
+    aws s3 rm --recursive "${SO_S3_URL}";
   else
     echo "[WARNING] Skip 'benchmark' testing"
   fi
@@ -21,10 +21,16 @@ benchmark(){
 integration(){
   pytest integration-tests/test_http.py integration-tests/test_207.py
 
-  if [[ "$TRAVIS_SECURE_ENV_VARS" == "true" ]]; then
+  if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]]; then
     pytest integration-tests/test_s3_ported.py;
   else
     echo "[WARNING] Skip 'integration' testing"
+  fi
+}
+
+doctest(){
+  if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]]; then
+      python -m doctest README.rst -v;
   fi
 }
 
