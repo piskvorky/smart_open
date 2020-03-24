@@ -22,6 +22,7 @@ jobs:
     - python: '3.6'
       env:
         - RUN_BENCHMARKS: true
+        - RUN_DOCTESTS: true
         - SO_S3_URL: "s3://smart-open-py36-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
@@ -30,6 +31,7 @@ jobs:
     - python: '3.7'
       env:
         - RUN_BENCHMARKS: true
+        - RUN_DOCTESTS: true
         - SO_S3_URL: "s3://smart-open-py37-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
         - BOTO_CONFIG: "/dev/null"
