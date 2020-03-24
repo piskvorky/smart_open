@@ -56,6 +56,8 @@ install_requires = [
     'requests',
     'boto3',
     'google-cloud-storage',
+    'azure-storage-blob',
+    'azure-common'
 ]
 if sys.version_info[0] == 2:
     install_requires.append('bz2file')
