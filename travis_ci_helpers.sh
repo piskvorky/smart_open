@@ -4,8 +4,16 @@ set -e
 set -x
 
 
-benchmark(){
+is_travis_secure_vars_available(){
   if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+benchmark(){
+  if is_travis_secure_vars_available; then
     SO_S3_URL="${SO_S3_URL}"/`python -c "from uuid import uuid4;print(uuid4())"`;
     COMMIT_HASH=`git rev-parse HEAD`;
 
@@ -21,7 +29,7 @@ benchmark(){
 integration(){
   pytest integration-tests/test_http.py integration-tests/test_207.py
 
-  if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]]; then
+  if is_travis_secure_vars_available; then
     pytest integration-tests/test_s3_ported.py;
   else
     echo "[WARNING] Skip 'integration' testing"
@@ -29,8 +37,10 @@ integration(){
 }
 
 doctest(){
-  if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]]; then
-      python -m doctest README.rst -v;
+  if is_travis_secure_vars_available; then
+    python -m doctest README.rst -v;
+  else
+    echo "[WARNING] Skip 'doctest' testing"
   fi
 }
 
