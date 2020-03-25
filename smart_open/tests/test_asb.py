@@ -20,6 +20,7 @@ from collections import OrderedDict
 
 from azure.storage.blob import BlobServiceClient
 from azure.common import AzureHttpError
+from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 import six
 
 import smart_open
@@ -59,7 +60,7 @@ class FakeBlobClient(object):
         if metadata is not None:
             self.set_blob_metadata(metadata)
         self.__contents = io.BytesIO(data[:length])
-        self._container_client.register_blob(self)
+        self._container_client.register_blob_client(self)
 
 
 class FakeBlobClientTest(unittest.TestCase):
@@ -100,16 +101,19 @@ class FakeContainerClient(object):
     def delete_blobs(self):
         self.__blob_clients = OrderedDict()
 
+    def delete_container(self):
+        self.blob_service_client.delete_container(self.name)
+
     def download_blob(self, blob):
         if blob.name not in list(self.__blob_clients.keys()):
-            raise AzureHttpError('Blob %s not found' % blob.name, status_code=404)
+            raise ResourceNotFoundError('The specified blob does not exist.')
         blob_client = self.__blob_clients[blob.name]
         blob_content = blob_client.download_blob()
         return blob_content
 
     def get_blob_client(self, blob_name):
         if blob_name not in list(self.__blob_clients.keys()):
-            raise AzureHttpError('Blob %s not found' % blob_name, status_code=404)
+            raise ResourceNotFoundError('The specified blob does not exist.')
         blob_client = self.__blob_clients[blob_name]
         return blob_client
 
@@ -124,8 +128,8 @@ class FakeContainerClient(object):
         blob_client.upload_blob(data)
         self.__blob_clients[blob_name] = blob_client
 
-    def register_blob(self, blob):
-        self.__blob_clients[blob.name] = blob
+    def register_blob_client(self, blob_client):
+        self.__blob_clients[blob_client.name] = blob_client
 
 
 class FakeContainerClientTest(unittest.TestCase):
@@ -134,19 +138,19 @@ class FakeContainerClientTest(unittest.TestCase):
         self.container_client = FakeContainerClient(self.blob_service_client, 'test-container')
 
     def test_nonexistent_blob(self):
-        with self.assertRaises(AzureHttpError):
+        with self.assertRaises(ResourceNotFoundError):
             self.container_client.get_blob_client('test-blob.txt')
-        blob = FakeBlobClient(self.container_client, 'test-blob.txt')
-        with self.assertRaises(AzureHttpError):
-            self.container_client.download_blob(blob)
+        blob_client = FakeBlobClient(self.container_client, 'test-blob.txt')
+        with self.assertRaises(ResourceNotFoundError):
+            self.container_client.download_blob(blob_client)
 
     def test_delete_blob(self):
         blob_name = 'test-blob.txt'
         data = b'Lorem ipsum'
         self.container_client.upload_blob(blob_name, data)
         self.assertEqual(self.container_client.list_blobs(), [blob_name])
-        blob = FakeBlobClient(self.container_client, 'test-blob.txt')
-        self.container_client.delete_blob(blob)
+        blob_client = FakeBlobClient(self.container_client, 'test-blob.txt')
+        self.container_client.delete_blob(blob_client)
         self.assertEqual(self.container_client.list_blobs(), [])
 
     def test_delete_blobs(self):
@@ -156,6 +160,14 @@ class FakeContainerClientTest(unittest.TestCase):
         self.container_client.upload_blob(blob_name_1, data)
         self.container_client.upload_blob(blob_name_2, data)
         self.assertEqual(self.container_client.list_blobs(), [blob_name_1, blob_name_2])
+
+    def test_delete_container(self):
+        container_name = 'test-container'
+        container_client = self.blob_service_client.create_container(container_name)
+        self.assertEqual(self.blob_service_client.get_container_client(container_name).name, container_name)
+        container_client.delete_container()
+        with self.assertRaises(ResourceNotFoundError):
+            self.blob_service_client.get_container_client(container_name)
 
     def test_list_blobs(self):
         blob_name_1 = 'test-blob-1.txt'
@@ -184,7 +196,7 @@ class FakeBlobServiceClient(object):
 
     def create_container(self, container_name, metadata=None):
         if container_name in self.__container_clients:
-            raise AzureHttpError('Container %s already exists' % container_name, status_code=409)
+            raise ResourceExistsError('The specified container already exists.')
         container_client = FakeContainerClient(self, container_name)
         if metadata is not None:
             container_client.create_container(metadata)
@@ -201,7 +213,7 @@ class FakeBlobServiceClient(object):
 
     def get_container_client(self, container):
         if container not in self.__container_clients:
-            raise AzureHttpError('Container %s not found' % container, status_code=404)
+            raise ResourceNotFoundError('The specified container does not exist.')
         return self.__container_clients[container]
 
 
@@ -210,7 +222,7 @@ class FakeBlobServiceClientTest(unittest.TestCase):
         self.blob_service_client = FakeBlobServiceClient()
 
     def test_nonexistent_container(self):
-        with self.assertRaises(AzureHttpError):
+        with self.assertRaises(ResourceNotFoundError):
             self.blob_service_client.get_container_client('test-container')
 
     def test_create_container(self):
@@ -222,26 +234,32 @@ class FakeBlobServiceClientTest(unittest.TestCase):
     def test_duplicate_container(self):
         container_name = 'test-container'
         self.blob_service_client.create_container(container_name)
-        with self.assertRaises(AzureHttpError):
+        with self.assertRaises(ResourceExistsError):
             self.blob_service_client.create_container(container_name)
 
     def test_delete_container(self):
         container_name = 'test_container'
         self.blob_service_client.create_container(container_name)
         self.blob_service_client.delete_container(container_name)
-        with self.assertRaises(AzureHttpError):
+        with self.assertRaises(ResourceNotFoundError):
             self.blob_service_client.get_container_client(container_name)
 
 
 if DISABLE_MOCKS:
-    connect_str = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;'
-    test_blob_service_client = BlobServiceClient.from_connection_string(connect_str)
+    """If mocks are disabled, allow to use the Azurite local Azure Storage API
+    https://github.com/Azure/Azurite
+    To use locally:
+    docker run -p 10000:10000 -p 10001:10001 mcr.microsoft.com/azure-storage/azurite
+    """
+    # use Azurite default connection string
+    CONNECT_STR = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;'
+    test_blob_service_client = BlobServiceClient.from_connection_string(CONNECT_STR)
 else:
     test_blob_service_client = FakeBlobServiceClient()
 
 
 def get_container_client():
-    return test_blob_service_client.create_container(CONTAINER_NAME)
+    return test_blob_service_client.get_container_client(container=CONTAINER_NAME)
 
 
 def get_blob_client():
@@ -249,7 +267,7 @@ def get_blob_client():
 
 
 def cleanup_container():
-    container_client = test_blob_service_client.get_container_client(container=CONTAINER_NAME)
+    container_client = get_container_client()
     container_client.delete_blobs()
 
 
@@ -263,7 +281,7 @@ def put_to_container(contents, num_attempts=12, sleep_time=5):
     #
     for attempt in range(num_attempts):
         try:
-            blob_client = test_blob_service_client.get_blob_client(container=CONTAINER_NAME, blob=BLOB_NAME)
+            blob_client = get_blob_client()
             blob_client.upload_blob(contents)
             return
         except AzureHttpError as err:
@@ -271,3 +289,39 @@ def put_to_container(contents, num_attempts=12, sleep_time=5):
             time.sleep(sleep_time)
 
     assert False, 'failed to create container %s after %d attempts' % (CONTAINER_NAME, num_attempts)
+
+
+def setUpModule():  # noqa
+    """Called once by unittest when initializing this module.  Set up the
+    test Azure container.
+    """
+    test_blob_service_client.create_container(CONTAINER_NAME)
+
+def tearDownModule():  # noqa
+    """Called once by unittest when tearing down this module.  Empty and
+    removes the test Azure container.
+    """
+    try:
+        container_client = get_container_client()
+        container_client.delete_container()
+    except AzureHttpError:
+        pass
+
+
+class SeekableBufferedInputBaseTest(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        cleanup_container()
+
+    def test_read(self):
+        """Are GCS files read correctly?"""
+        content = u"hello wořld\nhow are you?".encode('utf8')
+        put_to_container(contents=content)
+        logger.debug('content: %r len: %r', content, len(content))
+
+        fin = smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME)
+        self.assertEqual(content[:6], fin.read(6))
+        self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
+        self.assertEqual(content[14:], fin.read())  # read the rest
