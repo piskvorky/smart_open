@@ -26,7 +26,6 @@ matrix:
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
         - SO_ENABLE_MOTO_SERVER: "1"
         - BOTO_CONFIG: "/dev/null"
-      dist: xenial
 
 install:
   - pip install --upgrade setuptools
