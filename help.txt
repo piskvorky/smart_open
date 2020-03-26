@@ -19,6 +19,7 @@ DESCRIPTION
 PACKAGE CONTENTS
     bytebuffer
     doctools
+    gcs
     hdfs
     http
     s3
@@ -112,7 +113,11 @@ FUNCTIONS
             is more ideal for small file sizes.
             For writing only.
         version_id: str, optional
-            Version of the object, used when reading object. If None, will fetch the most recent version.
+            Version of the object, used when reading object.
+            If None, will fetch the most recent version.
+        object_kwargs: dict, optional
+            Additional parameters to pass to boto3's object.get function.
+            Used during reading only.
         
         HTTP (for details, see :mod:`smart_open.http` and :func:`smart_open.http.open`):
         
@@ -141,8 +146,12 @@ FUNCTIONS
         user: str, optional
             The username to use to login to the remote machine.
             If None, defaults to the name of the current user.
+        password: str, optional
+            The password to use to login to the remote machine.
         port: int, optional
             The port to connect to.
+        transport_params: dict, optional
+            Any additional settings to be passed to paramiko.SSHClient.connect
         
         
         Examples
@@ -190,6 +199,7 @@ FUNCTIONS
           s3://my_bucket/my_key
           s3://my_key:my_secret@my_bucket/my_key
           s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
+          gs://my_bucket/my_blob
           hdfs:///path/file
           hdfs://path/file
           webhdfs://host:port/path/file
@@ -200,6 +210,7 @@ FUNCTIONS
           file:///home/user/file
           file:///home/user/file.bz2
           [ssh|scp|sftp]://username@host//path/file
+          [ssh|scp|sftp]://username@host/path/file
         
         
         See Also
@@ -230,7 +241,7 @@ FUNCTIONS
         >>>
         >>> register_compressor('.xz', _handle_xz)
     
-    s3_iter_bucket = iter_bucket(bucket_name, prefix='', accept_key=None, key_limit=None, workers=16, retries=3)
+    s3_iter_bucket = iter_bucket(bucket_name, prefix='', accept_key=None, key_limit=None, workers=16, retries=3, **session_kwargs)
         Iterate and download all S3 objects under `s3://bucket_name/prefix`.
         
         Parameters
@@ -249,6 +260,11 @@ FUNCTIONS
             The number of subprocesses to use.
         retries: int, optional
             The number of time to retry a failed download.
+        session_kwargs: dict, optional
+            Keyword arguments to pass when creating a new session.
+            For a list of available names and values, see:
+            https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html#boto3.session.Session
+        
         
         Yields
         ------
@@ -282,9 +298,9 @@ DATA
     __all__ = ['open', 'smart_open', 's3_iter_bucket', 'register_compresso...
 
 VERSION
-    1.9.0
+    1.10.0
 
 FILE
-    /Users/misha/git/smart_open/smart_open/__init__.py
+    /home/misha/git/smart_open/smart_open/__init__.py
 
 

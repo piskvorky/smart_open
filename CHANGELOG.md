@@ -1,5 +1,21 @@
 # Unreleased
 
+# 1.10.0, 16 Mar 2020
+
+  - Various webhdfs improvements (PR [#383](https://github.com/RaRe-Technologies/smart_open/pull/383), [@mrk-its](https://github.com/mrk-its))
+  - Fixes "the connection was closed by the remote peer" error (PR [#389](https://github.com/RaRe-Technologies/smart_open/pull/389), [@Gapex](https://github.com/Gapex))
+  - allow use of S3 single part uploads (PR [#400](https://github.com/RaRe-Technologies/smart_open/pull/400), [@adrpar](https://github.com/adrpar))
+  - Add test data in package via MANIFEST.in (PR [#401](https://github.com/RaRe-Technologies/smart_open/pull/401), [@jayvdb](https://github.com/jayvdb))
+  - Google Cloud Storage (GCS) (PR [#404](https://github.com/RaRe-Technologies/smart_open/pull/404), [@petedannemann](https://github.com/petedannemann))
+  - Implement to_boto3 function for S3 I/O. (PR [#405](https://github.com/RaRe-Technologies/smart_open/pull/405), [@mpenkov](https://github.com/mpenkov))
+  - enable smart_open to operate without docstrings (PR [#406](https://github.com/RaRe-Technologies/smart_open/pull/406), [@mpenkov](https://github.com/mpenkov))
+  - Implement object_kwargs parameter (PR [#411](https://github.com/RaRe-Technologies/smart_open/pull/411), [@mpenkov](https://github.com/mpenkov))
+  - Remove dependency on old boto library (PR [#413](https://github.com/RaRe-Technologies/smart_open/pull/413), [@mpenkov](https://github.com/mpenkov))
+  - implemented efficient readline for ByteBuffer (PR [#426](https://github.com/RaRe-Technologies/smart_open/pull/426), [@mpenkov](https://github.com/mpenkov))
+  - improve buffering efficiency (PR [#427](https://github.com/RaRe-Technologies/smart_open/pull/427), [@mpenkov](https://github.com/mpenkov))
+  - fix WebHDFS read method (PR [#433](https://github.com/RaRe-Technologies/smart_open/pull/433), [@mpenkov](https://github.com/mpenkov))
+  - Make S3 uploads more robust (PR [#434](https://github.com/RaRe-Technologies/smart_open/pull/434), [@mpenkov](https://github.com/mpenkov))
+
 # 1.9.0, 3 Nov 2019
 
   - Add version_id transport parameter for fetching a specific S3 object version (PR [#325](https://github.com/RaRe-Technologies/smart_open/pull/325), [@interpolatio](https://github.com/interpolatio))

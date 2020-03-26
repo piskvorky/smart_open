@@ -2,12 +2,14 @@
 smart_open — utils for streaming large files in Python
 ======================================================
 
-|License|_ |Travis|_
+|License|_ |Travis|_ |Downloads|_
 
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
 .. |Travis| image:: https://travis-ci.org/RaRe-Technologies/smart_open.svg?branch=master
-.. _Travis: https://travis-ci.org/RaRe-Technologies/smart_open
+.. |Downloads| image:: https://pepy.tech/badge/smart-open/month
 .. _License: https://github.com/RaRe-Technologies/smart_open/blob/master/LICENSE
+.. _Travis: https://travis-ci.org/RaRe-Technologies/smart_open
+.. _Downloads: https://pypi.org/project/smart-open/
 
 What?
 =====
@@ -133,15 +135,18 @@ More examples
 
 .. code-block:: python
 
-    >>> import boto3
+    >>> import os, boto3
     >>>
     >>> # stream content *into* S3 (write mode) using a custom session
+    >>> session = boto3.Session(
+    ...     aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+    ...     aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    ... )
     >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-    >>> lines = [b'first line\n', b'second line\n', b'third line\n']
-    >>> transport_params = {'session': boto3.Session(profile_name='smart_open')}
-    >>> with open(url, 'wb', transport_params=transport_params) as fout:
-    ...     for line in lines:
-    ...         bytes_written = fout.write(line)
+    >>> with open(url, 'wb', transport_params={'session': session}) as fout:
+    ...     bytes_written = fout.write(b'hello world!')
+    ...     print(bytes_written)
+    12
 
 .. code-block:: python
 
@@ -332,11 +337,11 @@ to setting up GCS authentication with a service account.
 
 .. code-block:: python
 
-    >>> import os
-    >>> from google.cloud.storage import Client
-    >>> service_account_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
-    >>> client = Client.from_service_account_json(service_account_path)
-    >>> fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
+    import os
+    from google.cloud.storage import Client
+    service_account_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
+    client = Client.from_service_account_json(service_account_path)
+    fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
 If you need more credential options, you can create an explicit ``google.auth.credentials.Credentials`` object
 and pass it to the Client. To create an API token for use in the example below, refer to the
@@ -344,13 +349,13 @@ and pass it to the Client. To create an API token for use in the example below, 
 
 .. code-block:: python
 
-	>>> import os
-	>>> from google.auth.credentials import Credentials
-	>>> from google.cloud.storage import Client
-	>>> token = os.environ['GOOGLE_API_TOKEN']
-	>>> credentials = Credentials(token=token)
-	>>> client = Client(credentials=credentials)
-	>>> fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
+	import os
+	from google.auth.credentials import Credentials
+	from google.cloud.storage import Client
+	token = os.environ['GOOGLE_API_TOKEN']
+	credentials = Credentials(token=token)
+	client = Client(credentials=credentials)
+	fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
 File-like Binary Streams
 ------------------------
@@ -381,6 +386,26 @@ In this case, ``smart_open`` relied on the ``.name`` attribute of our `binary I/
 If your file object doesn't have one, set the ``.name`` attribute to an appropriate value.
 Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
 Otherwise, the transparent decompression will not occur.
+
+Drop-in replacement of ``pathlib.Path.open``
+--------------------------------------------
+
+``smart_open.open`` can also be used with ``Path`` objects.
+The built-in `Path.open()` is not able to read text from compressed files, so use ``patch_pathlib`` to replace it with `smart_open.open()` instead.
+This can be helpful when e.g. working with compressed files.
+
+.. code-block:: python
+
+    >>> from pathlib import Path
+    >>> from smart_open.smart_open_lib import patch_pathlib
+    >>>
+    >>> _ = patch_pathlib()  # replace `Path.open` with `smart_open.open`
+    >>>
+    >>> path = Path("smart_open/tests/test_data/crime-and-punishment.txt.gz")
+    >>>
+    >>> with path.open("r") as infile:
+    ...     print(infile.readline()[:41])
+    В начале июля, в чрезвычайно жаркое время
 
 Comments, bug reports
 =====================
