@@ -316,7 +316,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         cleanup_container()
 
     def test_read(self):
-        """Are GCS files read correctly?"""
+        """Are Azure Storage Blob files read correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_container(contents=content)
         logger.debug('content: %r len: %r', content, len(content))

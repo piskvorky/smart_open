@@ -41,6 +41,7 @@ import smart_open.webhdfs as smart_open_webhdfs
 import smart_open.http as smart_open_http
 import smart_open.ssh as smart_open_ssh
 import smart_open.gcs as smart_open_gcs
+import smart_open.asb as smart_open_asb
 
 from smart_open import doctools
 
@@ -388,6 +389,10 @@ open.__doc__ = None if open.__doc__ is None else open.__doc__ % {
         doctools.extract_kwargs(smart_open_gcs.open.__doc__),
         lpad=u'    ',
     ),
+    'asb': doctools.to_docstring(
+        doctools.extract_kwargs(smart_open_asb.open.__doc__),
+        lpad=u'    ',
+    ),
     'examples': doctools.extract_examples_from_readme_rst(),
 }
 
@@ -586,6 +591,9 @@ def _open_binary_stream(uri, mode, transport_params):
         elif parsed_uri.scheme == smart_open_gcs.SUPPORTED_SCHEME:
             kw = _check_kwargs(smart_open_gcs.open, transport_params)
             return smart_open_gcs.open(parsed_uri.bucket_id, parsed_uri.blob_id, mode, **kw), filename
+        elif parsed_uri.scheme == smart_open_asb.SUPPORTED_SCHEME:
+            kw = _check_kwargs(smart_open_asb.open, transport_params)
+            return smart_open_asb.open(parsed_uri.bucket_id, parsed_uri.blob_id, mode, **kw), filename
         else:
             raise NotImplementedError("scheme %r is not supported", parsed_uri.scheme)
     elif hasattr(uri, 'read'):
@@ -750,6 +758,8 @@ def _parse_uri(uri_as_string):
         return _parse_uri_ssh(parsed_uri)
     elif parsed_uri.scheme == smart_open_gcs.SUPPORTED_SCHEME:
         return _parse_uri_gcs(parsed_uri)
+    elif parsed_uri.scheme == smart_open_asb.SUPPORTED_SCHEME:
+        return _parse_uri_asb(parsed_uri)
     else:
         raise NotImplementedError(
             "unknown URI scheme %r in %r" % (parsed_uri.scheme, uri_as_string)
@@ -848,6 +858,13 @@ def _unquote(text):
 
 def _parse_uri_gcs(parsed_uri):
     assert parsed_uri.scheme == smart_open_gcs.SUPPORTED_SCHEME
+    bucket_id, blob_id = parsed_uri.netloc, parsed_uri.path[1:]
+
+    return Uri(scheme=parsed_uri.scheme, bucket_id=bucket_id, blob_id=blob_id)
+
+
+def _parse_uri_asb(parsed_uri):
+    assert parsed_uri.scheme == smart_open_asb.SUPPORTED_SCHEME
     bucket_id, blob_id = parsed_uri.netloc, parsed_uri.path[1:]
 
     return Uri(scheme=parsed_uri.scheme, bucket_id=bucket_id, blob_id=blob_id)

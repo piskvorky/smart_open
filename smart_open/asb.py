@@ -11,7 +11,7 @@ import io
 import logging
 
 from azure.storage.blob import BlobServiceClient
-from azure.common import AzureHttpError
+from azure.core.exceptions import ResourceNotFoundError
 import six
 
 import smart_open.bytebuffer
@@ -51,6 +51,47 @@ _WHENCE_CHOICES = (START, CURRENT, END)
 
 _BINARY_NEWLINE = b'\n'
 
+def open(
+        bucket_id,
+        blob_id,
+        mode,
+        buffer_size=DEFAULT_BUFFER_SIZE,
+        client=None,  # type: azure.storage.blob.BlobServiceClient
+        ):
+    """Open an Azure Storage Blob blob for reading or writing.
+
+    Parameters
+    ----------
+    bucket_id: str
+        The name of the bucket this object resides in.
+    blob_id: str
+        The name of the blob within the bucket.
+    mode: str
+        The mode for opening the object.  Must be either "rb" or "wb".
+    buffer_size: int, optional
+        The buffer size to use when performing I/O. For reading only.
+    client: azure.storage.blob.BlobServiceClient, optional
+        The Azure Storage Blob client to use when working with azure-storage-blob.
+
+    """
+    if mode == _READ_BINARY:
+        return SeekableBufferedInputBase(
+            bucket_id,
+            blob_id,
+            buffer_size=buffer_size,
+            line_terminator=_BINARY_NEWLINE,
+            client=client,
+        )
+    elif mode == _WRITE_BINARY:
+        return BufferedOutputBase(
+            bucket_id,
+            blob_id,
+            client=client,
+        )
+    else:
+        raise NotImplementedError('GCS support for mode %r not implemented' % mode)
+
+
 class _SeekableRawReader(object):
     """Read an Azure Storage Blob file."""
 
@@ -61,7 +102,7 @@ class _SeekableRawReader(object):
         self._position = 0
 
     def seek(self, position):
-        """Seek to the specified position (byte offset) in the Azure Storage Blob blob_name.
+        """Seek to the specified position (byte offset) in the Azure Storage Blob blob.
 
         :param int position: The byte offset from the beginning of the blob.
 
@@ -86,7 +127,7 @@ class _SeekableRawReader(object):
             #
             binary = b''
         elif size == -1:
-            binary = self._blob.download_blob()
+            binary = self._blob.download_blob().readall()
         return binary
 
 class SeekableBufferedInputBase(io.BufferedIOBase):
@@ -94,7 +135,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library.
 
-    :raises AzureHttpError: Raised when the blob to read from does not exist.
+    :raises ResourceNotFoundError: Raised when the blob to read from does not exist.
 
     """
     def __init__(
@@ -109,10 +150,10 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
             client = BlobServiceClient()
         container_client = client.get_container_client(container)  # type: azure.storage.blob.ContainerClient
 
-        self._blob = container_client.get_blob(blob)
+        self._blob = container_client.get_blob_client(blob)
         if self._blob is None:
-            raise AzureHttpError('blob {} not found in {}'.format(blob, container), status_code=404)
-        self._size = self._blob.get_properties().size if self._blob.get_properties().size is not None else 0
+            raise ResourceNotFoundError('blob {} not found in {}'.format(blob, container))
+        self._size = self._blob.get_blob_properties().size if self._blob.get_blob_properties().size is not None else 0
 
         self._raw_reader = _SeekableRawReader(self._blob, self._size)
         self._current_pos = 0
@@ -286,7 +327,6 @@ class BufferedOutputBase(io.BufferedIOBase):
             self,
             container,
             blob,
-            min_part_size=_DEFAULT_MIN_PART_SIZE,
             client=None,  # type: azure.storage.blob.BlobServiceClient
     ):
         if client is None:
