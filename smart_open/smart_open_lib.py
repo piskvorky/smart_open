@@ -35,12 +35,6 @@ from six.moves.urllib import parse as urlparse
 # smart_open.submodule to reference to the submodules.
 #
 import smart_open.local_file as so_file
-import smart_open.s3 as so_s3
-import smart_open.hdfs as so_hdfs
-import smart_open.webhdfs as so_webhdfs
-import smart_open.http as so_http
-import smart_open.ssh as so_ssh
-import smart_open.gcs as so_gcs
 
 from smart_open import compression
 from smart_open import doctools
@@ -80,6 +74,13 @@ _TRANSPORT = {NO_SCHEME: so_file}
 
 def _register_transport(submodule):
     global _TRANSPORT
+    if isinstance(submodule, str):
+        try:
+            submodule = importlib.import_module(submodule)
+        except ImportError:
+            _LOGGER.warning('unable to import %r, disabling that module', submodule)
+            return
+
     if hasattr(submodule, 'SCHEME'):
         schemes = [submodule.SCHEME]
     elif hasattr(submodule, 'SCHEMES'):
@@ -96,12 +97,12 @@ def _register_transport(submodule):
 
 
 _register_transport(so_file)
-_register_transport(so_gcs)
-_register_transport(so_hdfs)
-_register_transport(so_http)
-_register_transport(so_s3)
-_register_transport(so_ssh)
-_register_transport(so_webhdfs)
+_register_transport('smart_open.gcs')
+_register_transport('smart_open.hdfs')
+_register_transport('smart_open.http')
+_register_transport('smart_open.s3')
+_register_transport('smart_open.ssh')
+_register_transport('smart_open.webhdfs')
 
 SUPPORTED_SCHEMES = tuple(sorted(_TRANSPORT.keys()))
 """The transport schemes that ``smart_open`` supports."""
