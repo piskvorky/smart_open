@@ -13,13 +13,13 @@ The first is by far the more challenging, and also the more welcome.
 Each transport mechanism lives in its own submodule.
 For example, currently we have:
 
-- `smart_open.file`
-- `smart_open.s3`
-- `smart_open.ssh`
+- [smart_open.local_file](smart_open/local_file.py)
+- [smart_open.s3](smart_open/s3.py)
+- [smart_open.ssh](smart_open/ssh.py)
 - ... and others
 
 So, to implement a new transport mechanism, you need to create a new module.
-Your module must expose the following:
+Your module must expose the following (see [smart_open.http](smart_open/http.py) for the full implementation):
 
 ```python
 SCHEMA = ...
@@ -74,7 +74,7 @@ def open(..., mode, param1=None, param2=None, paramN=None):
 Have a look at the existing mechanisms to see how they work.
 You may define other functions and classes as necessary for your implementation.
 
-Once your module is working, register it in the `smart_open/transport.py` file.
+Once your module is working, register it in the [smart_open.transport](smart_open/transport.py) submodule.
 The `register_transport()` function updates a mapping from schemes to the modules that implement functionality for them.
 
 Once you've registered your new transport module, the following will happen automagically:
