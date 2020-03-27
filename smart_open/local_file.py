@@ -21,6 +21,9 @@ URI_EXAMPLES = (
 )
 
 
+open = io.open
+
+
 def parse_uri(uri_as_string):
     local_path = extract_local_path(uri_as_string)
     return dict(scheme=SCHEME, uri_path=local_path)

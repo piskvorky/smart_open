@@ -19,8 +19,7 @@ import re
 import six
 
 from . import compression
-
-_NO_SCHEME = ''
+from . import transport
 
 
 def extract_kwargs(docstring):
@@ -79,8 +78,12 @@ def extract_kwargs(docstring):
     # 1. Find the underlined 'Parameters' section
     # 2. Once there, continue parsing parameters until we hit an empty line
     #
-    while lines[0] != 'Parameters':
+    while lines and lines[0] != 'Parameters':
         lines.pop(0)
+
+    if not lines:
+        return []
+
     lines.pop(0)
     lines.pop(0)
 
@@ -164,7 +167,7 @@ def extract_examples_from_readme_rst(indent='    '):
         return indent + 'See README.rst'
 
 
-def tweak_docstrings(open_function, parse_uri_function, transport):
+def tweak_docstrings(open_function, parse_uri_function):
     #
     # The code below doesn't work on Py2.  We _could_ make it work, but given
     # that it's 2020 and Py2 is on it's way out, I'm just going to disable it.
@@ -177,14 +180,14 @@ def tweak_docstrings(open_function, parse_uri_function, transport):
     seen_examples = set()
     uri_examples = io.StringIO()
 
-    for scheme, transport in sorted(transport.items()):
-        if scheme == _NO_SCHEME:
+    for scheme, submodule in sorted(transport._REGISTRY.items()):
+        if scheme == transport.NO_SCHEME:
             continue
 
         schemes.write('    * %s\n' % scheme)
 
         try:
-            fn = transport.open
+            fn = submodule.open
         except AttributeError:
             substrings[scheme] = ''
         else:
@@ -192,7 +195,7 @@ def tweak_docstrings(open_function, parse_uri_function, transport):
             substrings[scheme] = to_docstring(kwargs, lpad=u'    ')
 
         try:
-            examples = transport.URI_EXAMPLES
+            examples = submodule.URI_EXAMPLES
         except AttributeError:
             continue
         else:

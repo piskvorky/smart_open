@@ -38,6 +38,7 @@ import smart_open.local_file as so_file
 
 from smart_open import compression
 from smart_open import doctools
+from smart_open import transport
 from smart_open import utils
 
 #
@@ -61,51 +62,11 @@ logger = logging.getLogger(__name__)
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
-NO_SCHEME = ''
-
 _TO_BINARY_LUT = {
     'r': 'rb', 'r+': 'rb+', 'rt': 'rb', 'rt+': 'rb+',
     'w': 'wb', 'w+': 'wb+', 'wt': 'wb', "wt+": 'wb+',
     'a': 'ab', 'a+': 'ab+', 'at': 'ab', 'at+': 'ab+',
 }
-
-_TRANSPORT = {NO_SCHEME: so_file}
-
-
-def _register_transport(submodule):
-    global _TRANSPORT
-    if isinstance(submodule, str):
-        try:
-            submodule = importlib.import_module(submodule)
-        except ImportError:
-            _LOGGER.warning('unable to import %r, disabling that module', submodule)
-            return
-
-    if hasattr(submodule, 'SCHEME'):
-        schemes = [submodule.SCHEME]
-    elif hasattr(submodule, 'SCHEMES'):
-        schemes = submodule.SCHEMES
-    else:
-        raise ValueError('%r does not have a .SCHEME or .SCHEMES attribute' % submodule)
-
-    assert hasattr(submodule, 'open_uri'), '%r is missing open_uri' % submodule
-    assert hasattr(submodule, 'parse_uri'), '%r is missing parse_uri' % submodule
-
-    for scheme in schemes:
-        assert scheme not in _TRANSPORT
-        _TRANSPORT[scheme] = submodule
-
-
-_register_transport(so_file)
-_register_transport('smart_open.gcs')
-_register_transport('smart_open.hdfs')
-_register_transport('smart_open.http')
-_register_transport('smart_open.s3')
-_register_transport('smart_open.ssh')
-_register_transport('smart_open.webhdfs')
-
-SUPPORTED_SCHEMES = tuple(sorted(_TRANSPORT.keys()))
-"""The transport schemes that the local installation of ``smart_open`` supports."""
 
 
 def _sniff_scheme(uri_as_string):
@@ -149,18 +110,8 @@ def parse_uri(uri_as_string):
 
     """
     scheme = _sniff_scheme(uri_as_string)
-
-    try:
-        transport = _TRANSPORT[scheme]
-    except KeyError:
-        raise NotImplementedError("unknown URI scheme %r in %r" % (scheme, uri_as_string))
-
-    try:
-        parse_uri = getattr(transport, 'parse_uri')
-    except AttributeError:
-        raise NotImplementedError('%r transport does not implement parse_uri', scheme)
-
-    as_dict = parse_uri(uri_as_string)
+    submodule = transport.get_transport(scheme)
+    as_dict = submodule.parse_uri(uri_as_string)
 
     #
     # The conversion to a namedtuple is just to keep the old tests happy while
@@ -434,7 +385,7 @@ def _shortcut_open(
         return None
 
     scheme = _sniff_scheme(uri)
-    if scheme not in (NO_SCHEME, so_file.SCHEME):
+    if scheme not in (transport.NO_SCHEME, so_file.SCHEME):
         return None
 
     local_path = so_file.extract_local_path(uri)
@@ -500,24 +451,8 @@ def _open_binary_stream(uri, mode, transport_params):
         raise TypeError("don't know how to handle uri %r" % uri)
 
     scheme = _sniff_scheme(uri)
-
-    bad_scheme = NotImplementedError(
-        "scheme %r is not supported, expected one of %r" % (
-            scheme, SUPPORTED_SCHEMES,
-        )
-    )
-
-    try:
-        transport = _TRANSPORT[scheme]
-    except KeyError:
-        raise bad_scheme
-
-    try:
-        open_uri = getattr(transport, 'open_uri')
-    except AttributeError:
-        raise bad_scheme
-
-    fobj = open_uri(uri, mode, transport_params)
+    submodule = transport.get_transport(scheme)
+    fobj = submodule.open_uri(uri, mode, transport_params)
     if not hasattr(fobj, 'name'):
         logger.critical('TODO')
         fobj.name = 'unknown'
@@ -586,4 +521,4 @@ def _patch_pathlib(func):
     return old_impl
 
 
-doctools.tweak_docstrings(open, parse_uri, _TRANSPORT)
+doctools.tweak_docstrings(open, parse_uri)

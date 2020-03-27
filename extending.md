@@ -74,8 +74,8 @@ def open(..., mode, param1=None, param2=None, paramN=None):
 Have a look at the existing mechanisms to see how they work.
 You may define other functions and classes as necessary for your implementation.
 
-Once your module is working, register it in the `smart_open/smart_open_lib.py` file.
-The `_generate_transport()` generator builds a dictionary that maps schemes to the modules that implement functionality for them.
+Once your module is working, register it in the `smart_open/transport.py` file.
+The `generate_transport()` generator updates a dictionary that maps schemes to the modules that implement functionality for them.
 
 Once you've registered your new transport module, the following will happen automagically:
 
@@ -88,6 +88,8 @@ Once you've registered your new transport module, the following will happen auto
 You can confirm the documentation changes by running:
 
     python -c 'help("smart_open")'
+
+and verify that documentation for your new submodule shows up.
 
 ### What's the difference between the `open_uri` and `open` functions?
 
