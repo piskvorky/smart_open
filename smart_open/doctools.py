@@ -15,6 +15,7 @@ import inspect
 import io
 import os.path
 import re
+import warnings
 
 from . import compression
 from . import transport
@@ -166,6 +167,17 @@ def extract_examples_from_readme_rst(indent='    '):
 
 
 def tweak_docstrings(open_function, parse_uri_function):
+    #
+    # The docstring can be None if -OO was passed to the interpreter.
+    #
+    if not (open_function.__doc__ and parse_uri_function.__doc__):
+        warnings.warn(
+            'docstrings for smart_open function are missing, '
+            'see https://github.com/RaRe-Technologies/smart_open'
+            '/blob/master/README.rst if you need documentation'
+        )
+        return
+
     substrings = {}
     schemes = io.StringIO()
     seen_examples = set()
@@ -200,14 +212,8 @@ def tweak_docstrings(open_function, parse_uri_function):
     )
     substrings['examples'] = extract_examples_from_readme_rst()
 
-    #
-    # The docstring can be None if -OO was passed to the interpreter.
-    #
-    if open_function.__doc__:
-        open_function.__doc__ = open_function.__doc__ % substrings
-
-    if parse_uri_function.__doc__:
-        parse_uri_function.__doc__ = parse_uri_function.__doc__ % dict(
-            schemes=schemes.getvalue(),
-            uri_examples=uri_examples.getvalue(),
-        )
+    open_function.__doc__ = open_function.__doc__ % substrings
+    parse_uri_function.__doc__ = parse_uri_function.__doc__ % dict(
+        schemes=schemes.getvalue(),
+        uri_examples=uri_examples.getvalue(),
+    )
