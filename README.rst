@@ -14,7 +14,7 @@ smart_open — utils for streaming large files in Python
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to storages such as S3, GCS, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
+``smart_open`` is a Python 3 library for **efficient streaming of very large files** from/to storages such as S3, GCS, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 

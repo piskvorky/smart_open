@@ -12,15 +12,13 @@ import contextlib
 import functools
 import logging
 import time
+import urllib.parse
 import warnings
 
 import boto
 import boto3
 import botocore.client
 import botocore.exceptions
-import six
-
-from six.moves.urllib import parse as urlparse
 
 import smart_open.bytebuffer
 import smart_open.utils
@@ -98,8 +96,8 @@ def _safe_urlsplit(url):
     https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
     https://github.com/RaRe-Technologies/smart_open/issues/285
     """
-    sr = urlparse.urlsplit(url.replace('?', '\n'), allow_fragments=False)
-    return urlparse.SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
+    sr = urllib.parse.urlsplit(url.replace('?', '\n'), allow_fragments=False)
+    return urllib.parse.SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
 
 
 def parse_uri(uri_as_string):
@@ -1154,7 +1152,7 @@ def _download_fileobj(bucket, key_name):
 class DummyPool(object):
     """A class that mimics multiprocessing.pool.Pool for our purposes."""
     def imap_unordered(self, function, items):
-        return six.moves.map(function, items)
+        return map(function, items)
 
     def terminate(self):
         pass

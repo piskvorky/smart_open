@@ -24,9 +24,8 @@ Similarly, from a command line::
 
 import getpass
 import logging
+import urllib.parse
 import warnings
-
-from six.moves.urllib import parse as urlparse
 
 import smart_open.utils
 
@@ -49,11 +48,11 @@ URI_EXAMPLES = (
 
 
 def _unquote(text):
-    return text and urlparse.unquote(text)
+    return text and urllib.parse.unquote(text)
 
 
 def parse_uri(uri_as_string):
-    split_uri = urlparse.urlsplit(uri_as_string)
+    split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
     return dict(
         scheme=split_uri.scheme,

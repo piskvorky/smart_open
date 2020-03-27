@@ -22,7 +22,6 @@ from collections import OrderedDict
 
 import google.cloud
 import google.api_core.exceptions
-import six
 
 import smart_open
 
@@ -42,8 +41,6 @@ logger = logging.getLogger(__name__)
 
 
 def ignore_resource_warnings():
-    if six.PY2:
-        return
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
@@ -174,8 +171,8 @@ class FakeBlob(object):
     def upload_from_string(self, data):
         # mimics Google's API by accepting bytes or str, despite the method name
         # https://google-cloud-python.readthedocs.io/en/0.32.0/storage/blobs.html#google.cloud.storage.blob.Blob.upload_from_string
-        if isinstance(data, six.string_types):
-            data = bytes(data) if six.PY2 else bytes(data, 'utf8')
+        if isinstance(data, str):
+            data = bytes(data, 'utf8')
         self.__contents = io.BytesIO(data)
         self.__contents.seek(0, io.SEEK_END)
 

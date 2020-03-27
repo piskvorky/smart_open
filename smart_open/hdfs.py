@@ -17,8 +17,7 @@ Uses the command-line hdfs utility under the covers.
 import io
 import logging
 import subprocess
-
-from six.moves.urllib import parse as urlparse
+import urllib.parse
 
 from smart_open import utils
 
@@ -33,7 +32,7 @@ URI_EXAMPLES = (
 
 
 def parse_uri(uri_as_string):
-    split_uri = urlparse.urlsplit(uri_as_string)
+    split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme == SCHEME
 
     uri_path = split_uri.netloc + split_uri.path

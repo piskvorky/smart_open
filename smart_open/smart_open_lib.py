@@ -22,13 +22,12 @@ import io
 import importlib
 import os
 import os.path as P
+import pathlib
+import urllib.parse
 import warnings
 import sys
 
 import boto3
-import six
-
-from six.moves.urllib import parse as urlparse
 
 #
 # This module defines a function called smart_open so we cannot use
@@ -47,16 +46,6 @@ from smart_open import utils
 from smart_open.compression import register_compressor  # noqa: F401
 from smart_open.utils import check_kwargs as _check_kwargs  # noqa: F401
 from smart_open.utils import inspect_kwargs as _inspect_kwargs  # noqa: F401
-
-# Import ``pathlib`` if the builtin ``pathlib`` or the backport ``pathlib2`` are
-# available. The builtin ``pathlib`` will be imported with higher precedence.
-for pathlib_module in ('pathlib', 'pathlib2'):
-    try:
-        pathlib = importlib.import_module(pathlib_module)
-        PATHLIB_SUPPORT = True
-        break
-    except ImportError:
-        PATHLIB_SUPPORT = False
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +67,7 @@ def _sniff_scheme(uri_as_string):
     if os.name == 'nt' and '://' not in uri_as_string:
         uri_as_string = 'file://' + uri_as_string
 
-    return urlparse.urlsplit(uri_as_string).scheme
+    return urllib.parse.urlsplit(uri_as_string).scheme
 
 
 def parse_uri(uri_as_string):
@@ -219,7 +208,7 @@ def open(
     """
     logger.debug('%r', locals())
 
-    if not isinstance(mode, six.string_types):
+    if not isinstance(mode, str):
         raise TypeError('mode should be a string')
 
     if transport_params is None:
@@ -247,8 +236,7 @@ def open(
     if encoding is not None and 'b' in mode:
         mode = mode.replace('b', '')
 
-    # Support opening ``pathlib.Path`` objects by casting them to strings.
-    if PATHLIB_SUPPORT and isinstance(uri, pathlib.Path):
+    if isinstance(uri, pathlib.Path):
         uri = str(uri)
 
     explicit_encoding = encoding
@@ -381,7 +369,7 @@ def _shortcut_open(
     :returns: The opened file
     :rtype: file
     """
-    if not isinstance(uri, six.string_types):
+    if not isinstance(uri, str):
         return None
 
     scheme = _sniff_scheme(uri)
@@ -405,17 +393,7 @@ def _shortcut_open(
     if errors and 'b' not in mode:
         open_kwargs['errors'] = errors
 
-    #
-    # Under Py3, the built-in open accepts kwargs, and it's OK to use that.
-    # Under Py2, the built-in open _doesn't_ accept kwargs, but we still use it
-    # whenever possible (see issue #207).  If we're under Py2 and have to use
-    # kwargs, then we have no option other to use io.open.
-    #
-    if six.PY3:
-        return _builtin_open(local_path, mode, buffering=buffering, **open_kwargs)
-    elif not open_kwargs:
-        return _builtin_open(local_path, mode, buffering=buffering)
-    return io.open(local_path, mode, buffering=buffering, **open_kwargs)
+    return _builtin_open(local_path, mode, buffering=buffering, **open_kwargs)
 
 
 def _open_binary_stream(uri, mode, transport_params):
@@ -447,7 +425,7 @@ def _open_binary_stream(uri, mode, transport_params):
             uri.name = getattr(uri, 'name', 'unknown')
         return uri
 
-    if not isinstance(uri, six.string_types):
+    if not isinstance(uri, str):
         raise TypeError("don't know how to handle uri %r" % uri)
 
     scheme = _sniff_scheme(uri)
@@ -512,10 +490,6 @@ class patch_pathlib(object):
 
 def _patch_pathlib(func):
     """Replace `Path.open` with `func`"""
-    if not PATHLIB_SUPPORT:
-        raise RuntimeError('install pathlib (or pathlib2) before using this function')
-    if six.PY2:
-        raise RuntimeError('this monkey patch does not work on Py2')
     old_impl = pathlib.Path.open
     pathlib.Path.open = func
     return old_impl

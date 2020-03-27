@@ -10,8 +10,8 @@
 import io
 import logging
 import os.path
+import urllib.parse
 
-from six.moves.urllib import parse as urlparse
 import requests
 
 from smart_open import bytebuffer, s3
@@ -33,7 +33,7 @@ the client (us) has to decompress them with the appropriate algorithm.
 
 
 def parse_uri(uri_as_string):
-    split_uri = urlparse.urlsplit(uri_as_string)
+    split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
 
     uri_path = split_uri.netloc + split_uri.path
@@ -79,7 +79,7 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
             uri, mode, kerberos=kerberos,
             user=user, password=password, headers=headers
         )
-        fobj.name = os.path.basename(urlparse.urlparse(uri).path)
+        fobj.name = os.path.basename(urllib.parse.urlparse(uri).path)
         return fobj
     else:
         raise NotImplementedError('http support for mode %r not implemented' % mode)
