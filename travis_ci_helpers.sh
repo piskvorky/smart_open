@@ -15,7 +15,7 @@ is_travis_secure_vars_available(){
 
 benchmark(){
   if ! is_travis_secure_vars_available; then
-    return 1
+    return 0
   fi
 
   SO_S3_URL="${SO_S3_URL}"/`python -c "from uuid import uuid4;print(uuid4())"`;
@@ -30,7 +30,7 @@ benchmark(){
 integration(){
   pytest integration-tests/test_http.py integration-tests/test_207.py
   if ! is_travis_secure_vars_available; then
-    return 1
+    return 0
   fi
 
   pytest integration-tests/test_s3_ported.py;
@@ -38,7 +38,7 @@ integration(){
 
 doctest(){
   if ! is_travis_secure_vars_available; then
-    return 1
+    return 0
   fi
 
   python -m doctest README.rst -v;
