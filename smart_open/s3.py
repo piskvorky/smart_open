@@ -21,7 +21,6 @@ import botocore.exceptions
 import six
 
 from six.moves.urllib import parse as urlparse
-from botocore.exceptions import IncompleteReadError
 
 import smart_open.bytebuffer
 import smart_open.utils

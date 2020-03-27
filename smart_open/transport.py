@@ -65,7 +65,7 @@ def get_transport(scheme):
 
     """
     message = "scheme %r is not supported, expected one of %r" % (scheme, SUPPORTED_SCHEMES)
-        
+
     try:
         submodule = _REGISTRY[scheme]
     except KeyError:

@@ -75,7 +75,7 @@ Have a look at the existing mechanisms to see how they work.
 You may define other functions and classes as necessary for your implementation.
 
 Once your module is working, register it in the `smart_open/transport.py` file.
-The `generate_transport()` generator updates a dictionary that maps schemes to the modules that implement functionality for them.
+The `register_transport()` function updates a mapping from schemes to the modules that implement functionality for them.
 
 Once you've registered your new transport module, the following will happen automagically:
 
