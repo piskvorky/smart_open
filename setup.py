@@ -16,14 +16,12 @@ from setuptools import setup, find_packages
 def _get_version():
     curr_dir = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(curr_dir, 'smart_open', 'version.py')) as fin:
-        #
-        # example: __version__ = '1.8.4'
-        #
         line = fin.readline().strip()
         parts = line.split(' ')
+        assert len(parts) == 3
         assert parts[0] == '__version__'
         assert parts[1] == '='
-        return parts[2][1:-1]
+        return parts[2].strip('\'"')
 
 
 #
