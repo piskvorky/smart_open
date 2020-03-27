@@ -14,17 +14,13 @@ The main entry point is the :func:`~smart_open.webhdfs.open` function.
 
 import io
 import logging
+import urllib.parse
 
 import requests
-import six
-from six.moves.urllib import parse as urlparse
 
 from smart_open import utils
 
-if six.PY2:
-    import httplib
-else:
-    import http.client as httplib
+import http.client as httplib
 
 logger = logging.getLogger(__name__)
 
@@ -79,17 +75,17 @@ def _convert_to_http_uri(webhdfs_url):
     webhdfs_url: str
         A URL starting with webhdfs://
     """
-    split_uri = urlparse.urlsplit(webhdfs_url)
+    split_uri = urllib.parse.urlsplit(webhdfs_url)
     netloc = split_uri.hostname
     if split_uri.port:
         netloc += ":{}".format(split_uri.port)
     query = split_uri.query
     if split_uri.username:
         query += (
-            ("&" if query else "") + "user.name=" + urlparse.quote(split_uri.username)
+            ("&" if query else "") + "user.name=" + urllib.parse.quote(split_uri.username)
         )
 
-    return urlparse.urlunsplit(
+    return urllib.parse.urlunsplit(
         ("http", netloc, "/webhdfs/v1" + split_uri.path, query, "")
     )
 
@@ -233,7 +229,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         if self._closed:
             raise ValueError("I/O operation on closed file")
 
-        if not isinstance(b, six.binary_type):
+        if not isinstance(b, bytes):
             raise TypeError("input must be a binary string")
 
         self.lines.append(b)

@@ -16,8 +16,6 @@ import io
 import os.path
 import re
 
-import six
-
 from . import compression
 from . import transport
 
@@ -168,13 +166,6 @@ def extract_examples_from_readme_rst(indent='    '):
 
 
 def tweak_docstrings(open_function, parse_uri_function):
-    #
-    # The code below doesn't work on Py2.  We _could_ make it work, but given
-    # that it's 2020 and Py2 is on it's way out, I'm just going to disable it.
-    #
-    if six.PY2:
-        return
-
     substrings = {}
     schemes = io.StringIO()
     seen_examples = set()

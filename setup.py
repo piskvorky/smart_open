@@ -9,7 +9,6 @@
 
 import io
 import os
-import sys
 
 from setuptools import setup, find_packages
 
@@ -18,7 +17,7 @@ def _get_version():
     curr_dir = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(curr_dir, 'smart_open', 'version.py')) as fin:
         #
-        # __version__ = '1.8.4'
+        # example: __version__ = '1.8.4'
         #
         line = fin.readline().strip()
         parts = line.split(' ')
@@ -59,8 +58,6 @@ install_requires = [
     'boto3',
     'google-cloud-storage',
 ]
-if sys.version_info[0] == 2:
-    install_requires.append('bz2file')
 
 setup(
     name='smart_open',

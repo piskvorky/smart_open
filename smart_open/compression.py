@@ -11,13 +11,10 @@ import logging
 import os.path
 import warnings
 
-import six
-
 logger = logging.getLogger(__name__)
 
 
 _COMPRESSOR_REGISTRY = {}
-_ISSUE_189_URL = 'https://github.com/RaRe-Technologies/smart_open/issues/189'
 
 
 def get_supported_extensions():
@@ -58,10 +55,7 @@ def register_compressor(ext, callback):
 
 
 def _handle_bz2(file_obj, mode):
-    if six.PY2:
-        from bz2file import BZ2File
-    else:
-        from bz2 import BZ2File
+    from bz2 import BZ2File
     return BZ2File(file_obj, mode)
 
 
@@ -91,9 +85,6 @@ def compression_wrapper(file_obj, mode):
         )
         return file_obj
 
-    if _need_to_buffer(file_obj, mode, ext):
-        warnings.warn('streaming gzip support unavailable, see %s' % _ISSUE_189_URL)
-        file_obj = io.BytesIO(file_obj.read())
     if ext in _COMPRESSOR_REGISTRY and mode.endswith('+'):
         raise ValueError('transparent (de)compression unsupported for mode %r' % mode)
 
@@ -103,20 +94,6 @@ def compression_wrapper(file_obj, mode):
         return file_obj
     else:
         return callback(file_obj, mode)
-
-
-def _need_to_buffer(file_obj, mode, ext):
-    """Returns True if we need to buffer the whole file in memory in order to proceed."""
-    try:
-        is_seekable = file_obj.seekable()
-    except AttributeError:
-        #
-        # Under Py2, built-in file objects returned by open do not have
-        # .seekable, but have a .seek method instead.
-        #
-        is_seekable = hasattr(file_obj, 'seek')
-    is_compressed = ext in _COMPRESSOR_REGISTRY
-    return six.PY2 and mode.startswith('r') and is_compressed and not is_seekable
 
 
 #

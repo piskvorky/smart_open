@@ -9,13 +9,12 @@
 
 import io
 import logging
+import urllib.parse
 import sys
 
 import google.cloud.exceptions
 import google.cloud.storage
 import google.auth.transport.requests as google_requests
-import six
-from six.moves.urllib import parse as urlparse
 
 import smart_open.bytebuffer
 import smart_open.s3
@@ -28,11 +27,8 @@ _WRITE_BINARY = 'wb'
 _MODES = (_READ_BINARY, _WRITE_BINARY)
 """Allowed I/O modes for working with GCS."""
 
-_BINARY_TYPES = (six.binary_type, bytearray)
+_BINARY_TYPES = (bytes, bytearray, memoryview)
 """Allowed binary buffer types for writing to the underlying GCS stream"""
-
-if sys.version_info >= (2, 7):
-    _BINARY_TYPES = (six.binary_type, bytearray, memoryview)
 
 _BINARY_NEWLINE = b'\n'
 
@@ -106,7 +102,7 @@ class UploadFailedError(Exception):
 
 
 def parse_uri(uri_as_string):
-    sr = urlparse.urlsplit(uri_as_string)
+    sr = urllib.parse.urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
     bucket_id = sr.netloc
     blob_id = sr.path.lstrip('/')
