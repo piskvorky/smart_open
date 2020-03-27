@@ -5,7 +5,9 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
+
 """Helper functions for documentation, etc."""
+
 import inspect
 import logging
 
