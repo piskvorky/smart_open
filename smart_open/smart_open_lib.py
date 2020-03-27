@@ -18,8 +18,6 @@ The main functions are:
 import codecs
 import collections
 import logging
-import io
-import importlib
 import os
 import os.path as P
 import pathlib
