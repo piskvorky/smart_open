@@ -42,8 +42,10 @@ SCHEMES = ("ssh", "scp", "sftp")
 DEFAULT_PORT = 22
 
 URI_EXAMPLES = (
-    '[ssh|scp|sftp]://username@host//path/file',
-    '[ssh|scp|sftp]://username@host/path/file',
+    'ssh://username@host/path/file',
+    'ssh://username@host//path/file',
+    'scp://username@host/path/file',
+    'sftp://username@host/path/file',
 )
 
 
