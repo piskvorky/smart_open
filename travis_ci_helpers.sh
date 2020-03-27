@@ -14,7 +14,7 @@ is_travis_secure_vars_available(){
 }
 
 benchmark(){
-  if !is_travis_secure_vars_available; then
+  if ! is_travis_secure_vars_available; then
     return 1
   fi
 
@@ -29,8 +29,7 @@ benchmark(){
 
 integration(){
   pytest integration-tests/test_http.py integration-tests/test_207.py
-
-  if !is_travis_secure_vars_available; then
+  if ! is_travis_secure_vars_available; then
     return 1
   fi
 
@@ -38,7 +37,7 @@ integration(){
 }
 
 doctest(){
-  if !is_travis_secure_vars_available; then
+  if ! is_travis_secure_vars_available; then
     return 1
   fi
 
