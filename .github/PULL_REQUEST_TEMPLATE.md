@@ -47,3 +47,8 @@ Before you create the PR, please make sure you have:
 - [ ] Linked to any existing issues that your PR will be solving
 - [ ] Included tests for any new functionality
 - [ ] Checked that all unit tests pass
+
+#### Workflow
+
+Please avoid rebasing and force-pushing to the branch of the PR once a review is in progress.
+Rebasing can make your commits look a bit cleaner, but it also makes life more difficult from the reviewer, because they are no longer able to distinguish between code that has already been reviewed, and unreviewed code.

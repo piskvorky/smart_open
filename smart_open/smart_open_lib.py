@@ -617,3 +617,27 @@ def _tweak_docstrings():
 #
 if not six.PY2:
     _tweak_docstrings()
+
+
+class patch_pathlib(object):
+    """Replace `Path.open` with `smart_open.open`"""
+
+    def __init__(self):
+        self.old_impl = _patch_pathlib(open)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        _patch_pathlib(self.old_impl)
+
+
+def _patch_pathlib(func):
+    """Replace `Path.open` with `func`"""
+    if not PATHLIB_SUPPORT:
+        raise RuntimeError('install pathlib (or pathlib2) before using this function')
+    if six.PY2:
+        raise RuntimeError('this monkey patch does not work on Py2')
+    old_impl = pathlib.Path.open
+    pathlib.Path.open = func
+    return old_impl
