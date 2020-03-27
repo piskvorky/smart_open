@@ -6,10 +6,8 @@
 # from the MIT License (MIT).
 #
 """Implements the compression layer of the ``smart_open`` library."""
-import io
 import logging
 import os.path
-import warnings
 
 logger = logging.getLogger(__name__)
 

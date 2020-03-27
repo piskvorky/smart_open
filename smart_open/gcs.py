@@ -10,7 +10,6 @@
 import io
 import logging
 import urllib.parse
-import sys
 
 import google.cloud.exceptions
 import google.cloud.storage
