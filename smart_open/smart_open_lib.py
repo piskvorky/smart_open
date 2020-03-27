@@ -105,7 +105,7 @@ _register_transport('smart_open.ssh')
 _register_transport('smart_open.webhdfs')
 
 SUPPORTED_SCHEMES = tuple(sorted(_TRANSPORT.keys()))
-"""The transport schemes that ``smart_open`` supports."""
+"""The transport schemes that the local installation of ``smart_open`` supports."""
 
 
 def _sniff_scheme(uri_as_string):
@@ -137,7 +137,6 @@ def parse_uri(uri_as_string):
     Notes
     -----
 
-<<<<<<< HEAD
     Supported URI schemes are:
 
 %(schemes)s
@@ -563,62 +562,6 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
     return fileobj
 
 
-def _tweak_docstrings():
-    substrings = {}
-    schemes = io.StringIO()
-    seen_examples = set()
-    uri_examples = io.StringIO()
-
-    for scheme, transport in sorted(_TRANSPORT.items()):
-        if scheme == NO_SCHEME:
-            continue
-
-        schemes.write('    * %s\n' % scheme)
-
-        try:
-            fn = transport.open
-        except AttributeError:
-            substrings[scheme] = ''
-        else:
-            kwargs = doctools.extract_kwargs(fn.__doc__)
-            substrings[scheme] = doctools.to_docstring(kwargs, lpad=u'    ')
-
-        try:
-            examples = transport.URI_EXAMPLES
-        except AttributeError:
-            continue
-        else:
-            for e in examples:
-                if e not in seen_examples:
-                    uri_examples.write('    * %s\n' % e)
-                seen_examples.add(e)
-
-    substrings['codecs'] = '\n'.join(
-        ['    * %s' % e for e in compression.get_supported_extensions()]
-    )
-    substrings['examples'] = doctools.extract_examples_from_readme_rst()
-
-    #
-    # The docstring can be None if -OO was passed to the interpreter.
-    #
-    if open.__doc__:
-        open.__doc__ = open.__doc__ % substrings
-
-    if parse_uri.__doc__:
-        parse_uri.__doc__ = parse_uri.__doc__ % dict(
-            schemes=schemes.getvalue(),
-            uri_examples=uri_examples.getvalue(),
-        )
-
-
-#
-# The code below doesn't work on Py2.  We _could_ make it work, but given that
-# it's 2020 and Py2 is on it's way out, I'm just going to disable it.
-#
-if not six.PY2:
-    _tweak_docstrings()
-
-
 class patch_pathlib(object):
     """Replace `Path.open` with `smart_open.open`"""
 
@@ -641,3 +584,6 @@ def _patch_pathlib(func):
     old_impl = pathlib.Path.open
     pathlib.Path.open = func
     return old_impl
+
+
+doctools.tweak_docstrings(open, parse_uri, _TRANSPORT)

@@ -16,6 +16,12 @@ import io
 import os.path
 import re
 
+import six
+
+from . import compression
+
+_NO_SCHEME = ''
+
 
 def extract_kwargs(docstring):
     """Extract keyword argument documentation from a function's docstring.
@@ -156,3 +162,58 @@ def extract_examples_from_readme_rst(indent='    '):
         return ''.join([indent + re.sub('^  ', '', l) for l in lines])
     except Exception:
         return indent + 'See README.rst'
+
+
+def tweak_docstrings(open_function, parse_uri_function, transport):
+    #
+    # The code below doesn't work on Py2.  We _could_ make it work, but given
+    # that it's 2020 and Py2 is on it's way out, I'm just going to disable it.
+    #
+    if six.PY2:
+        return
+
+    substrings = {}
+    schemes = io.StringIO()
+    seen_examples = set()
+    uri_examples = io.StringIO()
+
+    for scheme, transport in sorted(transport.items()):
+        if scheme == _NO_SCHEME:
+            continue
+
+        schemes.write('    * %s\n' % scheme)
+
+        try:
+            fn = transport.open
+        except AttributeError:
+            substrings[scheme] = ''
+        else:
+            kwargs = extract_kwargs(fn.__doc__)
+            substrings[scheme] = to_docstring(kwargs, lpad=u'    ')
+
+        try:
+            examples = transport.URI_EXAMPLES
+        except AttributeError:
+            continue
+        else:
+            for e in examples:
+                if e not in seen_examples:
+                    uri_examples.write('    * %s\n' % e)
+                seen_examples.add(e)
+
+    substrings['codecs'] = '\n'.join(
+        ['    * %s' % e for e in compression.get_supported_extensions()]
+    )
+    substrings['examples'] = extract_examples_from_readme_rst()
+
+    #
+    # The docstring can be None if -OO was passed to the interpreter.
+    #
+    if open_function.__doc__:
+        open_function.__doc__ = open_function.__doc__ % substrings
+
+    if parse_uri_function.__doc__:
+        parse_uri_function.__doc__ = parse_uri_function.__doc__ % dict(
+            schemes=schemes.getvalue(),
+            uri_examples=uri_examples.getvalue(),
+        )
