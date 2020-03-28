@@ -16,7 +16,6 @@ import google.cloud.storage
 import google.auth.transport.requests as google_requests
 
 import smart_open.bytebuffer
-import smart_open.s3
 import smart_open.utils
 
 from smart_open import constants

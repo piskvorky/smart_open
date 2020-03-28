@@ -608,15 +608,15 @@ class IterBucketTest(unittest.TestCase):
 
 
 @moto.mock_s3
-@unittest.skipIf(not smart_open.s3._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
+@unittest.skipIf(not smart_open.concurrency._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
 class IterBucketConcurrentFuturesTest(unittest.TestCase):
     def setUp(self):
-        self.old_flag_multi = smart_open.s3._MULTIPROCESSING
-        smart_open.s3._MULTIPROCESSING = False
+        self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
+        smart_open.concurrency._MULTIPROCESSING = False
         ignore_resource_warnings()
 
     def tearDown(self):
-        smart_open.s3._MULTIPROCESSING = self.old_flag_multi
+        smart_open.concurrency._MULTIPROCESSING = self.old_flag_multi
         cleanup_bucket()
 
     def test(self):
@@ -630,15 +630,15 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
 
 
 @moto.mock_s3
-@unittest.skipIf(not smart_open.s3._MULTIPROCESSING, 'multiprocessing unavailable')
+@unittest.skipIf(not smart_open.concurrency._MULTIPROCESSING, 'multiprocessing unavailable')
 class IterBucketMultiprocessingTest(unittest.TestCase):
     def setUp(self):
-        self.old_flag_concurrent = smart_open.s3._CONCURRENT_FUTURES
-        smart_open.s3._CONCURRENT_FUTURES = False
+        self.old_flag_concurrent = smart_open.concurrency._CONCURRENT_FUTURES
+        smart_open.concurrency._CONCURRENT_FUTURES = False
         ignore_resource_warnings()
 
     def tearDown(self):
-        smart_open.s3._CONCURRENT_FUTURES = self.old_flag_concurrent
+        smart_open.concurrency._CONCURRENT_FUTURES = self.old_flag_concurrent
         cleanup_bucket()
 
     def test(self):
@@ -654,16 +654,16 @@ class IterBucketMultiprocessingTest(unittest.TestCase):
 @moto.mock_s3
 class IterBucketSingleProcessTest(unittest.TestCase):
     def setUp(self):
-        self.old_flag_multi = smart_open.s3._MULTIPROCESSING
-        self.old_flag_concurrent = smart_open.s3._CONCURRENT_FUTURES
-        smart_open.s3._MULTIPROCESSING = False
-        smart_open.s3._CONCURRENT_FUTURES = False
+        self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
+        self.old_flag_concurrent = smart_open.concurrency._CONCURRENT_FUTURES
+        smart_open.concurrency._MULTIPROCESSING = False
+        smart_open.concurrency._CONCURRENT_FUTURES = False
 
         ignore_resource_warnings()
 
     def tearDown(self):
-        smart_open.s3._MULTIPROCESSING = self.old_flag_multi
-        smart_open.s3._CONCURRENT_FUTURES = self.old_flag_concurrent
+        smart_open.concurrency._MULTIPROCESSING = self.old_flag_multi
+        smart_open.concurrency._CONCURRENT_FUTURES = self.old_flag_concurrent
         cleanup_bucket()
 
     def test(self):
