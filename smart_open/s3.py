@@ -23,6 +23,8 @@ import botocore.exceptions
 import smart_open.bytebuffer
 import smart_open.utils
 
+from smart_open import constants
+
 logger = logging.getLogger(__name__)
 
 # AWS Lambda environments do not support multiprocessing.Queue or multiprocessing.Pool.
@@ -50,23 +52,12 @@ DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 """Default minimum part size for S3 multipart uploads"""
 MIN_MIN_PART_SIZE = 5 * 1024 ** 2
 """The absolute minimum permitted by Amazon."""
-READ_BINARY = 'rb'
-WRITE_BINARY = 'wb'
-MODES = (READ_BINARY, WRITE_BINARY)
-"""Allowed I/O modes for working with S3."""
-
-BINARY_NEWLINE = b'\n'
 
 SCHEMES = ("s3", "s3n", 's3u', "s3a")
 DEFAULT_PORT = 443
 DEFAULT_HOST = 's3.amazonaws.com'
 
 DEFAULT_BUFFER_SIZE = 128 * 1024
-
-START = 0
-CURRENT = 1
-END = 2
-WHENCE_CHOICES = [START, CURRENT, END]
 
 URI_EXAMPLES = (
     's3://my_bucket/my_key',
@@ -212,19 +203,6 @@ def _override_endpoint_url(transport_params, url):
         resource_kwargs.update(endpoint_url=url)
 
 
-def clamp(value, minval, maxval):
-    return max(min(value, maxval), minval)
-
-
-def make_range_string(start, stop=None):
-    #
-    # https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.35
-    #
-    if stop is None:
-        return 'bytes=%d-' % start
-    return 'bytes=%d-%d' % (start, stop)
-
-
 def open_uri(uri, mode, transport_params):
     parsed_uri = parse_uri(uri)
     parsed_uri, transport_params = _consolidate_params(parsed_uri, transport_params)
@@ -286,13 +264,13 @@ def open(
 
     """
     logger.debug('%r', locals())
-    if mode not in MODES:
-        raise NotImplementedError('bad mode: %r expected one of %r' % (mode, MODES))
+    if mode not in constants.BINARY_MODES:
+        raise NotImplementedError('bad mode: %r expected one of %r' % (mode, constants.BINARY_MODES))
 
-    if (mode == WRITE_BINARY) and (version_id is not None):
+    if (mode == constants.WRITE_BINARY) and (version_id is not None):
         raise ValueError("version_id must be None when writing")
 
-    if mode == READ_BINARY:
+    if mode == constants.READ_BINARY:
         fileobj = Reader(
             bucket_id,
             key_id,
@@ -302,7 +280,7 @@ def open(
             resource_kwargs=resource_kwargs,
             object_kwargs=object_kwargs,
         )
-    elif mode == WRITE_BINARY:
+    elif mode == constants.WRITE_BINARY:
         if multipart_upload:
             fileobj = MultipartWriter(
                 bucket_id,
@@ -371,7 +349,7 @@ class _SeekableRawReader(object):
     def _load_body(self):
         """Build a continuous connection with the remote peer starts from the current postion.
         """
-        range_string = make_range_string(self._position)
+        range_string = smart_open.utils.make_range_string(self._position)
         logger.debug('content_length: %r range_string: %r', self._content_length, range_string)
 
         if self._position == self._content_length == 0 or self._position == self._content_length:
@@ -419,7 +397,7 @@ class Reader(io.BufferedIOBase):
     Implements the io.BufferedIOBase interface of the standard library."""
 
     def __init__(self, bucket, key, version_id=None, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None,
+                 line_terminator=constants.BINARY_NEWLINE, session=None, resource_kwargs=None,
                  object_kwargs=None):
 
         self._buffer_size = buffer_size
@@ -537,7 +515,7 @@ class Reader(io.BufferedIOBase):
         We offer only seek support, and no truncate support."""
         return True
 
-    def seek(self, offset, whence=START):
+    def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
 
         :param int offset: The offset in bytes.
@@ -545,16 +523,16 @@ class Reader(io.BufferedIOBase):
 
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
-        if whence not in WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % WHENCE_CHOICES)
+        if whence not in constants.WHENCE_CHOICES:
+            raise ValueError('invalid whence, expected one of %r' % constants.WHENCE_CHOICES)
 
-        if whence == START:
+        if whence == constants.WHENCE_START:
             new_position = offset
-        elif whence == CURRENT:
+        elif whence == constants.WHENCE_CURRENT:
             new_position = self._current_pos + offset
         else:
             new_position = self._content_length + offset
-        new_position = clamp(new_position, 0, self._content_length)
+        new_position = smart_open.utils.clamp(new_position, 0, self._content_length)
         self._current_pos = new_position
         self._raw_reader.seek(new_position)
         logger.debug('new_position: %r', self._current_pos)

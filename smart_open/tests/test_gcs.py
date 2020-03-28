@@ -24,6 +24,7 @@ import google.cloud
 import google.api_core.exceptions
 
 import smart_open
+import smart_open.constants
 
 BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
@@ -573,7 +574,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
         fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
         self.assertEqual(fin.read(5), b'hello')
-        seek = fin.seek(1, whence=smart_open.gcs.CURRENT)
+        seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
@@ -583,7 +584,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         put_to_bucket(contents=content)
 
         fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
-        seek = fin.seek(-4, whence=smart_open.gcs.END)
+        seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
 
@@ -595,7 +596,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(content))
-        fin.seek(0, whence=smart_open.gcs.END)
+        fin.seek(0, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(eof, fin.tell())
 
     def test_read_gzip(self):

@@ -18,7 +18,7 @@ import urllib.parse
 
 import requests
 
-from smart_open import utils
+from smart_open import utils, constants
 
 import http.client as httplib
 
@@ -55,9 +55,9 @@ def open(http_uri, mode, min_part_size=MIN_PART_SIZE):
     if http_uri.startswith(SCHEME):
         http_uri = _convert_to_http_uri(http_uri)
 
-    if mode == 'rb':
+    if mode == constants.READ_BINARY:
         fobj = BufferedInputBase(http_uri)
-    elif mode == 'wb':
+    elif mode == constants.WRITE_BINARY:
         fobj = BufferedOutputBase(http_uri, min_part_size=min_part_size)
     else:
         raise NotImplementedError("webhdfs support for mode %r not implemented" % mode)

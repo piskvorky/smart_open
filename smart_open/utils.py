@@ -68,3 +68,51 @@ def check_kwargs(kallable, kwargs):
         logger.warning('ignoring unsupported keyword arguments: %r', unsupported_keywords)
 
     return supported_kwargs
+
+
+def clamp(value, minval, maxval):
+    """Clamp a numeric value to a specific range.
+
+    Parameters
+    ----------
+    value: numeric
+        The value to clamp.
+
+    minval: numeric
+        The lower bound.
+
+    maxval: numeric
+        The upper bound.
+
+    Returns
+    -------
+    numeric
+        The clamped value.  It will be in the range ``[minval, maxval]``.
+
+    """
+    return max(min(value, maxval), minval)
+
+
+def make_range_string(start, stop=None):
+    """Create a byte range specifier in accordance with RFC-2616.
+
+    Parameters
+    ----------
+    start: int
+        The start of the byte range
+
+    stop: int, optional
+        The end of the byte range.  If unspecified, indicates EOF.
+
+    Returns
+    -------
+    str
+        A byte range specifier.
+
+    """
+    #
+    # https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.35
+    #
+    if stop is None:
+        return 'bytes=%d-' % start
+    return 'bytes=%d-%d' % (start, stop)

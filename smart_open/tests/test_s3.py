@@ -180,7 +180,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
         self.assertEqual(fin.read(5), b'hello')
-        seek = fin.seek(1, whence=smart_open.s3.CURRENT)
+        seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
@@ -190,7 +190,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         put_to_bucket(contents=content)
 
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
-        seek = fin.seek(-4, whence=smart_open.s3.END)
+        seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
 
@@ -202,7 +202,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(content))
-        fin.seek(0, whence=smart_open.s3.END)
+        fin.seek(0, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(eof, fin.tell())
 
     def test_read_gzip(self):
@@ -520,13 +520,6 @@ class SinglepartWriterTest(unittest.TestCase):
         fout.write(text)
         fout.flush()
         fout.close()
-
-
-class ClampTest(unittest.TestCase):
-    def test(self):
-        self.assertEqual(smart_open.s3.clamp(5, 0, 10), 5)
-        self.assertEqual(smart_open.s3.clamp(11, 0, 10), 10)
-        self.assertEqual(smart_open.s3.clamp(-1, 0, 10), 0)
 
 
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
