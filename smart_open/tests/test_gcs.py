@@ -22,9 +22,9 @@ from collections import OrderedDict
 
 import google.cloud
 import google.api_core.exceptions
-import six
 
 import smart_open
+import smart_open.constants
 
 BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
@@ -42,8 +42,6 @@ logger = logging.getLogger(__name__)
 
 
 def ignore_resource_warnings():
-    if six.PY2:
-        return
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
@@ -174,8 +172,8 @@ class FakeBlob(object):
     def upload_from_string(self, data):
         # mimics Google's API by accepting bytes or str, despite the method name
         # https://google-cloud-python.readthedocs.io/en/0.32.0/storage/blobs.html#google.cloud.storage.blob.Blob.upload_from_string
-        if isinstance(data, six.string_types):
-            data = bytes(data) if six.PY2 else bytes(data, 'utf8')
+        if isinstance(data, str):
+            data = bytes(data, 'utf8')
         self.__contents = io.BytesIO(data)
         self.__contents.seek(0, io.SEEK_END)
 
@@ -448,18 +446,30 @@ def mock_gcs(class_or_func):
 
 def mock_gcs_func(func):
     """Mock the function and provide additional required arguments."""
+    assert callable(func), '%r is not a callable function' % func
+
     def inner(*args, **kwargs):
-        with mock.patch('google.cloud.storage.Client', return_value=storage_client), \
-            mock.patch(
-                'smart_open.gcs.google_requests.AuthorizedSession',
-                return_value=FakeAuthorizedSession(storage_client._credentials),
-        ):
-            assert callable(func), 'you didn\'t provide a function!'
-            try:  # is it a method that needs a self arg?
-                self_arg = inspect.signature(func).self
-                func(self_arg, *args, **kwargs)
-            except AttributeError:
-                func(*args, **kwargs)
+        #
+        # Is it a function or a method? The latter requires a self parameter.
+        #
+        signature = inspect.signature(func)
+
+        fake_session = FakeAuthorizedSession(storage_client._credentials)
+        patched_client = mock.patch(
+            'google.cloud.storage.Client',
+            return_value=storage_client,
+        )
+        patched_session = mock.patch(
+            'smart_open.gcs.google_requests.AuthorizedSession',
+            return_value=fake_session,
+        )
+
+        with patched_client, patched_session:
+            if not hasattr(signature, 'self'):
+                return func(*args, **kwargs)
+            else:
+                return func(signature.self, *args, **kwargs)
+
     return inner
 
 
@@ -564,7 +574,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
         fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
         self.assertEqual(fin.read(5), b'hello')
-        seek = fin.seek(1, whence=smart_open.gcs.CURRENT)
+        seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
@@ -574,7 +584,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         put_to_bucket(contents=content)
 
         fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
-        seek = fin.seek(-4, whence=smart_open.gcs.END)
+        seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
 
@@ -586,7 +596,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(content))
-        fin.seek(0, whence=smart_open.gcs.END)
+        fin.seek(0, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(eof, fin.tell())
 
     def test_read_gzip(self):
@@ -680,11 +690,12 @@ class BufferedOutputBaseTest(unittest.TestCase):
         with smart_open.gcs.BufferedOutputBase(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
             fout.write(test_string)
 
-        output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), "rb"))
+        with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), "rb") as fin:
+            output = list(fin)
 
         self.assertEqual(output, [test_string])
 
-    def test_write_01a(self):
+    def test_incorrect_input(self):
         """Does gcs write fail on incorrect input?"""
         try:
             with smart_open.gcs.BufferedOutputBase(BUCKET_NAME, WRITE_BLOB_NAME) as fin:

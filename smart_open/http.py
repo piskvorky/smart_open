@@ -9,12 +9,16 @@
 
 import io
 import logging
+import os.path
+import urllib.parse
 
 import requests
 
-from smart_open import bytebuffer, s3
+from smart_open import bytebuffer, constants
+import smart_open.utils
 
 DEFAULT_BUFFER_SIZE = 128 * 1024
+SCHEMES = ('http', 'https')
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,20 @@ For now, we ask the server to send us the files as they are.
 Sometimes, servers compress the file for more efficient transfer, in which case
 the client (us) has to decompress them with the appropriate algorithm.
 """
+
+
+def parse_uri(uri_as_string):
+    split_uri = urllib.parse.urlsplit(uri_as_string)
+    assert split_uri.scheme in SCHEMES
+
+    uri_path = split_uri.netloc + split_uri.path
+    uri_path = "/" + uri_path.lstrip("/")
+    return dict(scheme=split_uri.scheme, uri_path=uri_path)
+
+
+def open_uri(uri, mode, transport_params):
+    kwargs = smart_open.utils.check_kwargs(open, transport_params)
+    return open(uri, mode, **kwargs)
 
 
 def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
@@ -56,11 +74,13 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
     unauthenticated, unless set separately in headers.
 
     """
-    if mode == 'rb':
-        return SeekableBufferedInputBase(
+    if mode == constants.READ_BINARY:
+        fobj = SeekableBufferedInputBase(
             uri, mode, kerberos=kerberos,
             user=user, password=password, headers=headers
         )
+        fobj.name = os.path.basename(urllib.parse.urlparse(uri).path)
+        return fobj
     else:
         raise NotImplementedError('http support for mode %r not implemented' % mode)
 
@@ -233,20 +253,20 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
-        if whence not in s3.WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % s3.WHENCE_CHOICES)
+        if whence not in constants.WHENCE_CHOICES:
+            raise ValueError('invalid whence, expected one of %r' % constants.WHENCE_CHOICES)
 
         if not self.seekable():
             raise OSError
 
-        if whence == s3.START:
+        if whence == constants.WHENCE_START:
             new_pos = offset
-        elif whence == s3.CURRENT:
+        elif whence == constants.WHENCE_CURRENT:
             new_pos = self._current_pos + offset
-        elif whence == s3.END:
+        elif whence == constants.WHENCE_END:
             new_pos = self.content_length + offset
 
-        new_pos = s3.clamp(new_pos, 0, self.content_length)
+        new_pos = smart_open.utils.clamp(new_pos, 0, self.content_length)
 
         if self._current_pos == new_pos:
             return self._current_pos
@@ -282,7 +302,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
     def _partial_request(self, start_pos=None):
         if start_pos is not None:
-            self.headers.update({"range": s3.make_range_string(start_pos)})
+            self.headers.update({"range": smart_open.utils.make_range_string(start_pos)})
 
         response = requests.get(self.url, auth=self.auth, stream=True, headers=self.headers)
         return response

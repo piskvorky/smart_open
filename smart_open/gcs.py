@@ -9,35 +9,25 @@
 
 import io
 import logging
-import sys
+import urllib.parse
 
 import google.cloud.exceptions
 import google.cloud.storage
 import google.auth.transport.requests as google_requests
-import six
 
 import smart_open.bytebuffer
-import smart_open.s3
+import smart_open.utils
+
+from smart_open import constants
 
 logger = logging.getLogger(__name__)
 
-_READ_BINARY = 'rb'
-_WRITE_BINARY = 'wb'
-
-_MODES = (_READ_BINARY, _WRITE_BINARY)
-"""Allowed I/O modes for working with GCS."""
-
-_BINARY_TYPES = (six.binary_type, bytearray)
+_BINARY_TYPES = (bytes, bytearray, memoryview)
 """Allowed binary buffer types for writing to the underlying GCS stream"""
-
-if sys.version_info >= (2, 7):
-    _BINARY_TYPES = (six.binary_type, bytearray, memoryview)
-
-_BINARY_NEWLINE = b'\n'
 
 _UNKNOWN_FILE_SIZE = '*'
 
-SUPPORTED_SCHEME = "gs"
+SCHEME = "gs"
 """Supported scheme for GCS"""
 
 _MIN_MIN_PART_SIZE = _REQUIRED_CHUNK_MULTIPLE = 256 * 1024
@@ -49,22 +39,14 @@ _DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 DEFAULT_BUFFER_SIZE = 256 * 1024
 """Default buffer size for working with GCS"""
 
-START = 0
-"""Seek to the absolute start of a GCS file"""
-
-CURRENT = 1
-"""Seek relative to the current positive of a GCS file"""
-
-END = 2
-"""Seek relative to the end of a GCS file"""
-
-_WHENCE_CHOICES = (START, CURRENT, END)
-
 _UPLOAD_INCOMPLETE_STATUS_CODE = 308
 _UPLOAD_COMPLETE_STATUS_CODES = (200, 201)
 
 
 def _make_range_string(start, stop=None, end=_UNKNOWN_FILE_SIZE):
+    #
+    # GCS seems to violate RFC-2616 (see utils.make_range_string), so we
+    # need a separate implementation.
     #
     # https://cloud.google.com/storage/docs/xml-api/resumable-upload#step_3upload_the_file_blocks
     #
@@ -104,6 +86,20 @@ class UploadFailedError(Exception):
         return cls(msg, response.status_code, response.text)
 
 
+def parse_uri(uri_as_string):
+    sr = urllib.parse.urlsplit(uri_as_string)
+    assert sr.scheme == SCHEME
+    bucket_id = sr.netloc
+    blob_id = sr.path.lstrip('/')
+    return dict(scheme=SCHEME, bucket_id=bucket_id, blob_id=blob_id)
+
+
+def open_uri(uri, mode, transport_params):
+    parsed_uri = parse_uri(uri)
+    kwargs = smart_open.utils.check_kwargs(open, transport_params)
+    return open(parsed_uri['bucket_id'], parsed_uri['blob_id'], mode, **kwargs)
+
+
 def open(
         bucket_id,
         blob_id,
@@ -130,15 +126,15 @@ def open(
         The GCS client to use when working with google-cloud-storage.
 
     """
-    if mode == _READ_BINARY:
+    if mode == constants.READ_BINARY:
         return SeekableBufferedInputBase(
             bucket_id,
             blob_id,
             buffer_size=buffer_size,
-            line_terminator=_BINARY_NEWLINE,
+            line_terminator=constants.BINARY_NEWLINE,
             client=client,
         )
-    elif mode == _WRITE_BINARY:
+    elif mode == constants.WRITE_BINARY:
         return BufferedOutputBase(
             bucket_id,
             blob_id,
@@ -204,7 +200,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
             bucket,
             key,
             buffer_size=DEFAULT_BUFFER_SIZE,
-            line_terminator=_BINARY_NEWLINE,
+            line_terminator=constants.BINARY_NEWLINE,
             client=None,  # type: google.cloud.storage.Client
     ):
         if client is None:
@@ -256,7 +252,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         """Unsupported."""
         raise io.UnsupportedOperation
 
-    def seek(self, offset, whence=START):
+    def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
 
         :param int offset: The offset in bytes.
@@ -264,16 +260,16 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
 
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
-        if whence not in _WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % _WHENCE_CHOICES)
+        if whence not in constants.WHENCE_CHOICES:
+            raise ValueError('invalid whence, expected one of %r' % constants.WHENCE_CHOICES)
 
-        if whence == START:
+        if whence == constants.WHENCE_START:
             new_position = offset
-        elif whence == CURRENT:
+        elif whence == constants.WHENCE_CURRENT:
             new_position = self._current_pos + offset
         else:
             new_position = self._size + offset
-        new_position = smart_open.s3.clamp(new_position, 0, self._size)
+        new_position = smart_open.utils.clamp(new_position, 0, self._size)
         self._current_pos = new_position
         self._raw_reader.seek(new_position)
         logger.debug('current_pos: %r', self._current_pos)
