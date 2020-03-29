@@ -113,7 +113,8 @@ Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pyp
     python setup.py test  # run unit tests
     python setup.py install
 
-To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>`_ (``pip install mock moto responses``).
+To run the unit tests (optional), you'll also need to install some other dependencies.
+See setup.py or run `pip install .[test]`.
 The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
 
 If you're upgrading from ``smart_open`` versions 1.8.0 and below, please check out the `Migration Guide <MIGRATING_FROM_OLDER_VERSIONS.rst>`_.
