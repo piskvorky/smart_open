@@ -129,7 +129,7 @@ def open(
 
     """
     if mode == constants.READ_BINARY:
-        return SeekableBufferedInputBase(
+        return Reader(
             bucket_id,
             blob_id,
             buffer_size=buffer_size,
@@ -137,7 +137,7 @@ def open(
             client=client,
         )
     elif mode == constants.WRITE_BINARY:
-        return BufferedOutputBase(
+        return Writer(
             bucket_id,
             blob_id,
             min_part_size=min_part_size,
@@ -147,7 +147,7 @@ def open(
         raise NotImplementedError('GCS support for mode %r not implemented' % mode)
 
 
-class _SeekableRawReader(object):
+class _RawReader(object):
     """Read an GCS object."""
 
     def __init__(self, gcs_blob, size):
@@ -189,7 +189,7 @@ class _SeekableRawReader(object):
         return binary
 
 
-class SeekableBufferedInputBase(io.BufferedIOBase):
+class Reader(io.BufferedIOBase):
     """Reads bytes from GCS.
 
     Implements the io.BufferedIOBase interface of the standard library.
@@ -215,7 +215,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
 
         self._size = self._blob.size if self._blob.size is not None else 0
 
-        self._raw_reader = _SeekableRawReader(self._blob, self._size)
+        self._raw_reader = _RawReader(self._blob, self._size)
         self._current_pos = 0
         self._current_part_size = buffer_size
         self._current_part = smart_open.bytebuffer.ByteBuffer(buffer_size)
@@ -379,7 +379,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         )
 
 
-class BufferedOutputBase(io.BufferedIOBase):
+class Writer(io.BufferedIOBase):
     """Writes bytes to GCS.
 
     Implements the io.BufferedIOBase interface of the standard library."""
