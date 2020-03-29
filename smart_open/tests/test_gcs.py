@@ -339,10 +339,10 @@ class FakeAuthorizedSession(object):
                 upload.write(data.read())
             else:
                 upload.write(data)
-        if not headers.get('Content-Range', '').endswith(smart_open.gcs._UNKNOWN_FILE_SIZE):
+        if not headers.get('Content-Range', '').endswith(smart_open.gcs._UNKNOWN):
             upload.finish()
             return FakeResponse(200)
-        return FakeResponse(smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODE)
+        return FakeResponse(smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODES[0])
 
     @staticmethod
     def _blob_with_url(url, client):
@@ -371,7 +371,7 @@ class FakeAuthorizedSessionTest(unittest.TestCase):
             'Content-Length': str(4),
         }
         response = self.session.put(self.upload_url, data, headers=headers)
-        self.assertEqual(response.status_code, smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODE)
+        self.assertEqual(response.status_code, smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODES[0])
         self.session._blob_with_url(self.upload_url, self.client)
         blob_contents = self.blob.download_as_string()
         self.assertEqual(blob_contents, b'')
@@ -755,7 +755,6 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_03a(self):
         """Do multiple writes greater than the min_part_size work correctly?"""
-        # write
         min_part_size = 256 * 1024
         smart_open_write = smart_open.gcs.BufferedOutputBase(
             BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
@@ -778,7 +777,6 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_03b(self):
         """Does writing a last chunk size equal to a multiple of the min_part_size work?"""
-        # write
         min_part_size = 256 * 1024
         smart_open_write = smart_open.gcs.BufferedOutputBase(
             BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
