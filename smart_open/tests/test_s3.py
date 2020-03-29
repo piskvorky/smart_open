@@ -538,6 +538,16 @@ class IterBucketTest(unittest.TestCase):
         results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
         self.assertEqual(len(results), 10)
 
+    def test_iter_bucket_accept_key(self):
+        """ Ensure accept_key function can have 1 or 2 arguments."""
+        populate_bucket()
+        results = list(smart_open.s3.iter_bucket(BUCKET_NAME,
+            accept_key=lambda key: False))
+        self.assertEqual(len(results), 0)
+        results = list(smart_open.s3.iter_bucket(BUCKET_NAME,
+            accept_key=lambda key, content: False))
+        self.assertEqual(len(results), 0)
+
     def test_accepts_boto3_bucket(self):
         populate_bucket()
         bucket = boto3.resource('s3').Bucket(BUCKET_NAME)
