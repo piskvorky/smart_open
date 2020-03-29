@@ -538,7 +538,7 @@ class Writer(io.BufferedIOBase):
         self._bytes_uploaded += content_length
 
         #
-        # N.B. if is_last is True, the below are NOOPs.
+        # For the last part, the below _current_part handling is a NOOP.
         #
         self._current_part = io.BytesIO(self._current_part.read())
         self._current_part.seek(0, io.SEEK_END)
@@ -547,7 +547,8 @@ class Writer(io.BufferedIOBase):
         logger.debug("creating empty file")
         headers = {'Content-Length': '0'}
         response = self._session.put(self._resumable_upload_url, headers=headers)
-        assert response.status_code in _UPLOAD_COMPLETE_STATUS_CODES
+        if response.status_code not in _UPLOAD_COMPLETE_STATUS_CODES:
+            _fail(response, self._total_parts + 1, 0, self._total_size, headers)
 
         self._total_parts += 1
 
