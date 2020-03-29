@@ -14,7 +14,7 @@ import urllib.parse
 
 import google.cloud.exceptions
 import google.cloud.storage
-import google.auth.transport.requests as google_requests
+import google.auth.transport.requests
 
 import smart_open.bytebuffer
 import smart_open.utils
@@ -406,7 +406,7 @@ class Writer(io.BufferedIOBase):
         self._bytes_uploaded = 0
         self._current_part = io.BytesIO()
 
-        self._session = google_requests.AuthorizedSession(self._credentials)
+        self._session = google.auth.transport.requests.AuthorizedSession(self._credentials)
 
         #
         # https://cloud.google.com/storage/docs/json_api/v1/how-tos/resumable-upload#start-resumable
