@@ -955,8 +955,8 @@ def iter_bucket(
     prefix: str, optional
         Limits the iteration to keys starting wit the prefix.
     accept_key: callable, optional
-        This is a function that accepts a key name (unicode string), and optionally as a 
-        second argument, a dictionary of content metadata provided by S3, and 
+        This is a function that accepts a key name (unicode string), and optionally as a
+        second argument, a dictionary of content metadata provided by S3, and
         returns True/False, signalling whether the given key should be downloaded.
         The default behavior is to accept all keys.
     key_limit: int, optional
@@ -1067,8 +1067,8 @@ def _list_bucket(
                     is_included = accept_key(key)
                 except TypeError:
                     # Python raises TypeError when the number or arguments doesn't match the required number.
-                    is_included = accept_key(key, content)
-           
+                    is_included = accept_key(key, c)
+
                 if is_included:
                     yield key
         ctoken = response.get('NextContinuationToken', None)
