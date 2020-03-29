@@ -130,3 +130,13 @@ register_compressor('.xz', _handle_xz)
 There are many compression formats out there, and supporting all of them is beyond the scope of `smart_open`.
 We want our code's functionality to cover the bare minimum required to satisfy 80% of our users.
 We leave the remaining 20% of users with the ability to deal with compression in their own code, using the trivial mechanism described above.
+
+Documentation
+-------------
+
+Once you've contributed your extension, please add it to the documentation so that it is discoverable for other users.
+Some notable files:
+
+- setup.py: See the `description` keyword.  Not all contributions will affect this.
+- README.rst
+- howto.md (if your extension solves a specific problem that doesn't get covered by other documentation)
