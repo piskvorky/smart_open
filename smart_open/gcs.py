@@ -395,7 +395,6 @@ class Writer(io.BufferedIOBase):
         if client is None:
             client = google.cloud.storage.Client()
         self._client = client
-        self._credentials = self._client._credentials  # noqa
         self._blob = self._client.bucket(bucket).blob(blob)  # type: google.cloud.storage.Blob
         assert min_part_size % _REQUIRED_CHUNK_MULTIPLE == 0, 'min part size must be a multiple of 256KB'
         assert min_part_size >= _MIN_MIN_PART_SIZE, 'min part size must be greater than 256KB'
@@ -406,7 +405,7 @@ class Writer(io.BufferedIOBase):
         self._bytes_uploaded = 0
         self._current_part = io.BytesIO()
 
-        self._session = google.auth.transport.requests.AuthorizedSession(self._credentials)
+        self._session = google.auth.transport.requests.AuthorizedSession(client._credentials)
 
         #
         # https://cloud.google.com/storage/docs/json_api/v1/how-tos/resumable-upload#start-resumable
