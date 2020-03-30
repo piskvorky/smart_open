@@ -371,7 +371,7 @@ class FakeAuthorizedSessionTest(unittest.TestCase):
             'Content-Length': str(4),
         }
         response = self.session.put(self.upload_url, data, headers=headers)
-        self.assertEqual(response.status_code, smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODES[0])
+        self.assertIn(response.status_code, smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODES)
         self.session._blob_with_url(self.upload_url, self.client)
         blob_contents = self.blob.download_as_string()
         self.assertEqual(blob_contents, b'')
