@@ -460,7 +460,7 @@ def mock_gcs_func(func):
             return_value=storage_client,
         )
         patched_session = mock.patch(
-            'smart_open.gcs.google_requests.AuthorizedSession',
+            'google.auth.transport.requests.AuthorizedSession',
             return_value=fake_session,
         )
 
