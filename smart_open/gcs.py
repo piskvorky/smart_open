@@ -5,6 +5,7 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
+
 """Implements file-like objects for reading and writing to/from GCS."""
 
 import io
@@ -13,7 +14,7 @@ import urllib.parse
 
 import google.cloud.exceptions
 import google.cloud.storage
-import google.auth.transport.requests as google_requests
+import google.auth.transport.requests
 
 import smart_open.bytebuffer
 import smart_open.utils
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 _BINARY_TYPES = (bytes, bytearray, memoryview)
 """Allowed binary buffer types for writing to the underlying GCS stream"""
 
-_UNKNOWN_FILE_SIZE = '*'
+_UNKNOWN = '*'
 
 SCHEME = "gs"
 """Supported scheme for GCS"""
@@ -39,17 +40,19 @@ _DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 DEFAULT_BUFFER_SIZE = 256 * 1024
 """Default buffer size for working with GCS"""
 
-_UPLOAD_INCOMPLETE_STATUS_CODE = 308
+_UPLOAD_INCOMPLETE_STATUS_CODES = (308, )
 _UPLOAD_COMPLETE_STATUS_CODES = (200, 201)
 
 
-def _make_range_string(start, stop=None, end=_UNKNOWN_FILE_SIZE):
+def _make_range_string(start, stop=None, end=None):
     #
     # GCS seems to violate RFC-2616 (see utils.make_range_string), so we
     # need a separate implementation.
     #
     # https://cloud.google.com/storage/docs/xml-api/resumable-upload#step_3upload_the_file_blocks
     #
+    if end is None:
+        end = _UNKNOWN
     if stop is None:
         return 'bytes %d-/%s' % (start, end)
     return 'bytes %d-%d/%s' % (start, stop, end)
@@ -73,17 +76,17 @@ class UploadFailedError(Exception):
         self.status_code = status_code
         self.text = text
 
-    @classmethod
-    def from_response(cls, response, part_num, content_length, total_size, headers):
-        status_code = response.status_code
-        response_text = response.text
-        total_size_gb = total_size / 1024.0 ** 3
 
-        msg = (
-            "upload failed (status code: %(status_code)d, response text: %(response_text)s), "
-            "part #%(part_num)d, %(total_size)d bytes (total %(total_size_gb).3fGB), headers: %(headers)r"
-        ) % locals()
-        return cls(msg, response.status_code, response.text)
+def _fail(response, part_num, content_length, total_size, headers):
+    status_code = response.status_code
+    response_text = response.text
+    total_size_gb = total_size / 1024.0 ** 3
+
+    msg = (
+        "upload failed (status code: %(status_code)d, response text: %(response_text)s), "
+        "part #%(part_num)d, %(total_size)d bytes (total %(total_size_gb).3fGB), headers: %(headers)r"
+    ) % locals()
+    raise UploadFailedError(msg, response.status_code, response.text)
 
 
 def parse_uri(uri_as_string):
@@ -127,7 +130,7 @@ def open(
 
     """
     if mode == constants.READ_BINARY:
-        return SeekableBufferedInputBase(
+        return Reader(
             bucket_id,
             blob_id,
             buffer_size=buffer_size,
@@ -135,7 +138,7 @@ def open(
             client=client,
         )
     elif mode == constants.WRITE_BINARY:
-        return BufferedOutputBase(
+        return Writer(
             bucket_id,
             blob_id,
             min_part_size=min_part_size,
@@ -145,7 +148,7 @@ def open(
         raise NotImplementedError('GCS support for mode %r not implemented' % mode)
 
 
-class _SeekableRawReader(object):
+class _RawReader(object):
     """Read an GCS object."""
 
     def __init__(self, gcs_blob, size):
@@ -187,7 +190,7 @@ class _SeekableRawReader(object):
         return binary
 
 
-class SeekableBufferedInputBase(io.BufferedIOBase):
+class Reader(io.BufferedIOBase):
     """Reads bytes from GCS.
 
     Implements the io.BufferedIOBase interface of the standard library.
@@ -213,7 +216,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
 
         self._size = self._blob.size if self._blob.size is not None else 0
 
-        self._raw_reader = _SeekableRawReader(self._blob, self._size)
+        self._raw_reader = _RawReader(self._blob, self._size)
         self._current_pos = 0
         self._current_part_size = buffer_size
         self._current_part = smart_open.bytebuffer.ByteBuffer(buffer_size)
@@ -377,7 +380,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         )
 
 
-class BufferedOutputBase(io.BufferedIOBase):
+class Writer(io.BufferedIOBase):
     """Writes bytes to GCS.
 
     Implements the io.BufferedIOBase interface of the standard library."""
@@ -392,7 +395,6 @@ class BufferedOutputBase(io.BufferedIOBase):
         if client is None:
             client = google.cloud.storage.Client()
         self._client = client
-        self._credentials = self._client._credentials  # noqa
         self._blob = self._client.bucket(bucket).blob(blob)  # type: google.cloud.storage.Blob
         assert min_part_size % _REQUIRED_CHUNK_MULTIPLE == 0, 'min part size must be a multiple of 256KB'
         assert min_part_size >= _MIN_MIN_PART_SIZE, 'min part size must be greater than 256KB'
@@ -403,7 +405,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._bytes_uploaded = 0
         self._current_part = io.BytesIO()
 
-        self._session = google_requests.AuthorizedSession(self._credentials)
+        self._session = google.auth.transport.requests.AuthorizedSession(client._credentials)
 
         #
         # https://cloud.google.com/storage/docs/json_api/v1/how-tos/resumable-upload#start-resumable
@@ -427,7 +429,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             if self._total_size == 0:  # empty files
                 self._upload_empty_part()
             else:
-                self._upload_final_part()
+                self._upload_part(is_last=True)
             self._client = None
         logger.debug("successfully closed")
 
@@ -465,10 +467,10 @@ class BufferedOutputBase(io.BufferedIOBase):
         # If the size of this part is precisely equal to the minimum part size,
         # we don't perform the actual write now, and wait until we see more data.
         # We do this because the very last part of the upload must be handled slightly
-        # differently (see comments in the _upload_next_part method).
+        # differently (see comments in the _upload_part method).
         #
         if self._current_part.tell() > self._min_part_size:
-            self._upload_next_part()
+            self._upload_part()
 
         return len(b)
 
@@ -482,103 +484,71 @@ class BufferedOutputBase(io.BufferedIOBase):
     #
     # Internal methods.
     #
-    def _upload_next_part(self):
+    def _upload_part(self, is_last=False):
         part_num = self._total_parts + 1
 
-        # upload the largest amount possible given GCS's restriction
-        # of parts being multiples of 256kB, except for the last one
-        size_of_leftovers = self._current_part.tell() % self._min_part_size
-        content_length = self._current_part.tell() - size_of_leftovers
-
-        # a final upload of 0 bytes does not work, so we need to guard against this edge case
-        # this results in occasionally keeping an additional 256kB in the buffer after uploading a part,
-        # but until this is fixed on Google's end there is no other option
+        #
+        # Here we upload the largest amount possible given GCS's restriction
+        # of parts being multiples of 256kB, except for the last one.
+        #
+        # A final upload of 0 bytes does not work, so we need to guard against
+        # this edge case. This results in occasionally keeping an additional
+        # 256kB in the buffer after uploading a part, but until this is fixed
+        # on Google's end there is no other option.
+        #
         # https://stackoverflow.com/questions/60230631/upload-zero-size-final-part-to-google-cloud-storage-resumable-upload
-        if size_of_leftovers == 0:
+        #
+        content_length = self._current_part.tell()
+        remainder = content_length % self._min_part_size
+        if is_last:
+            end = self._bytes_uploaded + content_length
+        elif remainder == 0:
             content_length -= _REQUIRED_CHUNK_MULTIPLE
+            end = None
+        else:
+            content_length -= remainder
+            end = None
 
-        total_size = self._bytes_uploaded + content_length
-
-        start = self._bytes_uploaded
-        stop = total_size - 1
-
-        self._current_part.seek(0)
-
+        range_stop = self._bytes_uploaded + content_length - 1
+        content_range = _make_range_string(self._bytes_uploaded, range_stop, end=end)
         headers = {
             'Content-Length': str(content_length),
-            'Content-Range': _make_range_string(start, stop, _UNKNOWN_FILE_SIZE),
+            'Content-Range': content_range,
         }
-
         logger.info(
             "uploading part #%i, %i bytes (total %.3fGB) headers %r",
-            part_num, content_length, total_size / 1024.0 ** 3, headers,
+            part_num, content_length, range_stop / 1024.0 ** 3, headers,
         )
-
+        self._current_part.seek(0)
         response = self._session.put(
             self._resumable_upload_url,
             data=self._current_part.read(content_length),
             headers=headers,
         )
 
-        if response.status_code != _UPLOAD_INCOMPLETE_STATUS_CODE:
-            raise UploadFailedError.from_response(
-                response,
-                part_num,
-                content_length,
-                self._total_size,
-                headers,
-            )
+        if is_last:
+            expected = _UPLOAD_COMPLETE_STATUS_CODES
+        else:
+            expected = _UPLOAD_INCOMPLETE_STATUS_CODES
+        if response.status_code not in expected:
+            _fail(response, part_num, content_length, self._total_size, headers)
         logger.debug("upload of part #%i finished" % part_num)
 
         self._total_parts += 1
         self._bytes_uploaded += content_length
-        # handle the leftovers
+
+        #
+        # For the last part, the below _current_part handling is a NOOP.
+        #
         self._current_part = io.BytesIO(self._current_part.read())
         self._current_part.seek(0, io.SEEK_END)
-
-    def _upload_final_part(self):
-        part_num = self._total_parts + 1
-        content_length = self._current_part.tell()
-        stop = self._total_size - 1
-        start = self._bytes_uploaded
-
-        headers = {
-            'Content-Length': str(content_length),
-            'Content-Range': _make_range_string(start, stop, self._total_size),
-        }
-
-        logger.info(
-            "uploading part #%i, %i bytes (total %.3fGB) headers %r",
-            part_num, content_length, self._total_size / 1024.0 ** 3, headers,
-        )
-
-        self._current_part.seek(0)
-
-        response = self._session.put(
-            self._resumable_upload_url,
-            data=self._current_part,
-            headers=headers,
-        )
-
-        if response.status_code not in _UPLOAD_COMPLETE_STATUS_CODES:
-            raise UploadFailedError.from_response(
-                response,
-                part_num,
-                content_length,
-                self._total_size,
-                headers,
-            )
-        logger.debug("upload of part #%i finished" % part_num)
-
-        self._total_parts += 1
-        self._bytes_uploaded += content_length
-        self._current_part = io.BytesIO()
 
     def _upload_empty_part(self):
         logger.debug("creating empty file")
         headers = {'Content-Length': '0'}
         response = self._session.put(self._resumable_upload_url, headers=headers)
-        assert response.status_code in _UPLOAD_COMPLETE_STATUS_CODES
+        if response.status_code not in _UPLOAD_COMPLETE_STATUS_CODES:
+            _fail(response, self._total_parts + 1, 0, self._total_size, headers)
 
         self._total_parts += 1
 
