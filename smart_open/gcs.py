@@ -492,7 +492,7 @@ class Writer(io.BufferedIOBase):
         # of parts being multiples of 256kB, except for the last one.
         #
         # A final upload of 0 bytes does not work, so we need to guard against
-        # this edge case this results in occasionally keeping an additional
+        # this edge case. This results in occasionally keeping an additional
         # 256kB in the buffer after uploading a part, but until this is fixed
         # on Google's end there is no other option.
         #
