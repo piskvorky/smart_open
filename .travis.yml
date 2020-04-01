@@ -26,12 +26,12 @@ jobs:
         - SO_ENABLE_MOTO_SERVER: "1"
         - TOXENV: "check_keys,py37-doctest,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
     - python: '3.8'
-        env:
-          - SO_S3_URL: "s3://smart-open-py37-benchmark" # TODO: needs specific s3 for py38
-          - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"  # TODO: needs specific s3 for py38
-          - BOTO_CONFIG: "/dev/null"
-          - SO_ENABLE_MOTO_SERVER: "1"
-          - TOXENV: "check_keys,py38-doctest,enable_moto_server,py38-test,py38-benchmark,py38-integration,disable_moto_server"
+      env:
+        - SO_S3_URL: "s3://smart-open-py37-benchmark" # TODO: needs specific s3 for py38
+        - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"  # TODO: needs specific s3 for py38
+        - BOTO_CONFIG: "/dev/null"
+        - SO_ENABLE_MOTO_SERVER: "1"
+        - TOXENV: "check_keys,py38-doctest,enable_moto_server,py38-test,py38-benchmark,py38-integration,disable_moto_server"
 
 install:
   - pip install tox
