@@ -15,7 +15,7 @@
 #
 # Once you're happy, run merge.sh to continue with the release.
 #
-set -euo pipefail
+set -euxo pipefail
 
 version="$1"
 echo "version: $version"

@@ -50,6 +50,8 @@ tests_require = [
     'google-compute-engine==2.8.12',
     'paramiko',
     'parameterizedtestcase',
+    'pytest',
+    'pytest-rerunfailures',
 ]
 
 install_requires = [
