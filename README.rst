@@ -121,9 +121,9 @@ The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe
 
 If you're upgrading from ``smart_open`` versions 1.8.0 and below, please check out the `Migration Guide <MIGRATING_FROM_OLDER_VERSIONS.rst>`_.
 
-Version `x.x.x` will introduce a backwards incompatible installation method with regards to the cloud dependencies. A migration path to minimize breaking
-was introduced in version `x.x.x`. If you want to maintain backwards compatibility (installing all dependencies) install this package via `smart_open[all]` now
-and once the change is made you should not have any issues. If all you care about is AWS dependencies for example you can install via `smart_open[aws]` and
+Version ``x.x.x`` will introduce a backwards incompatible installation method with regards to the cloud dependencies. A migration path to minimize breaking
+was introduced in version ``x.x.x``. If you want to maintain backwards compatibility (installing all dependencies) install this package via ``smart_open[all]`` now
+and once the change is made you should not have any issues. If all you care about is AWS dependencies for example you can install via ``smart_open[aws]`` and
 once the dependency change is made you will simply drop the unwanted dependencies.
 
 
