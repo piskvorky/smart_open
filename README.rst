@@ -106,7 +106,10 @@ Installation
 ------------
 ::
 
-    pip install smart_open
+    pip install smart_open  // Install with no cloud dependencies
+    pip install smart_open[aws] // Install AWS deps
+    pip install smart_open[gcp] // Install GCP deps
+    pip install smart_open[all] // Installs all cloud dependencies
 
 Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pypi/smart_open>`_::
 
@@ -117,6 +120,11 @@ To run the unit tests (optional), you'll also need to install some other depende
 The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
 
 If you're upgrading from ``smart_open`` versions 1.8.0 and below, please check out the `Migration Guide <MIGRATING_FROM_OLDER_VERSIONS.rst>`_.
+
+Version `x.x.x` will introduce a backwards incompatible installation method with regards to the cloud dependencies. A migration path to minimize breaking
+was introduced in version `x.x.x`. If you want to maintain backwards compatibility (installing all dependencies) install this package via `smart_open[all]` now
+and once the change is made you should not have any issues. If all you care about is AWS dependencies for example you can install via `smart_open[aws]` and
+once the dependency change is made you will simply drop the unwanted dependencies.
 
 
 Built-in help
