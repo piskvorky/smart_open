@@ -9,8 +9,9 @@
 
 import io
 import logging
+import sys
 
-from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobServiceClient, StorageStreamDownloader
 from azure.core.exceptions import ResourceNotFoundError
 import six
 
@@ -22,7 +23,7 @@ _READ_BINARY = 'rb'
 _WRITE_BINARY = 'wb'
 
 _BINARY_TYPES = (six.binary_type, bytearray)
-"""Allowed binary buffer types for writing to the underlying GCS stream"""
+"""Allowed binary buffer types for writing to the underlying Azure Storage Blob stream"""
 
 SUPPORTED_SCHEME = "asb"
 """Supported scheme for Azure Storage Blob in smart_open endpoint URL"""
@@ -119,15 +120,21 @@ class _SeekableRawReader(object):
         return binary
 
     def _download_blob_chunk(self, size):
-        start = position = self._position
+        position = self._position
         if position == self._size:
             #
             # When reading, we can't seek to the first byte of an empty file.
             # Similarly, we can't seek past the last byte.  Do nothing here.
             #
-            binary = b''
+            return b''
         elif size == -1:
-            binary = self._blob.download_blob().readall()
+            stream = self._blob.download_blob(offset=position)
+        else:
+            stream = self._blob.download_blob(offset=position, length=size)
+        if isinstance(stream, StorageStreamDownloader):
+            binary = stream.readall()
+        else:
+            binary = stream.read()
         return binary
 
 class SeekableBufferedInputBase(io.BufferedIOBase):
@@ -153,7 +160,10 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         self._blob = container_client.get_blob_client(blob)
         if self._blob is None:
             raise ResourceNotFoundError('blob {} not found in {}'.format(blob, container))
-        self._size = self._blob.get_blob_properties().size if self._blob.get_blob_properties().size is not None else 0
+        try:
+            self._size = self._blob.get_blob_properties()['size']
+        except:
+            self._size = 0
 
         self._raw_reader = _SeekableRawReader(self._blob, self._size)
         self._current_pos = 0
@@ -388,7 +398,7 @@ class BufferedOutputBase(io.BufferedIOBase):
     def __enter__(self):
         return self
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
     def __str__(self):

@@ -565,6 +565,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
         self.assertEqual(fin.read(5), b'hello')
         seek = fin.seek(1, whence=smart_open.gcs.CURRENT)
+        print(seek, fin.tell())
         self.assertEqual(seek, 6)
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
