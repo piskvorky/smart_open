@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 #
+# Copyright (C) 2016 Radim Rehurek <radim@rare-technologies.com>
 # Copyright (C) 2020 Nicolas Mitchell <ncls.mitchell@gmail.com>
 #
 # This code is distributed under the terms and conditions
@@ -76,7 +77,7 @@ def open(
 
     """
     if mode == _READ_BINARY:
-        return SeekableBufferedInputBase(
+        return Reader(
             bucket_id,
             blob_id,
             buffer_size=buffer_size,
@@ -84,16 +85,16 @@ def open(
             client=client,
         )
     elif mode == _WRITE_BINARY:
-        return BufferedOutputBase(
+        return Writer(
             bucket_id,
             blob_id,
             client=client,
         )
     else:
-        raise NotImplementedError('GCS support for mode %r not implemented' % mode)
+        raise NotImplementedError('Azure Storage Blob support for mode %r not implemented' % mode)
 
 
-class _SeekableRawReader(object):
+class _RawReader(object):
     """Read an Azure Storage Blob file."""
 
     def __init__(self, asb_blob, size):
@@ -138,7 +139,7 @@ class _SeekableRawReader(object):
         return binary
 
 
-class SeekableBufferedInputBase(io.BufferedIOBase):
+class Reader(io.BufferedIOBase):
     """Reads bytes from Azure Blob Storage.
 
     Implements the io.BufferedIOBase interface of the standard library.
@@ -166,7 +167,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         except:
             self._size = 0
 
-        self._raw_reader = _SeekableRawReader(self._blob, self._size)
+        self._raw_reader = _RawReader(self._blob, self._size)
         self._current_pos = 0
         self._current_part_size = buffer_size
         self._current_part = smart_open.bytebuffer.ByteBuffer(buffer_size)
@@ -329,7 +330,7 @@ class SeekableBufferedInputBase(io.BufferedIOBase):
         )
 
 
-class BufferedOutputBase(io.BufferedIOBase):
+class Writer(io.BufferedIOBase):
     """Writes bytes to Azure Storage Blob.
 
     Implements the io.BufferedIOBase interface of the standard library."""

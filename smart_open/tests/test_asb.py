@@ -305,7 +305,7 @@ def tearDownModule():  # noqa
         pass
 
 
-class SeekableBufferedInputBaseTest(unittest.TestCase):
+class ReaderTest(unittest.TestCase):
 
     def tearDown(self):
         cleanup_container()
@@ -316,7 +316,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         put_to_container(contents=expected)
 
         # connect to fake Azure Storage Blob and read from the fake key we filled above
-        fin = smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
+        fin = smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
         output = [line.rstrip(b'\n') for line in fin]
         self.assertEqual(output, expected.split(b'\n'))
 
@@ -324,7 +324,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         # same thing but using a context manager
         expected = u"hello wořld\nhow are you?".encode('utf8')
         put_to_container(contents=expected)
-        with smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
+        with smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
             output = [line.rstrip(b'\n') for line in fin]
             self.assertEqual(output, expected.split(b'\n'))
 
@@ -334,7 +334,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         put_to_container(contents=content)
         logger.debug('content: %r len: %r', content, len(content))
 
-        fin = smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
+        fin = smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
         self.assertEqual(content[14:], fin.read())  # read the rest
@@ -344,7 +344,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_container(contents=content)
 
-        fin = smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
+        fin = smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
 
@@ -359,7 +359,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_container(contents=content)
 
-        fin = smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
+        fin = smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
         seek = fin.seek(6)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.tell(), 6)
@@ -370,7 +370,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_container(contents=content)
 
-        fin = smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
+        fin = smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
         self.assertEqual(fin.read(5), b'hello')
         seek = fin.seek(1, whence=smart_open.asb.CURRENT)
         self.assertEqual(seek, 6)
@@ -381,7 +381,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_container(contents=content)
 
-        fin = smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
+        fin = smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
         seek = fin.seek(-4, whence=smart_open.asb.END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
@@ -390,7 +390,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_container(contents=content)
 
-        fin = smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
+        fin = smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(content))
@@ -408,7 +408,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         #
         # Make sure we're reading things correctly.
         #
-        with smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
+        with smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
             self.assertEqual(fin.read(), buf.getvalue())
 
         #
@@ -419,7 +419,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
             self.assertEqual(zipfile.read(), expected)
 
         logger.debug('starting actual test')
-        with smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
+        with smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
@@ -429,7 +429,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_container(contents=content)
 
-        with smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
+        with smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
             fin.readline()
             self.assertEqual(fin.tell(), content.index(b'\n')+1)
 
@@ -444,7 +444,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_container(contents=content)
 
-        with smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client, buffer_size=8) as fin:
+        with smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client, buffer_size=8) as fin:
             actual = list(fin)
 
         expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
@@ -454,7 +454,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_container(contents=content)
 
-        with smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
+        with smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
             data = fin.read(0)
 
         self.assertEqual(data, b'')
@@ -463,13 +463,13 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_container(contents=content)
 
-        with smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
+        with smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
             data = fin.read(100)
 
         self.assertEqual(data, content)
 
 
-class BufferedOutputBaseTest(unittest.TestCase):
+class WriterTest(unittest.TestCase):
     """
     Test writing into asb files.
 
@@ -482,7 +482,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
         """Does writing into Azure Storage Blob work correctly?"""
         test_string = u"žluťoučký koníček".encode('utf8')
 
-        with smart_open.asb.BufferedOutputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fout:
+        with smart_open.asb.Writer(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fout:
             fout.write(test_string)
 
         output = list(smart_open.open("asb://{}/{}".format(CONTAINER_NAME, BLOB_NAME), "rb", transport_params=dict(client=test_blob_service_client)))
@@ -492,7 +492,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
     def test_write_01a(self):
         """Does Azure Storage Blob write fail on incorrect input?"""
         try:
-            with smart_open.asb.BufferedOutputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
+            with smart_open.asb.Writer(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
                 fin.write(None)
         except TypeError:
             pass
@@ -501,7 +501,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_02(self):
         """Does Azure Storage Blob write unicode-utf8 conversion work?"""
-        smart_open_write = smart_open.asb.BufferedOutputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
+        smart_open_write = smart_open.asb.Writer(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
         smart_open_write.tell()
         logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
@@ -510,7 +510,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_03(self):
         """Does writing no data cause key with an empty value to be created?"""
-        smart_open_write = smart_open.asb.BufferedOutputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
+        smart_open_write = smart_open.asb.Writer(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
         with smart_open_write as fout:  # noqa
             pass
 
@@ -525,10 +525,10 @@ class BufferedOutputBaseTest(unittest.TestCase):
         with gzip.GzipFile(fileobj=file, mode='w') as zipfile:
             zipfile.write(expected)
         file.seek(0)
-        with smart_open.asb.BufferedOutputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fout:
+        with smart_open.asb.Writer(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fout:
             fout.write(file.read())
 
-        with smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
+        with smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
