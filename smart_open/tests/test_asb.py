@@ -240,7 +240,6 @@ class FakeBlobServiceClientTest(unittest.TestCase):
         with self.assertRaises(ResourceNotFoundError):
             self.blob_service_client.get_container_client(container_name)
 
-# DISABLE_MOCKS = 1
 
 if DISABLE_MOCKS:
     """If mocks are disabled, allow to use the Azurite local Azure Storage API
@@ -249,8 +248,7 @@ if DISABLE_MOCKS:
     docker run -p 10000:10000 -p 10001:10001 mcr.microsoft.com/azure-storage/azurite
     """
     # use Azurite default connection string
-    # CONNECT_STR = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;'
-    CONNECT_STR = 'DefaultEndpointsProtocol=https;AccountName=smartopen;AccountKey=ifdDXdXjze8YVFw15jALavf3A32QGKXgU9iojocZ5o4DYIfdBN7KvoXquuLI64zmlhEcbkPiAEYRRBwxLDbqGw==;EndpointSuffix=core.windows.net'
+    CONNECT_STR = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;'
     test_blob_service_client = BlobServiceClient.from_connection_string(CONNECT_STR)
 else:
     test_blob_service_client = FakeBlobServiceClient()
@@ -523,9 +521,12 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_gzip(self):
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
+        file = io.BytesIO()
+        with gzip.GzipFile(fileobj=file, mode='w') as zipfile:
+            zipfile.write(expected)
+        file.seek(0)
         with smart_open.asb.BufferedOutputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fout:
-            with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
-                zipfile.write(expected)
+            fout.write(file.read())
 
         with smart_open.asb.SeekableBufferedInputBase(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:

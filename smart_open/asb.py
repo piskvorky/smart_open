@@ -137,6 +137,7 @@ class _SeekableRawReader(object):
             binary = stream.read()
         return binary
 
+
 class SeekableBufferedInputBase(io.BufferedIOBase):
     """Reads bytes from Azure Blob Storage.
 
@@ -389,7 +390,6 @@ class BufferedOutputBase(io.BufferedIOBase):
 
         if not isinstance(b, _BINARY_TYPES):
             raise TypeError("input must be one of %r, got: %r" % (_BINARY_TYPES, type(b)))
-
         self._total_size += len(b)
         self._blob.upload_blob(b)
 
