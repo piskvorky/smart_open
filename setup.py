@@ -49,6 +49,7 @@ tests_require = [
     'parameterizedtestcase',
     'pytest',
     'pytest-rerunfailures',
+    'pytest-cov'
 ]
 
 install_requires = [
