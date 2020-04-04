@@ -11,7 +11,6 @@ import io
 import functools
 import logging
 import time
-import urllib.parse
 
 import boto
 import boto3
@@ -47,28 +46,6 @@ _UPLOAD_ATTEMPTS = 6
 _SLEEP_SECONDS = 10
 
 
-def _safe_urlsplit(url):
-    """This is a hack to prevent the regular urlsplit from splitting around question marks.
-
-    A question mark (?) in a URL typically indicates the start of a
-    querystring, and the standard library's urlparse function handles the
-    querystring separately.  Unfortunately, question marks can also appear
-    _inside_ the actual URL for some schemas like S3.
-
-    Replaces question marks with newlines prior to splitting.  This is safe because:
-
-    1. The standard library's urlsplit completely ignores newlines
-    2. Raw newlines will never occur in innocuous URLs.  They are always URL-encoded.
-
-    See Also
-    --------
-    https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
-    https://github.com/RaRe-Technologies/smart_open/issues/285
-    """
-    sr = urllib.parse.urlsplit(url.replace('?', '\n'), allow_fragments=False)
-    return urllib.parse.SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
-
-
 def parse_uri(uri_as_string):
     #
     # Restrictions on bucket names and labels:
@@ -82,7 +59,7 @@ def parse_uri(uri_as_string):
     # We use the above as a guide only, and do not perform any validation.  We
     # let boto3 take care of that for us.
     #
-    split_uri = _safe_urlsplit(uri_as_string)
+    split_uri = smart_open.utils.safe_urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
 
     port = DEFAULT_PORT
