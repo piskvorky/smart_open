@@ -18,7 +18,7 @@ What?
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
-**Python 2.7 is no longer supported.  If you need Python 2.7 support, please use [smart_open version 1.10.0](https://github.com/RaRe-Technologies/smart_open/releases/tag/1.10.0).**
+**Python 2.7 is no longer supported. If you need Python 2.7 support, please use `smart_open 1.10.0 <https://github.com/RaRe-Technologies/smart_open/releases/tag/1.10.0>`_, the last version to support Python 2.**
 
 Why?
 ====
