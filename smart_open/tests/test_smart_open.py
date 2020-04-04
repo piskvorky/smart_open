@@ -179,6 +179,12 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, None)
         self.assertEqual(parsed_uri.access_secret, None)
 
+    def test_s3_uri_contains_question_mark(self):
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey?param")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "mydir/mykey?param")
+
     def test_host_and_port(self):
         as_string = 's3u://user:secret@host:1234@mybucket/mykey.txt'
         uri = smart_open_lib._parse_uri(as_string)
@@ -286,6 +292,12 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "gs")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
+
+    def test_gs_uri_contains_question_mark(self):
+        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob?param")
+        self.assertEqual(parsed_uri.scheme, "gs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "mydir/myblob?param")
 
     def test_pathlib_monkeypatch(self):
         from smart_open.smart_open_lib import pathlib
