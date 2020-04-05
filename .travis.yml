@@ -28,10 +28,10 @@ jobs:
     - python: '3.8'
       env:
         - BOTO_CONFIG: "/dev/null"
-        - TOXENV: "check_keys,py38-doctest,py38-test,py38-integration,coverage"
+        - TOXENV: "check_keys,py38-doctest,py38-test,py38-integration,coveralls"
 
 install:
-  - pip install tox coveralls
+  - pip install tox
 
 script:
   - tox -vv
