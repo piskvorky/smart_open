@@ -31,9 +31,13 @@ jobs:
         - TOXENV: "check_keys,py38-doctest,py38-test,py38-integration"
 
 install:
-  - pip install tox
+  - pip install tox coveralls
 
-script: tox -vv
+script:
+  - tox -vv
+
+after_success:
+  - coveralls
 
 cache:
   directories:
