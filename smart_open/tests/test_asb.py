@@ -4,7 +4,6 @@
 # from the MIT License (MIT).
 #
 import gzip
-import inspect
 import io
 import logging
 import os
@@ -15,13 +14,11 @@ try:
     from unittest import mock
 except ImportError:
     import mock
-import warnings
 from collections import OrderedDict
 
-from azure.storage.blob import BlobServiceClient
-from azure.common import AzureHttpError
-from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
-import six
+import azure.storage.blob
+import azure.common
+import azure.core.exceptions
 
 import smart_open
 
@@ -107,7 +104,7 @@ class FakeContainerClient(object):
 
     def download_blob(self, blob):
         if blob.name not in list(self.__blob_clients.keys()):
-            raise ResourceNotFoundError('The specified blob does not exist.')
+            raise azure.core.exceptions.ResourceNotFoundError('The specified blob does not exist.')
         blob_client = self.__blob_clients[blob.name]
         blob_content = blob_client.download_blob()
         return blob_content
@@ -137,7 +134,7 @@ class FakeContainerClientTest(unittest.TestCase):
 
     def test_nonexistent_blob(self):
         blob_client = self.container_client.get_blob_client('test-blob.txt')
-        with self.assertRaises(ResourceNotFoundError):
+        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
             self.container_client.download_blob(blob_client)
 
     def test_delete_blob(self):
@@ -162,7 +159,7 @@ class FakeContainerClientTest(unittest.TestCase):
         container_client = self.blob_service_client.create_container(container_name)
         self.assertEqual(self.blob_service_client.get_container_client(container_name).name, container_name)
         container_client.delete_container()
-        with self.assertRaises(ResourceNotFoundError):
+        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
             self.blob_service_client.get_container_client(container_name)
 
     def test_list_blobs(self):
@@ -192,7 +189,7 @@ class FakeBlobServiceClient(object):
 
     def create_container(self, container_name, metadata=None):
         if container_name in self.__container_clients:
-            raise ResourceExistsError('The specified container already exists.')
+            raise azure.core.exceptions.ResourceExistsError('The specified container already exists.')
         container_client = FakeContainerClient(self, container_name)
         if metadata is not None:
             container_client.create_container(metadata)
@@ -209,7 +206,7 @@ class FakeBlobServiceClient(object):
 
     def get_container_client(self, container):
         if container not in self.__container_clients:
-            raise ResourceNotFoundError('The specified container does not exist.')
+            raise azure.core.exceptions.ResourceNotFoundError('The specified container does not exist.')
         return self.__container_clients[container]
 
 
@@ -218,7 +215,7 @@ class FakeBlobServiceClientTest(unittest.TestCase):
         self.blob_service_client = FakeBlobServiceClient()
 
     def test_nonexistent_container(self):
-        with self.assertRaises(ResourceNotFoundError):
+        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
             self.blob_service_client.get_container_client('test-container')
 
     def test_create_container(self):
@@ -230,14 +227,14 @@ class FakeBlobServiceClientTest(unittest.TestCase):
     def test_duplicate_container(self):
         container_name = 'test-container'
         self.blob_service_client.create_container(container_name)
-        with self.assertRaises(ResourceExistsError):
+        with self.assertRaises(azure.core.exceptions.ResourceExistsError):
             self.blob_service_client.create_container(container_name)
 
     def test_delete_container(self):
         container_name = 'test_container'
         self.blob_service_client.create_container(container_name)
         self.blob_service_client.delete_container(container_name)
-        with self.assertRaises(ResourceNotFoundError):
+        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
             self.blob_service_client.get_container_client(container_name)
 
 
@@ -249,7 +246,7 @@ if DISABLE_MOCKS:
     """
     # use Azurite default connection string
     CONNECT_STR = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;'
-    test_blob_service_client = BlobServiceClient.from_connection_string(CONNECT_STR)
+    test_blob_service_client = azure.storage.blob.BlobServiceClient.from_connection_string(CONNECT_STR)
 else:
     test_blob_service_client = FakeBlobServiceClient()
 
@@ -281,7 +278,7 @@ def put_to_container(contents, num_attempts=12, sleep_time=5):
             container_client = get_container_client()
             container_client.upload_blob(BLOB_NAME, contents)
             return
-        except AzureHttpError as err:
+        except azure.common.AzureHttpError as err:
             logger.error('caught %r, retrying', err)
             time.sleep(sleep_time)
 
@@ -301,7 +298,7 @@ def tearDownModule():  # noqa
     try:
         container_client = get_container_client()
         container_client.delete_container()
-    except AzureHttpError:
+    except azure.common.AzureHttpError:
         pass
 
 
@@ -543,7 +540,7 @@ class WriterTest(unittest.TestCase):
 
     def test_nonexisting_container(self):
         expected = u"выйду ночью в поле с конём".encode('utf-8')
-        with self.assertRaises(ResourceNotFoundError):
+        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
             with smart_open.asb.open('thiscontainerdoesntexist', 'mykey', 'wb', client=test_blob_service_client) as fout:
                 fout.write(expected)
 

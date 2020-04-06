@@ -11,8 +11,8 @@
 import io
 import logging
 
-from azure.storage.blob import BlobServiceClient, StorageStreamDownloader
-from azure.core.exceptions import ResourceNotFoundError
+import azure.storage.blob
+import azure.core.exceptions
 import six
 
 import smart_open.bytebuffer
@@ -57,7 +57,7 @@ def open(
         blob_id,
         mode,
         buffer_size=DEFAULT_BUFFER_SIZE,
-        client=None,  # type: azure.storage.blob.BlobServiceClient
+        client=None,  # type: azure.storage.blob.azure.storage.blob.BlobServiceClient
         ):
     """Open an Azure Storage Blob blob for reading or writing.
 
@@ -71,7 +71,7 @@ def open(
         The mode for opening the object.  Must be either "rb" or "wb".
     buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
-    client: azure.storage.blob.BlobServiceClient, optional
+    client: azure.storage.blob.azure.storage.blob.BlobServiceClient, optional
         The Azure Storage Blob client to use when working with azure-storage-blob.
 
     """
@@ -131,7 +131,7 @@ class _RawReader(object):
             stream = self._blob.download_blob(offset=position)
         else:
             stream = self._blob.download_blob(offset=position, length=size)
-        if isinstance(stream, StorageStreamDownloader):
+        if isinstance(stream, azure.storage.blob.StorageStreamDownloader):
             binary = stream.readall()
         else:
             binary = stream.read()
@@ -143,7 +143,7 @@ class Reader(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library.
 
-    :raises ResourceNotFoundError: Raised when the blob to read from does not exist.
+    :raises azure.core.exceptions.ResourceNotFoundError: Raised when the blob to read from does not exist.
 
     """
     def __init__(
@@ -155,12 +155,12 @@ class Reader(io.BufferedIOBase):
             client=None,  # type: azure.storage.blob.BlobServiceClient
     ):
         if client is None:
-            client = BlobServiceClient()
+            client = azure.storage.blob.BlobServiceClient()
         container_client = client.get_container_client(container)  # type: azure.storage.blob.ContainerClient
 
         self._blob = container_client.get_blob_client(blob)
         if self._blob is None:
-            raise ResourceNotFoundError('blob {} not found in {}'.format(blob, container))
+            raise azure.core.exceptions.ResourceNotFoundError('blob {} not found in {}'.format(blob, container))
         try:
             self._size = self._blob.get_blob_properties()['size']
         except:
@@ -341,7 +341,7 @@ class Writer(io.BufferedIOBase):
             client=None,  # type: azure.storage.blob.BlobServiceClient
     ):
         if client is None:
-            client = BlobServiceClient()
+            client = azure.storage.blob.BlobServiceClient()
         self._client = client
         self._container_client = self._client.get_container_client(container)  # type: azure.storage.blob.ContainerClient
         self._blob = self._container_client.get_blob_client(blob)  # type: azure.storage.blob.BlobClient
