@@ -921,6 +921,19 @@ def _accept_all(key):
     return True
 
 
+def s3_iter_bucket(
+        bucket_name,
+        prefix='',
+        accept_key=None,
+        key_limit=None,
+        workers=16,
+        retries=3,
+        **session_kwargs):
+    warnings.warn("'smart_open.s3_iter_bucket' path deprecated. Use 'smart_open.s3.iter_bucket' instead.",
+                  DeprecationWarning)
+    yield iter_bucket(bucket_name, prefix, accept_key, key_limit, workers, retries, **session_kwargs)
+
+
 def iter_bucket(
         bucket_name,
         prefix='',
