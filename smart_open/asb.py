@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2016 Radim Rehurek <radim@rare-technologies.com>
+# Copyright (C) 2020 Radim Rehurek <radim@rare-technologies.com>
 # Copyright (C) 2020 Nicolas Mitchell <ncls.mitchell@gmail.com>
 #
 # This code is distributed under the terms and conditions
@@ -10,7 +10,6 @@
 
 import io
 import logging
-import sys
 
 from azure.storage.blob import BlobServiceClient, StorageStreamDownloader
 from azure.core.exceptions import ResourceNotFoundError
