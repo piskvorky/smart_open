@@ -13,14 +13,13 @@ import logging
 
 import azure.storage.blob
 import azure.core.exceptions
-import six
 
 import smart_open.bytebuffer
 import smart_open.constants
 
 logger = logging.getLogger(__name__)
 
-_BINARY_TYPES = (six.binary_type, bytearray)
+_BINARY_TYPES = (bytes, bytearray, memoryview)
 """Allowed binary buffer types for writing to the underlying Azure Storage Blob stream"""
 
 SCHEME = "asb"
