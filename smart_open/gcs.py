@@ -7,23 +7,13 @@
 #
 
 """Implements file-like objects for reading and writing to/from GCS."""
-import sys
-import warnings
-warnings.warn(
-    "Please install via smart_open[gcs] as we will be dropping cloud dependency installs by default",
-    DeprecationWarning
-)
 
 import io
 import logging
 
-try:
-    import google.cloud.exceptions
-    import google.cloud.storage
-    import google.auth.transport.requests
-except ImportError:
-    sys.stderr.write("Install via smart_open[gcs] or smart_open[all] to use this module")
-    raise
+import google.cloud.exceptions
+import google.cloud.storage
+import google.auth.transport.requests
 
 import smart_open.bytebuffer
 import smart_open.utils

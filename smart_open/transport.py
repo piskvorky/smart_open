@@ -12,6 +12,7 @@ The main entrypoint is :func:`get_transport`.  See also :file:`extending.md`.
 """
 import importlib
 import logging
+import warnings
 
 import smart_open.local_file
 
@@ -65,6 +66,17 @@ def get_transport(scheme):
 
     """
     message = "scheme %r is not supported, expected one of %r" % (scheme, SUPPORTED_SCHEMES)
+
+    if scheme in {"s3", "s3n", "s3u", "s3a"}:
+        warnings.warn(
+            "Installing cloud dependencies by default will be deprecated. Install via smart_tools[aws] for AWS support.",
+            DeprecationWarning
+        )
+    elif scheme in {"gc"}:
+        warnings.warn(
+            "Installing cloud dependencies by default will be deprecated. Install via smart_tools[gcs] for GCS support.",
+            DeprecationWarning
+        )
 
     try:
         submodule = _REGISTRY[scheme]
