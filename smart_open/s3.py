@@ -12,6 +12,7 @@ import io
 import functools
 import logging
 import time
+import warnings
 
 try:
     import boto
