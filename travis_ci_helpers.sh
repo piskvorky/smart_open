@@ -3,7 +3,7 @@
 set -e
 set -x
 
-export PYTEST_ADDOPTS=--reruns 3 --reruns-delay 1
+export PYTEST_ADDOPTS="--reruns 3 --reruns-delay 1"
 
 
 is_travis_secure_vars_available(){
