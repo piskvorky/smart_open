@@ -93,7 +93,7 @@ setup(
         'test': tests_require,
         'aws': aws_deps,
         'gcp': gcp_deps,
-        'all': all_deps
+        'all': all_deps,
     },
 
     test_suite="smart_open.tests",
