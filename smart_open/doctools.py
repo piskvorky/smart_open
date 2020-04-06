@@ -215,16 +215,18 @@ def tweak_open_docstring(f):
 
 def tweak_parse_uri_docstring(f):
     buf = io.StringIO()
-    schemes = set()
-    examples = set()
+    seen = set()
+    schemes = []
+    examples = []
 
     for scheme, submodule in sorted(transport._REGISTRY.items()):
-        if scheme == transport.NO_SCHEME:
+        if scheme == transport.NO_SCHEME or submodule in seen:
             continue
+        schemes.append(scheme)
+        seen.add(submodule)
 
-        schemes.add(scheme)
         try:
-            examples |= set(submodule.URI_EXAMPLES)
+            examples.extend(submodule.URI_EXAMPLES)
         except AttributeError:
             pass
 

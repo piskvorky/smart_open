@@ -20,6 +20,8 @@ DESCRIPTION
 PACKAGE CONTENTS
     bytebuffer
     compression
+    concurrency
+    constants
     doctools
     gcs
     hdfs
@@ -85,9 +87,11 @@ FUNCTIONS
         
         file (smart_open/local_file.py)
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements the transport for the file:// schema.
         
         gs (smart_open/gcs.py)
         ~~~~~~~~~~~~~~~~~~~~~~
+        Implements file-like objects for reading and writing to/from GCS.
         
         buffer_size: int, optional
             The buffer size to use when performing I/O. For reading only.
@@ -98,9 +102,11 @@ FUNCTIONS
         
         hdfs (smart_open/hdfs.py)
         ~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements reading and writing to/from HDFS.
         
         http (smart_open/http.py)
         ~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements file-like objects for reading from http.
         
         kerberos: boolean, optional
             If True, will attempt to use the local Kerberos credentials
@@ -115,6 +121,7 @@ FUNCTIONS
         
         s3 (smart_open/s3.py)
         ~~~~~~~~~~~~~~~~~~~~~
+        Implements file-like objects for reading and writing from/to AWS S3.
         
         buffer_size: int, optional
             The buffer size to use when performing I/O.
@@ -146,6 +153,7 @@ FUNCTIONS
         
         scp (smart_open/ssh.py)
         ~~~~~~~~~~~~~~~~~~~~~~~
+        Implements I/O streams over SSH.
         
         mode: str, optional
             The mode to use for opening the file.
@@ -163,6 +171,7 @@ FUNCTIONS
         
         webhdfs (smart_open/webhdfs.py)
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements reading and writing to/from WebHDFS.
         
         min_part_size: int, optional
             For writing only.
@@ -237,40 +246,34 @@ FUNCTIONS
         
         Notes
         -----
-        
-        
         Supported URI schemes are:
         
+        * file
+        * gs
         * hdfs
-        * s3u
         * http
         * s3
-        * gs
-        * s3n
-        * ssh
-        * webhdfs
         * scp
-        * sftp
-        * https
-        * file
-        * s3a
+        * webhdfs
         
         Valid URI examples::
         
-        * [ssh|scp|sftp]://username@host/path/file
-        * s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
-        * ./local/path/file.gz
-        * ~/local/path/file
-        * hdfs:///path/file
-        * file:///home/user/file.bz2
-        * s3://my_bucket/my_key
         * ./local/path/file
-        * [ssh|scp|sftp]://username@host//path/file
+        * ~/local/path/file
         * local/path/file
-        * s3://my_key:my_secret@my_bucket/my_key
-        * webhdfs://host:port/path/file
+        * ./local/path/file.gz
         * file:///home/user/file
+        * file:///home/user/file.bz2
+        * hdfs:///path/file
         * hdfs://path/file
+        * s3://my_bucket/my_key
+        * s3://my_key:my_secret@my_bucket/my_key
+        * s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
+        * ssh://username@host/path/file
+        * ssh://username@host//path/file
+        * scp://username@host/path/file
+        * sftp://username@host/path/file
+        * webhdfs://host:port/path/file
     
     register_compressor(ext, callback)
         Register a callback for transparently decompressing files with a specific extension.
