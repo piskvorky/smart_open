@@ -15,6 +15,10 @@ import inspect
 import io
 import os.path
 import re
+import warnings
+
+from . import compression
+from . import transport
 
 
 def extract_kwargs(docstring):
@@ -73,8 +77,12 @@ def extract_kwargs(docstring):
     # 1. Find the underlined 'Parameters' section
     # 2. Once there, continue parsing parameters until we hit an empty line
     #
-    while lines[0] != 'Parameters':
+    while lines and lines[0] != 'Parameters':
         lines.pop(0)
+
+    if not lines:
+        return []
+
     lines.pop(0)
     lines.pop(0)
 
@@ -156,3 +164,56 @@ def extract_examples_from_readme_rst(indent='    '):
         return ''.join([indent + re.sub('^  ', '', l) for l in lines])
     except Exception:
         return indent + 'See README.rst'
+
+
+def tweak_docstrings(open_function, parse_uri_function):
+    #
+    # The docstring can be None if -OO was passed to the interpreter.
+    #
+    if not (open_function.__doc__ and parse_uri_function.__doc__):
+        warnings.warn(
+            'docstrings for smart_open function are missing, '
+            'see https://github.com/RaRe-Technologies/smart_open'
+            '/blob/master/README.rst if you need documentation'
+        )
+        return
+
+    substrings = {}
+    schemes = io.StringIO()
+    seen_examples = set()
+    uri_examples = io.StringIO()
+
+    for scheme, submodule in sorted(transport._REGISTRY.items()):
+        if scheme == transport.NO_SCHEME:
+            continue
+
+        schemes.write('    * %s\n' % scheme)
+
+        try:
+            fn = submodule.open
+        except AttributeError:
+            substrings[scheme] = ''
+        else:
+            kwargs = extract_kwargs(fn.__doc__)
+            substrings[scheme] = to_docstring(kwargs, lpad=u'    ')
+
+        try:
+            examples = submodule.URI_EXAMPLES
+        except AttributeError:
+            continue
+        else:
+            for e in examples:
+                if e not in seen_examples:
+                    uri_examples.write('    * %s\n' % e)
+                seen_examples.add(e)
+
+    substrings['codecs'] = '\n'.join(
+        ['    * %s' % e for e in compression.get_supported_extensions()]
+    )
+    substrings['examples'] = extract_examples_from_readme_rst()
+
+    open_function.__doc__ = open_function.__doc__ % substrings
+    parse_uri_function.__doc__ = parse_uri_function.__doc__ % dict(
+        schemes=schemes.getvalue(),
+        uri_examples=uri_examples.getvalue(),
+    )

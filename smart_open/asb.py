@@ -16,16 +16,14 @@ import azure.core.exceptions
 import six
 
 import smart_open.bytebuffer
+import smart_open.constants
 
 logger = logging.getLogger(__name__)
-
-_READ_BINARY = 'rb'
-_WRITE_BINARY = 'wb'
 
 _BINARY_TYPES = (six.binary_type, bytearray)
 """Allowed binary buffer types for writing to the underlying Azure Storage Blob stream"""
 
-SUPPORTED_SCHEME = "asb"
+SCHEME = "asb"
 """Supported scheme for Azure Storage Blob in smart_open endpoint URL"""
 
 _MIN_MIN_PART_SIZE = _REQUIRED_CHUNK_MULTIPLE = 4 * 1024**2
@@ -39,21 +37,23 @@ DEFAULT_BUFFER_SIZE = 4 * 1024**2
 https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs
 """
 
-START = 0
-"""Seek to the absolute start of an Azure Storage Blob file"""
 
-CURRENT = 1
-"""Seek relative to the current positive of an Azure Storage Blob file"""
+def parse_uri(uri_as_string):
+    sr = smart_open.utils.safe_urlsplit(uri_as_string)
+    assert sr.scheme == SCHEME
+    container_id = sr.netloc
+    blob_id = sr.path.lstrip('/')
+    return dict(scheme=SCHEME, container_id=container_id, blob_id=blob_id)
 
-END = 2
-"""Seek relative to the end of an Azure Storage Blob file"""
 
-_WHENCE_CHOICES = (START, CURRENT, END)
+def open_uri(uri, mode, transport_params):
+    parsed_uri = parse_uri(uri)
+    kwargs = smart_open.utils.check_kwargs(open, transport_params)
+    return open(parsed_uri['container_id'], parsed_uri['blob_id'], mode, **kwargs)
 
-_BINARY_NEWLINE = b'\n'
 
 def open(
-        bucket_id,
+        container_id,
         blob_id,
         mode,
         buffer_size=DEFAULT_BUFFER_SIZE,
@@ -75,17 +75,17 @@ def open(
         The Azure Storage Blob client to use when working with azure-storage-blob.
 
     """
-    if mode == _READ_BINARY:
+    if mode == smart_open.constants.READ_BINARY:
         return Reader(
-            bucket_id,
+            container_id,
             blob_id,
             buffer_size=buffer_size,
-            line_terminator=_BINARY_NEWLINE,
+            line_terminator=smart_open.constants.BINARY_NEWLINE,
             client=client,
         )
-    elif mode == _WRITE_BINARY:
+    elif mode == smart_open.constants.WRITE_BINARY:
         return Writer(
-            bucket_id,
+            container_id,
             blob_id,
             client=client,
         )
@@ -151,7 +151,7 @@ class Reader(io.BufferedIOBase):
             container,
             blob,
             buffer_size=DEFAULT_BUFFER_SIZE,
-            line_terminator=_BINARY_NEWLINE,
+            line_terminator=smart_open.constants.BINARY_NEWLINE,
             client=None,  # type: azure.storage.blob.BlobServiceClient
     ):
         if client is None:
@@ -204,7 +204,7 @@ class Reader(io.BufferedIOBase):
         """Unsupported."""
         raise io.UnsupportedOperation
 
-    def seek(self, offset, whence=START):
+    def seek(self, offset, whence=smart_open.constants.WHENCE_START):
         """Seek to the specified position.
 
         :param int offset: The offset in bytes.
@@ -212,16 +212,15 @@ class Reader(io.BufferedIOBase):
 
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
-        if whence not in _WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % _WHENCE_CHOICES)
+        if whence not in smart_open.constants.WHENCE_CHOICES:
+            raise ValueError('invalid whence, expected one of %r' % smart_open.constants.WHENCE_CHOICES)
 
-        if whence == START:
+        if whence == smart_open.constants.WHENCE_START:
             new_position = offset
-        elif whence == CURRENT:
+        elif whence == smart_open.constants.WHENCE_CURRENT:
             new_position = self._current_pos + offset
         else:
             new_position = self._size + offset
-        new_position = smart_open.s3.clamp(new_position, 0, self._size)
         self._current_pos = new_position
         self._raw_reader.seek(new_position)
         logger.debug('current_pos: %r', self._current_pos)

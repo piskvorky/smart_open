@@ -14,22 +14,35 @@ The main entry point is the :func:`~smart_open.webhdfs.open` function.
 
 import io
 import logging
+import urllib.parse
 
 import requests
-import six
-from six.moves.urllib import parse as urlparse
 
-if six.PY2:
-    import httplib
-else:
-    import http.client as httplib
+from smart_open import utils, constants
+
+import http.client as httplib
 
 logger = logging.getLogger(__name__)
 
-WEBHDFS_MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
+SCHEME = 'webhdfs'
+
+URI_EXAMPLES = (
+    'webhdfs://host:port/path/file',
+)
+
+MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 
-def open(http_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
+def parse_uri(uri_as_str):
+    return dict(scheme=SCHEME, uri=uri_as_str)
+
+
+def open_uri(uri, mode, transport_params):
+    kwargs = utils.check_kwargs(open, transport_params)
+    return open(uri, mode, **kwargs)
+
+
+def open(http_uri, mode, min_part_size=MIN_PART_SIZE):
     """
     Parameters
     ----------
@@ -39,35 +52,49 @@ def open(http_uri, mode, min_part_size=WEBHDFS_MIN_PART_SIZE):
         For writing only.
 
     """
-    if mode == 'rb':
-        return BufferedInputBase(http_uri)
-    elif mode == 'wb':
-        return BufferedOutputBase(http_uri, min_part_size=min_part_size)
+    if http_uri.startswith(SCHEME):
+        http_uri = _convert_to_http_uri(http_uri)
+
+    if mode == constants.READ_BINARY:
+        fobj = BufferedInputBase(http_uri)
+    elif mode == constants.WRITE_BINARY:
+        fobj = BufferedOutputBase(http_uri, min_part_size=min_part_size)
     else:
         raise NotImplementedError("webhdfs support for mode %r not implemented" % mode)
 
+    fobj.name = http_uri.split('/')[-1]
+    return fobj
 
-def convert_to_http_uri(parsed_uri):
+
+def _convert_to_http_uri(webhdfs_url):
     """
     Convert webhdfs uri to http url and return it as text
 
     Parameters
     ----------
-    parsed_uri: str
-        result of urlsplit of webhdfs url
+    webhdfs_url: str
+        A URL starting with webhdfs://
     """
-    netloc = parsed_uri.hostname
-    if parsed_uri.port:
-        netloc += ":{}".format(parsed_uri.port)
-    query = parsed_uri.query
-    if parsed_uri.username:
+    split_uri = urllib.parse.urlsplit(webhdfs_url)
+    netloc = split_uri.hostname
+    if split_uri.port:
+        netloc += ":{}".format(split_uri.port)
+    query = split_uri.query
+    if split_uri.username:
         query += (
-            ("&" if query else "") + "user.name=" + urlparse.quote(parsed_uri.username)
+            ("&" if query else "") + "user.name=" + urllib.parse.quote(split_uri.username)
         )
 
-    return urlparse.urlunsplit(
-        ("http", netloc, "/webhdfs/v1" + parsed_uri.path, query, "")
+    return urllib.parse.urlunsplit(
+        ("http", netloc, "/webhdfs/v1" + split_uri.path, query, "")
     )
+
+
+#
+# For old unit tests.
+#
+def convert_to_http_uri(parsed_uri):
+    return _convert_to_http_uri(parsed_uri.uri)
 
 
 class BufferedInputBase(io.BufferedIOBase):
@@ -140,7 +167,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
 
 class BufferedOutputBase(io.BufferedIOBase):
-    def __init__(self, uri, min_part_size=WEBHDFS_MIN_PART_SIZE):
+    def __init__(self, uri, min_part_size=MIN_PART_SIZE):
         """
         Parameters
         ----------
@@ -202,7 +229,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         if self._closed:
             raise ValueError("I/O operation on closed file")
 
-        if not isinstance(b, six.binary_type):
+        if not isinstance(b, bytes):
             raise TypeError("input must be a binary string")
 
         self.lines.append(b)

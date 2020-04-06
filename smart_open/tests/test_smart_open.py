@@ -19,7 +19,6 @@ import mock
 from moto import mock_s3
 import responses
 import gzip
-import six
 
 import smart_open
 from smart_open import smart_open_lib
@@ -41,7 +40,7 @@ class ParseUriTest(unittest.TestCase):
     def test_scheme(self):
         """Do URIs schemes parse correctly?"""
         # supported schemes
-        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs"):
+        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs", "asb"):
             parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
             self.assertEqual(parsed_uri.scheme, scheme)
 
@@ -180,6 +179,12 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, None)
         self.assertEqual(parsed_uri.access_secret, None)
 
+    def test_s3_uri_contains_question_mark(self):
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey?param")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "mydir/mykey?param")
+
     def test_host_and_port(self):
         as_string = 's3u://user:secret@host:1234@mybucket/mykey.txt'
         uri = smart_open_lib._parse_uri(as_string)
@@ -288,7 +293,12 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
 
-    @unittest.skipUnless(smart_open_lib.six.PY3, "our monkey patch only works on Py3")
+    def test_gs_uri_contains_question_mark(self):
+        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob?param")
+        self.assertEqual(parsed_uri.scheme, "gs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "mydir/myblob?param")
+
     def test_pathlib_monkeypatch(self):
         from smart_open.smart_open_lib import pathlib
 
@@ -305,7 +315,6 @@ class ParseUriTest(unittest.TestCase):
         _patch_pathlib(obj.old_impl)
         assert pathlib.Path.open != smart_open.open
 
-    @unittest.skipUnless(smart_open_lib.six.PY3, "our monkey patch only works on Py3")
     def test_pathlib_monkeypath_read_gz(self):
         from smart_open.smart_open_lib import pathlib
 
@@ -324,11 +333,6 @@ class ParseUriTest(unittest.TestCase):
             self.assertEqual(len(lines), 3)
         finally:
             _patch_pathlib(obj.old_impl)
-
-    @unittest.skipUnless(smart_open_lib.six.PY2, 'this test is for Py2 only')
-    def test_monkey_patch_raises_exception_py2(self):
-        with self.assertRaises(RuntimeError):
-            patch_pathlib()
 
 
 class SmartOpenHttpTest(unittest.TestCase):
@@ -399,7 +403,6 @@ class SmartOpenHttpTest(unittest.TestCase):
         # decompress the file and get the same md5 hash
         self.assertEqual(smart_open_object.read(), raw_data)
 
-    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
     def test_http_gz(self):
         """Can open gzip via http?"""
         self._test_compressed_http(".gz", False)
@@ -408,7 +411,6 @@ class SmartOpenHttpTest(unittest.TestCase):
         """Can open bzip2 via http?"""
         self._test_compressed_http(".bz2", False)
 
-    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
     def test_http_gz_query(self):
         """Can open gzip via http with a query appended to URI?"""
         self._test_compressed_http(".gz", True)
@@ -418,7 +420,7 @@ class SmartOpenHttpTest(unittest.TestCase):
         self._test_compressed_http(".bz2", True)
 
 
-def make_buffer(cls=six.BytesIO, initial_value=None, name=None, noclose=False):
+def make_buffer(cls=io.BytesIO, initial_value=None, name=None, noclose=False):
     """
     Construct a new in-memory file object aka "buf".
 
@@ -431,9 +433,6 @@ def make_buffer(cls=six.BytesIO, initial_value=None, name=None, noclose=False):
     buf = cls(initial_value) if initial_value else cls()
     if name is not None:
         buf.name = name
-    if six.PY2:
-        buf.__enter__ = lambda: buf
-        buf.__exit__ = lambda exc_type, exc_val, exc_tb: None
     if noclose:
         buf.close = lambda: None
     return buf
@@ -515,7 +514,6 @@ class SmartOpenFileObjTest(unittest.TestCase):
             sf.write(SAMPLE_BYTES)
             self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
 
-    @unittest.skipIf(six.PY2, "Python 2 does not differentiate between str and bytes")
     def test_read_text_stream_fails(self):
         """Attempts to read directly from a text stream should fail.
 
@@ -523,14 +521,13 @@ class SmartOpenFileObjTest(unittest.TestCase):
         If you have a text stream, there's no point passing it to smart_open:
         you can read from it directly.
         """
-        buf = make_buffer(six.StringIO, initial_value=SAMPLE_TEXT)
+        buf = make_buffer(io.StringIO, initial_value=SAMPLE_TEXT)
         with smart_open.smart_open(buf, 'r') as sf:
             self.assertRaises(TypeError, sf.read)  # we expect binary mode
 
-    @unittest.skipIf(six.PY2, "Python 2 does not differentiate between str and bytes")
     def test_write_text_stream_fails(self):
         """Attempts to write directly to a text stream should fail."""
-        buf = make_buffer(six.StringIO)
+        buf = make_buffer(io.StringIO)
         with smart_open.smart_open(buf, 'w') as sf:
             self.assertRaises(TypeError, sf.write, SAMPLE_TEXT)  # we expect binary mode
 
@@ -649,7 +646,6 @@ class SmartOpenReadTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(expected, actual)
 
-    @unittest.skipUnless(smart_open_lib.PATHLIB_SUPPORT, "this test requires pathlib")
     def test_open_and_read_pathlib_path(self):
         """If ``pathlib.Path`` is available we should be able to open and read."""
         from smart_open.smart_open_lib import pathlib
@@ -762,7 +758,7 @@ class SmartOpenReadTest(unittest.TestCase):
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)
 
-    @mock.patch(_IO_OPEN if six.PY2 else _BUILTIN_OPEN)
+    @mock.patch(_BUILTIN_OPEN)
     def test_file_errors(self, mock_smart_open):
         prefix = "file://"
         full_path = '/tmp/test.txt'
@@ -1003,8 +999,7 @@ class SmartOpenTest(unittest.TestCase):
         #
 
     def test_text(self):
-        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
-        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("blah", "r", encoding='utf-8') as fin:
                 self.assertEqual(fin.read(), self.as_text)
                 mock_open.assert_called_with("blah", "r", buffering=-1, encoding='utf-8')
@@ -1033,22 +1028,19 @@ class SmartOpenTest(unittest.TestCase):
 
     def test_write_utf8(self):
         # correct write mode, correct file:// URI
-        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
-        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("blah", "w", encoding='utf-8') as fout:
                 mock_open.assert_called_with("blah", "w", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
 
     def test_write_utf8_absolute_path(self):
-        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
-        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("/some/file.txt", "w", encoding='utf-8') as fout:
                 mock_open.assert_called_with("/some/file.txt", "w", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
 
     def test_append_utf8(self):
-        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
-        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("/some/file.txt", "w+", encoding='utf-8') as fout:
                 mock_open.assert_called_with("/some/file.txt", "w+", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
@@ -1326,27 +1318,11 @@ class MultistreamsBZ2Test(unittest.TestCase):
             os.unlink(test_file)
 
     def test_can_read_multistream_bz2(self):
-        if six.PY2:
-            # this is a backport from Python 3
-            from bz2file import BZ2File
-        else:
-            from bz2 import BZ2File
+        from bz2 import BZ2File
 
         test_file = self.create_temp_bz2(streams=5)
         with BZ2File(test_file) as bz2f:
             self.assertEqual(bz2f.read(), self.TEXT * 5)
-        self.cleanup_temp_bz2(test_file)
-
-    def test_python2_stdlib_bz2_cannot_read_multistream(self):
-        # Multistream bzip is included in Python 3
-        if not six.PY2:
-            return
-        import bz2
-
-        test_file = self.create_temp_bz2(streams=5)
-        bz2f = bz2.BZ2File(test_file)
-        self.assertNotEqual(bz2f.read(), self.TEXT * 5)
-        bz2f.close()
         self.cleanup_temp_bz2(test_file)
 
     def test_file_smart_open_can_read_multistream_bz2(self):

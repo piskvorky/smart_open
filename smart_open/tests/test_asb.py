@@ -21,6 +21,7 @@ import azure.common
 import azure.core.exceptions
 
 import smart_open
+import smart_open.constants
 
 CONTAINER_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
@@ -369,7 +370,7 @@ class ReaderTest(unittest.TestCase):
 
         fin = smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
         self.assertEqual(fin.read(5), b'hello')
-        seek = fin.seek(1, whence=smart_open.asb.CURRENT)
+        seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
@@ -379,7 +380,7 @@ class ReaderTest(unittest.TestCase):
         put_to_container(contents=content)
 
         fin = smart_open.asb.Reader(CONTAINER_NAME, BLOB_NAME, client=test_blob_service_client)
-        seek = fin.seek(-4, whence=smart_open.asb.END)
+        seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
 
@@ -391,7 +392,7 @@ class ReaderTest(unittest.TestCase):
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(content))
-        fin.seek(0, whence=smart_open.asb.END)
+        fin.seek(0, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(eof, fin.tell())
 
     def test_read_gzip(self):

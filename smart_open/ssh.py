@@ -24,7 +24,10 @@ Similarly, from a command line::
 
 import getpass
 import logging
+import urllib.parse
 import warnings
+
+import smart_open.utils
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,38 @@ SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""
 
 DEFAULT_PORT = 22
+
+URI_EXAMPLES = (
+    'ssh://username@host/path/file',
+    'ssh://username@host//path/file',
+    'scp://username@host/path/file',
+    'sftp://username@host/path/file',
+)
+
+
+def _unquote(text):
+    return text and urllib.parse.unquote(text)
+
+
+def parse_uri(uri_as_string):
+    split_uri = urllib.parse.urlsplit(uri_as_string)
+    assert split_uri.scheme in SCHEMES
+    return dict(
+        scheme=split_uri.scheme,
+        uri_path=_unquote(split_uri.path),
+        user=_unquote(split_uri.username),
+        host=split_uri.hostname,
+        port=int(split_uri.port or DEFAULT_PORT),
+        password=_unquote(split_uri.password),
+    )
+
+
+def open_uri(uri, mode, transport_params):
+    smart_open.utils.check_kwargs(open, transport_params)
+    parsed_uri = parse_uri(uri)
+    uri_path = parsed_uri.pop('uri_path')
+    parsed_uri.pop('scheme')
+    return open(uri_path, mode, transport_params=transport_params, **parsed_uri)
 
 
 def _connect(hostname, username, port, password, transport_params):
@@ -106,4 +141,6 @@ def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT,
 
     conn = _connect(host, user, port, password, transport_params)
     sftp_client = conn.get_transport().open_sftp_client()
-    return sftp_client.open(path, mode)
+    fobj = sftp_client.open(path, mode)
+    fobj.name = path
+    return fobj
