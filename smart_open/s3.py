@@ -6,6 +6,7 @@
 # from the MIT License (MIT).
 #
 """Implements file-like objects for reading and writing from/to S3."""
+import sys
 import warnings
 warnings.warn("Please install via smart_open[gcs] as we will be dropping cloud dependency installs by default", DeprecationWarning)
 
@@ -14,10 +15,14 @@ import functools
 import logging
 import time
 
-import boto
-import boto3
-import botocore.client
-import botocore.exceptions
+try:
+    import boto
+    import boto3
+    import botocore.client
+    import botocore.exceptions
+except ImportError:
+    sys.stderr.write("Install via smart_open[aws] to use this module")
+    sys.exit(1)
 
 import smart_open.bytebuffer
 import smart_open.concurrency
