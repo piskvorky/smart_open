@@ -20,7 +20,7 @@ import re
 from . import compression
 from . import transport
 
-PLACEHOLDER = '   smart_open/doctools.py magic goes here'
+PLACEHOLDER = '    smart_open/doctools.py magic goes here'
 
 
 def extract_kwargs(docstring):
@@ -186,8 +186,7 @@ def tweak_open_docstring(f):
             heading = '%s (%s)' % (scheme, relpath)
             print('    %s' % heading)
             print('    %s' % ('~' * len(heading)))
-            print()
-            print('    For details, see %s.' % relpath)
+            print('    %s' % submodule.__doc__.split('\n')[0])
             print()
 
             kwargs = extract_kwargs(submodule.open.__doc__)
@@ -230,7 +229,6 @@ def tweak_parse_uri_docstring(f):
             pass
 
     with contextlib.redirect_stdout(buf):
-        print()
         print('    Supported URI schemes are:')
         print()
         for scheme in schemes:

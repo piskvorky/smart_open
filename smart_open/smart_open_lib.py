@@ -84,7 +84,6 @@ def parse_uri(uri_as_string):
 
     Notes
     -----
-
     smart_open/doctools.py magic goes here
     """
     scheme = _sniff_scheme(uri_as_string)
@@ -471,4 +470,10 @@ try:
     doctools.tweak_open_docstring(open)
     doctools.tweak_parse_uri_docstring(parse_uri)
 except Exception as ex:
-    logger.critical(ex)
+    logger.error(
+        'Encountered a non-fatal error while building docstrings (see below). '
+        'help(smart_open) will provide incomplete information as a result. '
+        'For full help text, see '
+        '<https://github.com/RaRe-Technologies/smart_open/blob/master/help.txt>.'
+    )
+    logger.exception(ex)
