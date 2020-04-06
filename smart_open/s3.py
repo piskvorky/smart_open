@@ -8,7 +8,7 @@
 """Implements file-like objects for reading and writing from/to S3."""
 import sys
 import warnings
-warnings.warn("Please install via smart_open[gcs] as we will be dropping cloud dependency installs by default", DeprecationWarning)
+warnings.warn("Please install via smart_open[aws] as we will be dropping cloud dependency installs by default", DeprecationWarning)
 
 import io
 import functools
