@@ -22,6 +22,9 @@ except ImportError:
     sys.stderr.write("Install via smart_open[gcs] or smart_open[all] to use this module")
     sys.exit(1)
 
+import smart_open.transport
+smart_open.transport.register_transport('smart_open.gcs')
+
 import smart_open.bytebuffer
 import smart_open.utils
 
