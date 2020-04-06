@@ -21,7 +21,7 @@ try:
     import botocore.client
     import botocore.exceptions
 except ImportError:
-    sys.stderr.write("Install via smart_open[aws] to use this module")
+    sys.stderr.write("Install via smart_open[aws] or smart_open[all] to use this module")
     sys.exit(1)
 
 import smart_open.bytebuffer

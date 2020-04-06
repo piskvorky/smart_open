@@ -19,7 +19,7 @@ try:
     import google.cloud.storage
     import google.auth.transport.requests
 except ImportError:
-    sys.stderr.write("Install via smart_open[gcs] to use this module")
+    sys.stderr.write("Install via smart_open[gcs] or smart_open[all] to use this module")
     sys.exit(1)
 
 import smart_open.bytebuffer
