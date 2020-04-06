@@ -16,18 +16,22 @@ except ImportError:
     import mock
 from collections import OrderedDict
 
-import azure.storage.blob
-import azure.common
-import azure.core.exceptions
-
 import smart_open
 import smart_open.constants
+
+logger = logging.getLogger(__name__)
+
+try:
+    import azure.storage.blob
+    import azure.common
+    import azure.core.exceptions
+except ImportError:
+    logger.info('Azure dependencies are not installed')
 
 CONTAINER_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
 DISABLE_MOCKS = os.environ.get('SO_DISABLE_Azure Storage Blob_MOCKS') == "1"
 
-logger = logging.getLogger(__name__)
 
 
 class FakeBlobClient(object):
