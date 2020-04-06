@@ -10,7 +10,6 @@
 
 import io
 import logging
-import urllib.parse
 
 import google.cloud.exceptions
 import google.cloud.storage
@@ -90,7 +89,7 @@ def _fail(response, part_num, content_length, total_size, headers):
 
 
 def parse_uri(uri_as_string):
-    sr = urllib.parse.urlsplit(uri_as_string)
+    sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
     bucket_id = sr.netloc
     blob_id = sr.path.lstrip('/')

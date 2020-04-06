@@ -25,11 +25,16 @@ jobs:
         - BOTO_CONFIG: "/dev/null"
         - SO_ENABLE_MOTO_SERVER: "1"
         - TOXENV: "check_keys,py37-doctest,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
+    - python: '3.8'
+      env:
+        - BOTO_CONFIG: "/dev/null"
+        - TOXENV: "check_keys,py38-doctest,test_coverage,py38-integration"
 
 install:
   - pip install tox
 
-script: tox -vv
+script:
+  - tox -vv
 
 cache:
   directories:
