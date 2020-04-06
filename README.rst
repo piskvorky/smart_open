@@ -2,7 +2,7 @@
 smart_open — utils for streaming large files in Python
 ======================================================
 
-|License|_ |Travis|_ |Coveralls_| |Downloads|_
+|License|_ |Travis|_ |Coveralls|_ |Downloads|_
 
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
 .. |Travis| image:: https://travis-ci.org/RaRe-Technologies/smart_open.svg?branch=master
