@@ -75,8 +75,11 @@ def get_transport(scheme):
 
 
 register_transport(smart_open.local_file)
+register_transport('smart_open.gcs')
 register_transport('smart_open.hdfs')
 register_transport('smart_open.http')
+register_transport('smart_open.s3')
+register_transport('smart_open.ssh')
 register_transport('smart_open.webhdfs')
 
 SUPPORTED_SCHEMES = tuple(sorted(_REGISTRY.keys()))
