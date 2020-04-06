@@ -318,6 +318,12 @@ class Reader(io.BufferedIOBase):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def __str__(self):
         return "(%s, %r, %r)" % (self.__class__.__name__,
                                  self._container.container_name,
