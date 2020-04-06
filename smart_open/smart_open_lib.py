@@ -282,7 +282,8 @@ def smart_open(uri, mode="rb", **kw):
 
     warnings.warn(
         'This function is deprecated, use smart_open.open instead. '
-        'See the migration notes for details: %s' % _MIGRATION_NOTES_URL
+        'See the migration notes for details: %s' % _MIGRATION_NOTES_URL,
+        DeprecationWarning
     )
 
     #
