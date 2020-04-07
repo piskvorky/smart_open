@@ -87,7 +87,7 @@ setup(
     # Concatenating the lists together is temporary and will
     # eventually simply be install_requires dropping the cloud
     # dependencies from being installed without explicitly being declared.
-    install_requires=install_requires + aws_deps + gcp_deps,
+    install_requires=install_requires + aws_deps,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
