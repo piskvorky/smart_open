@@ -58,7 +58,7 @@ install_requires = [
 aws_deps = ['boto3']
 gcp_deps = ['google-cloud-storage']
 
-all_deps = install_requires + aws_deps
+all_deps = install_requires + aws_deps + gcp_deps
 
 setup(
     name='smart_open',
