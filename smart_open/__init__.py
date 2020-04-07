@@ -26,7 +26,7 @@ import logging
 from smart_open import version
 
 from .smart_open_lib import open, parse_uri, smart_open, register_compressor
-from .s3 import s3_iter_bucket
+from .s3 import iter_bucket as s3_iter_bucket
 
 __all__ = [
     'open',

@@ -6,22 +6,16 @@
 # from the MIT License (MIT).
 #
 """Implements file-like objects for reading and writing from/to S3."""
-import sys
 
 import io
 import functools
 import logging
 import time
-import warnings
 
-try:
-    import boto
-    import boto3
-    import botocore.client
-    import botocore.exceptions
-except ImportError:
-    sys.stderr.write("Install via smart_open[aws] or smart_open[all] to use this module")
-    raise
+import boto
+import boto3
+import botocore.client
+import botocore.exceptions
 
 import smart_open.bytebuffer
 import smart_open.concurrency
@@ -918,19 +912,6 @@ BufferedOutputBase = MultipartWriter
 
 def _accept_all(key):
     return True
-
-
-def s3_iter_bucket(
-        bucket_name,
-        prefix='',
-        accept_key=None,
-        key_limit=None,
-        workers=16,
-        retries=3,
-        **session_kwargs):
-    warnings.warn("'smart_open.s3_iter_bucket' path deprecated. Use 'smart_open.s3.iter_bucket' instead.",
-                  DeprecationWarning)
-    yield iter_bucket(bucket_name, prefix, accept_key, key_limit, workers, retries, **session_kwargs)
 
 
 def iter_bucket(
