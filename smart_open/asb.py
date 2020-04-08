@@ -15,13 +15,10 @@ import base64
 import smart_open.bytebuffer
 import smart_open.constants
 
-logger = logging.getLogger(__name__)
+import azure.storage.blob
+import azure.core.exceptions
 
-try:
-    import azure.storage.blob
-    import azure.core.exceptions
-except ImportError:
-    logger.info('Azure dependencies are not installed')
+logger = logging.getLogger(__name__)
 
 _BINARY_TYPES = (bytes, bytearray, memoryview)
 """Allowed binary buffer types for writing to the underlying Azure Storage Blob stream"""
