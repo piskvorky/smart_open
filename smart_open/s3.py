@@ -5,7 +5,7 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-"""Implements file-like objects for reading and writing from/to S3."""
+"""Implements file-like objects for reading and writing from/to AWS S3."""
 
 import io
 import functools

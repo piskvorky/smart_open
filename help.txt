@@ -13,19 +13,26 @@ DESCRIPTION
     The main functions are:
     
     * `open()`, which opens the given file for reading/writing
+    * `parse_uri()`
     * `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
     * `register_compressor()`, which registers callbacks for transparent compressor handling
 
 PACKAGE CONTENTS
     bytebuffer
+    compression
+    concurrency
+    constants
     doctools
     gcs
     hdfs
     http
+    local_file
     s3
     smart_open_lib
     ssh
     tests (package)
+    transport
+    utils
     version
     webhdfs
 
@@ -33,26 +40,13 @@ FUNCTIONS
     open(uri, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, ignore_ext=False, transport_params=None)
         Open the URI object, returning a file-like object.
         
-        The URI is usually a string in a variety of formats:
-        
-        1. a URI for the local filesystem: `./lines.txt`, `/home/joe/lines.txt.gz`,
-           `file:///home/joe/lines.txt.bz2`
-        2. a URI for HDFS: `hdfs:///some/path/lines.txt`
-        3. a URI for Amazon's S3 (can also supply credentials inside the URI):
-           `s3://my_bucket/lines.txt`, `s3://my_aws_key_id:key_secret@my_bucket/lines.txt`
+        The URI is usually a string in a variety of formats.
+        For a full list of examples, see the :func:`parse_uri` function.
         
         The URI may also be one of:
         
         - an instance of the pathlib.Path class
         - a stream (anything that implements io.IOBase-like functionality)
-        
-        This function supports transparent compression and decompression using the
-        following codec:
-        
-        - ``.gz``
-        - ``.bz2``
-        
-        The function depends on the file extension to determine the appropriate codec.
         
         Parameters
         ----------
@@ -89,7 +83,45 @@ FUNCTIONS
         by the transport layer being used, smart_open will ignore that argument and
         log a warning message.
         
-        S3 (for details, see :mod:`smart_open.s3` and :func:`smart_open.s3.open`):
+        smart_open supports the following transport mechanisms:
+        
+        file (smart_open/local_file.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements the transport for the file:// schema.
+        
+        gs (smart_open/gcs.py)
+        ~~~~~~~~~~~~~~~~~~~~~~
+        Implements file-like objects for reading and writing to/from GCS.
+        
+        buffer_size: int, optional
+            The buffer size to use when performing I/O. For reading only.
+        min_part_size: int, optional
+            The minimum part size for multipart uploads.  For writing only.
+        client: google.cloud.storage.Client, optional
+            The GCS client to use when working with google-cloud-storage.
+        
+        hdfs (smart_open/hdfs.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements reading and writing to/from HDFS.
+        
+        http (smart_open/http.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements file-like objects for reading from http.
+        
+        kerberos: boolean, optional
+            If True, will attempt to use the local Kerberos credentials
+        user: str, optional
+            The username for authenticating over HTTP
+        password: str, optional
+            The password for authenticating over HTTP
+        headers: dict, optional
+            Any headers to send in the request. If ``None``, the default headers are sent:
+            ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
+            set this variable to an empty dict, ``{}``.
+        
+        s3 (smart_open/s3.py)
+        ~~~~~~~~~~~~~~~~~~~~~
+        Implements file-like objects for reading and writing from/to AWS S3.
         
         buffer_size: int, optional
             The buffer size to use when performing I/O.
@@ -119,25 +151,9 @@ FUNCTIONS
             Additional parameters to pass to boto3's object.get function.
             Used during reading only.
         
-        HTTP (for details, see :mod:`smart_open.http` and :func:`smart_open.http.open`):
-        
-        kerberos: boolean, optional
-            If True, will attempt to use the local Kerberos credentials
-        user: str, optional
-            The username for authenticating over HTTP
-        password: str, optional
-            The password for authenticating over HTTP
-        headers: dict, optional
-            Any headers to send in the request. If ``None``, the default headers are sent:
-            ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
-            set this variable to an empty dict, ``{}``.
-        
-        WebHDFS (for details, see :mod:`smart_open.webhdfs` and :func:`smart_open.webhdfs.open`):
-        
-        min_part_size: int, optional
-            For writing only.
-        
-        SSH (for details, see :mod:`smart_open.ssh` and :func:`smart_open.ssh.open`):
+        scp (smart_open/ssh.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~
+        Implements I/O streams over SSH.
         
         mode: str, optional
             The mode to use for opening the file.
@@ -153,9 +169,16 @@ FUNCTIONS
         transport_params: dict, optional
             Any additional settings to be passed to paramiko.SSHClient.connect
         
+        webhdfs (smart_open/webhdfs.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements reading and writing to/from WebHDFS.
+        
+        min_part_size: int, optional
+            For writing only.
         
         Examples
         --------
+        
         >>> from smart_open import open
         >>>
         >>> # stream lines from an S3 object
@@ -192,25 +215,14 @@ FUNCTIONS
         >>> for line in open('http://example.com/index.html'):
         ...     print(repr(line))
         ...     break
-        '<!doctype html>\n'
         
-        Other examples of URLs that ``smart_open`` accepts::
+        This function also supports transparent compression and decompression 
+        using the following codecs:
         
-          s3://my_bucket/my_key
-          s3://my_key:my_secret@my_bucket/my_key
-          s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
-          gs://my_bucket/my_blob
-          hdfs:///path/file
-          hdfs://path/file
-          webhdfs://host:port/path/file
-          ./local/path/file
-          ~/local/path/file
-          local/path/file
-          ./local/path/file.gz
-          file:///home/user/file
-          file:///home/user/file.bz2
-          [ssh|scp|sftp]://username@host//path/file
-          [ssh|scp|sftp]://username@host/path/file
+        * .bz2
+        * .gz
+        
+        The function depends on the file extension to determine the appropriate codec.
         
         
         See Also
@@ -219,20 +231,66 @@ FUNCTIONS
         - `smart_open README.rst
           <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
     
+    parse_uri(uri_as_string)
+        Parse the given URI from a string.
+        
+        Parameters
+        ----------
+        uri_as_string: str
+            The URI to parse.
+        
+        Returns
+        -------
+        collections.namedtuple
+            The parsed URI.
+        
+        Notes
+        -----
+        Supported URI schemes are:
+        
+        * file
+        * gs
+        * hdfs
+        * http
+        * s3
+        * scp
+        * webhdfs
+        
+        Valid URI examples::
+        
+        * ./local/path/file
+        * ~/local/path/file
+        * local/path/file
+        * ./local/path/file.gz
+        * file:///home/user/file
+        * file:///home/user/file.bz2
+        * hdfs:///path/file
+        * hdfs://path/file
+        * s3://my_bucket/my_key
+        * s3://my_key:my_secret@my_bucket/my_key
+        * s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
+        * ssh://username@host/path/file
+        * ssh://username@host//path/file
+        * scp://username@host/path/file
+        * sftp://username@host/path/file
+        * webhdfs://host:port/path/file
+    
     register_compressor(ext, callback)
         Register a callback for transparently decompressing files with a specific extension.
         
         Parameters
         ----------
         ext: str
-            The extension.
+            The extension.  Must include the leading period, e.g. ``.gz``.
         callback: callable
             The callback.  It must accept two position arguments, file_obj and mode.
+            This function will be called when ``smart_open`` is opening a file with
+            the specified extension.
         
         Examples
         --------
         
-        Instruct smart_open to use the identity function whenever opening a file
+        Instruct smart_open to use the `lzma` module whenever opening a file
         with a .xz extension (see README.rst for the complete example showing I/O):
         
         >>> def _handle_xz(file_obj, mode):
@@ -295,12 +353,12 @@ FUNCTIONS
     smart_open(uri, mode='rb', **kw)
 
 DATA
-    __all__ = ['open', 'smart_open', 's3_iter_bucket', 'register_compresso...
+    __all__ = ['open', 'parse_uri', 'register_compressor', 's3_iter_bucket...
 
 VERSION
     1.10.0
 
 FILE
-    /home/misha/git/smart_open/smart_open/__init__.py
+    /Users/misha/git/smart_open/smart_open/__init__.py
 
 
