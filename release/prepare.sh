@@ -23,6 +23,12 @@ echo "version: $version"
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
 cd "$script_dir"
 
+#
+# We will need these for the doctests.
+#
+export AWS_ACCESS_KEY_ID=$(aws --profile smart_open configure get aws_access_key_id)
+export AWS_SECRET_ACCESS_KEY=$(aws --profile smart_open configure get aws_secret_access_key)
+
 git fetch upstream
 
 #
@@ -41,8 +47,8 @@ set -u
 
 cd ..
 pip install -e .[test]  # for smart_open
-pip install .[test]  # for gensim
-python setup.py test  # for gensim
+pip install -e .[all]  # for smart_open
+python setup.py test
 
 #
 # Delete the release branch in case one is left lying around.
