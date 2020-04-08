@@ -1,5 +1,9 @@
 # Unreleased
 
+# 1.11.1, 8 Apr 2020
+
+  - Add missing boto dependency (Issue [#468](https://github.com/RaRe-Technologies/smart_open/issues/468))
+
 # 1.11.0, 8 Apr 2020
 
   - Fix GCS multiple writes (PR [#421](https://github.com/RaRe-Technologies/smart_open/pull/421), [@petedannemann](https://github.com/petedannemann))
