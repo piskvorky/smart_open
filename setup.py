@@ -53,11 +53,13 @@ tests_require = [
 
 install_requires = [
     'requests',
-    'boto3',
-    'google-cloud-storage',
-    'azure-storage-blob',
-    'azure-common'
 ]
+
+aws_deps = ['boto3']
+gcp_deps = ['google-cloud-storage']
+asb_deps = ['azure-storage-blob', 'azure-common', 'azure.core.exceptions']
+
+all_deps = install_requires + aws_deps + gcp_deps + asb_deps
 
 setup(
     name='smart_open',
@@ -83,10 +85,17 @@ setup(
     license='MIT',
     platforms='any',
 
-    install_requires=install_requires,
+    # Concatenating the lists together is temporary and will
+    # eventually simply be install_requires dropping the cloud
+    # dependencies from being installed without explicitly being declared.
+    install_requires=install_requires + aws_deps,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
+        'aws': aws_deps,
+        'gcp': gcp_deps,
+        'asb': asb_deps,
+        'all': all_deps,
     },
 
     test_suite="smart_open.tests",

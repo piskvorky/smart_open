@@ -1,5 +1,27 @@
 # Unreleased
 
+# 1.11.0, 8 Apr 2020
+
+  - Fix GCS multiple writes (PR [#421](https://github.com/RaRe-Technologies/smart_open/pull/421), [@petedannemann](https://github.com/petedannemann))
+  - Implemented efficient readline for ByteBuffer (PR [#426](https://github.com/RaRe-Technologies/smart_open/pull/426), [@mpenkov](https://github.com/mpenkov))
+  - Fix WebHDFS read method (PR [#433](https://github.com/RaRe-Technologies/smart_open/pull/433), [@mpenkov](https://github.com/mpenkov))
+  - Make S3 uploads more robust (PR [#434](https://github.com/RaRe-Technologies/smart_open/pull/434), [@mpenkov](https://github.com/mpenkov))
+  - Add pathlib monkeypatch with replacement of `pathlib.Path.open` (PR [#436](https://github.com/RaRe-Technologies/smart_open/pull/436), [@menshikh-iv](https://github.com/menshikh-iv))
+  - Fix error when calling str() or repr() on GCS SeekableBufferedInputBase (PR [#442](https://github.com/RaRe-Technologies/smart_open/pull/442), [@robcowie](https://github.com/robcowie))
+  - Move optional dependencies to extras (PR [#454](https://github.com/RaRe-Technologies/smart_open/pull/454), [@Amertz08](https://github.com/Amertz08))
+  - Correctly handle GCS paths that contain '?' char  (PR [#460](https://github.com/RaRe-Technologies/smart_open/pull/460), [@chakruperitus](https://github.com/chakruperitus))
+  - Make our doctools submodule more robust (PR [#467](https://github.com/RaRe-Technologies/smart_open/pull/467), [@mpenkov](https://github.com/mpenkov))
+
+Starting with this release, you will have to run:
+
+    pip install smart_open[gcs] to use the GCS transport.
+
+In the future, all extra dependencies will be optional.  If you want to continue installing all of them, use:
+
+	pip install smart_open[all]
+
+See the README.rst for details.
+
 # 1.10.0, 16 Mar 2020
 
   - Various webhdfs improvements (PR [#383](https://github.com/RaRe-Technologies/smart_open/pull/383), [@mrk-its](https://github.com/mrk-its))

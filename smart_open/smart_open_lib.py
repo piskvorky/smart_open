@@ -84,17 +84,7 @@ def parse_uri(uri_as_string):
 
     Notes
     -----
-
-    Supported URI schemes are:
-
-%(schemes)s
-    s3, s3a and s3n are treated the same way.  s3u is s3 but without SSL.
-
-    Valid URI examples::
-
-%(uri_examples)s
-
-
+    smart_open/doctools.py magic goes here
     """
     scheme = _sniff_scheme(uri_as_string)
     submodule = transport.get_transport(scheme)
@@ -138,13 +128,6 @@ def open(
     - an instance of the pathlib.Path class
     - a stream (anything that implements io.IOBase-like functionality)
 
-    This function supports transparent compression and decompression using the
-    following codecs:
-
-%(codecs)s
-
-    The function depends on the file extension to determine the appropriate codec.
-
     Parameters
     ----------
     uri: str or object
@@ -180,22 +163,7 @@ def open(
     by the transport layer being used, smart_open will ignore that argument and
     log a warning message.
 
-    S3 (for details, see :mod:`smart_open.s3` and :func:`smart_open.s3.open`):
-
-%(s3)s
-    HTTP (for details, see :mod:`smart_open.http` and :func:`smart_open.http.open`):
-
-%(http)s
-    WebHDFS (for details, see :mod:`smart_open.webhdfs` and :func:`smart_open.webhdfs.open`):
-
-%(webhdfs)s
-    SSH (for details, see :mod:`smart_open.ssh` and :func:`smart_open.ssh.open`):
-
-%(ssh)s
-
-    Examples
-    --------
-%(examples)s
+    smart_open/doctools.py magic goes here
 
     See Also
     --------
@@ -493,4 +461,19 @@ def _patch_pathlib(func):
     return old_impl
 
 
-doctools.tweak_docstrings(open, parse_uri)
+#
+# Prevent failures with doctools from messing up the entire library.  We don't
+# expect such failures, but contributed modules (e.g. new transport mechanisms)
+# may not be as polished.
+#
+try:
+    doctools.tweak_open_docstring(open)
+    doctools.tweak_parse_uri_docstring(parse_uri)
+except Exception as ex:
+    logger.error(
+        'Encountered a non-fatal error while building docstrings (see below). '
+        'help(smart_open) will provide incomplete information as a result. '
+        'For full help text, see '
+        '<https://github.com/RaRe-Technologies/smart_open/blob/master/help.txt>.'
+    )
+    logger.exception(ex)
