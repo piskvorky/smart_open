@@ -3,6 +3,7 @@
 # Run this _after_ you've run the other scripts, e.g. prepare.sh and merge.sh.
 #
 set -euo pipefail
+version=$1
 
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
 cd "$script_dir"
@@ -18,7 +19,6 @@ cd ..
 pip install twine
 python setup.py sdist
 
-version=$(python smart_open/version.py)
 read -p "Push version $version to PyPI? This step is non-reversible.  Answer yes or no: " reply
 if [ "$reply" != "yes" ]
 then
