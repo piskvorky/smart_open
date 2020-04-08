@@ -18,7 +18,7 @@ cd ..
 pip install twine
 python setup.py sdist
 
-version=$(env -i python -c "from smart_open.version import __version__; print(__version__)")
+version=$(python smart_open/version.py)
 read -p "Push version $version to PyPI? This step is non-reversible.  Answer yes or no: " reply
 if [ "$reply" != "yes" ]
 then
