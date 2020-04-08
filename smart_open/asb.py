@@ -123,17 +123,16 @@ class _RawReader(object):
         return binary
 
     def _download_blob_chunk(self, size):
-        position = self._position
-        if position == self._size:
+        if self._size == self._position:
             #
             # When reading, we can't seek to the first byte of an empty file.
             # Similarly, we can't seek past the last byte.  Do nothing here.
             #
             return b''
         elif size == -1:
-            stream = self._blob.download_blob(offset=position)
+            stream = self._blob.download_blob(offset=self._position)
         else:
-            stream = self._blob.download_blob(offset=position, length=size)
+            stream = self._blob.download_blob(offset=self._position, length=size)
         if isinstance(stream, azure.storage.blob.StorageStreamDownloader):
             binary = stream.readall()
         else:

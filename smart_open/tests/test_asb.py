@@ -1,4 +1,7 @@
-# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2020 Radim Rehurek <radim@rare-technologies.com>
+# Copyright (C) 2020 Nicolas Mitchell <ncls.mitchell@gmail.com>
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
@@ -10,10 +13,6 @@ import os
 import time
 import uuid
 import unittest
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 from collections import OrderedDict
 
 import smart_open
@@ -21,12 +20,9 @@ import smart_open.constants
 
 logger = logging.getLogger(__name__)
 
-try:
-    import azure.storage.blob
-    import azure.common
-    import azure.core.exceptions
-except ImportError:
-    logger.info('Azure dependencies are not installed')
+import azure.storage.blob
+import azure.common
+import azure.core.exceptions
 
 CONTAINER_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
