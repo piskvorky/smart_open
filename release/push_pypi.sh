@@ -3,7 +3,12 @@
 # Run this _after_ you've run the other scripts, e.g. prepare.sh and merge.sh.
 #
 set -euo pipefail
-version=$1
+
+#
+# env -i python seems to return the wrong Python version on MacOS...
+#
+my_python=$(which python3)
+version=$($my_python -c "from smart_open.version import __version__; print(__version__)")
 
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
 cd "$script_dir"
