@@ -10,6 +10,7 @@
 
 import io
 import logging
+import base64
 
 import smart_open.bytebuffer
 import smart_open.constants
@@ -158,9 +159,9 @@ class Reader(io.BufferedIOBase):
     ):
         if client is None:
             client = azure.storage.blob.BlobServiceClient()
-        container_client = client.get_container_client(container)  # type: azure.storage.blob.ContainerClient
+        self._container_client = client.get_container_client(container)  # type: azure.storage.blob.ContainerClient
 
-        self._blob = container_client.get_blob_client(blob)
+        self._blob = self._container_client.get_blob_client(blob)
         if self._blob is None:
             raise azure.core.exceptions.ResourceNotFoundError('blob {} not found in {}'.format(blob, container))
         try:
@@ -332,7 +333,7 @@ class Reader(io.BufferedIOBase):
 
     def __repr__(self):
         return "%s(container=%r, blob=%r, buffer_size=%r)" % (
-            self.__class__.__name__, self._container.container_name, self._blob.blob_name, self._current_part_size,
+            self.__class__.__name__, self._container_client.container_name, self._blob.blob_name, self._current_part_size,
         )
 
 
@@ -345,6 +346,7 @@ class Writer(io.BufferedIOBase):
             self,
             container,
             blob,
+            min_part_size=_DEFAULT_MIN_PART_SIZE,
             client=None,  # type: azure.storage.blob.BlobServiceClient
     ):
         if client is None:
@@ -352,7 +354,13 @@ class Writer(io.BufferedIOBase):
         self._client = client
         self._container_client = self._client.get_container_client(container)  # type: azure.storage.blob.ContainerClient
         self._blob = self._container_client.get_blob_client(blob)  # type: azure.storage.blob.BlobClient
+        self._min_part_size = min_part_size
+
         self._total_size = 0
+        self._total_parts = 0
+        self._bytes_uploaded = 0
+        self._current_part = io.BytesIO()
+        self._block_list = []
 
         #
         # This member is part of the io.BufferedIOBase interface.
@@ -397,10 +405,47 @@ class Writer(io.BufferedIOBase):
 
         if not isinstance(b, _BINARY_TYPES):
             raise TypeError("input must be one of %r, got: %r" % (_BINARY_TYPES, type(b)))
+
+        self._current_part.write(b)
         self._total_size += len(b)
-        self._blob.upload_blob(b)
+        if len(b) > 0:
+            self._upload_part()
 
         return len(b)
+
+    def _upload_part(self):
+        part_num = self._total_parts + 1
+
+        #
+        # Here we upload the largest amount possible given Azure Storage Blob's restriction
+        # of parts being multiples of 4MB, except for the last one.
+        #
+        content_length = self._current_part.tell()
+        range_stop = self._bytes_uploaded + content_length - 1
+
+        #
+        # The block_id correspond to the index of the content base64 encoded.
+        #
+        block_id = base64.b64encode(str(self._bytes_uploaded).encode())
+        self._current_part.seek(0)
+        self._blob.stage_block(block_id, self._current_part.read(content_length))
+        if block_id not in [block_blob['id'] for block_blob in self._block_list]:
+            self._block_list.append(azure.storage.blob.BlobBlock(block_id=block_id))
+
+        logger.info(
+            "uploading part #%i, %i bytes (total %.3fGB)",
+            part_num, content_length, range_stop / 1024.0 ** 3,
+        )
+
+        self._blob.commit_block_list(self._block_list)
+        self._total_parts += 1
+        self._bytes_uploaded += content_length
+
+        #
+        # For the last part, the below _current_part handling is a NOOP.
+        #
+        self._current_part = io.BytesIO(self._current_part.read())
+        self._current_part.seek(0, io.SEEK_END)
 
     def __enter__(self):
         return self
