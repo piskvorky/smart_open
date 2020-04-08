@@ -317,6 +317,7 @@ class Reader(io.BufferedIOBase):
             if bytes_read == 0:
                 logger.debug('reached EOF while filling buffer')
                 self._eof = True
+                return self._eof
 
     def __enter__(self):
         return self
