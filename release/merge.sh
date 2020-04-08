@@ -1,9 +1,9 @@
 #
 # Performs the following tasks:
 #
-# - Merges the current release branch into master
-# - Applies a tag to master
-# - Pushes the updated master branch and its tag to upstream
+# - Merges the current release branch into develop
+# - Applies a tag to develop
+# - Pushes the updated develop branch and its tag to upstream
 #
 # Use it like this:
 #
@@ -29,16 +29,16 @@ then
 fi
 
 #
-# Delete the local master branch in case one is left lying around.
+# Delete the local develop branch in case one is left lying around.
 #
 set +e
-git branch -D master
+git branch -D develop
 set -e
 
-git checkout upstream/master -b master
+git checkout upstream/develop -b develop
 git merge --no-ff release-${version}
 git tag -a ${version} -m "${version}"
-git push --tags upstream master
+git push --tags upstream develop
 
 #
 # TODO: we should be able to automate the release note stuff.  It's just a
