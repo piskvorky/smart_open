@@ -250,7 +250,7 @@ class Reader(io.BufferedIOBase):
         if self._position == self._size:
             return self._read_from_buffer()
 
-        self._fill_buffer(size)
+        self._fill_buffer()
         return self._read_from_buffer(size)
 
     def read1(self, size=-1):
@@ -301,7 +301,7 @@ class Reader(io.BufferedIOBase):
         return part
 
     def _fill_buffer(self, size=-1):
-        size = size if size >= 0 else self._current_part._chunk_size
+        size = max(size, self._current_part._chunk_size)
         while len(self._current_part) < size and not self._position == self._size:
             bytes_read = self._current_part.fill(self._raw_reader)
             if bytes_read == 0:
