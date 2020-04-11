@@ -68,7 +68,7 @@ setup(
 
     packages=find_packages(),
     package_data={
-        "smart_open.tests": ["test_data/*gz"],
+        "smart_open.tests": ["test_data/*"],
     },
 
     author='Radim Rehurek',
