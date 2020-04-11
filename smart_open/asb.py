@@ -166,10 +166,8 @@ class Reader(io.BufferedIOBase):
             self._size = 0
 
         self._raw_reader = _RawReader(self._blob, self._size)
-        self._current_pos = 0
-        self._current_part_size = buffer_size
+        self._position = 0
         self._current_part = smart_open.bytebuffer.ByteBuffer(buffer_size)
-        self._eof = False
         self._line_terminator = line_terminator
 
         #
@@ -212,25 +210,24 @@ class Reader(io.BufferedIOBase):
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
         if whence not in smart_open.constants.WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % smart_open.constants.WHENCE_CHOICES)
+            raise ValueError('invalid whence %, expected one of %r' % (whence, smart_open.constants.WHENCE_CHOICES))
 
         if whence == smart_open.constants.WHENCE_START:
             new_position = offset
         elif whence == smart_open.constants.WHENCE_CURRENT:
-            new_position = self._current_pos + offset
+            new_position = self._position + offset
         else:
             new_position = self._size + offset
-        self._current_pos = new_position
+        self._position = new_position
         self._raw_reader.seek(new_position)
-        logger.debug('current_pos: %r', self._current_pos)
+        logger.debug('current_pos: %r', self._position)
 
         self._current_part.empty()
-        self._eof = self._current_pos == self._size
-        return self._current_pos
+        return self._position
 
     def tell(self):
         """Return the current position within the file."""
-        return self._current_pos
+        return self._position
 
     def truncate(self, size=None):
         """Unsupported."""
@@ -241,7 +238,7 @@ class Reader(io.BufferedIOBase):
         if size == 0:
             return b''
         elif size < 0:
-            self._current_pos = self._size
+            self._position = self._size
             return self._read_from_buffer() + self._raw_reader.read()
 
         #
@@ -250,15 +247,9 @@ class Reader(io.BufferedIOBase):
         if len(self._current_part) >= size:
             return self._read_from_buffer(size)
 
-        #
-        # If the stream is finished, return what we have.
-        #
-        if self._eof:
+        if self._position == self._size:
             return self._read_from_buffer()
 
-        #
-        # Fill our buffer to the required size.
-        #
         self._fill_buffer(size)
         return self._read_from_buffer(size)
 
@@ -267,8 +258,7 @@ class Reader(io.BufferedIOBase):
         return self.read(size=size)
 
     def readinto(self, b):
-        """Read up to len(b) bytes into b, and return the number of bytes
-        read."""
+        """Read up to len(b) bytes into b, and return the number of bytes read."""
         data = self.read(len(b))
         if not data:
             return 0
@@ -280,7 +270,7 @@ class Reader(io.BufferedIOBase):
         if limit != -1:
             raise NotImplementedError('limits other than -1 not implemented yet')
         the_line = io.BytesIO()
-        while not (self._eof and len(self._current_part) == 0):
+        while not (self._position == self._size and len(self._current_part) == 0):
             #
             # In the worst case, we're reading the unread part of self._current_part
             # twice here, once in the if condition and once when calling index.
@@ -306,18 +296,17 @@ class Reader(io.BufferedIOBase):
         # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._current_part))
         size = size if size >= 0 else len(self._current_part)
         part = self._current_part.read(size)
-        self._current_pos += len(part)
+        self._position += len(part)
         # logger.debug('part: %r', part)
         return part
 
     def _fill_buffer(self, size=-1):
         size = size if size >= 0 else self._current_part._chunk_size
-        while len(self._current_part) < size and not self._eof:
+        while len(self._current_part) < size and not self._position == self._size:
             bytes_read = self._current_part.fill(self._raw_reader)
             if bytes_read == 0:
                 logger.debug('reached EOF while filling buffer')
-                self._eof = True
-                return self._eof
+                return True
 
     def __enter__(self):
         return self
@@ -329,8 +318,8 @@ class Reader(io.BufferedIOBase):
         return "(%s, %r, %r)" % (self.__class__.__name__, self._container.container_name, self._blob.blob_name)
 
     def __repr__(self):
-        return "%s(container=%r, blob=%r, buffer_size=%r)" % (
-            self.__class__.__name__, self._container_client.container_name, self._blob.blob_name, self._current_part_size,
+        return "%s(container=%r, blob=%r)" % (
+            self.__class__.__name__, self._container_client.container_name, self._blob.blob_name,
         )
 
 
