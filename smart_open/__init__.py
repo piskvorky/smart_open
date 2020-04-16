@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 if len(logger.handlers) == 0:
     logger.addHandler(logging.NullHandler())
 
-from .smart_open_lib import open, parse_uri, smart_open, register_compressor
-from .s3 import iter_bucket as s3_iter_bucket
+from .smart_open_lib import open, parse_uri, smart_open, register_compressor  # noqa: E402
+from .s3 import iter_bucket as s3_iter_bucket  # noqa: E402
 
 __all__ = [
     'open',
