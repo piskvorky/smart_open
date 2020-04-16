@@ -187,6 +187,7 @@ def open(
         buffering=buffering,
         encoding=encoding,
         errors=errors,
+        newline=newline
     )
     if fobj is not None:
         return fobj
@@ -316,6 +317,7 @@ def _shortcut_open(
         buffering=-1,
         encoding=None,
         errors=None,
+        newline=None
         ):
     """Try to open the URI using the standard library io.open function.
 
@@ -331,7 +333,6 @@ def _shortcut_open(
 
     :param str uri: A string indicating what to open.
     :param str mode: The mode to pass to the open function.
-    :param dict kw:
     :returns: The opened file
     :rtype: file
     """
@@ -347,7 +348,7 @@ def _shortcut_open(
     if extension in compression.get_supported_extensions() and not ignore_ext:
         return None
 
-    open_kwargs = {}
+    open_kwargs = {'newline': newline}
 
     if encoding is not None:
         open_kwargs['encoding'] = encoding

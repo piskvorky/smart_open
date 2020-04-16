@@ -7,6 +7,7 @@
 #
 
 import bz2
+import csv
 import io
 import unittest
 import logging
@@ -1050,6 +1051,21 @@ class SmartOpenTest(unittest.TestCase):
             with smart_open.smart_open("/some/file.txt", "wb+") as fout:
                 mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1)
                 fout.write(self.as_bytes)
+
+    def test_compatibility_with_csv_under_windows(self):
+        rows = [{'c1': 'a1', 'c2': 'b1'}, {'c1': 'a2', 'c2': 'b2'}]
+
+        expected = 'c1,c2\na1,b1\na2,b2\n'
+
+        with smart_open.open('test_smart_open.csv', 'w+', newline='\n') as f:
+            out = csv.DictWriter(f, fieldnames=['c1', 'c2'])
+            out.writeheader()
+            out.writerows(rows)
+
+        with open('test_smart_open.csv', 'r') as f:
+            content = f.read()
+        assert content == expected
+        os.remove('test_smart_open.csv')
 
     @mock.patch('boto3.Session')
     def test_s3_mode_mock(self, mock_session):
