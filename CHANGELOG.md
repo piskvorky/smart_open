@@ -1,5 +1,7 @@
 # Unreleased
 
+  - Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
+
 # 1.11.1, 8 Apr 2020
 
   - Add missing boto dependency (Issue [#468](https://github.com/RaRe-Technologies/smart_open/issues/468))
