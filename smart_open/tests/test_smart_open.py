@@ -1053,8 +1053,8 @@ class SmartOpenTest(unittest.TestCase):
 
     def test_newline(self):
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
-            with smart_open.smart_open("/some/file.txt", "wb+", newline='\n') as fout:
-                mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1, newline='\n')
+            smart_open.smart_open("/some/file.txt", "wb+", newline='\n')
+            mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1, newline='\n')
 
     def test_newline_csv(self):
         #
