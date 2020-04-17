@@ -1051,20 +1051,28 @@ class SmartOpenTest(unittest.TestCase):
                 mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1)
                 fout.write(self.as_bytes)
 
-    def test_compatibility_with_csv_under_windows(self):
-        rows = [{'c1': 'a1', 'c2': 'b1'}, {'c1': 'a2', 'c2': 'b2'}]
+    def test_newline(self):
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
+            with smart_open.smart_open("/some/file.txt", "wb+", newline='\n') as fout:
+                mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1, newline='\n')
 
-        expected = 'c1,c2\na1,b1\na2,b2\n'
+    def test_newline_csv(self):
+        #
+        # See https://github.com/RaRe-Technologies/smart_open/issues/477
+        #
+        rows = [{'name': 'alice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
+        expected = 'name,color\nalice,aqua\nbob,blue\n'
 
-        with smart_open.open('test_smart_open.csv', 'w+', newline='\n') as f:
-            out = csv.DictWriter(f, fieldnames=['c1', 'c2'])
-            out.writeheader()
-            out.writerows(rows)
+        with tempfile.NamedTemporaryFile() as tmp:
+            with smart_open.open(tmp.name, 'w+', newline='\n') as fout:
+                out = csv.DictWriter(fout, fieldnames=['name', 'color'])
+                out.writeheader()
+                out.writerows(rows)
 
-        with open('test_smart_open.csv', 'r') as f:
-            content = f.read()
+            with open(tmp.name, 'r') as fin:
+                content = fin.read()
+
         assert content == expected
-        os.remove('test_smart_open.csv')
 
     @mock.patch('boto3.Session')
     def test_s3_mode_mock(self, mock_session):
