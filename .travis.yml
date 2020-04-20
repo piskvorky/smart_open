@@ -8,13 +8,6 @@ jobs:
       name: "flake8"
       env: TOXENV="flake8"
 
-    - python: '2.7'
-      env:
-        - SO_S3_URL: "s3://smart-open-py27-benchmark"
-        - SO_S3_RESULT_URL: "s3://smart-open-py27-benchmark-results"
-        - BOTO_CONFIG: "/dev/null"
-        - TOXENV: "check_keys,py27-test,py27-benchmark,py27-integration"
-
     - python: '3.5'
       env: TOXENV="check_keys,py35-test,py35-integration"
 
@@ -32,11 +25,16 @@ jobs:
         - BOTO_CONFIG: "/dev/null"
         - SO_ENABLE_MOTO_SERVER: "1"
         - TOXENV: "check_keys,py37-doctest,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
+    - python: '3.8'
+      env:
+        - BOTO_CONFIG: "/dev/null"
+        - TOXENV: "check_keys,py38-doctest,test_coverage,py38-integration"
 
 install:
   - pip install tox
 
-script: tox -vv
+script:
+  - tox -vv
 
 cache:
   directories:

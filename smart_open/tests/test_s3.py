@@ -18,7 +18,6 @@ import boto3
 import botocore.client
 import mock
 import moto
-import six
 
 import smart_open
 import smart_open.s3
@@ -77,12 +76,13 @@ def ignore_resource_warnings():
     # https://github.com/boto/boto3/issues/454
     # Py2 doesn't have ResourceWarning, so do nothing.
     #
-    if six.PY2:
-        return
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
-@unittest.skipIf(not ENABLE_MOTO_SERVER, 'The test case needs a Moto server running on the local 5000 port.')
+@unittest.skipUnless(
+    ENABLE_MOTO_SERVER,
+    'The test case needs a Moto server running on the local 5000 port.'
+)
 class SeekableRawReaderTest(unittest.TestCase):
 
     def setUp(self):
@@ -180,7 +180,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
 
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
         self.assertEqual(fin.read(5), b'hello')
-        seek = fin.seek(1, whence=smart_open.s3.CURRENT)
+        seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
@@ -190,7 +190,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         put_to_bucket(contents=content)
 
         fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
-        seek = fin.seek(-4, whence=smart_open.s3.END)
+        seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
 
@@ -202,7 +202,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(content))
-        fin.seek(0, whence=smart_open.s3.END)
+        fin.seek(0, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(eof, fin.tell())
 
     def test_read_gzip(self):
@@ -522,13 +522,6 @@ class SinglepartWriterTest(unittest.TestCase):
         fout.close()
 
 
-class ClampTest(unittest.TestCase):
-    def test(self):
-        self.assertEqual(smart_open.s3.clamp(5, 0, 10), 5)
-        self.assertEqual(smart_open.s3.clamp(11, 0, 10), 10)
-        self.assertEqual(smart_open.s3.clamp(-1, 0, 10), 0)
-
-
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
 
 
@@ -615,15 +608,15 @@ class IterBucketTest(unittest.TestCase):
 
 
 @moto.mock_s3
-@unittest.skipIf(not smart_open.s3._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
+@unittest.skipIf(not smart_open.concurrency._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
 class IterBucketConcurrentFuturesTest(unittest.TestCase):
     def setUp(self):
-        self.old_flag_multi = smart_open.s3._MULTIPROCESSING
-        smart_open.s3._MULTIPROCESSING = False
+        self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
+        smart_open.concurrency._MULTIPROCESSING = False
         ignore_resource_warnings()
 
     def tearDown(self):
-        smart_open.s3._MULTIPROCESSING = self.old_flag_multi
+        smart_open.concurrency._MULTIPROCESSING = self.old_flag_multi
         cleanup_bucket()
 
     def test(self):
@@ -637,15 +630,15 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
 
 
 @moto.mock_s3
-@unittest.skipIf(not smart_open.s3._MULTIPROCESSING, 'multiprocessing unavailable')
+@unittest.skipIf(not smart_open.concurrency._MULTIPROCESSING, 'multiprocessing unavailable')
 class IterBucketMultiprocessingTest(unittest.TestCase):
     def setUp(self):
-        self.old_flag_concurrent = smart_open.s3._CONCURRENT_FUTURES
-        smart_open.s3._CONCURRENT_FUTURES = False
+        self.old_flag_concurrent = smart_open.concurrency._CONCURRENT_FUTURES
+        smart_open.concurrency._CONCURRENT_FUTURES = False
         ignore_resource_warnings()
 
     def tearDown(self):
-        smart_open.s3._CONCURRENT_FUTURES = self.old_flag_concurrent
+        smart_open.concurrency._CONCURRENT_FUTURES = self.old_flag_concurrent
         cleanup_bucket()
 
     def test(self):
@@ -661,16 +654,16 @@ class IterBucketMultiprocessingTest(unittest.TestCase):
 @moto.mock_s3
 class IterBucketSingleProcessTest(unittest.TestCase):
     def setUp(self):
-        self.old_flag_multi = smart_open.s3._MULTIPROCESSING
-        self.old_flag_concurrent = smart_open.s3._CONCURRENT_FUTURES
-        smart_open.s3._MULTIPROCESSING = False
-        smart_open.s3._CONCURRENT_FUTURES = False
+        self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
+        self.old_flag_concurrent = smart_open.concurrency._CONCURRENT_FUTURES
+        smart_open.concurrency._MULTIPROCESSING = False
+        smart_open.concurrency._CONCURRENT_FUTURES = False
 
         ignore_resource_warnings()
 
     def tearDown(self):
-        smart_open.s3._MULTIPROCESSING = self.old_flag_multi
-        smart_open.s3._CONCURRENT_FUTURES = self.old_flag_concurrent
+        smart_open.concurrency._MULTIPROCESSING = self.old_flag_multi
+        smart_open.concurrency._CONCURRENT_FUTURES = self.old_flag_concurrent
         cleanup_bucket()
 
     def test(self):

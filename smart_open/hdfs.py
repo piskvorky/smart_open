@@ -17,8 +17,39 @@ Uses the command-line hdfs utility under the covers.
 import io
 import logging
 import subprocess
+import urllib.parse
+
+from smart_open import utils
 
 logger = logging.getLogger(__name__)
+
+SCHEME = 'hdfs'
+
+URI_EXAMPLES = (
+    'hdfs:///path/file',
+    'hdfs://path/file',
+)
+
+
+def parse_uri(uri_as_string):
+    split_uri = urllib.parse.urlsplit(uri_as_string)
+    assert split_uri.scheme == SCHEME
+
+    uri_path = split_uri.netloc + split_uri.path
+    uri_path = "/" + uri_path.lstrip("/")
+    if not uri_path:
+        raise RuntimeError("invalid HDFS URI: %r" % uri_as_string)
+
+    return dict(scheme=SCHEME, uri_path=uri_path)
+
+
+def open_uri(uri, mode, transport_params):
+    utils.check_kwargs(open, transport_params)
+
+    parsed_uri = parse_uri(uri)
+    fobj = open(parsed_uri['uri_path'], mode)
+    fobj.name = parsed_uri['uri_path'].split('/')[-1]
+    return fobj
 
 
 def open(uri, mode):

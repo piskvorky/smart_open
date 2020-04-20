@@ -5,80 +5,164 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-"""Implements file-like objects for reading and writing from/to S3."""
+"""Implements file-like objects for reading and writing from/to AWS S3."""
 
 import io
-import contextlib
 import functools
 import logging
 import time
-import warnings
 
+import boto
 import boto3
 import botocore.client
 import botocore.exceptions
-import six
 
 import smart_open.bytebuffer
+import smart_open.concurrency
+import smart_open.utils
+
+from smart_open import constants
 
 logger = logging.getLogger(__name__)
-
-# AWS Lambda environments do not support multiprocessing.Queue or multiprocessing.Pool.
-# However they do support Threads and therefore concurrent.futures's ThreadPoolExecutor.
-# We use this flag to allow python 2 backward compatibility, where concurrent.futures doesn't exist.
-_CONCURRENT_FUTURES = False
-try:
-    import concurrent.futures
-    _CONCURRENT_FUTURES = True
-except ImportError:
-    warnings.warn("concurrent.futures could not be imported and won't be used")
-
-# Multiprocessing is unavailable in App Engine (and possibly other sandboxes).
-# The only method currently relying on it is iter_bucket, which is instructed
-# whether to use it by the MULTIPROCESSING flag.
-_MULTIPROCESSING = False
-try:
-    import multiprocessing.pool
-    _MULTIPROCESSING = True
-except ImportError:
-    warnings.warn("multiprocessing could not be imported and won't be used")
-
 
 DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 """Default minimum part size for S3 multipart uploads"""
 MIN_MIN_PART_SIZE = 5 * 1024 ** 2
 """The absolute minimum permitted by Amazon."""
-READ_BINARY = 'rb'
-WRITE_BINARY = 'wb'
-MODES = (READ_BINARY, WRITE_BINARY)
-"""Allowed I/O modes for working with S3."""
 
-BINARY_NEWLINE = b'\n'
-
-SUPPORTED_SCHEMES = ("s3", "s3n", 's3u', "s3a")
+SCHEMES = ("s3", "s3n", 's3u', "s3a")
+DEFAULT_PORT = 443
+DEFAULT_HOST = 's3.amazonaws.com'
 
 DEFAULT_BUFFER_SIZE = 128 * 1024
 
-START = 0
-CURRENT = 1
-END = 2
-WHENCE_CHOICES = [START, CURRENT, END]
+URI_EXAMPLES = (
+    's3://my_bucket/my_key',
+    's3://my_key:my_secret@my_bucket/my_key',
+    's3://my_key:my_secret@my_server:my_port@my_bucket/my_key',
+)
 
 _UPLOAD_ATTEMPTS = 6
 _SLEEP_SECONDS = 10
 
 
-def clamp(value, minval, maxval):
-    return max(min(value, maxval), minval)
+def parse_uri(uri_as_string):
+    #
+    # Restrictions on bucket names and labels:
+    #
+    # - Bucket names must be at least 3 and no more than 63 characters long.
+    # - Bucket names must be a series of one or more labels.
+    # - Adjacent labels are separated by a single period (.).
+    # - Bucket names can contain lowercase letters, numbers, and hyphens.
+    # - Each label must start and end with a lowercase letter or a number.
+    #
+    # We use the above as a guide only, and do not perform any validation.  We
+    # let boto3 take care of that for us.
+    #
+    split_uri = smart_open.utils.safe_urlsplit(uri_as_string)
+    assert split_uri.scheme in SCHEMES
+
+    port = DEFAULT_PORT
+    host = boto.config.get('s3', 'host', DEFAULT_HOST)
+    ordinary_calling_format = False
+    #
+    # These defaults tell boto3 to look for credentials elsewhere
+    #
+    access_id, access_secret = None, None
+
+    #
+    # Common URI template [secret:key@][host[:port]@]bucket/object
+    #
+    # The urlparse function doesn't handle the above schema, so we have to do
+    # it ourselves.
+    #
+    uri = split_uri.netloc + split_uri.path
+
+    if '@' in uri and ':' in uri.split('@')[0]:
+        auth, uri = uri.split('@', 1)
+        access_id, access_secret = auth.split(':')
+
+    head, key_id = uri.split('/', 1)
+    if '@' in head and ':' in head:
+        ordinary_calling_format = True
+        host_port, bucket_id = head.split('@')
+        host, port = host_port.split(':', 1)
+        port = int(port)
+    elif '@' in head:
+        ordinary_calling_format = True
+        host, bucket_id = head.split('@')
+    else:
+        bucket_id = head
+
+    return dict(
+        scheme=split_uri.scheme,
+        bucket_id=bucket_id,
+        key_id=key_id,
+        port=port,
+        host=host,
+        ordinary_calling_format=ordinary_calling_format,
+        access_id=access_id,
+        access_secret=access_secret,
+    )
 
 
-def make_range_string(start, stop=None):
-    #
-    # https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.35
-    #
-    if stop is None:
-        return 'bytes=%d-' % start
-    return 'bytes=%d-%d' % (start, stop)
+def _consolidate_params(uri, transport_params):
+    """Consolidates the parsed Uri with the additional parameters.
+
+    This is necessary because the user can pass some of the parameters can in
+    two different ways:
+
+    1) Via the URI itself
+    2) Via the transport parameters
+
+    These are not mutually exclusive, but we have to pick one over the other
+    in a sensible way in order to proceed.
+
+    """
+    transport_params = dict(transport_params)
+
+    session = transport_params.get('session')
+    if session is not None and (uri['access_id'] or uri['access_secret']):
+        logger.warning(
+            'ignoring credentials parsed from URL because they conflict with '
+            'transport_params.session. Set transport_params.session to None '
+            'to suppress this warning.'
+        )
+        uri.update(access_id=None, access_secret=None)
+    elif (uri['access_id'] and uri['access_secret']):
+        transport_params['session'] = boto3.Session(
+            aws_access_key_id=uri['access_id'],
+            aws_secret_access_key=uri['access_secret'],
+        )
+        uri.update(access_id=None, access_secret=None)
+
+    if uri['host'] != DEFAULT_HOST:
+        endpoint_url = 'https://%(host)s:%(port)d' % uri
+        _override_endpoint_url(transport_params, endpoint_url)
+
+    return uri, transport_params
+
+
+def _override_endpoint_url(transport_params, url):
+    try:
+        resource_kwargs = transport_params['resource_kwargs']
+    except KeyError:
+        resource_kwargs = transport_params['resource_kwargs'] = {}
+
+    if resource_kwargs.get('endpoint_url'):
+        logger.warning(
+            'ignoring endpoint_url parsed from URL because it conflicts '
+            'with transport_params.resource_kwargs.endpoint_url. '
+        )
+    else:
+        resource_kwargs.update(endpoint_url=url)
+
+
+def open_uri(uri, mode, transport_params):
+    parsed_uri = parse_uri(uri)
+    parsed_uri, transport_params = _consolidate_params(parsed_uri, transport_params)
+    kwargs = smart_open.utils.check_kwargs(open, transport_params)
+    return open(parsed_uri['bucket_id'], parsed_uri['key_id'], mode, **kwargs)
 
 
 def open(
@@ -135,13 +219,13 @@ def open(
 
     """
     logger.debug('%r', locals())
-    if mode not in MODES:
-        raise NotImplementedError('bad mode: %r expected one of %r' % (mode, MODES))
+    if mode not in constants.BINARY_MODES:
+        raise NotImplementedError('bad mode: %r expected one of %r' % (mode, constants.BINARY_MODES))
 
-    if (mode == WRITE_BINARY) and (version_id is not None):
+    if (mode == constants.WRITE_BINARY) and (version_id is not None):
         raise ValueError("version_id must be None when writing")
 
-    if mode == READ_BINARY:
+    if mode == constants.READ_BINARY:
         fileobj = Reader(
             bucket_id,
             key_id,
@@ -151,7 +235,7 @@ def open(
             resource_kwargs=resource_kwargs,
             object_kwargs=object_kwargs,
         )
-    elif mode == WRITE_BINARY:
+    elif mode == constants.WRITE_BINARY:
         if multipart_upload:
             fileobj = MultipartWriter(
                 bucket_id,
@@ -171,6 +255,8 @@ def open(
             )
     else:
         assert False, 'unexpected mode: %r' % mode
+
+    fileobj.name = key_id
     return fileobj
 
 
@@ -218,7 +304,7 @@ class _SeekableRawReader(object):
     def _load_body(self):
         """Build a continuous connection with the remote peer starts from the current postion.
         """
-        range_string = make_range_string(self._position)
+        range_string = smart_open.utils.make_range_string(self._position)
         logger.debug('content_length: %r range_string: %r', self._content_length, range_string)
 
         if self._position == self._content_length == 0 or self._position == self._content_length:
@@ -266,7 +352,7 @@ class Reader(io.BufferedIOBase):
     Implements the io.BufferedIOBase interface of the standard library."""
 
     def __init__(self, bucket, key, version_id=None, buffer_size=DEFAULT_BUFFER_SIZE,
-                 line_terminator=BINARY_NEWLINE, session=None, resource_kwargs=None,
+                 line_terminator=constants.BINARY_NEWLINE, session=None, resource_kwargs=None,
                  object_kwargs=None):
 
         self._buffer_size = buffer_size
@@ -384,7 +470,7 @@ class Reader(io.BufferedIOBase):
         We offer only seek support, and no truncate support."""
         return True
 
-    def seek(self, offset, whence=START):
+    def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
 
         :param int offset: The offset in bytes.
@@ -392,16 +478,16 @@ class Reader(io.BufferedIOBase):
 
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
-        if whence not in WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % WHENCE_CHOICES)
+        if whence not in constants.WHENCE_CHOICES:
+            raise ValueError('invalid whence, expected one of %r' % constants.WHENCE_CHOICES)
 
-        if whence == START:
+        if whence == constants.WHENCE_START:
             new_position = offset
-        elif whence == CURRENT:
+        elif whence == constants.WHENCE_CURRENT:
             new_position = self._current_pos + offset
         else:
             new_position = self._content_length + offset
-        new_position = clamp(new_position, 0, self._content_length)
+        new_position = smart_open.utils.clamp(new_position, 0, self._content_length)
         self._current_pos = new_position
         self._raw_reader.seek(new_position)
         logger.debug('new_position: %r', self._current_pos)
@@ -911,7 +997,7 @@ def iter_bucket(
         retries=retries,
         **session_kwargs)
 
-    with _create_process_pool(processes=workers) as pool:
+    with smart_open.concurrency.create_pool(processes=workers) as pool:
         result_iterator = pool.imap_unordered(download_key, key_iterator)
         for key_no, (key, content) in enumerate(result_iterator):
             if True or key_no % 1000 == 0:
@@ -994,41 +1080,3 @@ def _download_fileobj(bucket, key_name):
     buf = io.BytesIO()
     bucket.download_fileobj(key_name, buf)
     return buf.getvalue()
-
-
-class DummyPool(object):
-    """A class that mimics multiprocessing.pool.Pool for our purposes."""
-    def imap_unordered(self, function, items):
-        return six.moves.map(function, items)
-
-    def terminate(self):
-        pass
-
-
-class ConcurrentFuturesPool(object):
-    """A class that mimics multiprocessing.pool.Pool but uses concurrent futures instead of processes."""
-    def __init__(self, max_workers):
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers)
-
-    def imap_unordered(self, function, items):
-        futures = [self.executor.submit(function, item) for item in items]
-        for future in concurrent.futures.as_completed(futures):
-            yield future.result()
-
-    def terminate(self):
-        self.executor.shutdown(wait=True)
-
-
-@contextlib.contextmanager
-def _create_process_pool(processes=1):
-    if _MULTIPROCESSING and processes:
-        logger.info("creating multiprocessing pool with %i workers", processes)
-        pool = multiprocessing.pool.Pool(processes=processes)
-    elif _CONCURRENT_FUTURES and processes:
-        logger.info("creating concurrent futures pool with %i workers", processes)
-        pool = ConcurrentFuturesPool(max_workers=processes)
-    else:
-        logger.info("creating dummy pool")
-        pool = DummyPool()
-    yield pool
-    pool.terminate()
