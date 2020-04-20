@@ -10,6 +10,7 @@ smart_open — utils for streaming large files in Python
 .. |Downloads| image:: https://pepy.tech/badge/smart-open/month
 .. _License: https://github.com/RaRe-Technologies/smart_open/blob/master/LICENSE
 .. _Travis: https://travis-ci.org/RaRe-Technologies/smart_open
+.. _Appveyor: https://ci.appveyor.com/project/piskvorky/smart-open
 .. _Downloads: https://pypi.org/project/smart-open/
 
 What?
