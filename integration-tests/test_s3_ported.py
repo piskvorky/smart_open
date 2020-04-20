@@ -24,6 +24,8 @@ import boto3
 from parameterizedtestcase import ParameterizedTestCase as PTestCase
 
 import smart_open
+import smart_open.concurrency
+import smart_open.constants
 from initialize_s3_bucket import CONTENTS
 
 BUCKET_NAME = 'smartopen-integration-tests'
@@ -102,7 +104,7 @@ class ReaderTest(unittest.TestCase):
         """Does seeking from the middle of S3 files work correctly?"""
         fin = smart_open.s3.Reader(BUCKET_NAME, 'hello.txt')
         self.assertEqual(fin.read(5), b'hello')
-        seek = fin.seek(1, whence=smart_open.s3.CURRENT)
+        seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
@@ -112,7 +114,7 @@ class ReaderTest(unittest.TestCase):
         expected = CONTENTS[key_name]
 
         fin = smart_open.s3.Reader(BUCKET_NAME, key_name)
-        seek = fin.seek(-4, whence=smart_open.s3.END)
+        seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(seek, len(expected) - 4)
         self.assertEqual(fin.read(), b'you?')
 
@@ -124,7 +126,7 @@ class ReaderTest(unittest.TestCase):
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(expected))
-        fin.seek(0, whence=smart_open.s3.END)
+        fin.seek(0, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(eof, fin.tell())
 
     def test_read_gzip(self):
@@ -271,15 +273,15 @@ class WriterTest(unittest.TestCase):
 @contextlib.contextmanager
 def force(multiprocessing=False, concurrent_futures=False):
     assert not (multiprocessing and concurrent_futures)
-    old_multiprocessing = smart_open.s3._MULTIPROCESSING
-    old_concurrent_futures = smart_open.s3._CONCURRENT_FUTURES
-    smart_open.s3._MULTIPROCESSING = multiprocessing
-    smart_open.s3._CONCURRENT_FUTURES = concurrent_futures
+    old_multiprocessing = smart_open.concurrency._MULTIPROCESSING
+    old_concurrent_futures = smart_open.concurrency._CONCURRENT_FUTURES
+    smart_open.concurrency._MULTIPROCESSING = multiprocessing
+    smart_open.concurrency._CONCURRENT_FUTURES = concurrent_futures
 
     yield
 
-    smart_open.s3._MULTIPROCESSING = old_multiprocessing
-    smart_open.s3._CONCURRENT_FUTURES = old_concurrent_futures
+    smart_open.concurrency._MULTIPROCESSING = old_multiprocessing
+    smart_open.concurrency._CONCURRENT_FUTURES = old_concurrent_futures
 
 
 class IterBucketTest(PTestCase):
@@ -298,7 +300,7 @@ class IterBucketTest(PTestCase):
         self.assertEqual(len(self.expected), len(actual))
         self.assertEqual(self.expected, sorted(actual))
 
-    @unittest.skipIf(not smart_open.s3._MULTIPROCESSING, 'multiprocessing unavailable')
+    @unittest.skipIf(not smart_open.concurrency._MULTIPROCESSING, 'multiprocessing unavailable')
     def test_multiprocess(self):
         with force(multiprocessing=True):
             actual = list(smart_open.s3.iter_bucket(BUCKET_NAME, prefix='iter_bucket'))
@@ -306,7 +308,7 @@ class IterBucketTest(PTestCase):
         self.assertEqual(len(self.expected), len(actual))
         self.assertEqual(self.expected, sorted(actual))
 
-    @unittest.skipIf(not smart_open.s3._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
+    @unittest.skipIf(not smart_open.concurrency._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
     def test_concurrent_futures(self):
         with force(concurrent_futures=True):
             actual = list(smart_open.s3.iter_bucket(BUCKET_NAME, prefix='iter_bucket'))

@@ -16,6 +16,7 @@ full file contents into memory, allowing work with arbitrarily large files.
 The main functions are:
 
 * `open()`, which opens the given file for reading/writing
+* `parse_uri()`
 * `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
 * `register_compressor()`, which registers callbacks for transparent compressor handling
 
@@ -24,9 +25,16 @@ The main functions are:
 import logging
 from smart_open import version
 
-from .smart_open_lib import open, smart_open, register_compressor
+from .smart_open_lib import open, parse_uri, smart_open, register_compressor
 from .s3 import iter_bucket as s3_iter_bucket
-__all__ = ['open', 'smart_open', 's3_iter_bucket', 'register_compressor']
+
+__all__ = [
+    'open',
+    'parse_uri',
+    'register_compressor',
+    's3_iter_bucket',
+    'smart_open',
+]
 
 
 __version__ = version.__version__

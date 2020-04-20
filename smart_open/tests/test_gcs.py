@@ -22,9 +22,9 @@ from collections import OrderedDict
 
 import google.cloud
 import google.api_core.exceptions
-import six
 
 import smart_open
+import smart_open.constants
 
 BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
@@ -42,8 +42,6 @@ logger = logging.getLogger(__name__)
 
 
 def ignore_resource_warnings():
-    if six.PY2:
-        return
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
@@ -174,8 +172,8 @@ class FakeBlob(object):
     def upload_from_string(self, data):
         # mimics Google's API by accepting bytes or str, despite the method name
         # https://google-cloud-python.readthedocs.io/en/0.32.0/storage/blobs.html#google.cloud.storage.blob.Blob.upload_from_string
-        if isinstance(data, six.string_types):
-            data = bytes(data) if six.PY2 else bytes(data, 'utf8')
+        if isinstance(data, str):
+            data = bytes(data, 'utf8')
         self.__contents = io.BytesIO(data)
         self.__contents.seek(0, io.SEEK_END)
 
@@ -341,10 +339,10 @@ class FakeAuthorizedSession(object):
                 upload.write(data.read())
             else:
                 upload.write(data)
-        if not headers.get('Content-Range', '').endswith(smart_open.gcs._UNKNOWN_FILE_SIZE):
+        if not headers.get('Content-Range', '').endswith(smart_open.gcs._UNKNOWN):
             upload.finish()
             return FakeResponse(200)
-        return FakeResponse(smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODE)
+        return FakeResponse(smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODES[0])
 
     @staticmethod
     def _blob_with_url(url, client):
@@ -373,7 +371,7 @@ class FakeAuthorizedSessionTest(unittest.TestCase):
             'Content-Length': str(4),
         }
         response = self.session.put(self.upload_url, data, headers=headers)
-        self.assertEqual(response.status_code, smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODE)
+        self.assertIn(response.status_code, smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODES)
         self.session._blob_with_url(self.upload_url, self.client)
         blob_contents = self.blob.download_as_string()
         self.assertEqual(blob_contents, b'')
@@ -448,18 +446,30 @@ def mock_gcs(class_or_func):
 
 def mock_gcs_func(func):
     """Mock the function and provide additional required arguments."""
+    assert callable(func), '%r is not a callable function' % func
+
     def inner(*args, **kwargs):
-        with mock.patch('google.cloud.storage.Client', return_value=storage_client), \
-            mock.patch(
-                'smart_open.gcs.google_requests.AuthorizedSession',
-                return_value=FakeAuthorizedSession(storage_client._credentials),
-        ):
-            assert callable(func), 'you didn\'t provide a function!'
-            try:  # is it a method that needs a self arg?
-                self_arg = inspect.signature(func).self
-                func(self_arg, *args, **kwargs)
-            except AttributeError:
-                func(*args, **kwargs)
+        #
+        # Is it a function or a method? The latter requires a self parameter.
+        #
+        signature = inspect.signature(func)
+
+        fake_session = FakeAuthorizedSession(storage_client._credentials)
+        patched_client = mock.patch(
+            'google.cloud.storage.Client',
+            return_value=storage_client,
+        )
+        patched_session = mock.patch(
+            'google.auth.transport.requests.AuthorizedSession',
+            return_value=fake_session,
+        )
+
+        with patched_client, patched_session:
+            if not hasattr(signature, 'self'):
+                return func(*args, **kwargs)
+            else:
+                return func(signature.self, *args, **kwargs)
+
     return inner
 
 
@@ -491,7 +501,7 @@ def tearDownModule():  # noqa
 
 
 @maybe_mock_gcs
-class SeekableBufferedInputBaseTest(unittest.TestCase):
+class ReaderTest(unittest.TestCase):
     def setUp(self):
         # lower the multipart upload size, to speed up these tests
         self.old_min_buffer_size = smart_open.gcs.DEFAULT_BUFFER_SIZE
@@ -508,7 +518,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         put_to_bucket(contents=expected)
 
         # connect to fake GCS and read from the fake key we filled above
-        fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         output = [line.rstrip(b'\n') for line in fin]
         self.assertEqual(output, expected.split(b'\n'))
 
@@ -516,7 +526,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         # same thing but using a context manager
         expected = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=expected)
-        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME) as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             output = [line.rstrip(b'\n') for line in fin]
             self.assertEqual(output, expected.split(b'\n'))
 
@@ -526,7 +536,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         put_to_bucket(contents=content)
         logger.debug('content: %r len: %r', content, len(content))
 
-        fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
         self.assertEqual(content[14:], fin.read())  # read the rest
@@ -536,7 +546,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
 
@@ -551,7 +561,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         seek = fin.seek(6)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.tell(), 6)
@@ -562,9 +572,9 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         self.assertEqual(fin.read(5), b'hello')
-        seek = fin.seek(1, whence=smart_open.gcs.CURRENT)
+        seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
@@ -573,8 +583,8 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
-        seek = fin.seek(-4, whence=smart_open.gcs.END)
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
+        seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
 
@@ -582,11 +592,11 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        fin = smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME)
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(content))
-        fin.seek(0, whence=smart_open.gcs.END)
+        fin.seek(0, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(eof, fin.tell())
 
     def test_read_gzip(self):
@@ -600,7 +610,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         #
         # Make sure we're reading things correctly.
         #
-        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME) as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             self.assertEqual(fin.read(), buf.getvalue())
 
         #
@@ -611,7 +621,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
             self.assertEqual(zipfile.read(), expected)
 
         logger.debug('starting actual test')
-        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME) as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
@@ -621,7 +631,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME) as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             fin.readline()
             self.assertEqual(fin.tell(), content.index(b'\n')+1)
 
@@ -636,7 +646,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME, buffer_size=8) as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME, buffer_size=8) as fin:
             actual = list(fin)
 
         expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
@@ -646,7 +656,7 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME) as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             data = fin.read(0)
 
         self.assertEqual(data, b'')
@@ -655,14 +665,14 @@ class SeekableBufferedInputBaseTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, BLOB_NAME) as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             data = fin.read(100)
 
         self.assertEqual(data, content)
 
 
 @maybe_mock_gcs
-class BufferedOutputBaseTest(unittest.TestCase):
+class WriterTest(unittest.TestCase):
     """
     Test writing into GCS files.
 
@@ -677,17 +687,18 @@ class BufferedOutputBaseTest(unittest.TestCase):
         """Does writing into GCS work correctly?"""
         test_string = u"žluťoučký koníček".encode('utf8')
 
-        with smart_open.gcs.BufferedOutputBase(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
+        with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
             fout.write(test_string)
 
-        output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), "rb"))
+        with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), "rb") as fin:
+            output = list(fin)
 
         self.assertEqual(output, [test_string])
 
-    def test_write_01a(self):
+    def test_incorrect_input(self):
         """Does gcs write fail on incorrect input?"""
         try:
-            with smart_open.gcs.BufferedOutputBase(BUCKET_NAME, WRITE_BLOB_NAME) as fin:
+            with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fin:
                 fin.write(None)
         except TypeError:
             pass
@@ -696,7 +707,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_02(self):
         """Does gcs write unicode-utf8 conversion work?"""
-        smart_open_write = smart_open.gcs.BufferedOutputBase(BUCKET_NAME, WRITE_BLOB_NAME)
+        smart_open_write = smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME)
         smart_open_write.tell()
         logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
@@ -707,7 +718,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
         """Do multiple writes less than the min_part_size work correctly?"""
         # write
         min_part_size = 256 * 1024
-        smart_open_write = smart_open.gcs.BufferedOutputBase(
+        smart_open_write = smart_open.gcs.Writer(
             BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
         )
         local_write = io.BytesIO()
@@ -744,9 +755,8 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_03a(self):
         """Do multiple writes greater than the min_part_size work correctly?"""
-        # write
         min_part_size = 256 * 1024
-        smart_open_write = smart_open.gcs.BufferedOutputBase(
+        smart_open_write = smart_open.gcs.Writer(
             BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
         )
         local_write = io.BytesIO()
@@ -767,9 +777,8 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_03b(self):
         """Does writing a last chunk size equal to a multiple of the min_part_size work?"""
-        # write
         min_part_size = 256 * 1024
-        smart_open_write = smart_open.gcs.BufferedOutputBase(
+        smart_open_write = smart_open.gcs.Writer(
             BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
         )
         expected = b"t" * min_part_size * 2
@@ -787,7 +796,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
-        smart_open_write = smart_open.gcs.BufferedOutputBase(BUCKET_NAME, WRITE_BLOB_NAME)
+        smart_open_write = smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME)
         with smart_open_write as fout:  # noqa
             pass
 
@@ -798,11 +807,11 @@ class BufferedOutputBaseTest(unittest.TestCase):
 
     def test_gzip(self):
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
-        with smart_open.gcs.BufferedOutputBase(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
+        with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
             with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
                 zipfile.write(expected)
 
-        with smart_open.gcs.SeekableBufferedInputBase(BUCKET_NAME, WRITE_BLOB_NAME) as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, WRITE_BLOB_NAME) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
@@ -815,7 +824,7 @@ class BufferedOutputBaseTest(unittest.TestCase):
         """
         expected = u'не думай о секундах свысока'
 
-        with smart_open.gcs.BufferedOutputBase(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
+        with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
             with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 

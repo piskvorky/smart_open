@@ -25,7 +25,6 @@ import mock
 from moto import mock_s3
 import responses
 import gzip
-import six
 
 import smart_open
 from smart_open import smart_open_lib
@@ -70,7 +69,6 @@ class SmartOpenHttpTest(unittest.TestCase):
         self.assertTrue(actual_request.headers['Authorization'].startswith('Basic '))
 
     @responses.activate
-    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
     def test_http_gz(self):
         """Can open gzip via http?"""
         fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
@@ -88,7 +86,6 @@ class SmartOpenHttpTest(unittest.TestCase):
         self.assertEqual(m.hexdigest(), expected_hash)
 
     @responses.activate
-    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
     def test_http_gz_noquerystring(self):
         """Can open gzip via http?"""
         fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
@@ -171,9 +168,6 @@ class SmartOpenReadTest(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(expected, actual)
 
-    @unittest.skipUnless(
-        smart_open_lib.PATHLIB_SUPPORT,
-        "do not test pathlib support if pathlib or backport are not available")
     def test_open_and_read_pathlib_path(self):
         """If ``pathlib.Path`` is available we should be able to open and read."""
         from smart_open.smart_open_lib import pathlib
@@ -286,7 +280,7 @@ class SmartOpenReadTest(unittest.TestCase):
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)
 
-    @mock.patch(_IO_OPEN if six.PY2 else _BUILTIN_OPEN)
+    @mock.patch(_BUILTIN_OPEN)
     def test_file_errors(self, mock_smart_open):
         prefix = "file://"
         full_path = '/tmp/test.txt'
@@ -546,8 +540,7 @@ class SmartOpenTest(unittest.TestCase):
         #
 
     def test_text(self):
-        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
-        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("blah", "r", encoding='utf-8') as fin:
                 self.assertEqual(fin.read(), self.as_text)
                 mock_open.assert_called_with("blah", "r", buffering=-1, encoding='utf-8')
@@ -576,22 +569,19 @@ class SmartOpenTest(unittest.TestCase):
 
     def test_write_utf8(self):
         # correct write mode, correct file:// URI
-        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
-        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("blah", "w", encoding='utf-8') as fout:
                 mock_open.assert_called_with("blah", "w", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
 
     def test_write_utf8_absolute_path(self):
-        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
-        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("/some/file.txt", "w", encoding='utf-8') as fout:
                 mock_open.assert_called_with("/some/file.txt", "w", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
 
     def test_append_utf8(self):
-        patch = _IO_OPEN if six.PY2 else _BUILTIN_OPEN
-        with mock.patch(patch, mock.Mock(return_value=self.stringio)) as mock_open:
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
             with smart_open.smart_open("/some/file.txt", "w+", encoding='utf-8') as fout:
                 mock_open.assert_called_with("/some/file.txt", "w+", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
@@ -973,7 +963,6 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.smart_open(key, "rb") as fin:
             self.assertEqual(fin.read().decode("utf-8"), text)
 
-    @unittest.skipIf(six.PY2, 'this test does not work with Py2')
     @mock_s3
     def test_gzip_write_mode(self):
         """Should always open in binary mode when writing through a codec."""
@@ -984,7 +973,6 @@ class S3OpenTest(unittest.TestCase):
             smart_open.smart_open("s3://bucket/key.gz", "wb")
             mock_open.assert_called_with('bucket', 'key.gz', 'wb')
 
-    @unittest.skipIf(six.PY2, 'this test does not work with Py2')
     @mock_s3
     def test_gzip_read_mode(self):
         """Should always open in binary mode when reading through a codec."""

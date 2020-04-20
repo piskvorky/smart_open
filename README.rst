@@ -2,28 +2,32 @@
 smart_open — utils for streaming large files in Python
 ======================================================
 
-|License|_ |Travis|_ |Appveyor|_ |Downloads|_
+|License|_ |Travis|_ |Appveyor|_ |Coveralls|_ |Downloads|_
 
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
 .. |Travis| image:: https://travis-ci.org/RaRe-Technologies/smart_open.svg?branch=master
 .. |Appveyor| image:: https://ci.appveyor.com/api/projects/status/47py3gwhmt9tr74w/branch/master?svg=true
+.. |Coveralls| image:: https://coveralls.io/repos/github/RaRe-Technologies/smart_open/badge.svg?branch=HEAD
 .. |Downloads| image:: https://pepy.tech/badge/smart-open/month
 .. _License: https://github.com/RaRe-Technologies/smart_open/blob/master/LICENSE
 .. _Travis: https://travis-ci.org/RaRe-Technologies/smart_open
+.. _Coveralls: https://coveralls.io/github/RaRe-Technologies/smart_open?branch=HEAD
 .. _Downloads: https://pypi.org/project/smart-open/
+
 
 What?
 =====
 
-``smart_open`` is a Python 2 & Python 3 library for **efficient streaming of very large files** from/to storages such as S3, GCS, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
+``smart_open`` is a Python 3 library for **efficient streaming of very large files** from/to storages such as S3, GCS, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
+**Python 2.7 is no longer supported. If you need Python 2.7, please use** `smart_open 1.10.0 <https://github.com/RaRe-Technologies/smart_open/releases/tag/1.10.0>`_, **the last version to support Python 2.**
 
 Why?
 ====
 
-Working with large remote files, for example using Amazon's  `boto <http://docs.pythonboto.org/en/latest/>`_ and `boto3 <https://boto3.readthedocs.io/en/latest/>`_ Python library, is a pain.
+Working with large remote files, for example using Amazon's `boto <http://docs.pythonboto.org/en/latest/>`_ and `boto3 <https://boto3.readthedocs.io/en/latest/>`_ Python library, is a pain.
 ``boto``'s ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` methods only work for small files, because they're loaded fully into RAM, no streaming.
 There are nasty hidden gotchas when using ``boto``'s multipart upload functionality that is needed for large files, and a lot of boilerplate.
 
@@ -78,6 +82,8 @@ How?
   ...     break
   '<!doctype html>\n'
 
+.. _doctools_after_examples:
+
 Other examples of URLs that ``smart_open`` accepts::
 
     s3://my_bucket/my_key
@@ -97,8 +103,6 @@ Other examples of URLs that ``smart_open`` accepts::
     [ssh|scp|sftp]://username@host/path/file
     [ssh|scp|sftp]://username:password@host/path/file
 
-.. _doctools_after_examples:
-
 
 Documentation
 =============
@@ -107,17 +111,25 @@ Installation
 ------------
 ::
 
-    pip install smart_open
+    pip install smart_open  // Install with no cloud dependencies
+    pip install smart_open[aws] // Install AWS deps
+    pip install smart_open[gcp] // Install GCP deps
+    pip install smart_open[all] // Installs all cloud dependencies
 
 Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pypi/smart_open>`_::
 
     python setup.py test  # run unit tests
     python setup.py install
 
-To run the unit tests (optional), you'll also need to install `mock <https://pypi.python.org/pypi/mock>`_ , `moto <https://github.com/spulec/moto>`_ and `responses <https://github.com/getsentry/responses>`_ (``pip install mock moto responses``).
+To run the unit tests (optional), you'll also need to install some other dependencies: see setup.py or run `pip install .[test]`.
 The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
 
 If you're upgrading from ``smart_open`` versions 1.8.0 and below, please check out the `Migration Guide <MIGRATING_FROM_OLDER_VERSIONS.rst>`_.
+
+Version ``2.0`` will introduce a backwards incompatible installation method with regards to the cloud dependencies. A migration path to minimize breaking
+was introduced in version ``x.x.x``. If you want to maintain backwards compatibility (installing all dependencies) install this package via ``smart_open[all]`` now
+and once the change is made you should not have any issues. If all you care about is AWS dependencies for example you can install via ``smart_open[aws]`` and
+once the dependency change is made you will simply drop the unwanted dependencies. You can read more about the motivations `here <https://github.com/RaRe-Technologies/smart_open/issues/443>`_
 
 
 Built-in help
@@ -407,6 +419,11 @@ This can be helpful when e.g. working with compressed files.
     >>> with path.open("r") as infile:
     ...     print(infile.readline()[:41])
     В начале июля, в чрезвычайно жаркое время
+
+Extending ``smart_open``
+========================
+
+See `this document <extending.md>`__.
 
 Comments, bug reports
 =====================

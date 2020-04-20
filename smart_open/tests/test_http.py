@@ -11,6 +11,7 @@ import responses
 
 import smart_open.http
 import smart_open.s3
+import smart_open.constants
 
 
 BYTES = b'i tried so hard and got so far but in the end it doesn\'t even matter'
@@ -75,7 +76,7 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(BYTES[10:20], read_bytes)
 
         self.assertEqual(reader.tell(), 20)
-        reader.seek(10, whence=smart_open.s3.CURRENT)
+        reader.seek(10, whence=smart_open.constants.WHENCE_CURRENT)
         self.assertEqual(reader.tell(), 30)
         read_bytes = reader.read(size=10)
         self.assertEqual(reader.tell(), 40)
@@ -86,7 +87,7 @@ class HttpTest(unittest.TestCase):
         responses.add_callback(responses.GET, URL, callback=request_callback)
         reader = smart_open.http.SeekableBufferedInputBase(URL)
 
-        reader.seek(-10, whence=smart_open.s3.END)
+        reader.seek(-10, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(reader.tell(), len(BYTES) - 10)
         read_bytes = reader.read(size=10)
         self.assertEqual(reader.tell(), len(BYTES))
@@ -144,6 +145,6 @@ class HttpTest(unittest.TestCase):
 
         with smart_open.open(HTTPS_URL, "rb") as fin:
             read_bytes_1 = fin.read(size=10)
-            fin.seek(-10, whence=smart_open.s3.CURRENT)
+            fin.seek(-10, whence=smart_open.constants.WHENCE_CURRENT)
             read_bytes_2 = fin.read(size=10)
             self.assertEqual(read_bytes_1, read_bytes_2)
