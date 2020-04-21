@@ -331,11 +331,7 @@ class ReaderTest(unittest.TestCase):
         put_to_container(blob_name, contents=expected)
 
         # connect to fake Azure Storage Blob and read from the fake key we filled above
-        fin = smart_open.asb.Reader(
-            CONTAINER_NAME,
-            blob_name,
-            client=test_blob_service_client
-        )
+        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
         output = [line.rstrip(b'\n') for line in fin]
         self.assertEqual(output, expected.split(b'\n'))
 
@@ -360,11 +356,7 @@ class ReaderTest(unittest.TestCase):
         put_to_container(blob_name, contents=content)
         logger.debug('content: %r len: %r', content, len(content))
 
-        fin = smart_open.asb.Reader(
-            CONTAINER_NAME,
-            blob_name,
-            client=test_blob_service_client
-        )
+        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
         self.assertEqual(content[14:], fin.read())  # read the rest
@@ -375,11 +367,7 @@ class ReaderTest(unittest.TestCase):
         blob_name = "test_seek_beginning_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        fin = smart_open.asb.Reader(
-            CONTAINER_NAME,
-            blob_name,
-            client=test_blob_service_client
-        )
+        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
 
@@ -395,11 +383,7 @@ class ReaderTest(unittest.TestCase):
         blob_name = "test_seek_start_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        fin = smart_open.asb.Reader(
-            CONTAINER_NAME,
-            blob_name,
-            client=test_blob_service_client
-        )
+        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
         seek = fin.seek(6)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.tell(), 6)
@@ -411,11 +395,7 @@ class ReaderTest(unittest.TestCase):
         blob_name = "test_seek_current_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        fin = smart_open.asb.Reader(
-            CONTAINER_NAME,
-            blob_name,
-            client=test_blob_service_client
-        )
+        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
         self.assertEqual(fin.read(5), b'hello')
         seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
         self.assertEqual(seek, 6)
@@ -427,11 +407,7 @@ class ReaderTest(unittest.TestCase):
         blob_name = "test_seek_end_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        fin = smart_open.asb.Reader(
-            CONTAINER_NAME,
-            blob_name,
-            client=test_blob_service_client
-        )
+        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
         seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
@@ -441,11 +417,7 @@ class ReaderTest(unittest.TestCase):
         blob_name = "test_detect_eof_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        fin = smart_open.asb.Reader(
-            CONTAINER_NAME,
-            blob_name,
-            client=test_blob_service_client
-        )
+        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(content))
@@ -578,7 +550,8 @@ class WriterTest(unittest.TestCase):
         output = list(smart_open.open(
             "asb://%s/%s" % (CONTAINER_NAME, blob_name),
             "rb",
-            transport_params=dict(client=test_blob_service_client)))
+            transport_params=dict(client=test_blob_service_client))
+        )
         self.assertEqual(output, [test_string])
 
     def test_incorrect_input(self):
@@ -599,9 +572,7 @@ class WriterTest(unittest.TestCase):
     def test_write_02(self):
         """Does Azure Storage Blob write unicode-utf8 conversion work?"""
         blob_name = "test_write_02_%s" % BLOB_NAME
-        smart_open_write = smart_open.asb.Writer(CONTAINER_NAME,
-                                                 blob_name,
-                                                 client=test_blob_service_client)
+        smart_open_write = smart_open.asb.Writer(CONTAINER_NAME, blob_name, client=test_blob_service_client)
         smart_open_write.tell()
         logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
@@ -612,9 +583,7 @@ class WriterTest(unittest.TestCase):
         """Do multiple writes work correctly?"""
         # write
         blob_name = "test_write_03_%s" % BLOB_NAME
-        smart_open_write = smart_open.asb.Writer(
-            CONTAINER_NAME, blob_name, client=test_blob_service_client
-        )
+        smart_open_write = smart_open.asb.Writer(CONTAINER_NAME, blob_name, client=test_blob_service_client)
         local_write = io.BytesIO()
 
         with smart_open_write as fout:
@@ -653,11 +622,7 @@ class WriterTest(unittest.TestCase):
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
         blob_name = "test_write_04_%s" % BLOB_NAME
-        smart_open_write = smart_open.asb.Writer(
-            CONTAINER_NAME,
-            blob_name,
-            client=test_blob_service_client
-        )
+        smart_open_write = smart_open.asb.Writer(CONTAINER_NAME, blob_name, client=test_blob_service_client)
         with smart_open_write as fout:  # noqa
             pass
 
@@ -741,24 +706,14 @@ class WriterTest(unittest.TestCase):
 
     def test_double_close(self):
         text = u'там за туманами, вечными, пьяными'.encode('utf-8')
-        fout = smart_open.asb.open(
-            CONTAINER_NAME,
-            'key',
-            'wb',
-            client=test_blob_service_client
-        )
+        fout = smart_open.asb.open(CONTAINER_NAME, 'key', 'wb', client=test_blob_service_client)
         fout.write(text)
         fout.close()
         fout.close()
 
     def test_flush_close(self):
         text = u'там за туманами, вечными, пьяными'.encode('utf-8')
-        fout = smart_open.asb.open(
-            CONTAINER_NAME,
-            'key',
-            'wb',
-            client=test_blob_service_client
-        )
+        fout = smart_open.asb.open(CONTAINER_NAME, 'key', 'wb', client=test_blob_service_client)
         fout.write(text)
         fout.flush()
         fout.close()
