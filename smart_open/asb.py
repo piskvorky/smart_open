@@ -343,7 +343,8 @@ class Writer(io.BufferedIOBase):
         if client is None:
             client = azure.storage.blob.BlobServiceClient()
         self._client = client
-        self._container_client = self._client.get_container_client(container)  # type: azure.storage.blob.ContainerClient
+        self._container_client = self._client.get_container_client(container)
+        # type: azure.storage.blob.ContainerClient
         self._blob = self._container_client.get_blob_client(blob)  # type: azure.storage.blob.BlobClient
         self._min_part_size = min_part_size
 
@@ -445,9 +446,15 @@ class Writer(io.BufferedIOBase):
         self.close()
 
     def __str__(self):
-        return "(%s, %r, %r)" % (self.__class__.__name__, self._container_client.container_name, self._blob.blob_name)
+        return "(%s, %r, %r)" % (
+            self.__class__.__name__,
+            self._container_client.container_name,
+            self._blob.blob_name
+        )
 
     def __repr__(self):
         return "%s(container=%r, blob=%r, min_part_size=%r)" % (
-            self.__class__.__name__, self._container_client.container_name, self._blob.blob_name,
+            self.__class__.__name__,
+            self._container_client.container_name,
+            self._blob.blob_name,
         )
