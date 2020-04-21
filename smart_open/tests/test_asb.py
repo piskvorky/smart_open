@@ -277,11 +277,6 @@ def get_container_client():
     return test_blob_service_client.get_container_client(container=CONTAINER_NAME)
 
 
-def get_blob_client():
-    container_client = get_container_client()
-    return container_client.get_blob_client(BLOB_NAME)
-
-
 def cleanup_container():
     container_client = get_container_client()
     container_client.delete_blobs()
