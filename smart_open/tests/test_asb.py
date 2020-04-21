@@ -248,6 +248,13 @@ class FakeBlobServiceClientTest(unittest.TestCase):
         with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
             self.blob_service_client.get_container_client(container_name)
 
+    def test_get_blob_client(self):
+        container_name = 'test_container'
+        blob_name = 'test-blob.txt'
+        self.blob_service_client.create_container(container_name)
+        blob_client = self.blob_service_client.get_blob_client(container_name, blob_name)
+        self.assertEqual(blob_client.blob_name, blob_name)
+
 
 if DISABLE_MOCKS:
     """If mocks are disabled, allow to use the Azurite local Azure Storage API
