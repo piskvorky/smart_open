@@ -188,7 +188,7 @@ class FakeContainerClientTest(unittest.TestCase):
         data = b'Lorem ipsum'
         self.container_client.upload_blob(blob_name, data)
         blob_client = self.container_client.get_blob_client(blob_name)
-        actual = blob_client.download_blob().read()
+        actual = self.container_client.download_blob(blob_client).read()
         self.assertEqual(actual, data)
 
 
