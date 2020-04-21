@@ -57,7 +57,7 @@ install_requires = [
 
 aws_deps = ['boto3']
 gcp_deps = ['google-cloud-storage']
-asb_deps = ['azure-storage-blob', 'azure-common', 'azure.core.exceptions']
+asb_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 
 all_deps = install_requires + aws_deps + gcp_deps + asb_deps
 

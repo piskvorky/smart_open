@@ -155,14 +155,16 @@ class Reader(io.BufferedIOBase):
     ):
         if client is None:
             client = azure.storage.blob.BlobServiceClient()
-        self._container_client = client.get_container_client(container)  # type: azure.storage.blob.ContainerClient
+        self._container_client = client.get_container_client(container)
+        # type: azure.storage.blob.ContainerClient
 
         self._blob = self._container_client.get_blob_client(blob)
         if self._blob is None:
-            raise azure.core.exceptions.ResourceNotFoundError('blob {} not found in {}'.format(blob, container))
+            raise azure.core.exceptions.ResourceNotFoundError('blob {} not found in {}'
+                                                              .format(blob, container))
         try:
             self._size = self._blob.get_blob_properties()['size']
-        except:
+        except KeyError:
             self._size = 0
 
         self._raw_reader = _RawReader(self._blob, self._size)
@@ -210,7 +212,8 @@ class Reader(io.BufferedIOBase):
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
         if whence not in smart_open.constants.WHENCE_CHOICES:
-            raise ValueError('invalid whence %, expected one of %r' % (whence, smart_open.constants.WHENCE_CHOICES))
+            raise ValueError('invalid whence %, expected one of %r' % (whence,
+                                                                       smart_open.constants.WHENCE_CHOICES))
 
         if whence == smart_open.constants.WHENCE_START:
             new_position = offset
@@ -315,7 +318,9 @@ class Reader(io.BufferedIOBase):
         self.close()
 
     def __str__(self):
-        return "(%s, %r, %r)" % (self.__class__.__name__, self._container.container_name, self._blob.blob_name)
+        return "(%s, %r, %r)" % (self.__class__.__name__,
+                                 self._container.container_name,
+                                 self._blob.blob_name)
 
     def __repr__(self):
         return "%s(container=%r, blob=%r)" % (
