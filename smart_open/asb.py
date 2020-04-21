@@ -160,8 +160,9 @@ class Reader(io.BufferedIOBase):
 
         self._blob = self._container_client.get_blob_client(blob)
         if self._blob is None:
-            raise azure.core.exceptions.ResourceNotFoundError('blob {} not found in {}'
-                                                              .format(blob, container))
+            raise azure.core.exceptions.ResourceNotFoundError(
+                'blob %s not found in %s' % (blob, container)
+            )
         try:
             self._size = self._blob.get_blob_properties()['size']
         except KeyError:

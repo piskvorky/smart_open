@@ -325,7 +325,7 @@ class ReaderTest(unittest.TestCase):
     def test_iter(self):
         """Are Azure Storage Blob files iterated over correctly?"""
         expected = u"hello wořld\nhow are you?".encode('utf8')
-        blob_name = "test_iter_{}".format(BLOB_NAME)
+        blob_name = "test_iter_%s" % BLOB_NAME
         put_to_container(blob_name, contents=expected)
 
         # connect to fake Azure Storage Blob and read from the fake key we filled above
@@ -340,7 +340,7 @@ class ReaderTest(unittest.TestCase):
     def test_iter_context_manager(self):
         # same thing but using a context manager
         expected = u"hello wořld\nhow are you?".encode('utf8')
-        blob_name = "test_iter_context_manager_{}".format(BLOB_NAME)
+        blob_name = "test_iter_context_manager_%s" % BLOB_NAME
         put_to_container(blob_name, contents=expected)
 
         with smart_open.asb.Reader(
@@ -354,7 +354,7 @@ class ReaderTest(unittest.TestCase):
     def test_read(self):
         """Are Azure Storage Blob files read correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
-        blob_name = "test_read_{}".format(BLOB_NAME)
+        blob_name = "test_read_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
         logger.debug('content: %r len: %r', content, len(content))
 
@@ -370,7 +370,7 @@ class ReaderTest(unittest.TestCase):
     def test_seek_beginning(self):
         """Does seeking to the beginning of Azure Storage Blob files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
-        blob_name = "test_seek_beginning_{}".format(BLOB_NAME)
+        blob_name = "test_seek_beginning_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
         fin = smart_open.asb.Reader(
@@ -390,7 +390,7 @@ class ReaderTest(unittest.TestCase):
     def test_seek_start(self):
         """Does seeking from the start of Azure Storage Blob files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
-        blob_name = "test_seek_start_{}".format(BLOB_NAME)
+        blob_name = "test_seek_start_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
         fin = smart_open.asb.Reader(
@@ -406,7 +406,7 @@ class ReaderTest(unittest.TestCase):
     def test_seek_current(self):
         """Does seeking from the middle of Azure Storage Blob files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
-        blob_name = "test_seek_current_{}".format(BLOB_NAME)
+        blob_name = "test_seek_current_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
         fin = smart_open.asb.Reader(
@@ -422,7 +422,7 @@ class ReaderTest(unittest.TestCase):
     def test_seek_end(self):
         """Does seeking from the end of Azure Storage Blob files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
-        blob_name = "test_seek_end_{}".format(BLOB_NAME)
+        blob_name = "test_seek_end_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
         fin = smart_open.asb.Reader(
@@ -436,7 +436,7 @@ class ReaderTest(unittest.TestCase):
 
     def test_detect_eof(self):
         content = u"hello wořld\nhow are you?".encode('utf8')
-        blob_name = "test_detect_eof_{}".format(BLOB_NAME)
+        blob_name = "test_detect_eof_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
         fin = smart_open.asb.Reader(
@@ -456,7 +456,7 @@ class ReaderTest(unittest.TestCase):
         buf.close = lambda: None  # keep buffer open so that we can .getvalue()
         with gzip.GzipFile(fileobj=buf, mode='w') as zipfile:
             zipfile.write(expected)
-        blob_name = "test_read_gzip_{}".format(BLOB_NAME)
+        blob_name = "test_read_gzip_%s" % BLOB_NAME
         put_to_container(blob_name, contents=buf.getvalue())
 
         #
@@ -489,7 +489,7 @@ class ReaderTest(unittest.TestCase):
 
     def test_readline(self):
         content = b'englishman\nin\nnew\nyork\n'
-        blob_name = "test_readline_{}".format(BLOB_NAME)
+        blob_name = "test_readline_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
         with smart_open.asb.Reader(
@@ -509,7 +509,7 @@ class ReaderTest(unittest.TestCase):
 
     def test_readline_tiny_buffer(self):
         content = b'englishman\nin\nnew\nyork\n'
-        blob_name = "test_readline_tiny_buffer_{}".format(BLOB_NAME)
+        blob_name = "test_readline_tiny_buffer_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
         with smart_open.asb.Reader(
@@ -525,7 +525,7 @@ class ReaderTest(unittest.TestCase):
 
     def test_read0_does_not_return_data(self):
         content = b'englishman\nin\nnew\nyork\n'
-        blob_name = "test_read0_does_not_return_data_{}".format(BLOB_NAME)
+        blob_name = "test_read0_does_not_return_data_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
         with smart_open.asb.Reader(
@@ -539,7 +539,7 @@ class ReaderTest(unittest.TestCase):
 
     def test_read_past_end(self):
         content = b'englishman\nin\nnew\nyork\n'
-        blob_name = "test_read_past_end_{}".format(BLOB_NAME)
+        blob_name = "test_read_past_end_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
         with smart_open.asb.Reader(
@@ -564,7 +564,7 @@ class WriterTest(unittest.TestCase):
     def test_write_01(self):
         """Does writing into Azure Storage Blob work correctly?"""
         test_string = u"žluťoučký koníček".encode('utf8')
-        blob_name = "test_write_01_{}".format(BLOB_NAME)
+        blob_name = "test_write_01_%s" % BLOB_NAME
 
         with smart_open.asb.Writer(
                 CONTAINER_NAME,
@@ -574,14 +574,14 @@ class WriterTest(unittest.TestCase):
             fout.write(test_string)
 
         output = list(smart_open.open(
-            "asb://{}/{}".format(CONTAINER_NAME, blob_name),
+            "asb://%s/%s" % (CONTAINER_NAME, blob_name),
             "rb",
             transport_params=dict(client=test_blob_service_client)))
         self.assertEqual(output, [test_string])
 
     def test_incorrect_input(self):
         """Does gcs write fail on incorrect input?"""
-        blob_name = "test_incorrect_input_{}".format(BLOB_NAME)
+        blob_name = "test_incorrect_input_%s" % BLOB_NAME
         try:
             with smart_open.asb.Writer(
                     CONTAINER_NAME,
@@ -596,7 +596,7 @@ class WriterTest(unittest.TestCase):
 
     def test_write_02(self):
         """Does Azure Storage Blob write unicode-utf8 conversion work?"""
-        blob_name = "test_write_02_{}".format(BLOB_NAME)
+        blob_name = "test_write_02_%s" % BLOB_NAME
         smart_open_write = smart_open.asb.Writer(CONTAINER_NAME,
                                                  blob_name,
                                                  client=test_blob_service_client)
@@ -609,7 +609,7 @@ class WriterTest(unittest.TestCase):
     def test_write_03(self):
         """Do multiple writes work correctly?"""
         # write
-        blob_name = "test_write_03_{}".format(BLOB_NAME)
+        blob_name = "test_write_03_%s" % BLOB_NAME
         smart_open_write = smart_open.asb.Writer(
             CONTAINER_NAME, blob_name, client=test_blob_service_client
         )
@@ -641,7 +641,7 @@ class WriterTest(unittest.TestCase):
 
         # read back the same key and check its content
         output = list(smart_open.open(
-            "asb://{}/{}".format(CONTAINER_NAME, blob_name),
+            "asb://%s/%s" % (CONTAINER_NAME, blob_name),
             transport_params=dict(client=test_blob_service_client))
         )
         local_write.seek(0)
@@ -650,7 +650,7 @@ class WriterTest(unittest.TestCase):
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
-        blob_name = "test_write_04_{}".format(BLOB_NAME)
+        blob_name = "test_write_04_%s" % BLOB_NAME
         smart_open_write = smart_open.asb.Writer(
             CONTAINER_NAME,
             blob_name,
@@ -661,14 +661,14 @@ class WriterTest(unittest.TestCase):
 
         # read back the same key and check its content
         output = list(smart_open.open(
-            "asb://{}/{}".format(CONTAINER_NAME, blob_name),
+            "asb://%s/%s" % (CONTAINER_NAME, blob_name),
             transport_params=dict(client=test_blob_service_client))
         )
         self.assertEqual(output, [])
 
     def test_gzip(self):
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
-        blob_name = "test_gzip_{}".format(BLOB_NAME)
+        blob_name = "test_gzip_%s" % BLOB_NAME
         with smart_open.asb.Writer(
                 CONTAINER_NAME,
                 blob_name,
@@ -693,7 +693,7 @@ class WriterTest(unittest.TestCase):
         passes a memoryview object to the underlying stream in python >= 2.7
         """
         expected = u'не думай о секундах свысока'
-        blob_name = "test_buffered_writer_wrapper_works_{}".format(BLOB_NAME)
+        blob_name = "test_buffered_writer_wrapper_works_%s" % BLOB_NAME
 
         with smart_open.asb.Writer(
                 CONTAINER_NAME,
@@ -704,7 +704,7 @@ class WriterTest(unittest.TestCase):
                 sub_out.write(expected.encode('utf-8'))
 
         with smart_open.open(
-                "asb://{}/{}".format(CONTAINER_NAME, blob_name),
+                "asb://%s/%s" % (CONTAINER_NAME, blob_name),
                 'rb',
                 transport_params=dict(client=test_blob_service_client)
         ) as fin:
@@ -715,7 +715,7 @@ class WriterTest(unittest.TestCase):
 
     def test_binary_iterator(self):
         expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
-        blob_name = "test_binary_iterator_{}".format(BLOB_NAME)
+        blob_name = "test_binary_iterator_%s" % BLOB_NAME
         put_to_container(blob_name=blob_name, contents=b"\n".join(expected))
         with smart_open.asb.open(
                 CONTAINER_NAME,
