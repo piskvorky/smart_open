@@ -3,10 +3,10 @@ environment:
     TOX_PARALLEL_NO_SPINNER: 1
 
   matrix:
-  - TOXENV: "check_keys,py27-test,py27-integration"
   - TOXENV: "check_keys,py35-test,py35-integration"
   - TOXENV: "check_keys,py36-test,py36-integration"
   - TOXENV: "check_keys,py37-test,py37-integration"
+  - TOXENV: "check_keys,py38-test,py38-integration"
 
 
 init:
