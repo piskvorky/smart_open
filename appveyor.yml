@@ -2,7 +2,6 @@ environment:
   global:
     TOX_PARALLEL_NO_SPINNER: 1
 
-environment:
   matrix:
   - TOXENV: "check_keys,py27-test,py27-integration"
   - TOXENV: "check_keys,py35-test,py35-integration"
