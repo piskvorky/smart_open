@@ -40,7 +40,6 @@ def register_transport(submodule):
         try:
             submodule = importlib.import_module(submodule)
         except ImportError:
-            logger.warning('unable to import %r, disabling that module', submodule)
             return
 
     if hasattr(submodule, 'SCHEME'):
@@ -64,8 +63,13 @@ def get_transport(scheme):
     This submodule must have been previously registered via :func:`register_transport`.
 
     """
-    message = "scheme %r is not supported, expected one of %r" % (scheme, SUPPORTED_SCHEMES)
-
+    expected = SUPPORTED_SCHEMES
+    readme_url = 'https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst'
+    message = (
+        "Unable to handle scheme %(scheme)r, expected one of %(expected)r. "
+        "Extra dependencies required by %(scheme)r may be missing. "
+        "See <%(readme_url)s> for details." % locals()
+    )
     try:
         submodule = _REGISTRY[scheme]
     except KeyError:

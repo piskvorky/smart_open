@@ -1,6 +1,11 @@
 # Unreleased
 
+  - Prevent smart_open from writing to logs on import (PR [#476](https://github.com/RaRe-Technologies/smart_open/pull/476), [@mpenkov](https://github.com/mpenkov))
   - Modify setup.py to explicitly support Py3.5 and above (PR [#471](https://github.com/RaRe-Technologies/smart_open/pull/471), [@Amertz08](https://github.com/Amertz08))
+
+# 1.11.1, 8 Apr 2020
+
+  - Add missing boto dependency (Issue [#468](https://github.com/RaRe-Technologies/smart_open/issues/468))
 
 # 1.11.0, 8 Apr 2020
 

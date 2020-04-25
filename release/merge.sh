@@ -1,9 +1,9 @@
 #
 # Performs the following tasks:
 #
-# - Merges the current release branch into master
-# - Applies a tag to master
-# - Pushes the updated master branch and its tag to upstream
+# - Merges the current release branch into develop
+# - Applies a tag to develop
+# - Pushes the updated develop branch and its tag to upstream
 #
 # Use it like this:
 #
@@ -18,7 +18,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 #
 # env -i python seems to return the wrong Python version on MacOS...
 #
-my_python=$(which python)
+my_python=$(which python3)
 version=$($my_python -c "from smart_open.version import __version__; print(__version__)")
 
 read -p "Push version $version to github.com? yes or no: " reply
@@ -29,16 +29,16 @@ then
 fi
 
 #
-# Delete the local master branch in case one is left lying around.
+# Delete the local develop branch in case one is left lying around.
 #
 set +e
-git branch -D master
+git branch -D develop
 set -e
 
-git checkout upstream/master -b master
+git checkout upstream/develop -b develop
 git merge --no-ff release-${version}
 git tag -a ${version} -m "${version}"
-git push --tags upstream master
+git push --tags upstream develop
 
 #
 # TODO: we should be able to automate the release note stuff.  It's just a
