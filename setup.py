@@ -55,7 +55,7 @@ install_requires = [
     'requests',
 ]
 
-aws_deps = ['boto3']
+aws_deps = ['boto', 'boto3']
 gcp_deps = ['google-cloud-storage']
 
 all_deps = install_requires + aws_deps + gcp_deps
