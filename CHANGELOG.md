@@ -1,5 +1,8 @@
 # Unreleased
 
+  - Temporarily disable Google Cloud Storage transport mechanism for this release.
+    If you want to use GCS, please use version 1.11 and above.
+
 # 1.10.0, 16 Mar 2020
 
   - Various webhdfs improvements (PR [#383](https://github.com/RaRe-Technologies/smart_open/pull/383), [@mrk-its](https://github.com/mrk-its))
