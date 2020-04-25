@@ -14,7 +14,6 @@ backwards compatibility.
 
 import io
 import logging
-import tempfile
 import os
 import sys
 import hashlib
@@ -28,6 +27,8 @@ import gzip
 
 import smart_open
 from smart_open import smart_open_lib
+
+from .test_smart_open import named_temporary_file
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,7 @@ class SmartOpenHttpTest(unittest.TestCase):
         # TODO: why are these tests writing to temporary files?  We can do the
         # bz2 compression in memory.
         #
-        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as infile:
+        with named_temporary_file('wb', suffix='.bz2', delete=False) as infile:
             test_file = infile.name
 
         with smart_open.smart_open(test_file, 'wb') as outfile:
@@ -671,7 +672,7 @@ class SmartOpenTest(unittest.TestCase):
         text = u'欲しい気持ちが成長しすぎて'
 
         with self.assertRaises(UnicodeEncodeError):
-            with tempfile.NamedTemporaryFile('wb', delete=True) as infile:
+            with named_temporary_file('wb', delete=True) as infile:
                 with smart_open.smart_open(infile.name, 'w', encoding='koi8-r',
                                            errors='strict') as fout:
                     fout.write(text)
@@ -682,7 +683,7 @@ class SmartOpenTest(unittest.TestCase):
         text = u'欲しい気持ちが成長しすぎて'
         expected = u'?' * len(text)
 
-        with tempfile.NamedTemporaryFile('wb', delete=True) as infile:
+        with named_temporary_file('wb', delete=True) as infile:
             with smart_open.smart_open(infile.name, 'w', encoding='koi8-r',
                                        errors='replace') as fout:
                 fout.write(text)
@@ -788,13 +789,13 @@ class CompressionFormatTest(unittest.TestCase):
 
     def test_write_read_gz(self):
         """Can write and read gzip?"""
-        with tempfile.NamedTemporaryFile('wb', suffix='.gz', delete=False) as infile:
+        with named_temporary_file('wb', suffix='.gz', delete=False) as infile:
             test_file_name = infile.name
         self.write_read_assertion(test_file_name)
 
     def test_write_read_bz2(self):
         """Can write and read bz2?"""
-        with tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False) as infile:
+        with named_temporary_file('wb', suffix='.bz2', delete=False) as infile:
             test_file_name = infile.name
         self.write_read_assertion(test_file_name)
 
@@ -851,9 +852,8 @@ class MultistreamsBZ2Test(unittest.TestCase):
     )
 
     def create_temp_bz2(self, streams=1):
-        f = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False)
-        f.write(self.DATA * streams)
-        f.close()
+        with named_temporary_file('wb', suffix='.bz2', delete=False) as f:
+            f.write(self.DATA * streams)
         return f.name
 
     def cleanup_temp_bz2(self, test_file):
