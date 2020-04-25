@@ -38,10 +38,17 @@ SAMPLE_BYTES = SAMPLE_TEXT.encode('utf-8')
 # unwanted quirks.
 #
 # https://docs.python.org/3.8/library/tempfile.html#tempfile.NamedTemporaryFile
+# https://stackoverflow.com/a/58955530
 #
 @contextlib.contextmanager
 def named_temporary_file(mode='w+b', prefix=None, suffix=None, delete=True):
-    handle, pathname = tempfile.mkstemp(prefix=prefix, suffix=suffix)
+    filename = io.StringIO()
+    if prefix:
+        filename.write(prefix)
+    filename.write(os.urandom(8).hex())
+    if suffix:
+        filename.write(suffix)
+    pathname = os.path.join(tempfile.gettempdir(), filename.getvalue())
 
     with open(pathname, mode) as f:
         yield f
