@@ -1,5 +1,7 @@
 # Unreleased
 
+  - Prevent smart_open from writing to logs on import (PR [#476](https://github.com/RaRe-Technologies/smart_open/pull/476), [@mpenkov](https://github.com/mpenkov))
+
 # 1.11.1, 8 Apr 2020
 
   - Add missing boto dependency (Issue [#468](https://github.com/RaRe-Technologies/smart_open/issues/468))
