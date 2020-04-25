@@ -762,10 +762,6 @@ class WebHdfsWriteTest(unittest.TestCase):
 
 @mock.patch('warnings.warn', mock.Mock())
 class CompressionFormatTest(unittest.TestCase):
-    """
-    Test that compression
-    """
-
     TEXT = 'Hello'
 
     def write_read_assertion(self, test_file):
@@ -775,8 +771,15 @@ class CompressionFormatTest(unittest.TestCase):
         with smart_open.smart_open(test_file, 'rb') as fin:
             self.assertEqual(fin.read().decode('utf8'), self.TEXT)
 
-        if os.path.isfile(test_file):
+        try:
             os.unlink(test_file)
+        except PermissionError:
+            #
+            # Work-around for Windows, see:
+            #
+            # <https://github.com/RaRe-Technologies/smart_open/issues/482>
+            #
+            pass
 
     def test_open_gz(self):
         """Can open gzip?"""
