@@ -1,5 +1,7 @@
 # Unreleased
 
+  - Modify setup.py to explicitly support Py3.5 and above (PR [#471](https://github.com/RaRe-Technologies/smart_open/pull/471), [@Amertz08](https://github.com/Amertz08))
+
 # 1.11.0, 8 Apr 2020
 
   - Fix GCS multiple writes (PR [#421](https://github.com/RaRe-Technologies/smart_open/pull/421), [@petedannemann](https://github.com/petedannemann))
