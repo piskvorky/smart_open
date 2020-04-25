@@ -19,7 +19,6 @@ DESCRIPTION
 PACKAGE CONTENTS
     bytebuffer
     doctools
-    gcs
     hdfs
     http
     s3
@@ -298,9 +297,9 @@ DATA
     __all__ = ['open', 'smart_open', 's3_iter_bucket', 'register_compresso...
 
 VERSION
-    1.10.0
+    1.10.1
 
 FILE
-    /home/misha/git/smart_open/smart_open/__init__.py
+    /Users/misha/git/smart_open/smart_open/__init__.py
 
 
