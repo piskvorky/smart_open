@@ -8,6 +8,7 @@
 
 import bz2
 import csv
+import contextlib
 import io
 import unittest
 import logging
@@ -31,6 +32,30 @@ logger = logging.getLogger(__name__)
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 SAMPLE_TEXT = 'Hello, world!'
 SAMPLE_BYTES = SAMPLE_TEXT.encode('utf-8')
+
+
+#
+# For Windows platforms, under which tempfile.NamedTemporaryFile has some
+# unwanted quirks.
+#
+# https://docs.python.org/3.8/library/tempfile.html#tempfile.NamedTemporaryFile
+# https://stackoverflow.com/a/58955530
+#
+@contextlib.contextmanager
+def named_temporary_file(mode='w+b', prefix=None, suffix=None, delete=True):
+    filename = io.StringIO()
+    if prefix:
+        filename.write(prefix)
+    filename.write(os.urandom(8).hex())
+    if suffix:
+        filename.write(suffix)
+    pathname = os.path.join(tempfile.gettempdir(), filename.getvalue())
+
+    with open(pathname, mode) as f:
+        yield f
+
+    if delete:
+        os.unlink(pathname)
 
 
 class ParseUriTest(unittest.TestCase):
@@ -443,7 +468,7 @@ class RealFileSystemTests(unittest.TestCase):
     """Tests that touch the file system via temporary files."""
 
     def setUp(self):
-        with tempfile.NamedTemporaryFile(prefix='test', delete=False) as fout:
+        with named_temporary_file(prefix='test', delete=False) as fout:
             fout.write(SAMPLE_BYTES)
             self.temp_file = fout.name
 
@@ -599,7 +624,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
         `_open_binary_stream()`.
         """
         data = SAMPLE_BYTES * 1000
-        with tempfile.NamedTemporaryFile(prefix='smart_open_tests_', suffix=".bz2", delete=False) as tmpf:
+        with named_temporary_file(prefix='smart_open_tests_', suffix=".bz2", delete=False) as tmpf:
             tmpf.write(bz2.compress(data))
         try:
             with open(tmpf.name, 'rb') as openf:
@@ -1063,7 +1088,7 @@ class SmartOpenTest(unittest.TestCase):
         rows = [{'name': 'alice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
         expected = 'name,color\nalice,aqua\nbob,blue\n'
 
-        with tempfile.NamedTemporaryFile(mode='w') as tmp:
+        with named_temporary_file(mode='w') as tmp:
             with smart_open.open(tmp.name, 'w+', newline='\n') as fout:
                 out = csv.DictWriter(fout, fieldnames=['name', 'color'])
                 out.writeheader()
@@ -1156,7 +1181,7 @@ class SmartOpenTest(unittest.TestCase):
         text = u'欲しい気持ちが成長しすぎて'
 
         with self.assertRaises(UnicodeEncodeError):
-            with tempfile.NamedTemporaryFile('wb', delete=True) as infile:
+            with named_temporary_file('wb', delete=True) as infile:
                 with smart_open.smart_open(infile.name, 'w', encoding='koi8-r',
                                            errors='strict') as fout:
                     fout.write(text)
@@ -1167,7 +1192,7 @@ class SmartOpenTest(unittest.TestCase):
         text = u'欲しい気持ちが成長しすぎて'
         expected = u'?' * len(text)
 
-        with tempfile.NamedTemporaryFile('wb', delete=True) as infile:
+        with named_temporary_file('wb', delete=True) as infile:
             with smart_open.smart_open(infile.name, 'w', encoding='koi8-r',
                                        errors='replace') as fout:
                 fout.write(text)
@@ -1331,9 +1356,8 @@ class MultistreamsBZ2Test(unittest.TestCase):
     )
 
     def create_temp_bz2(self, streams=1):
-        f = tempfile.NamedTemporaryFile('wb', suffix='.bz2', delete=False)
-        f.write(self.DATA * streams)
-        f.close()
+        with named_temporary_file('wb', suffix='.bz2', delete=False) as f:
+            f.write(self.DATA * streams)
         return f.name
 
     def cleanup_temp_bz2(self, test_file):

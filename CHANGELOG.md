@@ -1,6 +1,11 @@
 # Unreleased
 
+<<<<<<< HEAD
   - Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
+=======
+  - Prevent smart_open from writing to logs on import (PR [#476](https://github.com/RaRe-Technologies/smart_open/pull/476), [@mpenkov](https://github.com/mpenkov))
+  - Modify setup.py to explicitly support Py3.5 and above (PR [#471](https://github.com/RaRe-Technologies/smart_open/pull/471), [@Amertz08](https://github.com/Amertz08))
+>>>>>>> 931a5f5fc008d727e8a3b1863ceca3d54215f567
 
 # 1.11.1, 8 Apr 2020
 
