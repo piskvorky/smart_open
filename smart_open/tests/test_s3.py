@@ -525,6 +525,11 @@ class SinglepartWriterTest(unittest.TestCase):
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
 
 
+@unittest.skipIf(
+    os.environ.get('APPVEYOR'),
+    'This test is disabled on AppVeyor, see '
+    '<https://github.com/RaRe-Technologies/smart_open/issues/482>'
+)
 @moto.mock_s3
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
