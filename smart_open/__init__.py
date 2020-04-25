@@ -23,6 +23,12 @@ The main functions are:
 """
 
 import logging
+
+#
+# Prevent regression of #474 and #475
+#
+logging.getLogger(__name__).addHandler(logging.NullHandler())  # noqa: E402
+
 from smart_open import version
 
 from .smart_open_lib import open, parse_uri, smart_open, register_compressor
@@ -36,8 +42,4 @@ __all__ = [
     'smart_open',
 ]
 
-
 __version__ = version.__version__
-
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
