@@ -16,7 +16,7 @@ What?
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
-**Important:** version 1.10 is the last version to support Python 2.7.
+**Important:** version 1.10.1 is the last version to support Python 2.7.
 Versions 1.11 and above will support Python 3 only.
 
 Why?
