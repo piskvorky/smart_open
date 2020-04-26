@@ -1,5 +1,10 @@
 # Unreleased
 
+# 1.10.1, 26 Apr 2020
+
+This is the last version to support Python 2.7.
+Versions 1.11 and above will support Python 3 only.
+
   - Temporarily disable Google Cloud Storage transport mechanism for this release.
     If you want to use GCS, please use version 1.11 and above.
 
