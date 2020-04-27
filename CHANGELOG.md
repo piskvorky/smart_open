@@ -1,7 +1,9 @@
 # Unreleased
 
-# 2.0.0, 27 April 2020
+# 2.0.0, 27 April 2020, "Python 3"
 
+  - **This version supports Python 3 only** (3.5+).
+    - If you still need Python 2, install the smart_open==1.10.1 legacy release instead.
   - Prevent smart_open from writing to logs on import (PR [#476](https://github.com/RaRe-Technologies/smart_open/pull/476), [@mpenkov](https://github.com/mpenkov))
   - Modify setup.py to explicitly support only Py3.5 and above (PR [#471](https://github.com/RaRe-Technologies/smart_open/pull/471), [@Amertz08](https://github.com/Amertz08))
   - Include all the test_data in setup.py (PR [#473](https://github.com/RaRe-Technologies/smart_open/pull/473), [@sikuan](https://github.com/sikuan))
