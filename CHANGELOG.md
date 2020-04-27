@@ -1,7 +1,10 @@
 # Unreleased
-  
+
+# 2.0.0, 27 April 2020
+
   - Prevent smart_open from writing to logs on import (PR [#476](https://github.com/RaRe-Technologies/smart_open/pull/476), [@mpenkov](https://github.com/mpenkov))
   - Modify setup.py to explicitly support only Py3.5 and above (PR [#471](https://github.com/RaRe-Technologies/smart_open/pull/471), [@Amertz08](https://github.com/Amertz08))
+  - Include all the test_data in setup.py (PR [#473](https://github.com/RaRe-Technologies/smart_open/pull/473), [@sikuan](https://github.com/sikuan))
 
 # 1.10.1, 26 April 2020
 
