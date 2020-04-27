@@ -22,7 +22,7 @@ set -u
 
 cd ..
 pip install twine
-python setup.py sdist
+python setup.py sdist bdist_wheel
 
 read -p "Push version $version to PyPI? This step is non-reversible.  Answer yes or no: " reply
 if [ "$reply" != "yes" ]
