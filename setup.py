@@ -55,7 +55,7 @@ install_requires = [
     'requests',
 ]
 
-aws_deps = ['boto3']
+aws_deps = ['boto', 'boto3']
 gcp_deps = ['google-cloud-storage']
 
 all_deps = install_requires + aws_deps + gcp_deps
@@ -95,6 +95,7 @@ setup(
         'gcp': gcp_deps,
         'all': all_deps,
     },
+    python_requires=">=3.5.*",
 
     test_suite="smart_open.tests",
 

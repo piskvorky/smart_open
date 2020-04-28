@@ -53,12 +53,12 @@ python setup.py test
 #
 # Delete the release branch in case one is left lying around.
 #
-git checkout upstream/master
+git checkout upstream/develop
 set +e
 git branch -D release-"$version"
 set -e
 
-git checkout upstream/master -b release-"$version"
+git checkout upstream/develop -b release-"$version"
 echo "__version__ = '$version'" > smart_open/version.py
 git commit smart_open/version.py -m "bump version to $version"
 

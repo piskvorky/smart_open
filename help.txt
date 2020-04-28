@@ -356,7 +356,7 @@ DATA
     __all__ = ['open', 'parse_uri', 'register_compressor', 's3_iter_bucket...
 
 VERSION
-    1.11.0
+    2.0.0
 
 FILE
     /home/misha/git/smart_open/smart_open/__init__.py
