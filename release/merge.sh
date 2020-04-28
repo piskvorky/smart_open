@@ -1,9 +1,29 @@
 #
-# Performs the following tasks:
+# This script performs the following tasks:
 #
-# - Merges the current release branch into develop
-# - Applies a tag to develop
-# - Pushes the updated develop branch and its tag to upstream
+# - Merges the current release branch into master
+# - Applies a tag to master
+# - Merges
+# - Pushes the updated master branch and its tag to upstream
+#
+# - develop: Our development branch.  We merge all PRs into this branch.
+# - release-$version: A local branch containing commits specific to this release.
+#   This is a local-only branch, we never push this anywhere.
+# - master: Our "clean" release branch.  Contains tags.
+#
+# The relationships between the three branches are illustrated below:
+#
+#   github.com PRs
+#          \
+# develop --+--+----------------------------------+---
+#               \                                /
+#   (new branch) \ commits (CHANGELOG.md, etc)  /
+#                 \   v                        /
+# release          ---*-----X (delete branch) / (merge 2)
+#                         \                  /
+#                (merge 1) \       TAG      /
+#                           \       v      /
+# master  -------------------+------*-----+-----------
 #
 # Use it like this:
 #
@@ -33,12 +53,24 @@ fi
 #
 set +e
 git branch -D develop
+git branch -D master
 set -e
 
-git checkout upstream/develop -b develop
+git checkout upstream/master -b master
 git merge --no-ff release-${version}
 git tag -a ${version} -m "${version}"
-git push --tags upstream develop
+
+git checkout upstream/develop -b develop
+git merge --no-ff master
+
+#
+# N.B. these push steps are non-reversible.
+#
+git checkout master
+git push --tags upstream master
+
+git checkout develop
+git push upstream develop
 
 #
 # TODO: we should be able to automate the release note stuff.  It's just a
