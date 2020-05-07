@@ -91,7 +91,7 @@ class TestVersionId(unittest.TestCase):
         """Does passing an invalid version_id exception into the s3 submodule get handled correctly?"""
         params = {'version_id': 'bad-version-does-not-exist'}
         with self.assertRaises(IOError):
-            open(self.url, 'rb', transport_params=params)
+            open(self.url, 'rb', transport_params=params).read()
 
     def test_bad_mode(self):
         """Do we correctly handle non-None version when writing?"""
