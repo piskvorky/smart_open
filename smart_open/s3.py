@@ -45,6 +45,9 @@ URI_EXAMPLES = (
 _UPLOAD_ATTEMPTS = 6
 _SLEEP_SECONDS = 10
 
+# Returned by AWS when we try to seek beyond EOF.
+_OUT_OF_RANGE = 'Requested Range Not Satisfiable'
+
 
 def parse_uri(uri_as_string):
     #
@@ -266,11 +269,21 @@ def _get(s3_object, version=None, **kwargs):
     try:
         return s3_object.get(**kwargs)
     except botocore.client.ClientError as error:
-        raise IOError(
+        wrapped_error = IOError(
             'unable to access bucket: %r key: %r version: %r error: %s' % (
                 s3_object.bucket_name, s3_object.key, version, error
             )
-        ) from error
+        )
+        wrapped_error.backend_error = error
+        raise wrapped_error from error
+
+
+def _unwrap_ioerror(ioe):
+    """Given an IOError from _get, return the 'Error' dictionary from boto."""
+    try:
+        return ioe.backend_error.response['Error']
+    except (AttributeError, KeyError):
+        return None
 
 
 class _SeekableRawReader(object):
@@ -293,7 +306,8 @@ class _SeekableRawReader(object):
         :param int offset: The offset in bytes.
         :param int whence: Where the offset is from.
 
-        Returns the position after seeking.
+        :returns: the position after seeking.
+        :rtype: int
         """
         if whence not in constants.WHENCE_CHOICES:
             raise ValueError('invalid whence, expected one of %r' % constants.WHENCE_CHOICES)
@@ -315,22 +329,41 @@ class _SeekableRawReader(object):
         else:
             stop = max(0, -offset)
 
-        if self._content_length is not None and \
-                ((start is not None and start >= self._content_length) or stop == 0):
-            # avoid calling _load_body() if we are at the end of the file
+        #
+        # If we can figure out that we've read past the EOF, then we can save
+        # an extra API call.
+        #
+        if self._content_length is None:
+            reached_eof = False
+        elif start is not None and start >= self._content_length:
+            reached_eof = True
+        elif stop == 0:
+            reached_eof = True
+        else:
+            reached_eof = False
+
+        if reached_eof:
             self._body = io.BytesIO()
             self._position = self._content_length
         else:
-            range_string = smart_open.utils.make_range_string(start, stop)
-            self._load_body(range_string)  # sets self._position
+            self._open_body(start, stop)
 
         return self._position
 
-    def _load_body(self, range_string=None):
-        """Build a continuous connection with the remote peer starts from the current postion.
+    def _open_body(self, start=None, stop=None):
+        """Open a connection to download the specified range of bytes. Store
+        the open file handle in self._body.
+
+        If no range is specified, start defaults to self._position.
+        start and stop follow the semantics of the http range header,
+        so a stop without a start will read bytes beginning at stop.
+
+        As a side effect, set self._content_length. Set self._position
+        to self._content_length if start is past end of file.
         """
-        if range_string is None:
-            range_string = smart_open.utils.make_range_string(self._position)
+        if start is None and stop is None:
+            start = self._position
+        range_string = smart_open.utils.make_range_string(start, stop)
         logger.debug('range_string: %r', range_string)
 
         try:
@@ -341,32 +374,24 @@ class _SeekableRawReader(object):
                 Range=range_string,
                 **self._object_kwargs
             )
-        except IOError as error:
-            # If we didn't know _content_length yet in .seek(), we may have requested an
-            # invalid range. In that case, set _position and _content_length from the actual
-            # object size returned by S3.
-            orig_error = error.__context__
-            aws_error = (
-                orig_error
-                and hasattr(orig_error, 'response')
-                and orig_error.response.get('Error', {})
-            )
-            if aws_error and aws_error.get('Message') == 'Requested Range Not Satisfiable':
-                if 'ActualObjectSize' in aws_error:
-                    self._position = self._content_length = int(aws_error['ActualObjectSize'])
-                else:
-                    # this shouldn't happen with real S3,
-                    # but does happen with moto which seems to lack ActualObjectSize
-                    self._position = self._content_length = _get(
-                        self._object,
-                        version=self._version_id,
-                        **self._object_kwargs
-                    )['ContentLength']
-                self._body = io.BytesIO()
-                return
-            raise
+        except IOError as ioe:
+            # Handle requested content range exceeding content size.
+            error_response = _unwrap_ioerror(ioe)
+            if error_response is None or error_response.get('Message') != _OUT_OF_RANGE:
+                raise
+            try:
+                self._position = self._content_length = int(error_response['ActualObjectSize'])
+            except KeyError:
+                # This shouldn't happen with real S3, but moto lacks ActualObjectSize.
+                # Reported at https://github.com/spulec/moto/issues/2981
+                self._position = self._content_length = _get(
+                    self._object,
+                    version=self._version_id,
+                    **self._object_kwargs
+                )['ContentLength']
+            self._body = io.BytesIO()
+            return
         else:
-            # Set _position and _content_length from the content-range header returned by S3.
             units, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
             self._content_length = length
             self._position = start
@@ -382,8 +407,8 @@ class _SeekableRawReader(object):
     def read(self, size=-1):
         """Read from the continuous connection with the remote peer."""
         if self._body is None:
-            # In the first read() after __init__(), self._body does not exist.
-            self._load_body()
+            # This is necessary for the very first read() after __init__().
+            self._open_body()
         if self._position >= self._content_length:
             return b''
 
@@ -391,7 +416,7 @@ class _SeekableRawReader(object):
             binary = self._read_from_body(size)
         except botocore.exceptions.IncompleteReadError:
             # The underlying connection of the self._body was closed by the remote peer.
-            self._load_body()
+            self._open_body()
             binary = self._read_from_body(size)
         self._position += len(binary)
         return binary
@@ -456,10 +481,9 @@ class Reader(io.BufferedIOBase):
         if size == 0:
             return b''
         elif size < 0:
-            from_buf = self._read_from_buffer()
             # call read() before setting _current_pos to make sure _content_length is set
-            out = from_buf + self._raw_reader.read()
-            self._current_pos = self._content_length
+            out = self._read_from_buffer() + self._raw_reader.read()
+            self._current_pos = self._raw_reader._content_length
             return out
 
         #
@@ -526,12 +550,17 @@ class Reader(io.BufferedIOBase):
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
 
-        self._raw_reader._position = self._current_pos
+        # Convert relative offset to absolute, since self._raw_reader
+        # doesn't know our current position.
+        if whence == constants.WHENCE_CURRENT:
+            whence = constants.WHENCE_START
+            offset += self._current_pos
+
         self._current_pos = self._raw_reader.seek(offset, whence)
         logger.debug('new_position: %r', self._current_pos)
 
         self._buffer.empty()
-        self._eof = self._current_pos == self._content_length
+        self._eof = self._current_pos == self._raw_reader._content_length
         return self._current_pos
 
     def tell(self):
@@ -565,10 +594,6 @@ class Reader(io.BufferedIOBase):
     #
     # Internal methods.
     #
-    @property
-    def _content_length(self):
-        return self._raw_reader._content_length
-
     def _read_from_buffer(self, size=-1):
         """Remove at most size bytes from our buffer and return them."""
         # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
