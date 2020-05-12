@@ -1250,9 +1250,7 @@ class WebHdfsWriteTest(unittest.TestCase):
 
 
 class CompressionFormatTest(unittest.TestCase):
-    """
-    Test that compression
-    """
+    """Test transparent (de)compression."""
 
     def write_read_assertion(self, suffix):
         test_file = make_buffer(name='file' + suffix)
