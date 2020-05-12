@@ -163,7 +163,7 @@ def extract_examples_from_readme_rst(indent='    '):
         start = lines.index('.. _doctools_before_examples:\n')
         end = lines.index(".. _doctools_after_examples:\n")
         lines = lines[start+4:end-2]
-        return ''.join([indent + re.sub('^  ', '', l) for l in lines])
+        return ''.join([indent + re.sub('^  ', '', line) for line in lines])
     except Exception:
         return indent + 'See README.rst'
 
