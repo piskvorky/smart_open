@@ -74,10 +74,9 @@ def compression_wrapper(file_obj, mode, filename=None):
     file_obj.
 
     """
-    if filename is None:
-        filename = file_obj.name
-
     try:
+        if filename is None:
+            filename = file_obj.name
         _, ext = os.path.splitext(filename)
     except (AttributeError, TypeError):
         logger.warning(
