@@ -1,6 +1,7 @@
 # Unreleased
 
   - Prevent smart_open from writing to logs on import (PR [#476](https://github.com/RaRe-Technologies/smart_open/pull/476), [@mpenkov](https://github.com/mpenkov))
+  - Prevent regression of #474 and #475 (PR [#486](https://github.com/RaRe-Technologies/smart_open/pull/486), [@mpenkov](https://github.com/mpenkov))
 
 # 1.11.1, 8 Apr 2020
 
