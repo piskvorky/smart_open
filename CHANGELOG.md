@@ -1,7 +1,6 @@
 # Unreleased
 
   - Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
-  - Prevent regression of #474 and #475 (PR [#486](https://github.com/RaRe-Technologies/smart_open/pull/486), [@mpenkov](https://github.com/mpenkov))
   
 # 2.0.0, 27 April 2020, "Python 3"
 
