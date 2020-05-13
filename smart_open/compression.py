@@ -68,7 +68,7 @@ def compression_wrapper(file_obj, mode, filename=None):
     [de]compression mechanism based on the extension of the filename.
 
     file_obj must either be a filehandle object, or a class which behaves
-    like one. It must have a .name attribute unless `filename` is given.
+    like one. It must have a .name attribute unless ``filename`` is given.
 
     If the filename extension isn't recognized, will simply return the original
     file_obj.
