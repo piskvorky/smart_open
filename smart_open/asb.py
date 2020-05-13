@@ -71,7 +71,7 @@ def open(
         The mode for opening the object.  Must be either "rb" or "wb".
     buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
-    client: azure.storage.blob.azure.storage.blob.BlobServiceClient, optional
+    client: azure.storage.blob.BlobServiceClient, optional
         The Azure Storage Blob client to use when working with azure-storage-blob.
 
     """
