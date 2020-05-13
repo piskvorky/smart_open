@@ -62,20 +62,22 @@ def _handle_gzip(file_obj, mode):
     return gzip.GzipFile(fileobj=file_obj, mode=mode)
 
 
-def compression_wrapper(file_obj, mode):
+def compression_wrapper(file_obj, mode, filename=None):
     """
     This function will wrap the file_obj with an appropriate
     [de]compression mechanism based on the extension of the filename.
 
     file_obj must either be a filehandle object, or a class which behaves
-        like one.  It must have a .name attribute.
+    like one. It must have a .name attribute unless ``filename`` is given.
 
     If the filename extension isn't recognized, will simply return the original
     file_obj.
-    """
 
+    """
     try:
-        _, ext = os.path.splitext(file_obj.name)
+        if filename is None:
+            filename = file_obj.name
+        _, ext = os.path.splitext(filename)
     except (AttributeError, TypeError):
         logger.warning(
             'unable to transparently decompress %r because it '
