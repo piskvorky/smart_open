@@ -63,8 +63,8 @@ def open(
 
     Parameters
     ----------
-    bucket_id: str
-        The name of the bucket this object resides in.
+    container_id: str
+        The name of the container this object resides in.
     blob_id: str
         The name of the blob within the bucket.
     mode: str

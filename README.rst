@@ -205,11 +205,11 @@ More examples
         fout.write(b'hello world')
 
     # stream from ASB
-    for line in open('asb://mybucket/myfile.txt'):
+    for line in open('asb://mycontainer/myfile.txt'):
         print(line)
 
     # stream content *into* ASB (write mode):
-    with open('asb://mybucket/my_file.txt', 'wb') as fout:
+    with open('asb://mycontainer/my_file.txt', 'wb') as fout:
         fout.write(b'hello world')
 
 Supported Compression Formats
@@ -399,7 +399,7 @@ to setting up GCS authentication with a service account.
     from azure.storage.blob import BlobServiceClient
     azure_storage_connection_string = os.environ['AZURE_STORAGE_CONNECTION_STRING']
     client = BlobServiceClient.from_connection_string(azure_storage_connection_string)
-    fin = open('asb://my_bucket/my_blob.txt', transport_params=dict(client=client))
+    fin = open('asb://my_container/my_blob.txt', transport_params=dict(client=client))
 
 If you need more credential options, refer to the
 `ASB authentication guide <https://docs.microsoft.com/en-us/azure/storage/common/storage-samples-python#authentication>`__.

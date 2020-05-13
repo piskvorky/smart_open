@@ -3,7 +3,6 @@ import io
 import os
 
 import azure.storage.blob
-from six.moves.urllib import parse as urlparse
 
 import smart_open
 
