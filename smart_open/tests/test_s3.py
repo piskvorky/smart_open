@@ -525,6 +525,11 @@ class SinglepartWriterTest(unittest.TestCase):
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
 
 
+@unittest.skipIf(
+    os.environ.get('APPVEYOR'),
+    'This test is disabled on AppVeyor, see '
+    '<https://github.com/RaRe-Technologies/smart_open/issues/482>'
+)
 @moto.mock_s3
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
@@ -629,6 +634,11 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(expected))
 
 
+@unittest.skipIf(
+    os.environ.get('APPVEYOR'),
+    'This test is disabled on AppVeyor, see '
+    '<https://github.com/RaRe-Technologies/smart_open/issues/482>'
+)
 @moto.mock_s3
 @unittest.skipIf(not smart_open.concurrency._MULTIPROCESSING, 'multiprocessing unavailable')
 class IterBucketMultiprocessingTest(unittest.TestCase):

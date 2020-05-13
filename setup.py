@@ -95,6 +95,7 @@ setup(
         'gcp': gcp_deps,
         'all': all_deps,
     },
+    python_requires=">=3.5.*",
 
     test_suite="smart_open.tests",
 
