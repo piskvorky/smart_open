@@ -382,6 +382,28 @@ and pass it to the Client. To create an API token for use in the example below, 
 	client = Client(credentials=credentials)
 	fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
+ASB Credentials
+---------------
+``smart_open`` uses the ``azure-storage-blob`` library to talk to ASB.
+By default, ``smart_open`` will defer to ``azure-storage-blob`` and let it take care of the credentials.
+
+To override this behavior, pass a ``azure.storage.blob.BlobServiceClient`` object as a transport parameter to the ``open`` function.
+You can `customize the credentials <https://docs.microsoft.com/en-us/azure/storage/common/storage-samples-python#authentication>`__
+when constructing the client. ``smart_open`` will then use the client when talking to ASB. To follow allow with
+the example below, `refer to Azure's guide <https://docs.microsoft.com/en-us/azure/storage/blobs/storage-quickstart-blobs-python#copy-your-credentials-from-the-azure-portal>`__
+to setting up GCS authentication with a service account.
+
+.. code-block:: python
+
+    import os
+    from azure.storage.blob import BlobServiceClient
+    azure_storage_connection_string = os.environ['AZURE_STORAGE_CONNECTION_STRING']
+    client = BlobServiceClient.from_connection_string(azure_storage_connection_string)
+    fin = open('asb://my_bucket/my_blob.txt', transport_params=dict(client=client))
+
+If you need more credential options, refer to the
+`ASB authentication guide <https://docs.microsoft.com/en-us/azure/storage/common/storage-samples-python#authentication>`__.
+
 File-like Binary Streams
 ------------------------
 

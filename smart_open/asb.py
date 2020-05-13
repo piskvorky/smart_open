@@ -57,7 +57,7 @@ def open(
         blob_id,
         mode,
         buffer_size=DEFAULT_BUFFER_SIZE,
-        client=None,  # type: azure.storage.blob.azure.storage.blob.BlobServiceClient
+        client=None,  # type: azure.storage.blob.BlobServiceClient
         ):
     """Open an Azure Storage Blob blob for reading or writing.
 
