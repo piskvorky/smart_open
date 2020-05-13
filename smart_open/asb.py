@@ -41,8 +41,17 @@ https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-bl
 def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
-    container_id = sr.netloc
-    blob_id = sr.path.lstrip('/')
+    first = sr.netloc
+    second = sr.path.lstrip('/')
+
+    # https://docs.microsoft.com/en-us/rest/api/storageservices/working-with-the-root-container
+    if not second:
+        container_id = '$root'
+        blob_id = first
+    else:
+        container_id = first
+        blob_id = second
+
     return dict(scheme=SCHEME, container_id=container_id, blob_id=blob_id)
 
 
