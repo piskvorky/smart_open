@@ -7,6 +7,7 @@
 #
 
 import bz2
+import csv
 import contextlib
 import io
 import unittest
@@ -911,7 +912,6 @@ class SmartOpenReadTest(unittest.TestCase):
 
         self.assertEqual(content[14:], smart_open_object.read())  # read the rest
 
-    @unittest.skip('seek functionality for S3 currently disabled because of Issue #152')
     @mock_s3
     def test_s3_seek_moto(self):
         """Does seeking in S3 files work correctly?"""
@@ -1075,6 +1075,29 @@ class SmartOpenTest(unittest.TestCase):
             with smart_open.smart_open("/some/file.txt", "wb+") as fout:
                 mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1)
                 fout.write(self.as_bytes)
+
+    def test_newline(self):
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
+            smart_open.smart_open("/some/file.txt", "wb+", newline='\n')
+            mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1, newline='\n')
+
+    def test_newline_csv(self):
+        #
+        # See https://github.com/RaRe-Technologies/smart_open/issues/477
+        #
+        rows = [{'name': 'alice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
+        expected = 'name,color\nalice,aqua\nbob,blue\n'
+
+        with named_temporary_file(mode='w') as tmp:
+            with smart_open.open(tmp.name, 'w+', newline='\n') as fout:
+                out = csv.DictWriter(fout, fieldnames=['name', 'color'])
+                out.writeheader()
+                out.writerows(rows)
+
+            with open(tmp.name, 'r') as fin:
+                content = fin.read()
+
+        assert content == expected
 
     @mock.patch('boto3.Session')
     def test_s3_mode_mock(self, mock_session):
