@@ -6,9 +6,9 @@ smart_open — utils for streaming large files in Python
 |License|_ |Travis|_ |Appveyor|_ |Coveralls|_ |Downloads|_
 
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
-.. |Travis| image:: https://travis-ci.org/RaRe-Technologies/smart_open.svg?branch=master
-.. |Appveyor| image:: https://ci.appveyor.com/api/projects/status/47py3gwhmt9tr74w/branch/master?svg=true
-.. |Coveralls| image:: https://coveralls.io/repos/github/RaRe-Technologies/smart_open/badge.svg?branch=HEAD
+.. |Travis| image:: https://travis-ci.org/RaRe-Technologies/smart_open.svg?branch=develop
+.. |Appveyor| image:: https://ci.appveyor.com/api/projects/status/47py3gwhmt9tr74w/branch/develop?svg=true
+.. |Coveralls| image:: https://coveralls.io/repos/github/RaRe-Technologies/smart_open/badge.svg?branch=develop
 .. |Downloads| image:: https://pepy.tech/badge/smart-open/month
 .. _License: https://github.com/RaRe-Technologies/smart_open/blob/master/LICENSE
 .. _Travis: https://travis-ci.org/RaRe-Technologies/smart_open
@@ -24,7 +24,7 @@ What?
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
-**Python 2.7 is no longer supported. If you need Python 2.7, please use** `smart_open 1.10.0 <https://github.com/RaRe-Technologies/smart_open/releases/tag/1.10.0>`_, **the last version to support Python 2.**
+**Python 2.7 is no longer supported. If you need Python 2.7, please use** `smart_open 1.10.1 <https://github.com/RaRe-Technologies/smart_open/releases/tag/1.10.0>`_, **the last version to support Python 2.**
 
 Why?
 ====
