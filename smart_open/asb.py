@@ -213,7 +213,7 @@ class Reader(io.BufferedIOBase):
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
         if whence not in smart_open.constants.WHENCE_CHOICES:
-            raise ValueError('invalid whence %, expected one of %r' % (whence,
+            raise ValueError('invalid whence %i, expected one of %r' % (whence,
                                                                        smart_open.constants.WHENCE_CHOICES))
 
         if whence == smart_open.constants.WHENCE_START:
@@ -464,4 +464,5 @@ class Writer(io.BufferedIOBase):
             self.__class__.__name__,
             self._container_client.container_name,
             self._blob.blob_name,
+            self._min_part_size
         )
