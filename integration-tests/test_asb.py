@@ -7,16 +7,22 @@ import azure.storage.blob
 import smart_open
 
 _ASB_CONTAINER = os.environ.get('SO_ASB_CONTAINER')
+_AZURE_STORAGE_CONNECTION_STRING = os.environ.get('AZURE_STORAGE_CONNECTION_STRING')
+_FILE_PREFIX = '%s://%s' % (smart_open.asb.SCHEME, _ASB_CONTAINER)
+
 assert _ASB_CONTAINER is not None, 'please set the SO_ASB_URL environment variable'
+assert _AZURE_STORAGE_CONNECTION_STRING is not None, 'please set the AZURE_STORAGE_CONNECTION_STRING environment variable'
 
 
 def initialize_bucket():
-    blob_service_client = azure.storage.blob.BlobServiceClient()
+    # type: () -> azure.storage.blob.BlobServiceClient
+    blob_service_client = azure.storage.blob.BlobServiceClient.from_connection_string(_AZURE_STORAGE_CONNECTION_STRING)
     container_client = blob_service_client.get_container_client(_ASB_CONTAINER)
-    container_client.create_container()
     blobs = container_client.list_blobs()
     for blob in blobs:
-        blob.delete()
+        container_client.delete_blob(blob=blob)
+
+    return blob_service_client
 
 
 def write_read(key, content, write_mode, read_mode, **kwargs):
@@ -40,69 +46,69 @@ def read_length_prefixed_messages(key, read_mode, **kwargs):
 
 
 def test_asb_readwrite_text(benchmark):
-    initialize_bucket()
+    client = initialize_bucket()
 
-    key = _ASB_CONTAINER + '/sanity.txt'
+    key = _FILE_PREFIX + '/sanity.txt'
     text = 'с гранатою в кармане, с чекою в руке'
-    actual = benchmark(write_read, key, text, 'w', 'r', encoding='utf-8')
+    actual = benchmark(write_read, key, text, 'w', 'r', encoding='utf-8', transport_params=dict(client=client))
     assert actual == text
 
 
 def test_asb_readwrite_text_gzip(benchmark):
-    initialize_bucket()
+    client = initialize_bucket()
 
-    key = _ASB_CONTAINER + '/sanity.txt.gz'
+    key = _FILE_PREFIX + '/sanity.txt.gz'
     text = 'не чайки здесь запели на знакомом языке'
-    actual = benchmark(write_read, key, text, 'w', 'r', encoding='utf-8')
+    actual = benchmark(write_read, key, text, 'w', 'r', encoding='utf-8', transport_params=dict(client=client))
     assert actual == text
 
 
 def test_asb_readwrite_binary(benchmark):
-    initialize_bucket()
+    client = initialize_bucket()
 
-    key = _ASB_CONTAINER + '/sanity.txt'
+    key = _FILE_PREFIX + '/sanity.txt'
     binary = b'this is a test'
-    actual = benchmark(write_read, key, binary, 'wb', 'rb')
+    actual = benchmark(write_read, key, binary, 'wb', 'rb', transport_params=dict(client=client))
     assert actual == binary
 
 
 def test_asb_readwrite_binary_gzip(benchmark):
-    initialize_bucket()
+    client = initialize_bucket()
 
-    key = _ASB_CONTAINER + '/sanity.txt.gz'
+    key = _FILE_PREFIX + '/sanity.txt.gz'
     binary = b'this is a test'
-    actual = benchmark(write_read, key, binary, 'wb', 'rb')
+    actual = benchmark(write_read, key, binary, 'wb', 'rb', transport_params=dict(client=client))
     assert actual == binary
 
 
 def test_asb_performance(benchmark):
-    initialize_bucket()
+    client = initialize_bucket()
 
     one_megabyte = io.BytesIO()
     for _ in range(1024*128):
         one_megabyte.write(b'01234567')
     one_megabyte = one_megabyte.getvalue()
 
-    key = _ASB_CONTAINER + '/performance.txt'
-    actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
+    key = _FILE_PREFIX + '/performance.txt'
+    actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb', transport_params=dict(client=client))
     assert actual == one_megabyte
 
 
 def test_asb_performance_gz(benchmark):
-    initialize_bucket()
+    client = initialize_bucket()
 
     one_megabyte = io.BytesIO()
     for _ in range(1024*128):
         one_megabyte.write(b'01234567')
     one_megabyte = one_megabyte.getvalue()
 
-    key = _ASB_CONTAINER + '/performance.txt.gz'
-    actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
+    key = _FILE_PREFIX + '/performance.txt.gz'
+    actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb', transport_params=dict(client=client))
     assert actual == one_megabyte
 
 
 def test_asb_performance_small_reads(benchmark):
-    initialize_bucket()
+    client = initialize_bucket()
 
     ONE_MIB = 1024**2
     one_megabyte_of_msgs = io.BytesIO()
@@ -111,10 +117,10 @@ def test_asb_performance_small_reads(benchmark):
         one_megabyte_of_msgs.write(msg)
     one_megabyte_of_msgs = one_megabyte_of_msgs.getvalue()
 
-    key = _ASB_CONTAINER + '/many_reads_performance.bin'
+    key = _FILE_PREFIX + '/many_reads_performance.bin'
 
-    with smart_open.open(key, 'wb') as fout:
+    with smart_open.open(key, 'wb', transport_params=dict(client=client)) as fout:
         fout.write(one_megabyte_of_msgs)
 
-    actual = benchmark(read_length_prefixed_messages, key, 'rb', buffering=ONE_MIB)
+    actual = benchmark(read_length_prefixed_messages, key, 'rb', buffering=ONE_MIB, transport_params=dict(client=client))
     assert actual == one_megabyte_of_msgs

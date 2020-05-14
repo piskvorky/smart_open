@@ -37,7 +37,7 @@ DEFAULT_BUFFER_SIZE = 4 * 1024**2
 https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs
 """
 
-
+# TODO: add tests for root container
 def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
