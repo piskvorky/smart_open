@@ -4,6 +4,8 @@ import os
 
 import azure.storage.blob
 
+from pytest import fixture
+
 import smart_open
 
 _ASB_CONTAINER = os.environ.get('SO_ASB_CONTAINER')
@@ -14,15 +16,17 @@ assert _ASB_CONTAINER is not None, 'please set the SO_ASB_URL environment variab
 assert _AZURE_STORAGE_CONNECTION_STRING is not None, 'please set the AZURE_STORAGE_CONNECTION_STRING environment variable'
 
 
-def initialize_bucket():
+@fixture
+def client():
     # type: () -> azure.storage.blob.BlobServiceClient
-    blob_service_client = azure.storage.blob.BlobServiceClient.from_connection_string(_AZURE_STORAGE_CONNECTION_STRING)
-    container_client = blob_service_client.get_container_client(_ASB_CONTAINER)
+    return azure.storage.blob.BlobServiceClient.from_connection_string(_AZURE_STORAGE_CONNECTION_STRING)
+
+
+def initialize_bucket(client):
+    container_client = client.get_container_client(_ASB_CONTAINER)
     blobs = container_client.list_blobs()
     for blob in blobs:
         container_client.delete_blob(blob=blob)
-
-    return blob_service_client
 
 
 def write_read(key, content, write_mode, read_mode, **kwargs):
@@ -45,8 +49,8 @@ def read_length_prefixed_messages(key, read_mode, **kwargs):
     return result.getvalue()
 
 
-def test_asb_readwrite_text(benchmark):
-    client = initialize_bucket()
+def test_asb_readwrite_text(benchmark, client):
+    initialize_bucket(client)
 
     key = _FILE_PREFIX + '/sanity.txt'
     text = 'с гранатою в кармане, с чекою в руке'
@@ -54,8 +58,8 @@ def test_asb_readwrite_text(benchmark):
     assert actual == text
 
 
-def test_asb_readwrite_text_gzip(benchmark):
-    client = initialize_bucket()
+def test_asb_readwrite_text_gzip(benchmark, client):
+    initialize_bucket(client)
 
     key = _FILE_PREFIX + '/sanity.txt.gz'
     text = 'не чайки здесь запели на знакомом языке'
@@ -63,8 +67,8 @@ def test_asb_readwrite_text_gzip(benchmark):
     assert actual == text
 
 
-def test_asb_readwrite_binary(benchmark):
-    client = initialize_bucket()
+def test_asb_readwrite_binary(benchmark, client):
+    initialize_bucket(client)
 
     key = _FILE_PREFIX + '/sanity.txt'
     binary = b'this is a test'
@@ -72,8 +76,8 @@ def test_asb_readwrite_binary(benchmark):
     assert actual == binary
 
 
-def test_asb_readwrite_binary_gzip(benchmark):
-    client = initialize_bucket()
+def test_asb_readwrite_binary_gzip(benchmark, client):
+    initialize_bucket(client)
 
     key = _FILE_PREFIX + '/sanity.txt.gz'
     binary = b'this is a test'
@@ -81,8 +85,8 @@ def test_asb_readwrite_binary_gzip(benchmark):
     assert actual == binary
 
 
-def test_asb_performance(benchmark):
-    client = initialize_bucket()
+def test_asb_performance(benchmark, client):
+    initialize_bucket(client)
 
     one_megabyte = io.BytesIO()
     for _ in range(1024*128):
@@ -94,8 +98,8 @@ def test_asb_performance(benchmark):
     assert actual == one_megabyte
 
 
-def test_asb_performance_gz(benchmark):
-    client = initialize_bucket()
+def test_asb_performance_gz(benchmark, client):
+    initialize_bucket(client)
 
     one_megabyte = io.BytesIO()
     for _ in range(1024*128):
@@ -107,8 +111,8 @@ def test_asb_performance_gz(benchmark):
     assert actual == one_megabyte
 
 
-def test_asb_performance_small_reads(benchmark):
-    client = initialize_bucket()
+def test_asb_performance_small_reads(benchmark, client):
+    initialize_bucket(client)
 
     ONE_MIB = 1024**2
     one_megabyte_of_msgs = io.BytesIO()
