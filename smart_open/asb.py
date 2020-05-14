@@ -37,7 +37,7 @@ DEFAULT_BUFFER_SIZE = 4 * 1024**2
 https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs
 """
 
-# TODO: add tests for root container
+
 def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
@@ -65,8 +65,8 @@ def open(
         container_id,
         blob_id,
         mode,
+        client,  # type: azure.storage.blob.BlobServiceClient
         buffer_size=DEFAULT_BUFFER_SIZE,
-        client=None,  # type: azure.storage.blob.BlobServiceClient
         ):
     """Open an Azure Storage Blob blob for reading or writing.
 
@@ -78,25 +78,25 @@ def open(
         The name of the blob within the bucket.
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
+    client: azure.storage.blob.BlobServiceClient
+        The Azure Storage Blob client to use when working with azure-storage-blob.
     buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
-    client: azure.storage.blob.BlobServiceClient, optional
-        The Azure Storage Blob client to use when working with azure-storage-blob.
 
     """
     if mode == smart_open.constants.READ_BINARY:
         return Reader(
             container_id,
             blob_id,
+            client,
             buffer_size=buffer_size,
             line_terminator=smart_open.constants.BINARY_NEWLINE,
-            client=client,
         )
     elif mode == smart_open.constants.WRITE_BINARY:
         return Writer(
             container_id,
             blob_id,
-            client=client,
+            client,
         )
     else:
         raise NotImplementedError('Azure Storage Blob support for mode %r not implemented' % mode)
@@ -158,12 +158,10 @@ class Reader(io.BufferedIOBase):
             self,
             container,
             blob,
+            client,  # type: azure.storage.blob.BlobServiceClient
             buffer_size=DEFAULT_BUFFER_SIZE,
             line_terminator=smart_open.constants.BINARY_NEWLINE,
-            client=None,  # type: azure.storage.blob.BlobServiceClient
     ):
-        if client is None:
-            client = azure.storage.blob.BlobServiceClient()
         self._container_client = client.get_container_client(container)
         # type: azure.storage.blob.ContainerClient
 
@@ -353,11 +351,9 @@ class Writer(io.BufferedIOBase):
             self,
             container,
             blob,
+            client,  # type: azure.storage.blob.BlobServiceClient
             min_part_size=_DEFAULT_MIN_PART_SIZE,
-            client=None,  # type: azure.storage.blob.BlobServiceClient
     ):
-        if client is None:
-            client = azure.storage.blob.BlobServiceClient()
         self._client = client
         self._container_client = self._client.get_container_client(container)
         # type: azure.storage.blob.ContainerClient

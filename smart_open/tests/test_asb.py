@@ -24,7 +24,7 @@ import azure.core.exceptions
 
 CONTAINER_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
-DISABLE_MOCKS = os.environ.get('SO_DISABLE_Azure Storage Blob_MOCKS') == "1"
+DISABLE_MOCKS = os.environ.get('SO_DISABLE_AZURE_BLOB_MOCKS') == "1"
 
 logger = logging.getLogger(__name__)
 
