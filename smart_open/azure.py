@@ -6,7 +6,7 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-"""Implements file-like objects for reading and writing to/from Azure Storage Blob (ASB)."""
+"""Implements file-like objects for reading and writing to/from Azure Blob Storage."""
 
 import io
 import logging
@@ -21,10 +21,10 @@ import azure.core.exceptions
 logger = logging.getLogger(__name__)
 
 _BINARY_TYPES = (bytes, bytearray, memoryview)
-"""Allowed binary buffer types for writing to the underlying Azure Storage Blob stream"""
+"""Allowed binary buffer types for writing to the underlying Azure Blob Storage stream"""
 
 SCHEME = "azure"
-"""Supported scheme for Azure Storage Blob in smart_open endpoint URL"""
+"""Supported scheme for Azure Blob Storage in smart_open endpoint URL"""
 
 _MIN_MIN_PART_SIZE = _REQUIRED_CHUNK_MULTIPLE = 4 * 1024**2
 """Azure requires you to upload in multiples of 4MB, except for the last part."""
@@ -33,7 +33,7 @@ _DEFAULT_MIN_PART_SIZE = 64 * 1024**2
 """Default minimum part size for Azure Cloud Storage multipart uploads is 64MB"""
 
 DEFAULT_BUFFER_SIZE = 4 * 1024**2
-"""Default buffer size for working with Azure Storage Blob is 256MB
+"""Default buffer size for working with Azure Blob Storage is 256MB
 https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs
 """
 
@@ -68,7 +68,7 @@ def open(
         client=None,  # type: azure.storage.blob.BlobServiceClient
         buffer_size=DEFAULT_BUFFER_SIZE,
         ):
-    """Open an Azure Storage Blob blob for reading or writing.
+    """Open an Azure Blob Storage blob for reading or writing.
 
     Parameters
     ----------
@@ -79,7 +79,7 @@ def open(
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
     client: azure.storage.blob.BlobServiceClient
-        The Azure Storage Blob client to use when working with azure-storage-blob.
+        The Azure Blob Storage client to use when working with azure-storage-blob.
     buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
 
@@ -102,20 +102,20 @@ def open(
             client,
         )
     else:
-        raise NotImplementedError('Azure Storage Blob support for mode %r not implemented' % mode)
+        raise NotImplementedError('Azure Blob Storage support for mode %r not implemented' % mode)
 
 
 class _RawReader(object):
-    """Read an Azure Storage Blob file."""
+    """Read an Azure Blob Storage file."""
 
-    def __init__(self, asb_blob, size):
+    def __init__(self, blob, size):
         # type: (azure.storage.blob.BlobClient, int) -> None
-        self._blob = asb_blob
+        self._blob = blob
         self._size = size
         self._position = 0
 
     def seek(self, position):
-        """Seek to the specified position (byte offset) in the Azure Storage Blob blob.
+        """Seek to the specified position (byte offset) in the Azure Blob Storage blob.
 
         :param int position: The byte offset from the beginning of the blob.
 
@@ -346,7 +346,7 @@ class Reader(io.BufferedIOBase):
 
 
 class Writer(io.BufferedIOBase):
-    """Writes bytes to Azure Storage Blob.
+    """Writes bytes to Azure Blob Storage.
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
@@ -405,7 +405,7 @@ class Writer(io.BufferedIOBase):
         raise io.UnsupportedOperation("detach() not supported")
 
     def write(self, b):
-        """Write the given bytes (binary string) to the Azure Storage Blob file.
+        """Write the given bytes (binary string) to the Azure Blob Storage file.
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
@@ -424,7 +424,7 @@ class Writer(io.BufferedIOBase):
         part_num = self._total_parts + 1
 
         #
-        # Here we upload the largest amount possible given Azure Storage Blob's restriction
+        # Here we upload the largest amount possible given Azure Blob Storage's restriction
         # of parts being multiples of 4MB, except for the last one.
         #
         content_length = self._current_part.tell()

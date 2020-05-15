@@ -332,12 +332,12 @@ class ReaderTest(unittest.TestCase):
         cleanup_container()
 
     def test_iter(self):
-        """Are Azure Storage Blob files iterated over correctly?"""
+        """Are Azure Blob Storage files iterated over correctly?"""
         expected = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_iter_%s" % BLOB_NAME
         put_to_container(blob_name, contents=expected)
 
-        # connect to fake Azure Storage Blob and read from the fake key we filled above
+        # connect to fake Azure Blob Storage and read from the fake key we filled above
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, test_blob_service_client)
         output = [line.rstrip(b'\n') for line in fin]
         self.assertEqual(output, expected.split(b'\n'))
@@ -357,7 +357,7 @@ class ReaderTest(unittest.TestCase):
             self.assertEqual(output, expected.split(b'\n'))
 
     def test_read(self):
-        """Are Azure Storage Blob files read correctly?"""
+        """Are Azure Blob Storage files read correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_read_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
@@ -369,7 +369,7 @@ class ReaderTest(unittest.TestCase):
         self.assertEqual(content[14:], fin.read())  # read the rest
 
     def test_seek_beginning(self):
-        """Does seeking to the beginning of Azure Storage Blob files work correctly?"""
+        """Does seeking to the beginning of Azure Blob Storage files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_seek_beginning_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
@@ -385,7 +385,7 @@ class ReaderTest(unittest.TestCase):
         self.assertEqual(content, fin.read(-1))  # same thing
 
     def test_seek_start(self):
-        """Does seeking from the start of Azure Storage Blob files work correctly?"""
+        """Does seeking from the start of Azure Blob Storage files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_seek_start_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
@@ -397,7 +397,7 @@ class ReaderTest(unittest.TestCase):
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
     def test_seek_current(self):
-        """Does seeking from the middle of Azure Storage Blob files work correctly?"""
+        """Does seeking from the middle of Azure Blob Storage files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_seek_current_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
@@ -409,7 +409,7 @@ class ReaderTest(unittest.TestCase):
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
     def test_seek_end(self):
-        """Does seeking from the end of Azure Storage Blob files work correctly?"""
+        """Does seeking from the end of Azure Blob Storage files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_seek_end_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
@@ -540,7 +540,7 @@ class WriterTest(unittest.TestCase):
         cleanup_container()
 
     def test_write_01(self):
-        """Does writing into Azure Storage Blob work correctly?"""
+        """Does writing into Azure Blob Storage work correctly?"""
         test_string = u"žluťoučký koníček".encode('utf8')
         blob_name = "test_write_01_%s" % BLOB_NAME
 
@@ -574,7 +574,7 @@ class WriterTest(unittest.TestCase):
             self.fail()
 
     def test_write_02(self):
-        """Does Azure Storage Blob write unicode-utf8 conversion work?"""
+        """Does Azure Blob Storage write unicode-utf8 conversion work?"""
         blob_name = "test_write_02_%s" % BLOB_NAME
         smart_open_write = smart_open.azure.Writer(CONTAINER_NAME, blob_name, test_blob_service_client)
         smart_open_write.tell()
