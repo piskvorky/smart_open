@@ -26,9 +26,6 @@ _BINARY_TYPES = (bytes, bytearray, memoryview)
 SCHEME = "azure"
 """Supported scheme for Azure Blob Storage in smart_open endpoint URL"""
 
-_MIN_MIN_PART_SIZE = _REQUIRED_CHUNK_MULTIPLE = 4 * 1024**2
-"""Azure requires you to upload in multiples of 4MB, except for the last part."""
-
 _DEFAULT_MIN_PART_SIZE = 64 * 1024**2
 """Default minimum part size for Azure Cloud Storage multipart uploads is 64MB"""
 
@@ -383,6 +380,7 @@ class Writer(io.BufferedIOBase):
     def close(self):
         logger.debug("closing")
         if not self.closed:
+            self._upload_part()
             self._client = None
         logger.debug("successfully closed")
 
@@ -415,18 +413,14 @@ class Writer(io.BufferedIOBase):
 
         self._current_part.write(b)
         self._total_size += len(b)
-        if len(b) > 0:
+
+        if self._current_part.tell() >= self._min_part_size:
             self._upload_part()
 
         return len(b)
 
     def _upload_part(self):
         part_num = self._total_parts + 1
-
-        #
-        # Here we upload the largest amount possible given Azure Blob Storage's restriction
-        # of parts being multiples of 4MB, except for the last one.
-        #
         content_length = self._current_part.tell()
         range_stop = self._bytes_uploaded + content_length - 1
 

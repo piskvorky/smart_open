@@ -24,7 +24,7 @@ import azure.core.exceptions
 
 CONTAINER_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
-DISABLE_MOCKS = os.environ.get('SO_DISABLE_AZURE_BLOB_MOCKS') == "1"
+DISABLE_MOCKS = os.environ.get('SO_DISABLE_AZURE_MOCKS') == "1"
 
 """If mocks are disabled, allow to use the Azurite local Azure Storage API
 https://github.com/Azure/Azurite
@@ -606,19 +606,19 @@ class WriterTest(unittest.TestCase):
             fout.write(second_part)
             local_write.write(second_part)
             self.assertEqual(fout.tell(), 66)
-            self.assertEqual(fout._total_parts, 2)
+            self.assertEqual(fout._total_parts, 0)
 
             third_part = b"t"
             fout.write(third_part)
             local_write.write(third_part)
             self.assertEqual(fout.tell(), 67)
-            self.assertEqual(fout._total_parts, 3)
+            self.assertEqual(fout._total_parts, 0)
 
             fourth_part = b"t" * 1
             fout.write(fourth_part)
             local_write.write(fourth_part)
             self.assertEqual(fout.tell(), 68)
-            self.assertEqual(fout._total_parts, 4)
+            self.assertEqual(fout._total_parts, 0)
 
         # read back the same key and check its content
         output = list(smart_open.open(
