@@ -12,7 +12,7 @@ _AZURE_CONTAINER = os.environ.get('SO_AZURE_CONTAINER')
 _AZURE_STORAGE_CONNECTION_STRING = os.environ.get('AZURE_STORAGE_CONNECTION_STRING')
 _FILE_PREFIX = '%s://%s' % (smart_open.azure.SCHEME, _AZURE_CONTAINER)
 
-assert _AZURE_CONTAINER is not None, 'please set the SO_AZURE_URL environment variable'
+assert _AZURE_CONTAINER is not None, 'please set the SO_AZURE_CONTAINER environment variable'
 assert _AZURE_STORAGE_CONNECTION_STRING is not None, 'please set the AZURE_STORAGE_CONNECTION_STRING environment variable'
 
 
