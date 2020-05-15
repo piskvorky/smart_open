@@ -151,7 +151,7 @@ class FakeContainerClient(object):
 
 class FakeContainerClientTest(unittest.TestCase):
     def setUp(self):
-        self.blob_service_client = FakeBlobServiceClient()
+        self.blob_service_client = FakeBlobServiceClient.from_connection_string(CONNECT_STR)
         self.container_client = FakeContainerClient(self.blob_service_client, 'test-container')
 
     def test_nonexistent_blob(self):
@@ -207,13 +207,19 @@ class FakeContainerClientTest(unittest.TestCase):
 class FakeBlobServiceClient(object):
     # From Azure's BlobServiceClient API
     # https://docs.microsoft.com/fr-fr/python/api/azure-storage-blob/azure.storage.blob.blobserviceclient?view=azure-python
-    def __init__(self):
+    def __init__(self, account_url, credential=None, **kwargs):
+        self._account_url = account_url
+        self._credential = credential
+
         self.__container_clients = OrderedDict()
 
     @classmethod
-    def from_connection_string(self, connection_string):
-        return FakeBlobServiceClient()
-        #return FakeBlobServiceClient(connection_string=connection_string)
+    def from_connection_string(cls, conn_str, credential=None, **kwargs):
+        account_url, secondary, credential = \
+            azure.storage.blob._shared.base_client.parse_connection_str(conn_str, credential, 'blob')
+        if 'secondary_hostname' not in kwargs:
+            kwargs['secondary_hostname'] = secondary
+        return cls(account_url, credential=credential, **kwargs)
 
     def create_container(self, container_name, metadata=None):
         if container_name in self.__container_clients:
@@ -240,7 +246,7 @@ class FakeBlobServiceClient(object):
 
 class FakeBlobServiceClientTest(unittest.TestCase):
     def setUp(self):
-        self.blob_service_client = FakeBlobServiceClient()
+        self.blob_service_client = FakeBlobServiceClient.from_connection_string(CONNECT_STR)
 
     def test_nonexistent_container(self):
         with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
