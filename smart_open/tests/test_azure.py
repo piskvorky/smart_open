@@ -590,41 +590,64 @@ class WriterTest(unittest.TestCase):
             self.assertEqual(fout.tell(), 14)
 
     def test_write_03(self):
-        """Do multiple writes work correctly?"""
+        """Do multiple writes less than the min_part_size work correctly?"""
         # write
         blob_name = "test_write_03_%s" % BLOB_NAME
-        smart_open_write = smart_open.azure.Writer(CONTAINER_NAME, blob_name, test_blob_service_client)
+        min_part_size = 256 * 1024
+        smart_open_write = smart_open.azure.Writer(
+            CONTAINER_NAME, blob_name, test_blob_service_client, min_part_size=min_part_size
+        )
         local_write = io.BytesIO()
 
         with smart_open_write as fout:
-            first_part = b"t" * 64
+            first_part = b"t" * 262141
             fout.write(first_part)
             local_write.write(first_part)
-            self.assertEqual(fout.tell(), 64)
+            self.assertEqual(fout._current_part.tell(), 262141)
 
             second_part = b"t\n"
             fout.write(second_part)
             local_write.write(second_part)
-            self.assertEqual(fout.tell(), 66)
+            self.assertEqual(fout._current_part.tell(), 262143)
             self.assertEqual(fout._total_parts, 0)
 
             third_part = b"t"
             fout.write(third_part)
             local_write.write(third_part)
-            self.assertEqual(fout.tell(), 67)
+            self.assertEqual(fout._current_part.tell(), 262144)
             self.assertEqual(fout._total_parts, 0)
 
             fourth_part = b"t" * 1
             fout.write(fourth_part)
             local_write.write(fourth_part)
-            self.assertEqual(fout.tell(), 68)
-            self.assertEqual(fout._total_parts, 0)
+            self.assertEqual(fout._current_part.tell(), 1)
+            self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content
-        output = list(smart_open.open(
-            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
-            transport_params=dict(client=test_blob_service_client))
+        output = list(smart_open.open("azure://{}/{}".format(CONTAINER_NAME, blob_name)))
+        local_write.seek(0)
+        actual = [line.decode("utf-8") for line in list(local_write)]
+        self.assertEqual(output, actual)
+
+    def test_write_03a(self):
+        """Do multiple writes greater than the min_part_size work correctly?"""
+        min_part_size = 256 * 1024
+        blob_name = "test_write_03_%s" % BLOB_NAME
+        smart_open_write = smart_open.azure.Writer(
+            CONTAINER_NAME, blob_name, test_blob_service_client, min_part_size=min_part_size
         )
+        local_write = io.BytesIO()
+
+        with smart_open_write as fout:
+            for i in range(1, 4):
+                part = b"t" * (min_part_size + 1)
+                fout.write(part)
+                local_write.write(part)
+                self.assertEqual(fout._current_part.tell(), i)
+                self.assertEqual(fout._total_parts, i)
+
+        # read back the same key and check its content
+        output = list(smart_open.open("azure://{}/{}".format(CONTAINER_NAME, blob_name)))
         local_write.seek(0)
         actual = [line.decode("utf-8") for line in list(local_write)]
         self.assertEqual(output, actual)

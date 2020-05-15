@@ -64,6 +64,7 @@ def open(
         mode,
         client=None,  # type: azure.storage.blob.BlobServiceClient
         buffer_size=DEFAULT_BUFFER_SIZE,
+        min_part_size=_DEFAULT_MIN_PART_SIZE
         ):
     """Open an Azure Blob Storage blob for reading or writing.
 
@@ -79,6 +80,8 @@ def open(
         The Azure Blob Storage client to use when working with azure-storage-blob.
     buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
+    min_part_size: int, optional
+        The minimum part size for multipart uploads.  For writing only.
 
     """
     if not client:
@@ -97,6 +100,7 @@ def open(
             container_id,
             blob_id,
             client,
+            min_part_size=min_part_size
         )
     else:
         raise NotImplementedError('Azure Blob Storage support for mode %r not implemented' % mode)
