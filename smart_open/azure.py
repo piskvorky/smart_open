@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _BINARY_TYPES = (bytes, bytearray, memoryview)
 """Allowed binary buffer types for writing to the underlying Azure Storage Blob stream"""
 
-SCHEME = "asb"
+SCHEME = "azure"
 """Supported scheme for Azure Storage Blob in smart_open endpoint URL"""
 
 _MIN_MIN_PART_SIZE = _REQUIRED_CHUNK_MULTIPLE = 4 * 1024**2
@@ -65,7 +65,7 @@ def open(
         container_id,
         blob_id,
         mode,
-        client,  # type: azure.storage.blob.BlobServiceClient
+        client=None,  # type: azure.storage.blob.BlobServiceClient
         buffer_size=DEFAULT_BUFFER_SIZE,
         ):
     """Open an Azure Storage Blob blob for reading or writing.
@@ -84,6 +84,9 @@ def open(
         The buffer size to use when performing I/O. For reading only.
 
     """
+    if not client:
+        raise ValueError('you must specify the client to connect to Azure')
+
     if mode == smart_open.constants.READ_BINARY:
         return Reader(
             container_id,
