@@ -66,7 +66,7 @@ class ParseUriTest(unittest.TestCase):
     def test_scheme(self):
         """Do URIs schemes parse correctly?"""
         # supported schemes
-        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs"):
+        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs", "asb"):
             parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
             self.assertEqual(parsed_uri.scheme, scheme)
 

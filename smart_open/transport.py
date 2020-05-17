@@ -79,6 +79,7 @@ def get_transport(scheme):
 
 
 register_transport(smart_open.local_file)
+register_transport('smart_open.asb')
 register_transport('smart_open.gcs')
 register_transport('smart_open.hdfs')
 register_transport('smart_open.http')
