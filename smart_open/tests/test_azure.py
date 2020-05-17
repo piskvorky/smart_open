@@ -614,8 +614,8 @@ class WriterTest(unittest.TestCase):
             third_part = b"t"
             fout.write(third_part)
             local_write.write(third_part)
-            self.assertEqual(fout._current_part.tell(), 262144)
-            self.assertEqual(fout._total_parts, 0)
+            self.assertEqual(fout._current_part.tell(), 0)
+            self.assertEqual(fout._total_parts, 1)
 
             fourth_part = b"t" * 1
             fout.write(fourth_part)
@@ -624,13 +624,14 @@ class WriterTest(unittest.TestCase):
             self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content
-        output = list(smart_open.open("azure://{}/{}".format(CONTAINER_NAME, blob_name)))
+        uri = "azure://%s/%s" % (CONTAINER_NAME, blob_name)
+        output = list(smart_open.open(uri, transport_params=dict(client=test_blob_service_client)))
         local_write.seek(0)
         actual = [line.decode("utf-8") for line in list(local_write)]
         self.assertEqual(output, actual)
 
     def test_write_03a(self):
-        """Do multiple writes greater than the min_part_size work correctly?"""
+        """Do multiple writes greater than or equal to the min_part_size work correctly?"""
         min_part_size = 256 * 1024
         blob_name = "test_write_03_%s" % BLOB_NAME
         smart_open_write = smart_open.azure.Writer(
@@ -640,14 +641,15 @@ class WriterTest(unittest.TestCase):
 
         with smart_open_write as fout:
             for i in range(1, 4):
-                part = b"t" * (min_part_size + 1)
+                part = b"t" * min_part_size
                 fout.write(part)
                 local_write.write(part)
-                self.assertEqual(fout._current_part.tell(), i)
+                self.assertEqual(fout._current_part.tell(), 0)
                 self.assertEqual(fout._total_parts, i)
 
         # read back the same key and check its content
-        output = list(smart_open.open("azure://{}/{}".format(CONTAINER_NAME, blob_name)))
+        uri = "azure://%s/%s" % (CONTAINER_NAME, blob_name)
+        output = list(smart_open.open(uri, transport_params=dict(client=test_blob_service_client)))
         local_write.seek(0)
         actual = [line.decode("utf-8") for line in list(local_write)]
         self.assertEqual(output, actual)

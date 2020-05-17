@@ -8,9 +8,9 @@
 #
 """Implements file-like objects for reading and writing to/from Azure Blob Storage."""
 
+import base64
 import io
 import logging
-import base64
 
 import smart_open.bytebuffer
 import smart_open.constants
@@ -384,7 +384,10 @@ class Writer(io.BufferedIOBase):
     def close(self):
         logger.debug("closing")
         if not self.closed:
-            self._upload_part()
+            if self._current_part.tell() > 0:
+                self._upload_part()
+            self._blob.commit_block_list(self._block_list)
+            self._block_list = []
             self._client = None
         logger.debug("successfully closed")
 
@@ -428,27 +431,24 @@ class Writer(io.BufferedIOBase):
         content_length = self._current_part.tell()
         range_stop = self._bytes_uploaded + content_length - 1
 
-        #
-        # The block_id correspond to the index of the content base64 encoded.
-        #
-        block_id = base64.b64encode(str(self._bytes_uploaded).encode())
+        """
+        block_id's must be base64 encoded, all the same length, and less than or equal to 64 bytes in size prior
+        to encoding.
+        https://docs.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.blobclient?view=azure-python#stage-block-block-id--data--length-none----kwargs-
+        """
+        zero_padded_bytes_uploaded = str(self._bytes_uploaded).zfill(64 // 2)
+        block_id = base64.b64encode(zero_padded_bytes_uploaded.encode())
         self._current_part.seek(0)
         self._blob.stage_block(block_id, self._current_part.read(content_length))
-        if block_id not in [block_blob['id'] for block_blob in self._block_list]:
-            self._block_list.append(azure.storage.blob.BlobBlock(block_id=block_id))
+        self._block_list.append(azure.storage.blob.BlobBlock(block_id=block_id))
 
         logger.info(
             "uploading part #%i, %i bytes (total %.3fGB)",
             part_num, content_length, range_stop / 1024.0 ** 3,
         )
 
-        self._blob.commit_block_list(self._block_list)
         self._total_parts += 1
         self._bytes_uploaded += content_length
-
-        #
-        # For the last part, the below _current_part handling is a NOOP.
-        #
         self._current_part = io.BytesIO(self._current_part.read())
         self._current_part.seek(0, io.SEEK_END)
 
