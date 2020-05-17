@@ -436,8 +436,8 @@ class Writer(io.BufferedIOBase):
         to encoding.
         https://docs.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.blobclient?view=azure-python#stage-block-block-id--data--length-none----kwargs-
         """
-        zero_padded_bytes_uploaded = str(self._bytes_uploaded).zfill(64 // 2)
-        block_id = base64.b64encode(zero_padded_bytes_uploaded.encode())
+        zero_padded_part_num = str(part_num).zfill(64 // 2)
+        block_id = base64.b64encode(zero_padded_part_num.encode())
         self._current_part.seek(0)
         self._blob.stage_block(block_id, self._current_part.read(content_length))
         self._block_list.append(azure.storage.blob.BlobBlock(block_id=block_id))
