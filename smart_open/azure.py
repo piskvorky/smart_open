@@ -303,9 +303,6 @@ class Reader(io.BufferedIOBase):
                 self._fill_buffer()
         return the_line.getvalue()
 
-    def terminate(self):
-        self._blob.delete_blob()
-
     #
     # Internal methods.
     #
