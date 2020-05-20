@@ -303,6 +303,9 @@ class Reader(io.BufferedIOBase):
                 self._fill_buffer()
         return the_line.getvalue()
 
+    def terminate(self):
+        self._blob.delete_blob()
+
     #
     # Internal methods.
     #
@@ -327,13 +330,10 @@ class Reader(io.BufferedIOBase):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        if exc_type is not None:
+            self.terminate()
+        else:
+            self.close()
 
     def __str__(self):
         return "(%s, %r, %r)" % (self.__class__.__name__,
