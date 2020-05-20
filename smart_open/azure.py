@@ -327,10 +327,7 @@ class Reader(io.BufferedIOBase):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None:
-            self.terminate()
-        else:
-            self.close()
+        self.close()
 
     def __str__(self):
         return "(%s, %r, %r)" % (self.__class__.__name__,
