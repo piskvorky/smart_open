@@ -181,6 +181,7 @@ def open(
         multipart_upload=True,
         singlepart_upload_kwargs=None,
         object_kwargs=None,
+        defer_seek=False,
         ):
     """Open an S3 object for reading or writing.
 
@@ -219,7 +220,11 @@ def open(
     object_kwargs: dict, optional
         Additional parameters to pass to boto3's object.get function.
         Used during reading only.
-
+    defer_seek: boolean, optional
+        Default: `False`
+        If set to `True` on a file opened for reading, GetObject will not be
+        called until the first seek() or read().
+        Avoids redundant API queries when seeking before reading.
     """
     logger.debug('%r', locals())
     if mode not in constants.BINARY_MODES:
@@ -237,6 +242,7 @@ def open(
             session=session,
             resource_kwargs=resource_kwargs,
             object_kwargs=object_kwargs,
+            defer_seek=defer_seek,
         )
     elif mode == constants.WRITE_BINARY:
         if multipart_upload:
@@ -387,10 +393,9 @@ class _SeekableRawReader(object):
                 self._position = self._content_length = _get(
                     self._object,
                     version=self._version_id,
-                    **self._object_kwargs
+                    **self._object_kwargs,
                 )['ContentLength']
             self._body = io.BytesIO()
-            return
         else:
             units, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
             self._content_length = length
@@ -429,7 +434,7 @@ class Reader(io.BufferedIOBase):
 
     def __init__(self, bucket, key, version_id=None, buffer_size=DEFAULT_BUFFER_SIZE,
                  line_terminator=constants.BINARY_NEWLINE, session=None, resource_kwargs=None,
-                 object_kwargs=None):
+                 object_kwargs=None, defer_seek=False):
 
         self._buffer_size = buffer_size
 
@@ -462,6 +467,9 @@ class Reader(io.BufferedIOBase):
         # This member is part of the io.BufferedIOBase interface.
         #
         self.raw = None
+
+        if not defer_seek:
+            self.seek(0)
 
     #
     # io.BufferedIOBase methods.

@@ -441,13 +441,13 @@ class SmartOpenReadTest(unittest.TestCase):
 class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.Session')
     def test_no_kwargs(self, mock_session):
-        smart_open.smart_open('s3://mybucket/mykey')
+        smart_open.smart_open('s3://mybucket/mykey', defer_seek=True)
         mock_session.assert_called()
         mock_session.return_value.resource.assert_called_with('s3')
 
     @mock.patch('boto3.Session')
     def test_credentials(self, mock_session):
-        smart_open.smart_open('s3://access_id:access_secret@mybucket/mykey')
+        smart_open.smart_open('s3://access_id:access_secret@mybucket/mykey', defer_seek=True)
         mock_session.assert_called_with(
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret',
@@ -456,13 +456,13 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
 
     @mock.patch('boto3.Session')
     def test_profile(self, mock_session):
-        smart_open.smart_open('s3://mybucket/mykey', profile_name='my_credentials')
+        smart_open.smart_open('s3://mybucket/mykey', profile_name='my_credentials', defer_seek=True)
         mock_session.assert_called_with(profile_name='my_credentials')
         mock_session.return_value.resource.assert_called_with('s3')
 
     @mock.patch('boto3.Session')
     def test_host(self, mock_session):
-        smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey", host='aa.domain.com')
+        smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey", host='aa.domain.com', defer_seek=True)
         mock_session.assert_called_with(
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret',
@@ -504,7 +504,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         session = boto3.Session()
         session.resource = mock.MagicMock()
 
-        smart_open.smart_open('s3://bucket/key', s3_session=session)
+        smart_open.smart_open('s3://bucket/key', s3_session=session, defer_seek=True)
         session.resource.assert_called_with('s3')
 
     def test_session_write_mode(self):

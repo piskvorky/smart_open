@@ -13,6 +13,7 @@ import os
 import time
 import unittest
 import warnings
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import boto.s3.bucket
@@ -83,18 +84,23 @@ def ignore_resource_warnings():
 
 
 class BaseTest(unittest.TestCase):
-    def setUp(self):
+    @contextmanager
+    def assertApiCalls(self, **expected_api_calls):
         """ Track calls to S3 in self.api_calls by patching botocore.endpoint.Endpoint.make_request. """
         _real_make_request = botocore.endpoint.Endpoint.make_request
-        self.api_calls = api_calls = defaultdict(int)
+        api_calls = defaultdict(int)
 
         def mock_make_request(self, operation_model, *args, **kwargs):
             api_calls[operation_model.name] += 1
             return _real_make_request(self, operation_model, *args, **kwargs)
 
         patcher = patch('botocore.endpoint.Endpoint.make_request', new=mock_make_request)
-        self.addCleanup(patcher.stop)
         patcher.start()
+        try:
+            yield api_calls
+            self.assertDictEqual(expected_api_calls, api_calls)
+        finally:
+            patcher.stop()
 
 
 @unittest.skipUnless(
@@ -143,21 +149,19 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=expected)
 
         # connect to fake s3 and read from the fake key we filled above
-        self.api_calls.clear()
-        fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
-        output = [line.rstrip(b'\n') for line in fin]
+        with self.assertApiCalls(GetObject=1):
+            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
+            output = [line.rstrip(b'\n') for line in fin]
         self.assertEqual(output, expected.split(b'\n'))
-        self.assertDictEqual(self.api_calls, {'GetObject': 1})
 
     def test_iter_context_manager(self):
         # same thing but using a context manager
         expected = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=expected)
-        self.api_calls.clear()
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
-            output = [line.rstrip(b'\n') for line in fin]
-            self.assertEqual(output, expected.split(b'\n'))
-        self.assertDictEqual(self.api_calls, {'GetObject': 1})
+        with self.assertApiCalls(GetObject=1):
+            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+                output = [line.rstrip(b'\n') for line in fin]
+        self.assertEqual(output, expected.split(b'\n'))
 
     def test_read(self):
         """Are S3 files read correctly?"""
@@ -165,83 +169,80 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=content)
         logger.debug('content: %r len: %r', content, len(content))
 
-        self.api_calls.clear()
-        fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
-        self.assertEqual(content[:6], fin.read(6))
-        self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
-        self.assertEqual(content[14:], fin.read())  # read the rest
-        self.assertDictEqual(self.api_calls, {'GetObject': 1})
+        with self.assertApiCalls(GetObject=1):
+            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
+            self.assertEqual(content[:6], fin.read(6))
+            self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
+            self.assertEqual(content[14:], fin.read())  # read the rest
 
     def test_seek_beginning(self):
         """Does seeking to the beginning of S3 files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        self.api_calls.clear()
-        fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
-        self.assertEqual(content[:6], fin.read(6))
-        self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
+        with self.assertApiCalls(GetObject=1):
+            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
+            self.assertEqual(content[:6], fin.read(6))
+            self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
 
-        fin.seek(0)
-        self.assertEqual(content, fin.read())  # no size given => read whole file
+        with self.assertApiCalls(GetObject=1):
+            fin.seek(0)
+            self.assertEqual(content, fin.read())  # no size given => read whole file
 
-        fin.seek(0)
-        self.assertEqual(content, fin.read(-1))  # same thing
-        self.assertDictEqual(self.api_calls, {'GetObject': 3})  # one additional call per seek
+        with self.assertApiCalls(GetObject=1):
+            fin.seek(0)
+            self.assertEqual(content, fin.read(-1))  # same thing
 
     def test_seek_start(self):
         """Does seeking from the start of S3 files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        self.api_calls.clear()
-        fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
-        seek = fin.seek(6)
-        self.assertEqual(seek, 6)
-        self.assertEqual(fin.tell(), 6)
-        self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
-        self.assertDictEqual(self.api_calls, {'GetObject': 1})  # no additional call from pre-read seek
+        with self.assertApiCalls(GetObject=1):
+            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            seek = fin.seek(6)
+            self.assertEqual(seek, 6)
+            self.assertEqual(fin.tell(), 6)
+            self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
     def test_seek_current(self):
         """Does seeking from the middle of S3 files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        self.api_calls.clear()
-        fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
-        self.assertEqual(fin.read(5), b'hello')
-        seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-        self.assertEqual(seek, 6)
-        self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
-        self.assertDictEqual(self.api_calls, {'GetObject': 2})  # one additional call per seek
+        with self.assertApiCalls(GetObject=1):
+            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
+            self.assertEqual(fin.read(5), b'hello')
+
+        with self.assertApiCalls(GetObject=1):
+            seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
+            self.assertEqual(seek, 6)
+            self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
     def test_seek_end(self):
         """Does seeking from the end of S3 files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        self.api_calls.clear()
-        fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
-        seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
-        self.assertEqual(seek, len(content) - 4)
-        self.assertEqual(fin.read(), b'you?')
-        self.assertDictEqual(self.api_calls, {'GetObject': 1})  # no additional call from pre-read seek
+        with self.assertApiCalls(GetObject=1):
+            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
+            self.assertEqual(seek, len(content) - 4)
+            self.assertEqual(fin.read(), b'you?')
 
     def test_detect_eof(self):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        self.api_calls.clear()
-        fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
-        fin.read()
-        eof = fin.tell()
-        self.assertEqual(eof, len(content))
-        fin.seek(0, whence=smart_open.constants.WHENCE_END)
-        self.assertEqual(eof, fin.tell())
-        fin.seek(eof)
-        self.assertEqual(eof, fin.tell())
-        # no additional call from seeking to end of file
-        self.assertDictEqual(self.api_calls, {'GetObject': 1})
+        with self.assertApiCalls(GetObject=1):
+            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
+            fin.read()
+            eof = fin.tell()
+            self.assertEqual(eof, len(content))
+            fin.seek(0, whence=smart_open.constants.WHENCE_END)
+            self.assertEqual(eof, fin.tell())
+            fin.seek(eof)
+            self.assertEqual(eof, fin.tell())
 
     def test_read_gzip(self):
         expected = u'раcцветали яблони и груши, поплыли туманы над рекой...'.encode('utf-8')
@@ -265,62 +266,59 @@ class SeekableBufferedInputBaseTest(BaseTest):
             self.assertEqual(zipfile.read(), expected)
 
         logger.debug('starting actual test')
-        self.api_calls.clear()
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
-            with gzip.GzipFile(fileobj=fin) as zipfile:
-                actual = zipfile.read()
+        with self.assertApiCalls(GetObject=1):
+            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+                with gzip.GzipFile(fileobj=fin) as zipfile:
+                    actual = zipfile.read()
 
         self.assertEqual(expected, actual)
-        self.assertDictEqual(self.api_calls, {'GetObject': 1})
 
     def test_readline(self):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        self.api_calls.clear()
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
-            fin.readline()
-            self.assertEqual(fin.tell(), content.index(b'\n')+1)
+        with self.assertApiCalls(GetObject=2):
+            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+                fin.readline()
+                self.assertEqual(fin.tell(), content.index(b'\n')+1)
 
-            fin.seek(0)
-            actual = list(fin)
-            self.assertEqual(fin.tell(), len(content))
+                fin.seek(0)
+                actual = list(fin)
+                self.assertEqual(fin.tell(), len(content))
 
         expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
         self.assertEqual(expected, actual)
-        self.assertDictEqual(self.api_calls, {'GetObject': 2})  # one additional call per seek
 
     def test_readline_tiny_buffer(self):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        self.api_calls.clear()
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, buffer_size=8) as fin:
-            actual = list(fin)
+        with self.assertApiCalls(GetObject=1):
+            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, buffer_size=8) as fin:
+                actual = list(fin)
 
         expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
         self.assertEqual(expected, actual)
-        self.assertDictEqual(self.api_calls, {'GetObject': 1})
 
     def test_read0_does_not_return_data(self):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        self.api_calls.clear()
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
-            data = fin.read(0)
+        with self.assertApiCalls():
+            # set defer_seek to verify that read(0) doesn't trigger an unnecessary API call
+            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
+                data = fin.read(0)
 
         self.assertEqual(data, b'')
-        self.assertDictEqual(self.api_calls, {})  # no API call to read 0 bytes
 
     def test_to_boto3(self):
         contents = b'the spice melange\n'
         put_to_bucket(contents=contents)
 
-        self.api_calls.clear()
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
-            returned_obj = fin.to_boto3()
-        self.assertDictEqual(self.api_calls, {})
+        with self.assertApiCalls():
+            # set defer_seek to verify that to_boto3() doesn't trigger an unnecessary API call
+            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
+                returned_obj = fin.to_boto3()
 
         boto3_body = returned_obj.get()['Body'].read()
         self.assertEqual(contents, boto3_body)
@@ -328,11 +326,25 @@ class SeekableBufferedInputBaseTest(BaseTest):
     def test_binary_iterator(self):
         expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
         put_to_bucket(contents=b"\n".join(expected))
-        self.api_calls.clear()
-        with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'rb') as fin:
-            actual = [line.rstrip() for line in fin]
+        with self.assertApiCalls(GetObject=1):
+            with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'rb') as fin:
+                actual = [line.rstrip() for line in fin]
         self.assertEqual(expected, actual)
-        self.assertDictEqual(self.api_calls, {'GetObject': 1})
+
+    def test_defer_seek(self):
+        content = b'englishman\nin\nnew\nyork\n'
+        put_to_bucket(contents=content)
+
+        with self.assertApiCalls():
+            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True)
+        with self.assertApiCalls(GetObject=1):
+            self.assertEqual(fin.read(), content)
+
+        with self.assertApiCalls():
+            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True)
+        with self.assertApiCalls(GetObject=1):
+            fin.seek(10)
+            self.assertEqual(fin.read(), content[10:])
 
 
 @moto.mock_s3
