@@ -13,7 +13,8 @@ _AZURE_STORAGE_CONNECTION_STRING = os.environ.get('AZURE_STORAGE_CONNECTION_STRI
 _FILE_PREFIX = '%s://%s' % (smart_open.azure.SCHEME, _AZURE_CONTAINER)
 
 assert _AZURE_CONTAINER is not None, 'please set the SO_AZURE_CONTAINER environment variable'
-assert _AZURE_STORAGE_CONNECTION_STRING is not None, 'please set the AZURE_STORAGE_CONNECTION_STRING environment variable'
+assert _AZURE_STORAGE_CONNECTION_STRING is not None, \
+    'please set the AZURE_STORAGE_CONNECTION_STRING environment variable'
 
 
 @fixture
@@ -54,7 +55,9 @@ def test_azure_readwrite_text(benchmark, client):
 
     key = _FILE_PREFIX + '/sanity.txt'
     text = 'с гранатою в кармане, с чекою в руке'
-    actual = benchmark(write_read, key, text, 'w', 'r', encoding='utf-8', transport_params=dict(client=client))
+    actual = benchmark(
+        write_read, key, text, 'w', 'r', encoding='utf-8', transport_params=dict(client=client)
+    )
     assert actual == text
 
 
@@ -63,7 +66,9 @@ def test_azure_readwrite_text_gzip(benchmark, client):
 
     key = _FILE_PREFIX + '/sanity.txt.gz'
     text = 'не чайки здесь запели на знакомом языке'
-    actual = benchmark(write_read, key, text, 'w', 'r', encoding='utf-8', transport_params=dict(client=client))
+    actual = benchmark(
+        write_read, key, text, 'w', 'r', encoding='utf-8', transport_params=dict(client=client)
+    )
     assert actual == text
 
 
@@ -126,5 +131,7 @@ def test_azure_performance_small_reads(benchmark, client):
     with smart_open.open(key, 'wb', transport_params=dict(client=client)) as fout:
         fout.write(one_megabyte_of_msgs)
 
-    actual = benchmark(read_length_prefixed_messages, key, 'rb', buffering=ONE_MIB, transport_params=dict(client=client))
+    actual = benchmark(
+        read_length_prefixed_messages, key, 'rb', buffering=ONE_MIB, transport_params=dict(client=client)
+    )
     assert actual == one_megabyte_of_msgs

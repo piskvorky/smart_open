@@ -207,7 +207,7 @@ More examples
     # stream from Azure Blob Storage
     connect_str = os.environ['AZURE_STORAGE_CONNECTION_STRING']
     transport_params = {
-        client=azure.storage.blob.BlobServiceClient.from_connection_string(connect_str)
+        client: azure.storage.blob.BlobServiceClient.from_connection_string(connect_str)
     }
     for line in open('azure://mycontainer/myfile.txt', transport_params=transport_params):
         print(line)
@@ -215,7 +215,7 @@ More examples
     # stream content *into* Azure Blob Storage (write mode):
     connect_str = os.environ['AZURE_STORAGE_CONNECTION_STRING']
     transport_params = {
-        client=azure.storage.blob.BlobServiceClient.from_connection_string(connect_str)
+        client: azure.storage.blob.BlobServiceClient.from_connection_string(connect_str)
     }
     with open('azure://mycontainer/my_file.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'hello world')
