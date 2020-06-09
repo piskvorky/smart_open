@@ -462,7 +462,11 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
 
     @mock.patch('boto3.Session')
     def test_host(self, mock_session):
-        smart_open.smart_open("s3://access_id:access_secret@mybucket/mykey", host='aa.domain.com', defer_seek=True)
+        smart_open.smart_open(
+            "s3://access_id:access_secret@mybucket/mykey",
+            host='aa.domain.com',
+            defer_seek=True,
+        )
         mock_session.assert_called_with(
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret',
