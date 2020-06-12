@@ -72,8 +72,8 @@ class FakeBucket(object):
     def get_blob(self, blob_id):
         try:
             return self.blobs[blob_id]
-        except KeyError:
-            raise google.cloud.exceptions.NotFound('Blob {} not found'.format(blob_id))
+        except KeyError as e:
+            raise google.cloud.exceptions.NotFound('Blob {} not found'.format(blob_id)) from e
 
     def list_blobs(self):
         return list(self.blobs.values())
@@ -246,8 +246,8 @@ class FakeClient(object):
     def bucket(self, bucket_id):
         try:
             return self.__buckets[bucket_id]
-        except KeyError:
-            raise google.cloud.exceptions.NotFound('Bucket %s not found' % bucket_id)
+        except KeyError as e:
+            raise google.cloud.exceptions.NotFound('Bucket %s not found' % bucket_id) from e
 
     def create_bucket(self, bucket_id):
         bucket = FakeBucket(self, bucket_id)

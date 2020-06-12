@@ -72,8 +72,8 @@ def get_transport(scheme):
     )
     try:
         submodule = _REGISTRY[scheme]
-    except KeyError:
-        raise NotImplementedError(message)
+    except KeyError as e:
+        raise NotImplementedError(message) from e
     else:
         return submodule
 

@@ -270,7 +270,7 @@ def _get(s3_object, version=None, **kwargs):
             'unable to access bucket: %r key: %r version: %r error: %s' % (
                 s3_object.bucket_name, s3_object.key, version, error
             )
-        )
+        ) from error
 
 
 class _SeekableRawReader(object):
@@ -610,7 +610,7 @@ multipart upload may fail")
                 'the bucket %r does not exist, or is forbidden for access (%r)' % (
                     bucket, error
                 )
-            )
+            ) from error
 
         self._buf = io.BytesIO()
         self._total_bytes = 0
@@ -790,8 +790,8 @@ class SinglepartWriter(io.BufferedIOBase):
         try:
             self._object = s3.Object(bucket, key)
             s3.meta.client.head_bucket(Bucket=bucket)
-        except botocore.client.ClientError:
-            raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket)
+        except botocore.client.ClientError as e:
+            raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket) from e
 
         self._buf = io.BytesIO()
         self._total_bytes = 0
@@ -815,9 +815,9 @@ class SinglepartWriter(io.BufferedIOBase):
 
         try:
             self._object.put(Body=self._buf, **self._upload_kwargs)
-        except botocore.client.ClientError:
+        except botocore.client.ClientError as e:
             raise ValueError(
-                'the bucket %r does not exist, or is forbidden for access' % self._object.bucket_name)
+                'the bucket %r does not exist, or is forbidden for access' % self._object.bucket_name) from e
 
         logger.debug("direct upload finished")
         self._buf = None
