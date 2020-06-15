@@ -1,7 +1,7 @@
 # Unreleased
 
   - Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
-  - Azure storage blob support
+  - Azure storage blob support ([@nclsmitchell](https://github.com/nclsmitchell) and [@petedannemann](https://github.com/petedannemann))
 
 # 2.0.0, 27 April 2020, "Python 3"
 
