@@ -214,8 +214,8 @@ class Reader(io.BufferedIOBase):
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
         if whence not in smart_open.constants.WHENCE_CHOICES:
             raise ValueError(
-                'invalid whence %, expected one of %r' % 
-                (whence, list(smart_open.constants.WHENCE_CHOICES)
+                'invalid whence %, expected one of %r' %
+                (whence, list(smart_open.constants.WHENCE_CHOICES))
             )
 
         if whence == smart_open.constants.WHENCE_START:
