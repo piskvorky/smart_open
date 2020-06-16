@@ -136,14 +136,13 @@ class FakeBucketTest(unittest.TestCase):
 
 
 class FakeBlob(object):
-    def __init__(self, name, bucket, create=True):
+    def __init__(self, name, bucket):
         self.name = name
         self._bucket = bucket  # type: FakeBucket
         self._exists = False
         self.__contents = io.BytesIO()
 
-        if create:
-            self._create_if_not_exists()
+        self._create_if_not_exists()
 
     def create_resumable_upload_session(self):
         resumeable_upload_url = RESUMABLE_SESSION_URI_TEMPLATE % dict(

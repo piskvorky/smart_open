@@ -20,7 +20,7 @@ smart_open — utils for streaming large files in Python
 What?
 =====
 
-``smart_open`` is a Python 3 library for **efficient streaming of very large files** from/to storages such as S3, GCS, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
+``smart_open`` is a Python 3 library for **efficient streaming of very large files** from/to storages such as S3, GCS, Azure Blob Storage, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
@@ -92,6 +92,7 @@ Other examples of URLs that ``smart_open`` accepts::
     s3://my_key:my_secret@my_bucket/my_key
     s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
     gs://my_bucket/my_blob
+    azure://my_bucket/my_blob
     hdfs:///path/file
     hdfs://path/file
     webhdfs://host:port/path/file
@@ -203,6 +204,22 @@ More examples
     with open('gs://my_bucket/my_file.txt', 'wb') as fout:
         fout.write(b'hello world')
 
+    # stream from Azure Blob Storage
+    connect_str = os.environ['AZURE_STORAGE_CONNECTION_STRING']
+    transport_params = {
+        client: azure.storage.blob.BlobServiceClient.from_connection_string(connect_str)
+    }
+    for line in open('azure://mycontainer/myfile.txt', transport_params=transport_params):
+        print(line)
+
+    # stream content *into* Azure Blob Storage (write mode):
+    connect_str = os.environ['AZURE_STORAGE_CONNECTION_STRING']
+    transport_params = {
+        client: azure.storage.blob.BlobServiceClient.from_connection_string(connect_str)
+    }
+    with open('azure://mycontainer/my_file.txt', 'wb', transport_params=transport_params) as fout:
+        fout.write(b'hello world')
+
 Supported Compression Formats
 -----------------------------
 
@@ -242,6 +259,7 @@ Transport-specific Options
 - SSH, SCP and SFTP
 - WebHDFS
 - GCS
+- Azure Blob Storage
 
 Each option involves setting up its own set of parameters.
 For example, for accessing S3, you often need to set up authentication, like API keys or a profile name.
@@ -371,6 +389,29 @@ and pass it to the Client. To create an API token for use in the example below, 
 	credentials = Credentials(token=token)
 	client = Client(credentials=credentials)
 	fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
+
+Azure Credentials
+---------------
+``smart_open`` uses the ``azure-storage-blob`` library to talk to Azure Blob Storage.
+By default, ``smart_open`` will defer to ``azure-storage-blob`` and let it take care of the credentials.
+
+Azure Blob Storage does not have any ways of inferring credentials therefore, passing a ``azure.storage.blob.BlobServiceClient``
+object as a transport parameter to the ``open`` function is required.
+You can `customize the credentials <https://docs.microsoft.com/en-us/azure/storage/common/storage-samples-python#authentication>`__
+when constructing the client. ``smart_open`` will then use the client when talking to. To follow allow with
+the example below, `refer to Azure's guide <https://docs.microsoft.com/en-us/azure/storage/blobs/storage-quickstart-blobs-python#copy-your-credentials-from-the-azure-portal>`__
+to setting up authentication.
+
+.. code-block:: python
+
+    import os
+    from azure.storage.blob import BlobServiceClient
+    azure_storage_connection_string = os.environ['AZURE_STORAGE_CONNECTION_STRING']
+    client = BlobServiceClient.from_connection_string(azure_storage_connection_string)
+    fin = open('azure://my_container/my_blob.txt', transport_params=dict(client=client))
+
+If you need more credential options, refer to the
+`Azure Storage authentication guide <https://docs.microsoft.com/en-us/azure/storage/common/storage-samples-python#authentication>`__.
 
 File-like Binary Streams
 ------------------------
