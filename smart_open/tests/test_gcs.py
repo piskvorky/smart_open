@@ -889,9 +889,11 @@ class OpenTest(unittest.TestCase):
         """read should never return None."""
         test_string = u"ветер по морю гуляет..."
         with smart_open.gcs.open(BUCKET_NAME, BLOB_NAME, "wb") as fout:
+            self.assertEqual(fout.name, BLOB_NAME)
             fout.write(test_string.encode('utf8'))
 
         r = smart_open.gcs.open(BUCKET_NAME, BLOB_NAME, "rb")
+        self.assertEqual(r.name, BLOB_NAME)
         self.assertEqual(r.read(), test_string.encode("utf-8"))
         self.assertEqual(r.read(), b"")
         self.assertEqual(r.read(), b"")
