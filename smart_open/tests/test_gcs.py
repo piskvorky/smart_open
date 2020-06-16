@@ -897,6 +897,17 @@ class OpenTest(unittest.TestCase):
         self.assertEqual(r.read(), b"")
         self.assertEqual(r.read(), b"")
 
+    def test_round_trip(self):
+        test_string = u"ветер по морю гуляет..."
+        url = 'gs://%s/%s' % (BUCKET_NAME, BLOB_NAME)
+        with smart_open.open(url, "w") as fout:
+            fout.write(test_string)
+
+        with smart_open.open(url) as fin:
+            actual = fin.read()
+
+        self.assertEqual(test_string, actual)
+
 
 class MakeRangeStringTest(unittest.TestCase):
     def test_no_stop(self):
