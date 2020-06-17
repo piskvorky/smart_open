@@ -66,7 +66,7 @@ class ParseUriTest(unittest.TestCase):
     def test_scheme(self):
         """Do URIs schemes parse correctly?"""
         # supported schemes
-        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs", "asb"):
+        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs", "azure"):
             parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
             self.assertEqual(parsed_uri.scheme, scheme)
 
@@ -324,6 +324,26 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "gs")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob?param")
+
+    def test_azure_blob_uri(self):
+        """Do Azure Blob URIs parse correctly?"""
+        # correct uri without credentials
+        parsed_uri = smart_open_lib._parse_uri("azure://mycontainer/myblob")
+        self.assertEqual(parsed_uri.scheme, "azure")
+        self.assertEqual(parsed_uri.container_id, "mycontainer")
+        self.assertEqual(parsed_uri.blob_id, "myblob")
+
+    def test_azure_blob_uri_root_container(self):
+        parsed_uri = smart_open_lib._parse_uri("azure://myblob")
+        self.assertEqual(parsed_uri.scheme, "azure")
+        self.assertEqual(parsed_uri.container_id, "$root")
+        self.assertEqual(parsed_uri.blob_id, "myblob")
+
+    def test_azure_blob_uri_contains_slash(self):
+        parsed_uri = smart_open_lib._parse_uri("azure://mycontainer/mydir/myblob")
+        self.assertEqual(parsed_uri.scheme, "azure")
+        self.assertEqual(parsed_uri.container_id, "mycontainer")
+        self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
 
     def test_pathlib_monkeypatch(self):
         from smart_open.smart_open_lib import pathlib

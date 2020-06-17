@@ -136,14 +136,13 @@ class FakeBucketTest(unittest.TestCase):
 
 
 class FakeBlob(object):
-    def __init__(self, name, bucket, create=True):
+    def __init__(self, name, bucket):
         self.name = name
         self._bucket = bucket  # type: FakeBucket
         self._exists = False
         self.__contents = io.BytesIO()
 
-        if create:
-            self._create_if_not_exists()
+        self._create_if_not_exists()
 
     def create_resumable_upload_session(self):
         resumeable_upload_url = RESUMABLE_SESSION_URI_TEMPLATE % dict(
@@ -889,12 +888,25 @@ class OpenTest(unittest.TestCase):
         """read should never return None."""
         test_string = u"ветер по морю гуляет..."
         with smart_open.gcs.open(BUCKET_NAME, BLOB_NAME, "wb") as fout:
+            self.assertEqual(fout.name, BLOB_NAME)
             fout.write(test_string.encode('utf8'))
 
         r = smart_open.gcs.open(BUCKET_NAME, BLOB_NAME, "rb")
+        self.assertEqual(r.name, BLOB_NAME)
         self.assertEqual(r.read(), test_string.encode("utf-8"))
         self.assertEqual(r.read(), b"")
         self.assertEqual(r.read(), b"")
+
+    def test_round_trip(self):
+        test_string = u"ветер по морю гуляет..."
+        url = 'gs://%s/%s' % (BUCKET_NAME, BLOB_NAME)
+        with smart_open.open(url, "w") as fout:
+            fout.write(test_string)
+
+        with smart_open.open(url) as fin:
+            actual = fin.read()
+
+        self.assertEqual(test_string, actual)
 
 
 class MakeRangeStringTest(unittest.TestCase):

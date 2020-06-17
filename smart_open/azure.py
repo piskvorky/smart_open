@@ -6,11 +6,11 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-"""Implements file-like objects for reading and writing to/from Azure Storage Blob (ASB)."""
+"""Implements file-like objects for reading and writing to/from Azure Blob Storage."""
 
+import base64
 import io
 import logging
-import base64
 
 import smart_open.bytebuffer
 import smart_open.constants
@@ -21,19 +21,16 @@ import azure.core.exceptions
 logger = logging.getLogger(__name__)
 
 _BINARY_TYPES = (bytes, bytearray, memoryview)
-"""Allowed binary buffer types for writing to the underlying Azure Storage Blob stream"""
+"""Allowed binary buffer types for writing to the underlying Azure Blob Storage stream"""
 
-SCHEME = "asb"
-"""Supported scheme for Azure Storage Blob in smart_open endpoint URL"""
-
-_MIN_MIN_PART_SIZE = _REQUIRED_CHUNK_MULTIPLE = 4 * 1024**2
-"""Azure requires you to upload in multiples of 4MB, except for the last part."""
+SCHEME = "azure"
+"""Supported scheme for Azure Blob Storage in smart_open endpoint URL"""
 
 _DEFAULT_MIN_PART_SIZE = 64 * 1024**2
 """Default minimum part size for Azure Cloud Storage multipart uploads is 64MB"""
 
 DEFAULT_BUFFER_SIZE = 4 * 1024**2
-"""Default buffer size for working with Azure Storage Blob is 256MB
+"""Default buffer size for working with Azure Blob Storage is 256MB
 https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs
 """
 
@@ -41,8 +38,17 @@ https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-bl
 def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
-    container_id = sr.netloc
-    blob_id = sr.path.lstrip('/')
+    first = sr.netloc
+    second = sr.path.lstrip('/')
+
+    # https://docs.microsoft.com/en-us/rest/api/storageservices/working-with-the-root-container
+    if not second:
+        container_id = '$root'
+        blob_id = first
+    else:
+        container_id = first
+        blob_id = second
+
     return dict(scheme=SCHEME, container_id=container_id, blob_id=blob_id)
 
 
@@ -56,54 +62,61 @@ def open(
         container_id,
         blob_id,
         mode,
+        client=None,  # type: azure.storage.blob.BlobServiceClient
         buffer_size=DEFAULT_BUFFER_SIZE,
-        client=None,  # type: azure.storage.blob.azure.storage.blob.BlobServiceClient
+        min_part_size=_DEFAULT_MIN_PART_SIZE
         ):
-    """Open an Azure Storage Blob blob for reading or writing.
+    """Open an Azure Blob Storage blob for reading or writing.
 
     Parameters
     ----------
-    bucket_id: str
-        The name of the bucket this object resides in.
+    container_id: str
+        The name of the container this object resides in.
     blob_id: str
         The name of the blob within the bucket.
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
+    client: azure.storage.blob.BlobServiceClient
+        The Azure Blob Storage client to use when working with azure-storage-blob.
     buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
-    client: azure.storage.blob.azure.storage.blob.BlobServiceClient, optional
-        The Azure Storage Blob client to use when working with azure-storage-blob.
+    min_part_size: int, optional
+        The minimum part size for multipart uploads.  For writing only.
 
     """
+    if not client:
+        raise ValueError('you must specify the client to connect to Azure')
+
     if mode == smart_open.constants.READ_BINARY:
         return Reader(
             container_id,
             blob_id,
+            client,
             buffer_size=buffer_size,
             line_terminator=smart_open.constants.BINARY_NEWLINE,
-            client=client,
         )
     elif mode == smart_open.constants.WRITE_BINARY:
         return Writer(
             container_id,
             blob_id,
-            client=client,
+            client,
+            min_part_size=min_part_size
         )
     else:
-        raise NotImplementedError('Azure Storage Blob support for mode %r not implemented' % mode)
+        raise NotImplementedError('Azure Blob Storage support for mode %r not implemented' % mode)
 
 
 class _RawReader(object):
-    """Read an Azure Storage Blob file."""
+    """Read an Azure Blob Storage file."""
 
-    def __init__(self, asb_blob, size):
+    def __init__(self, blob, size):
         # type: (azure.storage.blob.BlobClient, int) -> None
-        self._blob = asb_blob
+        self._blob = blob
         self._size = size
         self._position = 0
 
     def seek(self, position):
-        """Seek to the specified position (byte offset) in the Azure Storage Blob blob.
+        """Seek to the specified position (byte offset) in the Azure Blob Storage blob.
 
         :param int position: The byte offset from the beginning of the blob.
 
@@ -149,12 +162,10 @@ class Reader(io.BufferedIOBase):
             self,
             container,
             blob,
+            client,  # type: azure.storage.blob.BlobServiceClient
             buffer_size=DEFAULT_BUFFER_SIZE,
             line_terminator=smart_open.constants.BINARY_NEWLINE,
-            client=None,  # type: azure.storage.blob.BlobServiceClient
     ):
-        if client is None:
-            client = azure.storage.blob.BlobServiceClient()
         self._container_client = client.get_container_client(container)
         # type: azure.storage.blob.ContainerClient
 
@@ -213,7 +224,7 @@ class Reader(io.BufferedIOBase):
         Returns the position after seeking."""
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
         if whence not in smart_open.constants.WHENCE_CHOICES:
-            raise ValueError('invalid whence %, expected one of %r' % (whence,
+            raise ValueError('invalid whence %i, expected one of %r' % (whence,
                                                                        smart_open.constants.WHENCE_CHOICES))
 
         if whence == smart_open.constants.WHENCE_START:
@@ -330,7 +341,7 @@ class Reader(io.BufferedIOBase):
 
 
 class Writer(io.BufferedIOBase):
-    """Writes bytes to Azure Storage Blob.
+    """Writes bytes to Azure Blob Storage.
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
@@ -338,11 +349,9 @@ class Writer(io.BufferedIOBase):
             self,
             container,
             blob,
+            client,  # type: azure.storage.blob.BlobServiceClient
             min_part_size=_DEFAULT_MIN_PART_SIZE,
-            client=None,  # type: azure.storage.blob.BlobServiceClient
     ):
-        if client is None:
-            client = azure.storage.blob.BlobServiceClient()
         self._client = client
         self._container_client = self._client.get_container_client(container)
         # type: azure.storage.blob.ContainerClient
@@ -369,6 +378,10 @@ class Writer(io.BufferedIOBase):
     def close(self):
         logger.debug("closing")
         if not self.closed:
+            if self._current_part.tell() > 0:
+                self._upload_part()
+            self._blob.commit_block_list(self._block_list)
+            self._block_list = []
             self._client = None
         logger.debug("successfully closed")
 
@@ -391,7 +404,7 @@ class Writer(io.BufferedIOBase):
         raise io.UnsupportedOperation("detach() not supported")
 
     def write(self, b):
-        """Write the given bytes (binary string) to the Azure Storage Blob file.
+        """Write the given bytes (binary string) to the Azure Blob Storage file.
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
@@ -401,42 +414,35 @@ class Writer(io.BufferedIOBase):
 
         self._current_part.write(b)
         self._total_size += len(b)
-        if len(b) > 0:
+
+        if self._current_part.tell() >= self._min_part_size:
             self._upload_part()
 
         return len(b)
 
     def _upload_part(self):
         part_num = self._total_parts + 1
-
-        #
-        # Here we upload the largest amount possible given Azure Storage Blob's restriction
-        # of parts being multiples of 4MB, except for the last one.
-        #
         content_length = self._current_part.tell()
         range_stop = self._bytes_uploaded + content_length - 1
 
-        #
-        # The block_id correspond to the index of the content base64 encoded.
-        #
-        block_id = base64.b64encode(str(self._bytes_uploaded).encode())
+        """  # noqa: E501
+        block_id's must be base64 encoded, all the same length, and less than or equal to 64 bytes in size prior
+        to encoding.
+        https://docs.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.blobclient?view=azure-python#stage-block-block-id--data--length-none----kwargs-
+        """
+        zero_padded_part_num = str(part_num).zfill(64 // 2)
+        block_id = base64.b64encode(zero_padded_part_num.encode())
         self._current_part.seek(0)
         self._blob.stage_block(block_id, self._current_part.read(content_length))
-        if block_id not in [block_blob['id'] for block_blob in self._block_list]:
-            self._block_list.append(azure.storage.blob.BlobBlock(block_id=block_id))
+        self._block_list.append(azure.storage.blob.BlobBlock(block_id=block_id))
 
         logger.info(
             "uploading part #%i, %i bytes (total %.3fGB)",
             part_num, content_length, range_stop / 1024.0 ** 3,
         )
 
-        self._blob.commit_block_list(self._block_list)
         self._total_parts += 1
         self._bytes_uploaded += content_length
-
-        #
-        # For the last part, the below _current_part handling is a NOOP.
-        #
         self._current_part = io.BytesIO(self._current_part.read())
         self._current_part.seek(0, io.SEEK_END)
 
@@ -458,4 +464,5 @@ class Writer(io.BufferedIOBase):
             self.__class__.__name__,
             self._container_client.container_name,
             self._blob.blob_name,
+            self._min_part_size
         )

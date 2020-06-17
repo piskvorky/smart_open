@@ -129,7 +129,7 @@ def open(
 
     """
     if mode == constants.READ_BINARY:
-        return Reader(
+        fileobj = Reader(
             bucket_id,
             blob_id,
             buffer_size=buffer_size,
@@ -137,7 +137,7 @@ def open(
             client=client,
         )
     elif mode == constants.WRITE_BINARY:
-        return Writer(
+        fileobj = Writer(
             bucket_id,
             blob_id,
             min_part_size=min_part_size,
@@ -145,6 +145,9 @@ def open(
         )
     else:
         raise NotImplementedError('GCS support for mode %r not implemented' % mode)
+
+    fileobj.name = blob_id
+    return fileobj
 
 
 class _RawReader(object):

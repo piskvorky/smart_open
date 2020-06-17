@@ -24,7 +24,19 @@ import azure.core.exceptions
 
 CONTAINER_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
-DISABLE_MOCKS = os.environ.get('SO_DISABLE_Azure Storage Blob_MOCKS') == "1"
+DISABLE_MOCKS = os.environ.get('SO_DISABLE_AZURE_MOCKS') == "1"
+
+"""If mocks are disabled, allow to use the Azurite local Azure Storage API
+https://github.com/Azure/Azurite
+To use locally:
+docker run -p 10000:10000 -p 10001:10001 mcr.microsoft.com/azure-storage/azurite
+"""
+_AZURITE_DEFAULT_CONNECT_STR = 'DefaultEndpointsProtocol=http;' \
+    'AccountName=devstoreaccount1;' \
+    'AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/' \
+    'K1SZFPTOtr/KBHBeksoGMGw==;' \
+    'BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;'
+CONNECT_STR = os.environ.get('SO_AZURE_CONNECTION_STRING', _AZURITE_DEFAULT_CONNECT_STR)
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +85,7 @@ class FakeBlobClient(object):
 
 class FakeBlobClientTest(unittest.TestCase):
     def setUp(self):
-        self.blob_service_client = FakeBlobServiceClient()
+        self.blob_service_client = FakeBlobServiceClient.from_connection_string(CONNECT_STR)
         self.container_client = FakeContainerClient(self.blob_service_client, 'test-container')
         self.blob_client = FakeBlobClient(self.container_client, 'test-blob.txt')
 
@@ -139,7 +151,7 @@ class FakeContainerClient(object):
 
 class FakeContainerClientTest(unittest.TestCase):
     def setUp(self):
-        self.blob_service_client = FakeBlobServiceClient()
+        self.blob_service_client = FakeBlobServiceClient.from_connection_string(CONNECT_STR)
         self.container_client = FakeContainerClient(self.blob_service_client, 'test-container')
 
     def test_nonexistent_blob(self):
@@ -195,8 +207,19 @@ class FakeContainerClientTest(unittest.TestCase):
 class FakeBlobServiceClient(object):
     # From Azure's BlobServiceClient API
     # https://docs.microsoft.com/fr-fr/python/api/azure-storage-blob/azure.storage.blob.blobserviceclient?view=azure-python
-    def __init__(self):
+    def __init__(self, account_url, credential=None, **kwargs):
+        self._account_url = account_url
+        self._credential = credential
+
         self.__container_clients = OrderedDict()
+
+    @classmethod
+    def from_connection_string(cls, conn_str, credential=None, **kwargs):
+        account_url, secondary, credential = \
+            azure.storage.blob._shared.base_client.parse_connection_str(conn_str, credential, 'blob')
+        if 'secondary_hostname' not in kwargs:
+            kwargs['secondary_hostname'] = secondary
+        return cls(account_url, credential=credential, **kwargs)
 
     def create_container(self, container_name, metadata=None):
         if container_name in self.__container_clients:
@@ -223,7 +246,7 @@ class FakeBlobServiceClient(object):
 
 class FakeBlobServiceClientTest(unittest.TestCase):
     def setUp(self):
-        self.blob_service_client = FakeBlobServiceClient()
+        self.blob_service_client = FakeBlobServiceClient.from_connection_string(CONNECT_STR)
 
     def test_nonexistent_container(self):
         with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
@@ -257,24 +280,13 @@ class FakeBlobServiceClientTest(unittest.TestCase):
 
 
 if DISABLE_MOCKS:
-    """If mocks are disabled, allow to use the Azurite local Azure Storage API
-    https://github.com/Azure/Azurite
-    To use locally:
-    docker run -p 10000:10000 -p 10001:10001 mcr.microsoft.com/azure-storage/azurite
-    """
-    # use Azurite default connection string
-    CONNECT_STR = 'DefaultEndpointsProtocol=http;' \
-        'AccountName=devstoreaccount1;' \
-        'AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/' \
-        'K1SZFPTOtr/KBHBeksoGMGw==;' \
-        'BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;'
-    test_blob_service_client = azure.storage.blob.BlobServiceClient.from_connection_string(CONNECT_STR)
+    CLIENT = azure.storage.blob.BlobServiceClient.from_connection_string(CONNECT_STR)
 else:
-    test_blob_service_client = FakeBlobServiceClient()
+    CLIENT = FakeBlobServiceClient.from_connection_string(CONNECT_STR)
 
 
 def get_container_client():
-    return test_blob_service_client.get_container_client(container=CONTAINER_NAME)
+    return CLIENT.get_container_client(container=CONTAINER_NAME)
 
 
 def cleanup_container():
@@ -306,7 +318,8 @@ def setUpModule():  # noqa
     """Called once by unittest when initializing this module.  Set up the
     test Azure container.
     """
-    test_blob_service_client.create_container(CONTAINER_NAME)
+    CLIENT.create_container(CONTAINER_NAME)
+
 
 def tearDownModule():  # noqa
     """Called once by unittest when tearing down this module.  Empty and
@@ -325,13 +338,13 @@ class ReaderTest(unittest.TestCase):
         cleanup_container()
 
     def test_iter(self):
-        """Are Azure Storage Blob files iterated over correctly?"""
+        """Are Azure Blob Storage files iterated over correctly?"""
         expected = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_iter_%s" % BLOB_NAME
         put_to_container(blob_name, contents=expected)
 
-        # connect to fake Azure Storage Blob and read from the fake key we filled above
-        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
+        # connect to fake Azure Blob Storage and read from the fake key we filled above
+        fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         output = [line.rstrip(b'\n') for line in fin]
         self.assertEqual(output, expected.split(b'\n'))
 
@@ -341,33 +354,29 @@ class ReaderTest(unittest.TestCase):
         blob_name = "test_iter_context_manager_%s" % BLOB_NAME
         put_to_container(blob_name, contents=expected)
 
-        with smart_open.asb.Reader(
-                CONTAINER_NAME,
-                blob_name,
-                client=test_blob_service_client
-        ) as fin:
+        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             output = [line.rstrip(b'\n') for line in fin]
             self.assertEqual(output, expected.split(b'\n'))
 
     def test_read(self):
-        """Are Azure Storage Blob files read correctly?"""
+        """Are Azure Blob Storage files read correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_read_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
         logger.debug('content: %r len: %r', content, len(content))
 
-        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
+        fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
         self.assertEqual(content[14:], fin.read())  # read the rest
 
     def test_seek_beginning(self):
-        """Does seeking to the beginning of Azure Storage Blob files work correctly?"""
+        """Does seeking to the beginning of Azure Blob Storage files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_seek_beginning_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
+        fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
 
@@ -378,36 +387,36 @@ class ReaderTest(unittest.TestCase):
         self.assertEqual(content, fin.read(-1))  # same thing
 
     def test_seek_start(self):
-        """Does seeking from the start of Azure Storage Blob files work correctly?"""
+        """Does seeking from the start of Azure Blob Storage files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_seek_start_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
+        fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         seek = fin.seek(6)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.tell(), 6)
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
     def test_seek_current(self):
-        """Does seeking from the middle of Azure Storage Blob files work correctly?"""
+        """Does seeking from the middle of Azure Blob Storage files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_seek_current_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
+        fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         self.assertEqual(fin.read(5), b'hello')
         seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
 
     def test_seek_end(self):
-        """Does seeking from the end of Azure Storage Blob files work correctly?"""
+        """Does seeking from the end of Azure Blob Storage files work correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
         blob_name = "test_seek_end_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
+        fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
@@ -417,7 +426,7 @@ class ReaderTest(unittest.TestCase):
         blob_name = "test_detect_eof_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        fin = smart_open.asb.Reader(CONTAINER_NAME, blob_name, client=test_blob_service_client)
+        fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(content))
@@ -436,11 +445,7 @@ class ReaderTest(unittest.TestCase):
         #
         # Make sure we're reading things correctly.
         #
-        with smart_open.asb.Reader(
-                CONTAINER_NAME,
-                blob_name,
-                client=test_blob_service_client
-        ) as fin:
+        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             self.assertEqual(fin.read(), buf.getvalue())
 
         #
@@ -451,11 +456,7 @@ class ReaderTest(unittest.TestCase):
             self.assertEqual(zipfile.read(), expected)
 
         logger.debug('starting actual test')
-        with smart_open.asb.Reader(
-                CONTAINER_NAME,
-                blob_name,
-                client=test_blob_service_client
-        ) as fin:
+        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
@@ -466,11 +467,7 @@ class ReaderTest(unittest.TestCase):
         blob_name = "test_readline_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        with smart_open.asb.Reader(
-                CONTAINER_NAME,
-                blob_name,
-                client=test_blob_service_client
-        ) as fin:
+        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             fin.readline()
             self.assertEqual(fin.tell(), content.index(b'\n')+1)
 
@@ -486,10 +483,10 @@ class ReaderTest(unittest.TestCase):
         blob_name = "test_readline_tiny_buffer_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        with smart_open.asb.Reader(
+        with smart_open.azure.Reader(
                 CONTAINER_NAME,
                 blob_name,
-                client=test_blob_service_client,
+                CLIENT,
                 buffer_size=8
         ) as fin:
             actual = list(fin)
@@ -502,11 +499,7 @@ class ReaderTest(unittest.TestCase):
         blob_name = "test_read0_does_not_return_data_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        with smart_open.asb.Reader(
-                CONTAINER_NAME,
-                blob_name,
-                client=test_blob_service_client
-        ) as fin:
+        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             data = fin.read(0)
 
         self.assertEqual(data, b'')
@@ -516,53 +509,38 @@ class ReaderTest(unittest.TestCase):
         blob_name = "test_read_past_end_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
 
-        with smart_open.asb.Reader(
-                CONTAINER_NAME,
-                blob_name,
-                client=test_blob_service_client
-        ) as fin:
+        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             data = fin.read(100)
 
         self.assertEqual(data, content)
 
 
 class WriterTest(unittest.TestCase):
-    """
-    Test writing into asb files.
-
-    """
+    """Test writing into Azure Blob files."""
 
     def tearDown(self):
         cleanup_container()
 
     def test_write_01(self):
-        """Does writing into Azure Storage Blob work correctly?"""
+        """Does writing into Azure Blob Storage work correctly?"""
         test_string = u"žluťoučký koníček".encode('utf8')
         blob_name = "test_write_01_%s" % BLOB_NAME
 
-        with smart_open.asb.Writer(
-                CONTAINER_NAME,
-                blob_name,
-                client=test_blob_service_client
-        ) as fout:
+        with smart_open.azure.Writer(CONTAINER_NAME, blob_name, CLIENT) as fout:
             fout.write(test_string)
 
         output = list(smart_open.open(
-            "asb://%s/%s" % (CONTAINER_NAME, blob_name),
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
             "rb",
-            transport_params=dict(client=test_blob_service_client))
-        )
+            transport_params=dict(client=CLIENT),
+        ))
         self.assertEqual(output, [test_string])
 
     def test_incorrect_input(self):
-        """Does gcs write fail on incorrect input?"""
+        """Does azure write fail on incorrect input?"""
         blob_name = "test_incorrect_input_%s" % BLOB_NAME
         try:
-            with smart_open.asb.Writer(
-                    CONTAINER_NAME,
-                    blob_name,
-                    client=test_blob_service_client
-            ) as fin:
+            with smart_open.azure.Writer(CONTAINER_NAME, blob_name, CLIENT) as fin:
                 fin.write(None)
         except TypeError:
             pass
@@ -570,9 +548,9 @@ class WriterTest(unittest.TestCase):
             self.fail()
 
     def test_write_02(self):
-        """Does Azure Storage Blob write unicode-utf8 conversion work?"""
+        """Does Azure Blob Storage write unicode-utf8 conversion work?"""
         blob_name = "test_write_02_%s" % BLOB_NAME
-        smart_open_write = smart_open.asb.Writer(CONTAINER_NAME, blob_name, client=test_blob_service_client)
+        smart_open_write = smart_open.azure.Writer(CONTAINER_NAME, blob_name, CLIENT)
         smart_open_write.tell()
         logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
@@ -580,41 +558,66 @@ class WriterTest(unittest.TestCase):
             self.assertEqual(fout.tell(), 14)
 
     def test_write_03(self):
-        """Do multiple writes work correctly?"""
+        """Do multiple writes less than the min_part_size work correctly?"""
         # write
         blob_name = "test_write_03_%s" % BLOB_NAME
-        smart_open_write = smart_open.asb.Writer(CONTAINER_NAME, blob_name, client=test_blob_service_client)
+        min_part_size = 256 * 1024
+        smart_open_write = smart_open.azure.Writer(
+            CONTAINER_NAME, blob_name, CLIENT, min_part_size=min_part_size
+        )
         local_write = io.BytesIO()
 
         with smart_open_write as fout:
-            first_part = b"t" * 64
+            first_part = b"t" * 262141
             fout.write(first_part)
             local_write.write(first_part)
-            self.assertEqual(fout.tell(), 64)
+            self.assertEqual(fout._current_part.tell(), 262141)
 
             second_part = b"t\n"
             fout.write(second_part)
             local_write.write(second_part)
-            self.assertEqual(fout.tell(), 66)
-            self.assertEqual(fout._total_parts, 2)
+            self.assertEqual(fout._current_part.tell(), 262143)
+            self.assertEqual(fout._total_parts, 0)
 
             third_part = b"t"
             fout.write(third_part)
             local_write.write(third_part)
-            self.assertEqual(fout.tell(), 67)
-            self.assertEqual(fout._total_parts, 3)
+            self.assertEqual(fout._current_part.tell(), 0)
+            self.assertEqual(fout._total_parts, 1)
 
             fourth_part = b"t" * 1
             fout.write(fourth_part)
             local_write.write(fourth_part)
-            self.assertEqual(fout.tell(), 68)
-            self.assertEqual(fout._total_parts, 4)
+            self.assertEqual(fout._current_part.tell(), 1)
+            self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content
-        output = list(smart_open.open(
-            "asb://%s/%s" % (CONTAINER_NAME, blob_name),
-            transport_params=dict(client=test_blob_service_client))
+        uri = "azure://%s/%s" % (CONTAINER_NAME, blob_name)
+        output = list(smart_open.open(uri, transport_params=dict(client=CLIENT)))
+        local_write.seek(0)
+        actual = [line.decode("utf-8") for line in list(local_write)]
+        self.assertEqual(output, actual)
+
+    def test_write_03a(self):
+        """Do multiple writes greater than or equal to the min_part_size work correctly?"""
+        min_part_size = 256 * 1024
+        blob_name = "test_write_03_%s" % BLOB_NAME
+        smart_open_write = smart_open.azure.Writer(
+            CONTAINER_NAME, blob_name, CLIENT, min_part_size=min_part_size
         )
+        local_write = io.BytesIO()
+
+        with smart_open_write as fout:
+            for i in range(1, 4):
+                part = b"t" * min_part_size
+                fout.write(part)
+                local_write.write(part)
+                self.assertEqual(fout._current_part.tell(), 0)
+                self.assertEqual(fout._total_parts, i)
+
+        # read back the same key and check its content
+        uri = "azure://%s/%s" % (CONTAINER_NAME, blob_name)
+        output = list(smart_open.open(uri, transport_params=dict(client=CLIENT)))
         local_write.seek(0)
         actual = [line.decode("utf-8") for line in list(local_write)]
         self.assertEqual(output, actual)
@@ -622,33 +625,25 @@ class WriterTest(unittest.TestCase):
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
         blob_name = "test_write_04_%s" % BLOB_NAME
-        smart_open_write = smart_open.asb.Writer(CONTAINER_NAME, blob_name, client=test_blob_service_client)
+        smart_open_write = smart_open.azure.Writer(CONTAINER_NAME, blob_name, CLIENT)
         with smart_open_write as fout:  # noqa
             pass
 
         # read back the same key and check its content
         output = list(smart_open.open(
-            "asb://%s/%s" % (CONTAINER_NAME, blob_name),
-            transport_params=dict(client=test_blob_service_client))
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+            transport_params=dict(client=CLIENT))
         )
         self.assertEqual(output, [])
 
     def test_gzip(self):
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
         blob_name = "test_gzip_%s" % BLOB_NAME
-        with smart_open.asb.Writer(
-                CONTAINER_NAME,
-                blob_name,
-                client=test_blob_service_client
-        ) as fout:
+        with smart_open.azure.Writer(CONTAINER_NAME, blob_name, CLIENT) as fout:
             with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
                 zipfile.write(expected)
 
-        with smart_open.asb.Reader(
-                CONTAINER_NAME,
-                blob_name,
-                client=test_blob_service_client
-        ) as fin:
+        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
@@ -656,24 +651,20 @@ class WriterTest(unittest.TestCase):
 
     def test_buffered_writer_wrapper_works(self):
         """
-        Ensure that we can wrap a smart_open gcs stream in a BufferedWriter, which
+        Ensure that we can wrap a smart_open azure stream in a BufferedWriter, which
         passes a memoryview object to the underlying stream in python >= 2.7
         """
         expected = u'не думай о секундах свысока'
         blob_name = "test_buffered_writer_wrapper_works_%s" % BLOB_NAME
 
-        with smart_open.asb.Writer(
-                CONTAINER_NAME,
-                blob_name,
-                client=test_blob_service_client
-        ) as fout:
+        with smart_open.azure.Writer(CONTAINER_NAME, blob_name, CLIENT) as fout:
             with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 
         with smart_open.open(
-                "asb://%s/%s" % (CONTAINER_NAME, blob_name),
+                "azure://%s/%s" % (CONTAINER_NAME, blob_name),
                 'rb',
-                transport_params=dict(client=test_blob_service_client)
+                transport_params=dict(client=CLIENT)
         ) as fin:
             with io.TextIOWrapper(fin, encoding='utf-8') as text:
                 actual = text.read()
@@ -684,36 +675,31 @@ class WriterTest(unittest.TestCase):
         expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
         blob_name = "test_binary_iterator_%s" % BLOB_NAME
         put_to_container(blob_name=blob_name, contents=b"\n".join(expected))
-        with smart_open.asb.open(
-                CONTAINER_NAME,
-                blob_name,
-                'rb',
-                client=test_blob_service_client
-        ) as fin:
+        with smart_open.azure.open(CONTAINER_NAME, blob_name, 'rb', CLIENT) as fin:
             actual = [line.rstrip() for line in fin]
         self.assertEqual(expected, actual)
 
     def test_nonexisting_container(self):
         expected = u"выйду ночью в поле с конём".encode('utf-8')
         with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
-            with smart_open.asb.open(
+            with smart_open.azure.open(
                     'thiscontainerdoesntexist',
                     'mykey',
                     'wb',
-                    client=test_blob_service_client
+                    CLIENT
             ) as fout:
                 fout.write(expected)
 
     def test_double_close(self):
         text = u'там за туманами, вечными, пьяными'.encode('utf-8')
-        fout = smart_open.asb.open(CONTAINER_NAME, 'key', 'wb', client=test_blob_service_client)
+        fout = smart_open.azure.open(CONTAINER_NAME, 'key', 'wb', CLIENT)
         fout.write(text)
         fout.close()
         fout.close()
 
     def test_flush_close(self):
         text = u'там за туманами, вечными, пьяными'.encode('utf-8')
-        fout = smart_open.asb.open(CONTAINER_NAME, 'key', 'wb', client=test_blob_service_client)
+        fout = smart_open.azure.open(CONTAINER_NAME, 'key', 'wb', CLIENT)
         fout.write(text)
         fout.flush()
         fout.close()
