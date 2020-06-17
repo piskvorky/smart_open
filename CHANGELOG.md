@@ -2,6 +2,7 @@
 
   - Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
   - Azure storage blob support ([@nclsmitchell](https://github.com/nclsmitchell) and [@petedannemann](https://github.com/petedannemann))
+  - Ensure GCS objects always have a .name attribute (PR [#506](https://github.com/RaRe-Technologies/smart_open/pull/506), [@todor-markov](https://github.com/todor-markov))
 
 # 2.0.0, 27 April 2020, "Python 3"
 
