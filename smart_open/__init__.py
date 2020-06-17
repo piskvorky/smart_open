@@ -23,10 +23,15 @@ The main functions are:
 """
 
 import logging
-from smart_open import version
 
-from .smart_open_lib import open, parse_uri, smart_open, register_compressor
-from .s3 import iter_bucket as s3_iter_bucket
+#
+# Prevent regression of #474 and #475
+#
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
+from smart_open import version  # noqa: E402
+from .smart_open_lib import open, parse_uri, smart_open, register_compressor  # noqa: E402
+from .s3 import iter_bucket as s3_iter_bucket  # noqa: E402
 
 __all__ = [
     'open',
@@ -36,8 +41,4 @@ __all__ = [
     'smart_open',
 ]
 
-
 __version__ = version.__version__
-
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
