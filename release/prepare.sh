@@ -1,7 +1,8 @@
 #
 # Prepare a new release of smart_open.  Use it like this:
 #
-#     bash release/prepare.sh 1.2.3
+#     export SMART_OPEN_RELEASE=2.3.4
+#     bash release/prepare.sh
 #
 # where 1.2.3 is the new version to release.
 #
@@ -17,7 +18,7 @@
 #
 set -euxo pipefail
 
-version="$1"
+version="$SMART_OPEN_RELEASE"
 echo "version: $version"
 
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
