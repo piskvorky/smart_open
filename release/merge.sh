@@ -35,11 +35,7 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-#
-# env -i python seems to return the wrong Python version on MacOS...
-#
-my_python=$(which python3)
-version=$($my_python -c "from smart_open.version import __version__; print(__version__)")
+version="$SMART_OPEN_RELEASE"
 
 read -p "Push version $version to github.com? yes or no: " reply
 if [ "$reply" != "yes" ]
