@@ -6,7 +6,7 @@ jobs:
   include:
     - python: '3.7'
       name: "flake8"
-      env: TOXENV="flake8"
+      env: TOXENV="flake8,rstlint"
 
     - python: '3.5'
       env: TOXENV="check_keys,py35-test,py35-integration"
