@@ -4,11 +4,7 @@
 #
 set -euo pipefail
 
-#
-# env -i python seems to return the wrong Python version on MacOS...
-#
-my_python=$(which python3)
-version=$($my_python -c "from smart_open.version import __version__; print(__version__)")
+version="$SMART_OPEN_RELEASE"
 
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
 cd "$script_dir"

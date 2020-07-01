@@ -57,13 +57,14 @@ install_requires = [
 
 aws_deps = ['boto', 'boto3']
 gcp_deps = ['google-cloud-storage']
+azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 
-all_deps = install_requires + aws_deps + gcp_deps
+all_deps = install_requires + aws_deps + gcp_deps + azure_deps
 
 setup(
     name='smart_open',
     version=__version__,
-    description='Utils for streaming large files (S3, HDFS, GCS, gzip, bz2...)',
+    description='Utils for streaming large files (S3, HDFS, GCS, Azure Blob Storage, gzip, bz2...)',
     long_description=read('README.rst'),
 
     packages=find_packages(),
@@ -79,7 +80,7 @@ setup(
     url='https://github.com/piskvorky/smart_open',
     download_url='http://pypi.python.org/pypi/smart_open',
 
-    keywords='file streaming, s3, hdfs, gcs',
+    keywords='file streaming, s3, hdfs, gcs, azure blob storage',
 
     license='MIT',
     platforms='any',
@@ -93,6 +94,7 @@ setup(
         'test': tests_require,
         'aws': aws_deps,
         'gcp': gcp_deps,
+        'azure': azure_deps,
         'all': all_deps,
     },
     python_requires=">=3.5.*",

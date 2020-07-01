@@ -7,6 +7,7 @@
 #
 
 import bz2
+import csv
 import contextlib
 import io
 import unittest
@@ -65,7 +66,7 @@ class ParseUriTest(unittest.TestCase):
     def test_scheme(self):
         """Do URIs schemes parse correctly?"""
         # supported schemes
-        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs"):
+        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs", "azure"):
             parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
             self.assertEqual(parsed_uri.scheme, scheme)
 
@@ -323,6 +324,26 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "gs")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob?param")
+
+    def test_azure_blob_uri(self):
+        """Do Azure Blob URIs parse correctly?"""
+        # correct uri without credentials
+        parsed_uri = smart_open_lib._parse_uri("azure://mycontainer/myblob")
+        self.assertEqual(parsed_uri.scheme, "azure")
+        self.assertEqual(parsed_uri.container_id, "mycontainer")
+        self.assertEqual(parsed_uri.blob_id, "myblob")
+
+    def test_azure_blob_uri_root_container(self):
+        parsed_uri = smart_open_lib._parse_uri("azure://myblob")
+        self.assertEqual(parsed_uri.scheme, "azure")
+        self.assertEqual(parsed_uri.container_id, "$root")
+        self.assertEqual(parsed_uri.blob_id, "myblob")
+
+    def test_azure_blob_uri_contains_slash(self):
+        parsed_uri = smart_open_lib._parse_uri("azure://mycontainer/mydir/myblob")
+        self.assertEqual(parsed_uri.scheme, "azure")
+        self.assertEqual(parsed_uri.container_id, "mycontainer")
+        self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
 
     def test_pathlib_monkeypatch(self):
         from smart_open.smart_open_lib import pathlib
@@ -720,7 +741,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
         reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
 
-        actual_lines = [l.decode("utf-8") for l in reader]
+        actual_lines = [line.decode("utf-8") for line in reader]
         self.assertEqual(2, len(actual_lines))
         self.assertEqual(lines[0], actual_lines[0])
         self.assertEqual(lines[1], actual_lines[1])
@@ -911,7 +932,6 @@ class SmartOpenReadTest(unittest.TestCase):
 
         self.assertEqual(content[14:], smart_open_object.read())  # read the rest
 
-    @unittest.skip('seek functionality for S3 currently disabled because of Issue #152')
     @mock_s3
     def test_s3_seek_moto(self):
         """Does seeking in S3 files work correctly?"""
@@ -1075,6 +1095,29 @@ class SmartOpenTest(unittest.TestCase):
             with smart_open.smart_open("/some/file.txt", "wb+") as fout:
                 mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1)
                 fout.write(self.as_bytes)
+
+    def test_newline(self):
+        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
+            smart_open.smart_open("/some/file.txt", "wb+", newline='\n')
+            mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1, newline='\n')
+
+    def test_newline_csv(self):
+        #
+        # See https://github.com/RaRe-Technologies/smart_open/issues/477
+        #
+        rows = [{'name': 'alice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
+        expected = 'name,color\nalice,aqua\nbob,blue\n'
+
+        with named_temporary_file(mode='w') as tmp:
+            with smart_open.open(tmp.name, 'w+', newline='\n') as fout:
+                out = csv.DictWriter(fout, fieldnames=['name', 'color'])
+                out.writeheader()
+                out.writerows(rows)
+
+            with open(tmp.name, 'r') as fin:
+                content = fin.read()
+
+        assert content == expected
 
     @mock.patch('boto3.Session')
     def test_s3_mode_mock(self, mock_session):
@@ -1250,9 +1293,7 @@ class WebHdfsWriteTest(unittest.TestCase):
 
 
 class CompressionFormatTest(unittest.TestCase):
-    """
-    Test that compression
-    """
+    """Test transparent (de)compression."""
 
     def write_read_assertion(self, suffix):
         test_file = make_buffer(name='file' + suffix)

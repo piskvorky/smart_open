@@ -72,13 +72,14 @@ def get_transport(scheme):
     )
     try:
         submodule = _REGISTRY[scheme]
-    except KeyError:
-        raise NotImplementedError(message)
+    except KeyError as e:
+        raise NotImplementedError(message) from e
     else:
         return submodule
 
 
 register_transport(smart_open.local_file)
+register_transport('smart_open.azure')
 register_transport('smart_open.gcs')
 register_transport('smart_open.hdfs')
 register_transport('smart_open.http')

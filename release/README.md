@@ -25,9 +25,10 @@ First, check that the [latest commit](https://github.com/RaRe-Technologies/smart
 
 For the subsequent steps to work, you will need to be in the top-level subdirectory for the repo (e.g. /home/misha/git/smart_open).
 
-Prepare the release, replacing 1.2.3 with the actual version of the new release:
+Prepare the release, replacing 2.3.4 with the actual version of the new release:
 
-    bash release/prepare.sh 1.2.3
+    export SMART_OPEN_RELEASE=2.3.4
+    bash release/prepare.sh
 
 This will create a local release branch.
 Look around the branch and make sure everything is in order.

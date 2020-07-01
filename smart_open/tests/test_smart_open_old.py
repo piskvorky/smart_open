@@ -218,7 +218,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
         reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
 
-        actual_lines = [l.decode("utf-8") for l in reader]
+        actual_lines = [line.decode("utf-8") for line in reader]
         self.assertEqual(2, len(actual_lines))
         self.assertEqual(lines[0], actual_lines[0])
         self.assertEqual(lines[1], actual_lines[1])
