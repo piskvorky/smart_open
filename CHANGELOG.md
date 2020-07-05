@@ -1,6 +1,7 @@
 # Unreleased
 
   - Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
+  - Avoid redundant GetObject API queries in s3.Reader (PR [#495](https://github.com/RaRe-Technologies/smart_open/pull/495), [@jcushman](https://github.com/jcushman)
   - Azure storage blob support ([@nclsmitchell](https://github.com/nclsmitchell) and [@petedannemann](https://github.com/petedannemann))
   - Ensure GCS objects always have a .name attribute (PR [#506](https://github.com/RaRe-Technologies/smart_open/pull/506), [@todor-markov](https://github.com/todor-markov))
   - Use exception chaining to convey the original cause of the exception (PR [#508](https://github.com/RaRe-Technologies/smart_open/pull/508), [@cool-RR](https://github.com/cool-RR))
