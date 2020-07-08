@@ -4,6 +4,8 @@
 #
 set -euo pipefail
 
+version="$SMART_OPEN_RELEASE"
+
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
 cd "$script_dir"
 
@@ -18,7 +20,6 @@ cd ..
 pip install twine
 python setup.py sdist
 
-version=$(env -i python -c "from smart_open.version import __version__; print(__version__)")
 read -p "Push version $version to PyPI? This step is non-reversible.  Answer yes or no: " reply
 if [ "$reply" != "yes" ]
 then

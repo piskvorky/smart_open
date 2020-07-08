@@ -23,15 +23,18 @@ You'll also need your PyPI username and password (for push_pypi.sh).
 
 First, check that the [latest commit](https://github.com/RaRe-Technologies/smart_open/commits/master) passed all CI.
 
-Prepare the release, replacing 1.2.3 with the actual version of the new release:
+For the subsequent steps to work, you will need to be in the top-level subdirectory for the repo (e.g. /home/misha/git/smart_open).
 
-    bash prepare.sh 1.2.3
+Prepare the release, replacing 2.3.4 with the actual version of the new release:
+
+    export SMART_OPEN_RELEASE=2.3.4
+    bash release/prepare.sh
 
 This will create a local release branch.
 Look around the branch and make sure everything is in order.
 Checklist:
 
-- [ ] Does smart_open/VERSION contain the correct version number for the release?
+- [ ] Does smart_open/version.py contain the correct version number for the release?
 - [ ] Does the CHANGELOG.md contain a section detailing the new release?
 - [ ] Are there any PRs that should be in CHANGELOG.md, but currently aren't?
 
@@ -40,13 +43,13 @@ For example, you may use the summarize_pr.sh helper script to generate one-line 
 
 **Once you're happy with the release branch**, run:
 
-    bash merge.sh
+    bash release/merge.sh
 
 This will perform a merge and push your changes to github.com.
 
 **This is the point of no return**.  Run:
 
-    bash push_pypi.sh
+    bash release/push_pypi.sh
 
 and provide your PyPI username and password.
 
@@ -64,7 +67,7 @@ If anything is wrong with the local release branch (before you call merge.sh), f
 
 - Typo in CHANGELOG.md
 - Missing entries in CHANGELOG.md
-- Wrong VERSION number
+- Wrong version.py number
 
 then just fix it in the release branch before moving on.
 

@@ -1,7 +1,8 @@
 #
 # Prepare a new release of smart_open.  Use it like this:
 #
-#     bash release/prepare.sh 1.2.3
+#     export SMART_OPEN_RELEASE=2.3.4
+#     bash release/prepare.sh
 #
 # where 1.2.3 is the new version to release.
 #
@@ -15,13 +16,19 @@
 #
 # Once you're happy, run merge.sh to continue with the release.
 #
-set -euo pipefail
+set -euxo pipefail
 
-version="$1"
+version="$SMART_OPEN_RELEASE"
 echo "version: $version"
 
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
 cd "$script_dir"
+
+#
+# We will need these for the doctests.
+#
+export AWS_ACCESS_KEY_ID=$(aws --profile smart_open configure get aws_access_key_id)
+export AWS_SECRET_ACCESS_KEY=$(aws --profile smart_open configure get aws_secret_access_key)
 
 git fetch upstream
 
@@ -41,18 +48,18 @@ set -u
 
 cd ..
 pip install -e .[test]  # for smart_open
-pip install .[test]  # for gensim
-python setup.py test  # for gensim
+pip install -e .[all]  # for smart_open
+python setup.py test
 
 #
 # Delete the release branch in case one is left lying around.
 #
-git checkout upstream/master
+git checkout upstream/develop
 set +e
 git branch -D release-"$version"
 set -e
 
-git checkout upstream/master -b release-"$version"
+git checkout upstream/develop -b release-"$version"
 echo "__version__ = '$version'" > smart_open/version.py
 git commit smart_open/version.py -m "bump version to $version"
 
@@ -60,7 +67,7 @@ echo "Next, update CHANGELOG.md."
 echo "Consider running summarize_pr.sh for each PR merged since the last release."
 read -p "Press Enter to continue..."
 
-$EDITOR CHANGELOG.md
+${EDITOR:-vim} CHANGELOG.md
 set +e
 git commit CHANGELOG.md -m "updated CHANGELOG.md for version $version"
 set -e

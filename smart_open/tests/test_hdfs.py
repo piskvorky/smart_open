@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+#
+# Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
+#
+# This code is distributed under the terms and conditions
+# from the MIT License (MIT).
+#
 from __future__ import print_function
 from __future__ import unicode_literals
 
@@ -8,7 +14,6 @@ import subprocess
 import unittest
 
 import mock
-import six
 
 import smart_open.hdfs
 
@@ -50,7 +55,6 @@ class CliRawInputBaseTest(unittest.TestCase):
         expected = 'В начале июля, в чрезвычайно жаркое время'
         self.assertEqual(expected, as_text)
 
-    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
     def test_unzip(self):
         path = P.join(CURR_DIR, 'test_data/crime-and-punishment.txt.gz')
         cat = subprocess.Popen(['cat', path], stdout=subprocess.PIPE)
@@ -87,7 +91,6 @@ class CliRawOutputBaseTest(unittest.TestCase):
         actual = cat.stdout.read().decode('utf-8')
         self.assertEqual(as_text, actual)
 
-    @unittest.skipIf(six.PY2, 'gzip support for Py2 is not implemented yet')
     def test_zip(self):
         cat = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         as_text = 'мы в ответе за тех, кого приручили'

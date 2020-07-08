@@ -9,7 +9,6 @@
 
 import io
 import os
-import sys
 
 from setuptools import setup, find_packages
 
@@ -17,14 +16,12 @@ from setuptools import setup, find_packages
 def _get_version():
     curr_dir = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(curr_dir, 'smart_open', 'version.py')) as fin:
-        #
-        # __version__ = '1.8.4'
-        #
         line = fin.readline().strip()
         parts = line.split(' ')
+        assert len(parts) == 3
         assert parts[0] == '__version__'
         assert parts[1] == '='
-        return parts[2][1:-1]
+        return parts[2].strip('\'"')
 
 
 #
@@ -41,35 +38,38 @@ def read(fname):
 
 tests_require = [
     'mock',
-    'moto==1.3.4',
+    'moto[server]',
     'pathlib2',
     'responses',
-    # Temporary pin boto3 & botocore, because moto doesn't work with new version
-    # See https://github.com/spulec/moto/issues/1793 and https://github.com/RaRe-Technologies/smart_open/issues/227
-    'boto3 < 1.8.0',
-    # 'botocore < 1.11.0'
+    'boto3',
     # Not used directly but allows boto GCE plugins to load.
     # https://github.com/GoogleCloudPlatform/compute-image-packages/issues/262
-    'google-compute-engine==2.8.12'
+    'google-compute-engine==2.8.12',
+    'paramiko',
+    'parameterizedtestcase',
+    'pytest',
+    'pytest-rerunfailures',
 ]
 
 install_requires = [
-    'boto >= 2.32',
     'requests',
-    'boto3',
 ]
-if sys.version_info[0] == 2:
-    install_requires.append('bz2file')
+
+aws_deps = ['boto', 'boto3']
+gcp_deps = ['google-cloud-storage']
+azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
+
+all_deps = install_requires + aws_deps + gcp_deps + azure_deps
 
 setup(
     name='smart_open',
     version=__version__,
-    description='Utils for streaming large files (S3, HDFS, gzip, bz2...)',
+    description='Utils for streaming large files (S3, HDFS, GCS, Azure Blob Storage, gzip, bz2...)',
     long_description=read('README.rst'),
 
     packages=find_packages(),
     package_data={
-        "smart_open.tests": ["test_data/*gz"],
+        "smart_open.tests": ["test_data/*"],
     },
 
     author='Radim Rehurek',
@@ -80,16 +80,24 @@ setup(
     url='https://github.com/piskvorky/smart_open',
     download_url='http://pypi.python.org/pypi/smart_open',
 
-    keywords='file streaming, s3, hdfs',
+    keywords='file streaming, s3, hdfs, gcs, azure blob storage',
 
     license='MIT',
     platforms='any',
 
-    install_requires=install_requires,
+    # Concatenating the lists together is temporary and will
+    # eventually simply be install_requires dropping the cloud
+    # dependencies from being installed without explicitly being declared.
+    install_requires=install_requires + aws_deps,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
+        'aws': aws_deps,
+        'gcp': gcp_deps,
+        'azure': azure_deps,
+        'all': all_deps,
     },
+    python_requires=">=3.5.*",
 
     test_suite="smart_open.tests",
 
@@ -99,7 +107,6 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',

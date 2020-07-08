@@ -1,5 +1,80 @@
 # Unreleased
 
+  - Bypass unnecessary GCS storage.buckets.get permission (PR [#516](https://github.com/RaRe-Technologies/smart_open/pull/516), [@gelioz](https://github.com/gelioz))
+
+# 2.1.0, 1 July 2020
+
+  - Azure storage blob support ([@nclsmitchell](https://github.com/nclsmitchell) and [@petedannemann](https://github.com/petedannemann))
+  - Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
+  - Ensure GCS objects always have a .name attribute (PR [#506](https://github.com/RaRe-Technologies/smart_open/pull/506), [@todor-markov](https://github.com/todor-markov))
+  - Use exception chaining to convey the original cause of the exception (PR [#508](https://github.com/RaRe-Technologies/smart_open/pull/508), [@cool-RR](https://github.com/cool-RR))
+
+# 2.0.0, 27 April 2020, "Python 3"
+
+  - **This version supports Python 3 only** (3.5+).
+    - If you still need Python 2, install the smart_open==1.10.1 legacy release instead.
+  - Prevent smart_open from writing to logs on import (PR [#476](https://github.com/RaRe-Technologies/smart_open/pull/476), [@mpenkov](https://github.com/mpenkov))
+  - Modify setup.py to explicitly support only Py3.5 and above (PR [#471](https://github.com/RaRe-Technologies/smart_open/pull/471), [@Amertz08](https://github.com/Amertz08))
+  - Include all the test_data in setup.py (PR [#473](https://github.com/RaRe-Technologies/smart_open/pull/473), [@sikuan](https://github.com/sikuan))
+
+# 1.10.1, 26 April 2020
+
+  - This is the last version to support Python 2.7. Versions 1.11 and above will support Python 3 only.
+  - Use only if you need Python 2.
+
+# 1.11.1, 8 Apr 2020
+
+  - Add missing boto dependency (Issue [#468](https://github.com/RaRe-Technologies/smart_open/issues/468))
+
+# 1.11.0, 8 Apr 2020
+
+  - Fix GCS multiple writes (PR [#421](https://github.com/RaRe-Technologies/smart_open/pull/421), [@petedannemann](https://github.com/petedannemann))
+  - Implemented efficient readline for ByteBuffer (PR [#426](https://github.com/RaRe-Technologies/smart_open/pull/426), [@mpenkov](https://github.com/mpenkov))
+  - Fix WebHDFS read method (PR [#433](https://github.com/RaRe-Technologies/smart_open/pull/433), [@mpenkov](https://github.com/mpenkov))
+  - Make S3 uploads more robust (PR [#434](https://github.com/RaRe-Technologies/smart_open/pull/434), [@mpenkov](https://github.com/mpenkov))
+  - Add pathlib monkeypatch with replacement of `pathlib.Path.open` (PR [#436](https://github.com/RaRe-Technologies/smart_open/pull/436), [@menshikh-iv](https://github.com/menshikh-iv))
+  - Fix error when calling str() or repr() on GCS SeekableBufferedInputBase (PR [#442](https://github.com/RaRe-Technologies/smart_open/pull/442), [@robcowie](https://github.com/robcowie))
+  - Move optional dependencies to extras (PR [#454](https://github.com/RaRe-Technologies/smart_open/pull/454), [@Amertz08](https://github.com/Amertz08))
+  - Correctly handle GCS paths that contain '?' char  (PR [#460](https://github.com/RaRe-Technologies/smart_open/pull/460), [@chakruperitus](https://github.com/chakruperitus))
+  - Make our doctools submodule more robust (PR [#467](https://github.com/RaRe-Technologies/smart_open/pull/467), [@mpenkov](https://github.com/mpenkov))
+
+Starting with this release, you will have to run:
+
+    pip install smart_open[gcs] to use the GCS transport.
+
+In the future, all extra dependencies will be optional.  If you want to continue installing all of them, use:
+
+	pip install smart_open[all]
+
+See the README.rst for details.
+
+# 1.10.0, 16 Mar 2020
+
+  - Various webhdfs improvements (PR [#383](https://github.com/RaRe-Technologies/smart_open/pull/383), [@mrk-its](https://github.com/mrk-its))
+  - Fixes "the connection was closed by the remote peer" error (PR [#389](https://github.com/RaRe-Technologies/smart_open/pull/389), [@Gapex](https://github.com/Gapex))
+  - allow use of S3 single part uploads (PR [#400](https://github.com/RaRe-Technologies/smart_open/pull/400), [@adrpar](https://github.com/adrpar))
+  - Add test data in package via MANIFEST.in (PR [#401](https://github.com/RaRe-Technologies/smart_open/pull/401), [@jayvdb](https://github.com/jayvdb))
+  - Google Cloud Storage (GCS) (PR [#404](https://github.com/RaRe-Technologies/smart_open/pull/404), [@petedannemann](https://github.com/petedannemann))
+  - Implement to_boto3 function for S3 I/O. (PR [#405](https://github.com/RaRe-Technologies/smart_open/pull/405), [@mpenkov](https://github.com/mpenkov))
+  - enable smart_open to operate without docstrings (PR [#406](https://github.com/RaRe-Technologies/smart_open/pull/406), [@mpenkov](https://github.com/mpenkov))
+  - Implement object_kwargs parameter (PR [#411](https://github.com/RaRe-Technologies/smart_open/pull/411), [@mpenkov](https://github.com/mpenkov))
+  - Remove dependency on old boto library (PR [#413](https://github.com/RaRe-Technologies/smart_open/pull/413), [@mpenkov](https://github.com/mpenkov))
+  - implemented efficient readline for ByteBuffer (PR [#426](https://github.com/RaRe-Technologies/smart_open/pull/426), [@mpenkov](https://github.com/mpenkov))
+  - improve buffering efficiency (PR [#427](https://github.com/RaRe-Technologies/smart_open/pull/427), [@mpenkov](https://github.com/mpenkov))
+  - fix WebHDFS read method (PR [#433](https://github.com/RaRe-Technologies/smart_open/pull/433), [@mpenkov](https://github.com/mpenkov))
+  - Make S3 uploads more robust (PR [#434](https://github.com/RaRe-Technologies/smart_open/pull/434), [@mpenkov](https://github.com/mpenkov))
+
+# 1.9.0, 3 Nov 2019
+
+  - Add version_id transport parameter for fetching a specific S3 object version (PR [#325](https://github.com/RaRe-Technologies/smart_open/pull/325), [@interpolatio](https://github.com/interpolatio))
+  - Document passthrough use case (PR [#333](https://github.com/RaRe-Technologies/smart_open/pull/333), [@mpenkov](https://github.com/mpenkov))
+  - Support seeking over HTTP and HTTPS (PR [#339](https://github.com/RaRe-Technologies/smart_open/pull/339), [@interpolatio](https://github.com/interpolatio))
+  - Add support for rt, rt+, wt, wt+, at, at+ methods (PR [#342](https://github.com/RaRe-Technologies/smart_open/pull/342), [@interpolatio](https://github.com/interpolatio))
+  - Change VERSION to version.py (PR [#349](https://github.com/RaRe-Technologies/smart_open/pull/349), [@mpenkov](https://github.com/mpenkov))
+  - Adding howto guides (PR [#355](https://github.com/RaRe-Technologies/smart_open/pull/355), [@mpenkov](https://github.com/mpenkov))
+  - smart_open/s3: Initial implementations of str and repr (PR [#359](https://github.com/RaRe-Technologies/smart_open/pull/359), [@ZlatSic](https://github.com/ZlatSic))
+  - Support writing any bytes-like object to S3. (PR [#361](https://github.com/RaRe-Technologies/smart_open/pull/361), [@gilbsgilbs](https://github.com/gilbsgilbs))
+
 # 1.8.4, 2 Jun 2019
 
   - Don't use s3 bucket_head to check for bucket existence (PR [#315](https://github.com/RaRe-Technologies/smart_open/pull/315), [@caboteria](https://github.com/caboteria))

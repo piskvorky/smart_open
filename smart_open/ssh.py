@@ -1,9 +1,9 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
-# This code is distributed under the terms and conditions from the MIT License (MIT).
+# This code is distributed under the terms and conditions
+# from the MIT License (MIT).
 #
 
 """Implements I/O streams over SSH.
@@ -24,7 +24,10 @@ Similarly, from a command line::
 
 import getpass
 import logging
+import urllib.parse
 import warnings
+
+import smart_open.utils
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +41,40 @@ SCHEMES = ("ssh", "scp", "sftp")
 
 DEFAULT_PORT = 22
 
+URI_EXAMPLES = (
+    'ssh://username@host/path/file',
+    'ssh://username@host//path/file',
+    'scp://username@host/path/file',
+    'sftp://username@host/path/file',
+)
 
-def _connect(hostname, username, port):
+
+def _unquote(text):
+    return text and urllib.parse.unquote(text)
+
+
+def parse_uri(uri_as_string):
+    split_uri = urllib.parse.urlsplit(uri_as_string)
+    assert split_uri.scheme in SCHEMES
+    return dict(
+        scheme=split_uri.scheme,
+        uri_path=_unquote(split_uri.path),
+        user=_unquote(split_uri.username),
+        host=split_uri.hostname,
+        port=int(split_uri.port or DEFAULT_PORT),
+        password=_unquote(split_uri.password),
+    )
+
+
+def open_uri(uri, mode, transport_params):
+    smart_open.utils.check_kwargs(open, transport_params)
+    parsed_uri = parse_uri(uri)
+    uri_path = parsed_uri.pop('uri_path')
+    parsed_uri.pop('scheme')
+    return open(uri_path, mode, transport_params=transport_params, **parsed_uri)
+
+
+def _connect(hostname, username, port, password, transport_params):
     try:
         import paramiko
     except ImportError:
@@ -55,11 +90,14 @@ def _connect(hostname, username, port):
         ssh = _SSH[key] = paramiko.client.SSHClient()
         ssh.load_system_host_keys()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(hostname, port, username)
+        kwargs = transport_params.get('connect_kwargs', {}).copy()
+        kwargs.setdefault('password', password)
+        kwargs.setdefault('username', username)
+        ssh.connect(hostname, port, **kwargs)
     return ssh
 
 
-def open(path, mode='r', host=None, user=None, port=DEFAULT_PORT):
+def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT, transport_params=None):
     """Open a file on a remote machine over SSH.
 
     Expects authentication to be already set up via existing keys on the local machine.
@@ -75,8 +113,12 @@ def open(path, mode='r', host=None, user=None, port=DEFAULT_PORT):
     user: str, optional
         The username to use to login to the remote machine.
         If None, defaults to the name of the current user.
+    password: str, optional
+        The password to use to login to the remote machine.
     port: int, optional
         The port to connect to.
+    transport_params: dict, optional
+        Any additional settings to be passed to paramiko.SSHClient.connect
 
     Returns
     -------
@@ -87,11 +129,18 @@ def open(path, mode='r', host=None, user=None, port=DEFAULT_PORT):
     If you specify a previously unseen host, then its host key will be added to
     the local ~/.ssh/known_hosts *automatically*.
 
+    If ``username`` or ``password`` are specified in *both* the uri and
+    ``transport_params``, ``transport_params`` will take precedence
     """
     if not host:
         raise ValueError('you must specify the host to connect to')
     if not user:
         user = getpass.getuser()
-    conn = _connect(host, user, port)
+    if not transport_params:
+        transport_params = {}
+
+    conn = _connect(host, user, port, password, transport_params)
     sftp_client = conn.get_transport().open_sftp_client()
-    return sftp_client.open(path, mode)
+    fobj = sftp_client.open(path, mode)
+    fobj.name = path
+    return fobj
