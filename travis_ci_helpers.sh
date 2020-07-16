@@ -63,7 +63,7 @@ enable_azurite(){
     -d \
     mcr.microsoft.com/azure-storage/azurite
 
-  until $(curl --output /dev/null --silent --head --fail http://localhost:10000); do
+  until $(curl --output /dev/null --silent "http://127.0.0.1:10000/devstoreaccount1"); do
     echo "Waiting for azurite to be healthy..."
     sleep 5
   done
