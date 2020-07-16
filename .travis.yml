@@ -1,6 +1,8 @@
 language: python
 dist: xenial
 os: linux
+services:
+  - docker
 
 jobs:
   include:
@@ -9,26 +11,32 @@ jobs:
       env: TOXENV="flake8"
 
     - python: '3.5'
-      env: TOXENV="check_keys,py35-test,py35-integration"
+      env:
+        - SO_AZURE_CONTAINER: "azure-container"
+        - TOXENV: "enable_azurite,check_keys,py35-test,py35-integration,disable_azurite"
 
     - python: '3.6'
       env:
         - SO_S3_URL: "s3://smart-open-py36-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
+        - SO_AZURE_CONTAINER: "azure-container"
         - BOTO_CONFIG: "/dev/null"
-        - TOXENV: "check_keys,py36-doctest,py36-test,py36-benchmark,py36-integration"
+        - TOXENV: "check_keys,py36-doctest,enable_azurite,py36-test,py36-benchmark,py36-integration,disable_azurite"
 
     - python: '3.7'
       env:
         - SO_S3_URL: "s3://smart-open-py37-benchmark"
         - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
+        - SO_AZURE_CONTAINER: "azure-container"
         - BOTO_CONFIG: "/dev/null"
         - SO_ENABLE_MOTO_SERVER: "1"
-        - TOXENV: "check_keys,py37-doctest,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
+        - SO_DISABLE_AZURE_MOCKS: "1"
+        - TOXENV: "check_keys,py37-doctest,enable_moto_server,enable_azurite,py37-test,py37-benchmark,py37-integration,disable_moto_server,disable_azurite"
     - python: '3.8'
       env:
         - BOTO_CONFIG: "/dev/null"
-        - TOXENV: "check_keys,py38-doctest,test_coverage,py38-integration"
+        - SO_AZURE_CONTAINER: "azure-container"
+        - TOXENV: "check_keys,py38-doctest,enable_azurite,test_coverage,py38-integration,disable_azurite"
 
 install:
   - pip install tox

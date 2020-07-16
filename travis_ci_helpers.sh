@@ -36,6 +36,7 @@ integration(){
   fi
 
   pytest integration-tests/test_s3_ported.py;
+  pytest integration-tests/test_azure.py;
 }
 
 doctest(){
@@ -53,6 +54,23 @@ enable_moto_server(){
 
 disable_moto_server(){
   lsof -i tcp:5000 | tail -n1 | cut -f2 -d" " | xargs kill -9
+}
+
+enable_azurite(){
+  docker run \
+    --name azurite \
+    -p 10000:10000 \
+    -d \
+    mcr.microsoft.com/azure-storage/azurite
+
+  until $(curl --output /dev/null --silent --head --fail http://localhost:10000); do
+    echo "Waiting for azurite to be healthy..."
+    sleep 5
+  done
+}
+
+disable_azurite(){
+  docker rm azurite
 }
 
 "$@"

@@ -29,7 +29,7 @@ DISABLE_MOCKS = os.environ.get('SO_DISABLE_AZURE_MOCKS') == "1"
 """If mocks are disabled, allow to use the Azurite local Azure Storage API
 https://github.com/Azure/Azurite
 To use locally:
-docker run -p 10000:10000 -p 10001:10001 mcr.microsoft.com/azure-storage/azurite
+docker run -p 10000:10000 mcr.microsoft.com/azure-storage/azurite
 """
 _AZURITE_DEFAULT_CONNECT_STR = 'DefaultEndpointsProtocol=http;' \
     'AccountName=devstoreaccount1;' \

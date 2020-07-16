@@ -9,7 +9,17 @@ from pytest import fixture
 import smart_open
 
 _AZURE_CONTAINER = os.environ.get('SO_AZURE_CONTAINER')
-_AZURE_STORAGE_CONNECTION_STRING = os.environ.get('AZURE_STORAGE_CONNECTION_STRING')
+"""Default Azurite local Azure Storage API endpoint
+https://github.com/Azure/Azurite
+To use locally:
+docker run -p 10000:10000 mcr.microsoft.com/azure-storage/azurite
+"""
+_AZURITE_DEFAULT_CONNECT_STR = 'DefaultEndpointsProtocol=http;' \
+    'AccountName=devstoreaccount1;' \
+    'AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/' \
+    'K1SZFPTOtr/KBHBeksoGMGw==;' \
+    'BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;'
+_AZURE_STORAGE_CONNECTION_STRING = os.environ.get('AZURE_STORAGE_CONNECTION_STRING', _AZURITE_DEFAULT_CONNECT_STR)
 _FILE_PREFIX = '%s://%s' % (smart_open.azure.SCHEME, _AZURE_CONTAINER)
 
 assert _AZURE_CONTAINER is not None, 'please set the SO_AZURE_CONTAINER environment variable'
