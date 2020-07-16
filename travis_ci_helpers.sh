@@ -70,7 +70,7 @@ enable_azurite(){
 }
 
 disable_azurite(){
-  docker rm azurite
+  docker rm -f azurite
 }
 
 "$@"
