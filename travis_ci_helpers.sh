@@ -30,8 +30,7 @@ benchmark(){
 }
 
 integration(){
-  pytest integration-tests/test_http.py integration-tests/test_207.py
-  pytest integration-tests/test_azure.py
+  pytest integration-tests/test_http.py integration-tests/test_207.py integration-tests/test_azure.py
   if ! is_travis_secure_vars_available; then
     return 0
   fi
