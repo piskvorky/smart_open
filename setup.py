@@ -41,6 +41,7 @@ tests_require = [
     'moto[server]',
     'pathlib2',
     'responses',
+    'boto',
     'boto3',
     # Not used directly but allows boto GCE plugins to load.
     # https://github.com/GoogleCloudPlatform/compute-image-packages/issues/262
@@ -55,7 +56,7 @@ install_requires = [
     'requests',
 ]
 
-aws_deps = ['boto', 'boto3']
+aws_deps = ['boto3']
 gcp_deps = ['google-cloud-storage']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 
