@@ -49,6 +49,7 @@ class SSHOpen(unittest.TestCase):
         )
         mock_connect.assert_called_with("some-host", 22, username="user", key_filename="key")
 
+
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s : %(levelname)s : %(message)s", level=logging.DEBUG)
     unittest.main()
