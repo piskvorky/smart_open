@@ -17,16 +17,16 @@ import smart_open
 _S3_BUCKET_NAME = os.environ.get('SO_BUCKET_NAME')
 assert _S3_BUCKET_NAME is not None, 'please set the SO_BUCKET_NAME environment variable'
 
-SO_KEY = os.environ.get('SO_KEY')
-assert SO_KEY is not None, 'please set the SO_KEY environment variable'
+_SO_KEY = os.environ.get('SO_KEY')
+assert _SO_KEY is not None, 'please set the SO_KEY environment variable'
 
-_S3_URL = 's3://%s/%s' % (_S3_BUCKET_NAME, SO_KEY)
+_S3_URL = 's3://%s/%s' % (_S3_BUCKET_NAME, _SO_KEY)
 
 
 
 def initialize_bucket():
     subprocess.check_call(['aws', 's3', 'rm', '--recursive', _S3_URL])
-    key = 's3://%s/%s/%s' % (_S3_BUCKET_NAME, SO_KEY, 'test-write-key-{}'.format(uuid.uuid4().hex))
+    key = 's3://%s/%s/%s' % (_S3_BUCKET_NAME, _SO_KEY, 'test-write-key-{}'.format(uuid.uuid4().hex))
     return key
 
 def clear_bucket():
