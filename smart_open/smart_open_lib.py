@@ -25,8 +25,6 @@ import urllib.parse
 import warnings
 import sys
 
-import boto3
-
 #
 # This module defines a function called smart_open so we cannot use
 # smart_open.submodule to reference to the submodules.

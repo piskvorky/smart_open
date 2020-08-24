@@ -15,8 +15,17 @@ import logging
 import smart_open.bytebuffer
 import smart_open.constants
 
-import azure.storage.blob
-import azure.core.exceptions
+import_error = """You are trying to use the Azure functionality of smart_open
+but you do not have the correct Azure dependencies installed. Try:
+
+    pip install smart_open[azure]
+
+"""
+try:
+    import azure.storage.blob
+    import azure.core.exceptions
+except ImportError as e:
+    raise ImportError(import_error)
 
 logger = logging.getLogger(__name__)
 

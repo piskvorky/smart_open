@@ -17,7 +17,7 @@ The main functions are:
 
 * `open()`, which opens the given file for reading/writing
 * `parse_uri()`
-* `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
+* `s3.iter_bucket()`, which goes over all keys in an S3 bucket in parallel
 * `register_compressor()`, which registers callbacks for transparent compressor handling
 
 """
@@ -31,13 +31,11 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 from smart_open import version  # noqa: E402
 from .smart_open_lib import open, parse_uri, smart_open, register_compressor  # noqa: E402
-from .s3 import iter_bucket as s3_iter_bucket  # noqa: E402
 
 __all__ = [
     'open',
     'parse_uri',
     'register_compressor',
-    's3_iter_bucket',
     'smart_open',
 ]
 

@@ -11,9 +11,19 @@
 import io
 import logging
 
-import google.cloud.exceptions
-import google.cloud.storage
-import google.auth.transport.requests
+import_error = """You are trying to use the GCS functionality of smart_open
+but you do not have the correct GCS dependencies installed. Try:
+
+    pip install smart_open[gcs]
+
+"""
+try:
+    import google.cloud.exceptions
+    import google.cloud.storage
+    import google.auth.transport.requests
+except ImportError as e:
+    raise ImportError(import_error)
+
 
 import smart_open.bytebuffer
 import smart_open.utils

@@ -574,7 +574,7 @@ class IterBucketTest(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(expected))
 
     def test_old(self):
-        """Does s3_iter_bucket work correctly?"""
+        """Does s3.iter_bucket work correctly?"""
         #
         # Use an old-school boto Bucket class for historical reasons.
         #
@@ -589,19 +589,19 @@ class IterBucketTest(unittest.TestCase):
                 fout.write(content)
                 expected[key_name] = content
 
-        # read all keys + their content back, in parallel, using s3_iter_bucket
+        # read all keys + their content back, in parallel, using s3.iter_bucket
         result = {}
         for k, c in smart_open.s3.iter_bucket(mybucket):
             result[k] = c
         self.assertEqual(expected, result)
 
-        # read some of the keys back, in parallel, using s3_iter_bucket
+        # read some of the keys back, in parallel, using s3.iter_bucket
         result = {}
         for k, c in smart_open.s3.iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('4')):
             result[k] = c
         self.assertEqual(result, dict((k, c) for k, c in expected.items() if k.endswith('4')))
 
-        # read some of the keys back, in parallel, using s3_iter_bucket
+        # read some of the keys back, in parallel, using s3.iter_bucket
         result = dict(smart_open.s3.iter_bucket(mybucket, key_limit=10))
         self.assertEqual(len(result), min(len(expected), 10))
 
