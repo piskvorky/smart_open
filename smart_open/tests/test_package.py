@@ -3,7 +3,7 @@ import os
 import unittest
 import pytest
 
-skip_tests: bool = "SMART_OPEN_TEST_MISSING_DEPS" not in os.environ
+skip_tests = "SMART_OPEN_TEST_MISSING_DEPS" not in os.environ
 
 
 class PackageTests(unittest.TestCase):
