@@ -24,7 +24,7 @@ but you do not have the correct Azure dependencies installed. Try:
 try:
     import azure.storage.blob
     import azure.core.exceptions
-except ImportError as e:
+except ImportError:
     raise ImportError(import_error)
 
 logger = logging.getLogger(__name__)

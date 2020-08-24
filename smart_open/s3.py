@@ -12,7 +12,11 @@ import functools
 import logging
 import time
 
+import smart_open.bytebuffer
+import smart_open.concurrency
+import smart_open.utils
 
+from smart_open import constants
 
 import_error = """You are trying to use the S3 functionality of smart_open
 but you do not have the correct AWS dependencies installed. Try:
@@ -25,14 +29,8 @@ try:
     import boto3
     import botocore.client
     import botocore.exceptions
-except ImportError as e:
+except ImportError:
     raise ImportError(import_error)
-
-import smart_open.bytebuffer
-import smart_open.concurrency
-import smart_open.utils
-
-from smart_open import constants
 
 logger = logging.getLogger(__name__)
 
