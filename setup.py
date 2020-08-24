@@ -86,9 +86,6 @@ setup(
     license='MIT',
     platforms='any',
 
-    # Concatenating the lists together is temporary and will
-    # eventually simply be install_requires dropping the cloud
-    # dependencies from being installed without explicitly being declared.
     install_requires=install_requires,
     tests_require=tests_require,
     extras_require={

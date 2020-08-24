@@ -34,7 +34,7 @@ from smart_open import version  # noqa: E402
 from .smart_open_lib import open, parse_uri, smart_open, register_compressor  # noqa: E402
 
 deprecated_warning = """smart_open.s3_iter_bucket is deprecated and will stop functioning
-in a future version. Please import the iter_bucket from the smart_open.s3 module instead:
+in a future version. Please import iter_bucket from the smart_open.s3 module instead:
 
     from smart_open.s3 import iter_bucket as s3_iter_bucket
 
