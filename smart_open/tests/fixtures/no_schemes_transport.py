@@ -5,9 +5,9 @@ import io
 open = io.open
 
 
-def parse_uri(uri_as_string):
+def parse_uri(uri_as_string):   # pragma: no cover
     ...
 
 
-def open_uri(uri_as_string, mode, transport_params):
+def open_uri(uri_as_string, mode, transport_params):   # pragma: no cover
     ...
