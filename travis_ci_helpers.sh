@@ -3,9 +3,6 @@
 set -e
 set -x
 
-export PYTEST_ADDOPTS="--reruns 3 --reruns-delay 1"
-
-
 is_travis_secure_vars_available(){
   if [[ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]]; then
     return 0
@@ -20,6 +17,7 @@ benchmark(){
     return 0
   fi
 
+  export PYTEST_ADDOPTS="--reruns 3 --reruns-delay 1"
   SO_S3_URL="${SO_S3_URL}"/`python -c "from uuid import uuid4;print(uuid4())"`;
   COMMIT_HASH=`git rev-parse HEAD`;
 
@@ -30,12 +28,17 @@ benchmark(){
 }
 
 integration(){
+  export PYTEST_ADDOPTS="--reruns 3 --reruns-delay 1"
   pytest integration-tests/test_http.py integration-tests/test_207.py
   if ! is_travis_secure_vars_available; then
     return 0
   fi
 
   pytest integration-tests/test_s3_ported.py;
+}
+
+dependencies(){
+  SMART_OPEN_TEST_MISSING_DEPS=1 pytest smart_open/tests/test_package.py -v --cov smart_open --cov-report term-missing;
 }
 
 doctest(){
