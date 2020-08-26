@@ -7,6 +7,7 @@
 #
 
 from __future__ import unicode_literals
+import contextlib
 import io
 import os
 import subprocess
@@ -23,15 +24,24 @@ assert _SO_KEY is not None, 'please set the SO_KEY environment variable'
 _S3_URL = 's3://%s/%s' % (_S3_BUCKET_NAME, _SO_KEY)
 
 
-
-def initialize_bucket():
+@contextlib.contextmanager
+def temporary():
+    """Yields a bucket/key than can be used for temporary writing."""
+    key = '%s/%s' % (_SO_KEY, uuid.uuid4().hex)
+    url = 's3://%s/%s' % (_S3_BUCKET_NAME, key)
+    yield (_S3_BUCKET_NAME, url)
     subprocess.check_call(['aws', 's3', 'rm', '--recursive', _S3_URL])
-    key = 's3://%s/%s/%s' % (_S3_BUCKET_NAME, _SO_KEY, 'test-write-key-{}'.format(uuid.uuid4().hex))
-    return key
 
-def clear_bucket():
-    subprocess.check_call(['aws', 's3', 'rm', '--recursive', _S3_URL])
+def case_test(function):
+    """Decorator for our test cases.
 
+    Handles setting up temporary storage before the test begins, and tearing it down after completion.
+    """
+    #print(function)
+    def inner(benchmark):
+        with temporary() as (bucket, url):
+            return function(benchmark, url)
+    return inner
 
 def write_read(key, content, write_mode, read_mode, encoding=None, s3_upload=None, **kwargs):
     with smart_open.smart_open(
@@ -54,82 +64,57 @@ def read_length_prefixed_messages(key, read_mode, encoding=None, **kwargs):
             length_byte = fin.read(1)
     return actual
 
-
-def test_s3_readwrite_text(benchmark):
-    _S3_URL_KEY = initialize_bucket()
-
-    key = _S3_URL_KEY + '/sanity.txt'
+@case_test
+def test_s3_readwrite_text(benchmark, key):
     text = 'с гранатою в кармане, с чекою в руке'
     actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8')
 
-    clear_bucket()
     assert actual == text
 
-
-def test_s3_readwrite_text_gzip(benchmark):
-    _S3_URL_KEY = initialize_bucket()
-
-    key = _S3_URL_KEY + '/sanity.txt.gz'
+@case_test
+def test_s3_readwrite_text_gzip(benchmark, key):
     text = 'не чайки здесь запели на знакомом языке'
     actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8')
     assert actual == text
 
-
-def test_s3_readwrite_binary(benchmark):
-    _S3_URL_KEY = initialize_bucket()
-
-    key = _S3_URL_KEY + '/sanity.txt'
+@case_test
+def test_s3_readwrite_binary(benchmark, key):
     binary = b'this is a test'
     actual = benchmark(write_read, key, binary, 'wb', 'rb')
 
-    clear_bucket()
     assert actual == binary
 
-
-def test_s3_readwrite_binary_gzip(benchmark):
-    _S3_URL_KEY = initialize_bucket()
-
-    key = _S3_URL_KEY + '/sanity.txt.gz'
+@case_test
+def test_s3_readwrite_binary_gzip(benchmark, key):
     binary = b'this is a test'
     actual = benchmark(write_read, key, binary, 'wb', 'rb')
 
-    clear_bucket()
     assert actual == binary
 
-
-def test_s3_performance(benchmark):
-    _S3_URL_KEY = initialize_bucket()
-
+@case_test
+def test_s3_performance(benchmark, key):
     one_megabyte = io.BytesIO()
     for _ in range(1024*128):
         one_megabyte.write(b'01234567')
     one_megabyte = one_megabyte.getvalue()
 
-    key = _S3_URL_KEY + '/performance.txt'
     actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
 
-    clear_bucket()
     assert actual == one_megabyte
 
-
-def test_s3_performance_gz(benchmark):
-    _S3_URL_KEY = initialize_bucket()
-
+@case_test
+def test_s3_performance_gz(benchmark, key):
     one_megabyte = io.BytesIO()
     for _ in range(1024*128):
         one_megabyte.write(b'01234567')
     one_megabyte = one_megabyte.getvalue()
 
-    key = _S3_URL_KEY + '/performance.txt.gz'
     actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
 
-    clear_bucket()
     assert actual == one_megabyte
 
-
-def test_s3_performance_small_reads(benchmark):
-    _S3_URL_KEY = initialize_bucket()
-
+@case_test
+def test_s3_performance_small_reads(benchmark, key):
     ONE_MIB = 1024**2
     one_megabyte_of_msgs = io.BytesIO()
     msg = b'\x0f' + b'0123456789abcde'  # a length-prefixed "message"
@@ -137,25 +122,18 @@ def test_s3_performance_small_reads(benchmark):
         one_megabyte_of_msgs.write(msg)
     one_megabyte_of_msgs = one_megabyte_of_msgs.getvalue()
 
-    key = _S3_URL_KEY + '/many_reads_performance.bin'
-
     with smart_open.smart_open(key, 'wb') as fout:
         fout.write(one_megabyte_of_msgs)
 
     actual = benchmark(read_length_prefixed_messages, key, 'rb', buffer_size=ONE_MIB)
 
-    clear_bucket()
     assert actual == one_megabyte_of_msgs
 
-
-def test_s3_encrypted_file(benchmark):
-    _S3_URL_KEY = initialize_bucket()
-
-    key = _S3_URL_KEY + '/sanity.txt'
+@case_test
+def test_s3_encrypted_file(benchmark, key):
     text = 'с гранатою в кармане, с чекою в руке'
     actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8', s3_upload={
         'ServerSideEncryption': 'AES256'
     })
 
-    clear_bucket()
     assert actual == text
