@@ -41,11 +41,7 @@ tests_require = [
     'moto[server]',
     'pathlib2',
     'responses',
-    'boto',
     'boto3',
-    # Not used directly but allows boto GCE plugins to load.
-    # https://github.com/GoogleCloudPlatform/compute-image-packages/issues/262
-    'google-compute-engine==2.8.12',
     'paramiko',
     'parameterizedtestcase',
     'pytest',
