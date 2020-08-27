@@ -391,7 +391,8 @@ and pass it to the Client. To create an API token for use in the example below, 
 	fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
 Azure Credentials
----------------
+-----------------
+
 ``smart_open`` uses the ``azure-storage-blob`` library to talk to Azure Blob Storage.
 By default, ``smart_open`` will defer to ``azure-storage-blob`` and let it take care of the credentials.
 
