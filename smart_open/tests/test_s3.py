@@ -13,7 +13,6 @@ import time
 import unittest
 import warnings
 
-import boto.s3.bucket
 import boto3
 import botocore.client
 import mock
@@ -549,12 +548,6 @@ class IterBucketTest(unittest.TestCase):
         results = list(smart_open.s3.iter_bucket(bucket))
         self.assertEqual(len(results), 10)
 
-    def test_accepts_boto_bucket(self):
-        populate_bucket()
-        bucket = boto.s3.bucket.Bucket(name=BUCKET_NAME)
-        results = list(smart_open.s3.iter_bucket(bucket))
-        self.assertEqual(len(results), 10)
-
     def test_list_bucket(self):
         num_keys = 10
         populate_bucket()
@@ -572,44 +565,6 @@ class IterBucketTest(unittest.TestCase):
 
         expected = ['key_%d' % x for x in range(num_keys)]
         self.assertEqual(sorted(keys), sorted(expected))
-
-    def test_old(self):
-        """Does s3_iter_bucket work correctly?"""
-        #
-        # Use an old-school boto Bucket class for historical reasons.
-        #
-        mybucket = boto.s3.bucket.Bucket(name=BUCKET_NAME)
-
-        # first, create some keys in the bucket
-        expected = {}
-        for key_no in range(42):
-            key_name = "mykey%s" % key_no
-            with smart_open.smart_open("s3://%s/%s" % (BUCKET_NAME, key_name), 'wb') as fout:
-                content = '\n'.join("line%i%i" % (key_no, line_no) for line_no in range(10)).encode('utf8')
-                fout.write(content)
-                expected[key_name] = content
-
-        # read all keys + their content back, in parallel, using s3_iter_bucket
-        result = {}
-        for k, c in smart_open.s3.iter_bucket(mybucket):
-            result[k] = c
-        self.assertEqual(expected, result)
-
-        # read some of the keys back, in parallel, using s3_iter_bucket
-        result = {}
-        for k, c in smart_open.s3.iter_bucket(mybucket, accept_key=lambda fname: fname.endswith('4')):
-            result[k] = c
-        self.assertEqual(result, dict((k, c) for k, c in expected.items() if k.endswith('4')))
-
-        # read some of the keys back, in parallel, using s3_iter_bucket
-        result = dict(smart_open.s3.iter_bucket(mybucket, key_limit=10))
-        self.assertEqual(len(result), min(len(expected), 10))
-
-        for workers in [1, 4, 8, 16, 64]:
-            result = {}
-            for k, c in smart_open.s3.iter_bucket(mybucket):
-                result[k] = c
-            self.assertEqual(result, expected)
 
 
 @moto.mock_s3
