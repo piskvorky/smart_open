@@ -1,5 +1,7 @@
 # Unreleased
 
+  - Remove boto as a dependency (PR [#523](https://github.com/RaRe-Technologies/smart_open/pull/523), [@isobit](https://github.com/isobit))
+
 # 2.1.1, 27 Aug 2020
 
   - Bypass unnecessary GCS storage.buckets.get permission (PR [#516](https://github.com/RaRe-Technologies/smart_open/pull/516), [@gelioz](https://github.com/gelioz))
