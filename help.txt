@@ -86,6 +86,15 @@ FUNCTIONS
         
         smart_open supports the following transport mechanisms:
         
+        azure (smart_open/azure.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements file-like objects for reading and writing to/from Azure Blob Storage.
+        
+        buffer_size: int, optional
+            The buffer size to use when performing I/O. For reading only.
+        min_part_size: int, optional
+            The minimum part size for multipart uploads.  For writing only.
+        
         file (smart_open/local_file.py)
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements the transport for the file:// schema.
@@ -254,6 +263,7 @@ FUNCTIONS
         -----
         Supported URI schemes are:
         
+        * azure
         * file
         * gs
         * hdfs
@@ -362,7 +372,7 @@ DATA
     __all__ = ['open', 'parse_uri', 'register_compressor', 's3_iter_bucket...
 
 VERSION
-    2.0.0
+    2.1.1
 
 FILE
     /Users/misha/git/smart_open/smart_open/__init__.py

@@ -29,10 +29,8 @@ What?
 Why?
 ====
 
-Working with large remote files, for example using Amazon's `boto <http://docs.pythonboto.org/en/latest/>`_ and `boto3 <https://boto3.readthedocs.io/en/latest/>`_ Python library, is a pain.
-``boto``'s ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` methods only work for small files, because they're loaded fully into RAM, no streaming.
-There are nasty hidden gotchas when using ``boto``'s multipart upload functionality that is needed for large files, and a lot of boilerplate.
-
+Working with large remote files, for example using Amazon's `boto3 <https://boto3.amazonaws.com/v1/documentation/api/latest/index.html>`_ Python library, is a pain.
+``boto3``'s ``Object.upload_fileobj()`` and ``Object.download_fileobj()`` methods require gotcha-prone boilerplate to use successfully, such as constructing file-like object wrappers.
 ``smart_open`` shields you from that. It builds on boto3 and other remote storage libraries, but offers a **clean unified Pythonic API**. The result is less code for you to write and fewer bugs to make.
 
 
@@ -391,7 +389,8 @@ and pass it to the Client. To create an API token for use in the example below, 
 	fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
 Azure Credentials
----------------
+-----------------
+
 ``smart_open`` uses the ``azure-storage-blob`` library to talk to Azure Blob Storage.
 By default, ``smart_open`` will defer to ``azure-storage-blob`` and let it take care of the credentials.
 

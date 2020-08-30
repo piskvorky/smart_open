@@ -12,7 +12,6 @@ import functools
 import logging
 import time
 
-import boto
 import boto3
 import botocore.client
 import botocore.exceptions
@@ -66,7 +65,7 @@ def parse_uri(uri_as_string):
     assert split_uri.scheme in SCHEMES
 
     port = DEFAULT_PORT
-    host = boto.config.get('s3', 'host', DEFAULT_HOST)
+    host = DEFAULT_HOST
     ordinary_calling_format = False
     #
     # These defaults tell boto3 to look for credentials elsewhere

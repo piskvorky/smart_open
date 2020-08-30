@@ -60,5 +60,8 @@ target/
 # PyCharm
 .idea/
 
+# VSCode
+.vscode/
+
 # env files
 .env
