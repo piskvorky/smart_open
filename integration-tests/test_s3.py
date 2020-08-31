@@ -120,17 +120,17 @@ def test_s3_performance_gz(benchmark, key):
 
 @case_test
 def test_s3_performance_small_reads(benchmark, key):
-    ONE_MIB = 1024**2
+    one_mib = 1024**2
     one_megabyte_of_msgs = io.BytesIO()
     msg = b'\x0f' + b'0123456789abcde'  # a length-prefixed "message"
-    for _ in range(0, ONE_MIB, len(msg)):
+    for _ in range(0, one_mib, len(msg)):
         one_megabyte_of_msgs.write(msg)
     one_megabyte_of_msgs = one_megabyte_of_msgs.getvalue()
 
     with smart_open.smart_open(key, 'wb') as fout:
         fout.write(one_megabyte_of_msgs)
 
-    actual = benchmark(read_length_prefixed_messages, key, 'rb', buffer_size=ONE_MIB)
+    actual = benchmark(read_length_prefixed_messages, key, 'rb', buffer_size=one_mib)
 
     assert actual == one_megabyte_of_msgs
 
