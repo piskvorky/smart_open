@@ -28,7 +28,7 @@ def temporary():
     key = '%s/%s' % (_SO_KEY, uuid.uuid4().hex)
     url = 's3://%s/%s' % (_S3_BUCKET_NAME, key)
     yield (_S3_BUCKET_NAME, url)
-    subprocess.check_call(['aws', 's3', 'rm', '--recursive', key])
+    subprocess.check_call(['aws', 's3', 'rm', '--recursive', url])
 
 def case_test(function):
     """Decorator for our test cases.
