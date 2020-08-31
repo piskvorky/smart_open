@@ -30,7 +30,7 @@ def temporary():
     """
     key = '%s/%s' % (_SO_KEY, uuid.uuid4().hex)
     url = 's3://%s/%s' % (_S3_BUCKET_NAME, key)
-    yield (url)
+    yield url
     subprocess.check_call(['aws', 's3', 'rm', '--recursive', url])
 
 
@@ -92,6 +92,7 @@ def test_s3_readwrite_binary_gzip(benchmark, key):
     actual = benchmark(write_read, key, binary, 'wb', 'rb')
 
     assert actual == binary
+
 
 @case_test
 def test_s3_performance(benchmark, key):
