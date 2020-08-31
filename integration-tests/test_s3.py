@@ -33,11 +33,13 @@ def temporary():
     yield (url)
     subprocess.check_call(['aws', 's3', 'rm', '--recursive', url])
 
+
 def case_test(function):
     def inner(benchmark):
         with temporary() as (url):
             return function(benchmark, url)
     return inner
+
 
 def write_read(key, content, write_mode, read_mode, encoding=None, s3_upload=None, **kwargs):
     with smart_open.smart_open(
@@ -60,6 +62,7 @@ def read_length_prefixed_messages(key, read_mode, encoding=None, **kwargs):
             length_byte = fin.read(1)
     return actual
 
+
 @case_test
 def test_s3_readwrite_text(benchmark, key):
     text = 'с гранатою в кармане, с чекою в руке'
@@ -67,11 +70,13 @@ def test_s3_readwrite_text(benchmark, key):
 
     assert actual == text
 
+
 @case_test
 def test_s3_readwrite_text_gzip(benchmark, key):
     text = 'не чайки здесь запели на знакомом языке'
     actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8')
     assert actual == text
+
 
 @case_test
 def test_s3_readwrite_binary(benchmark, key):
@@ -79,6 +84,7 @@ def test_s3_readwrite_binary(benchmark, key):
     actual = benchmark(write_read, key, binary, 'wb', 'rb')
 
     assert actual == binary
+
 
 @case_test
 def test_s3_readwrite_binary_gzip(benchmark, key):
@@ -98,6 +104,7 @@ def test_s3_performance(benchmark, key):
 
     assert actual == one_megabyte
 
+
 @case_test
 def test_s3_performance_gz(benchmark, key):
     one_megabyte = io.BytesIO()
@@ -108,6 +115,7 @@ def test_s3_performance_gz(benchmark, key):
     actual = benchmark(write_read, key, one_megabyte, 'wb', 'rb')
 
     assert actual == one_megabyte
+
 
 @case_test
 def test_s3_performance_small_reads(benchmark, key):
@@ -124,6 +132,7 @@ def test_s3_performance_small_reads(benchmark, key):
     actual = benchmark(read_length_prefixed_messages, key, 'rb', buffer_size=ONE_MIB)
 
     assert actual == one_megabyte_of_msgs
+
 
 @case_test
 def test_s3_encrypted_file(benchmark, key):
