@@ -21,8 +21,6 @@ assert _S3_BUCKET_NAME is not None, 'please set the SO_BUCKET_NAME environment v
 _SO_KEY = os.environ.get('SO_KEY')
 assert _SO_KEY is not None, 'please set the SO_KEY environment variable'
 
-_S3_URL = 's3://%s/%s' % (_S3_BUCKET_NAME, _SO_KEY)
-
 
 @contextlib.contextmanager
 def temporary():
@@ -30,7 +28,7 @@ def temporary():
     key = '%s/%s' % (_SO_KEY, uuid.uuid4().hex)
     url = 's3://%s/%s' % (_S3_BUCKET_NAME, key)
     yield (_S3_BUCKET_NAME, url)
-    subprocess.check_call(['aws', 's3', 'rm', '--recursive', _S3_URL])
+    subprocess.check_call(['aws', 's3', 'rm', '--recursive', key])
 
 def case_test(function):
     """Decorator for our test cases.
