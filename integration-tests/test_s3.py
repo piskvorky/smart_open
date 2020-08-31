@@ -24,18 +24,18 @@ assert _SO_KEY is not None, 'please set the SO_KEY environment variable'
 
 @contextlib.contextmanager
 def temporary():
-    """Yields a bucket/key than can be used for temporary writing."""
+    """Yields a bucket/URL than can be used for temporary writing.
+
+    Removes all content under the URL when exiting.
+    """
     key = '%s/%s' % (_SO_KEY, uuid.uuid4().hex)
     url = 's3://%s/%s' % (_S3_BUCKET_NAME, key)
-    yield (_S3_BUCKET_NAME, url)
+    yield (url)
     subprocess.check_call(['aws', 's3', 'rm', '--recursive', url])
 
 def case_test(function):
-    """Decorator for our test cases.
-    Handles setting up temporary storage before the test begins, and tearing it down after completion.
-    """
     def inner(benchmark):
-        with temporary() as (bucket, url):
+        with temporary() as (url):
             return function(benchmark, url)
     return inner
 
