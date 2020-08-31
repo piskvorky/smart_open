@@ -34,7 +34,7 @@ def temporary():
     subprocess.check_call(['aws', 's3', 'rm', '--recursive', url])
 
 
-def case_test(function):
+def _test_case(function):
     def inner(benchmark):
         with temporary() as (url):
             return function(benchmark, url)
@@ -63,7 +63,7 @@ def read_length_prefixed_messages(key, read_mode, encoding=None, **kwargs):
     return actual
 
 
-@case_test
+@_test_case
 def test_s3_readwrite_text(benchmark, key):
     text = 'с гранатою в кармане, с чекою в руке'
     actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8')
@@ -71,14 +71,14 @@ def test_s3_readwrite_text(benchmark, key):
     assert actual == text
 
 
-@case_test
+@_test_case
 def test_s3_readwrite_text_gzip(benchmark, key):
     text = 'не чайки здесь запели на знакомом языке'
     actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8')
     assert actual == text
 
 
-@case_test
+@_test_case
 def test_s3_readwrite_binary(benchmark, key):
     binary = b'this is a test'
     actual = benchmark(write_read, key, binary, 'wb', 'rb')
@@ -86,7 +86,7 @@ def test_s3_readwrite_binary(benchmark, key):
     assert actual == binary
 
 
-@case_test
+@_test_case
 def test_s3_readwrite_binary_gzip(benchmark, key):
     binary = b'this is a test'
     actual = benchmark(write_read, key, binary, 'wb', 'rb')
@@ -94,7 +94,7 @@ def test_s3_readwrite_binary_gzip(benchmark, key):
     assert actual == binary
 
 
-@case_test
+@_test_case
 def test_s3_performance(benchmark, key):
     one_megabyte = io.BytesIO()
     for _ in range(1024*128):
@@ -106,7 +106,7 @@ def test_s3_performance(benchmark, key):
     assert actual == one_megabyte
 
 
-@case_test
+@_test_case
 def test_s3_performance_gz(benchmark, key):
     one_megabyte = io.BytesIO()
     for _ in range(1024*128):
@@ -118,7 +118,7 @@ def test_s3_performance_gz(benchmark, key):
     assert actual == one_megabyte
 
 
-@case_test
+@_test_case
 def test_s3_performance_small_reads(benchmark, key):
     one_mib = 1024**2
     one_megabyte_of_msgs = io.BytesIO()
@@ -135,7 +135,7 @@ def test_s3_performance_small_reads(benchmark, key):
     assert actual == one_megabyte_of_msgs
 
 
-@case_test
+@_test_case
 def test_s3_encrypted_file(benchmark, key):
     text = 'с гранатою в кармане, с чекою в руке'
     actual = benchmark(write_read, key, text, 'w', 'r', 'utf-8', s3_upload={
