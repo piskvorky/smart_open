@@ -160,6 +160,11 @@ FUNCTIONS
         object_kwargs: dict, optional
             Additional parameters to pass to boto3's object.get function.
             Used during reading only.
+        defer_seek: boolean, optional
+            Default: `False`
+            If set to `True` on a file opened for reading, GetObject will not be
+            called until the first seek() or read().
+            Avoids redundant API queries when seeking before reading.
         
         scp (smart_open/ssh.py)
         ~~~~~~~~~~~~~~~~~~~~~~~
@@ -367,7 +372,7 @@ DATA
     __all__ = ['open', 'parse_uri', 'register_compressor', 's3_iter_bucket...
 
 VERSION
-    2.1.0
+    2.1.1
 
 FILE
     /Users/misha/git/smart_open/smart_open/__init__.py

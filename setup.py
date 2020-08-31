@@ -42,10 +42,6 @@ tests_require = [
     'pathlib2',
     'responses',
     'boto3',
-    'python-jose',
-    # Not used directly but allows boto GCE plugins to load.
-    # https://github.com/GoogleCloudPlatform/compute-image-packages/issues/262
-    'google-compute-engine==2.8.12',
     'paramiko',
     'parameterizedtestcase',
     'pytest',
@@ -56,7 +52,7 @@ install_requires = [
     'requests',
 ]
 
-aws_deps = ['boto', 'boto3']
+aws_deps = ['boto3']
 gcp_deps = ['google-cloud-storage']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 

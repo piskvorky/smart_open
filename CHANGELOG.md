@@ -1,6 +1,13 @@
 # Unreleased
 
+  - Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
+  - Remove boto as a dependency (PR [#523](https://github.com/RaRe-Technologies/smart_open/pull/523), [@isobit](https://github.com/isobit))
+  - Performance improvement: avoid redundant GetObject API queries in s3.Reader (PR [#495](https://github.com/RaRe-Technologies/smart_open/pull/495), [@jcushman](https://github.com/jcushman))
+
+# 2.1.1, 27 Aug 2020
+
   - Bypass unnecessary GCS storage.buckets.get permission (PR [#516](https://github.com/RaRe-Technologies/smart_open/pull/516), [@gelioz](https://github.com/gelioz))
+  - Allow SFTP connection with SSH key (PR [#522](https://github.com/RaRe-Technologies/smart_open/pull/522), [@rostskadat](https://github.com/rostskadat))
 
 # 2.1.0, 1 July 2020
 
