@@ -32,10 +32,8 @@ def temporary():
 
 def case_test(function):
     """Decorator for our test cases.
-
     Handles setting up temporary storage before the test begins, and tearing it down after completion.
     """
-    #print(function)
     def inner(benchmark):
         with temporary() as (bucket, url):
             return function(benchmark, url)
