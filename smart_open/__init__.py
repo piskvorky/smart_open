@@ -44,17 +44,17 @@ _WARNED = False
 
 def s3_iter_bucket(
         bucket_name,
-    prefix='',
-    accept_key=None,
-    key_limit=None,
-    workers=16,
-    retries=3,
-    **session_kwargs):
-    global _warned
+        prefix='',
+        accept_key=None,
+        key_limit=None,
+        workers=16,
+        retries=3,
+        **session_kwargs):
+    global _WARNED
     from .s3 import iter_bucket
-    if not _warned:
-        logger.warn(deprecated_warning)
-        _warned = True
+    if not _WARNED:
+        logger.warn(_WARNING)
+        _WARNED = True
     return iter_bucket(
         bucket_name=bucket_name,
         prefix=prefix,

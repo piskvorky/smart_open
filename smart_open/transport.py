@@ -21,9 +21,15 @@ NO_SCHEME = ''
 
 _REGISTRY = {NO_SCHEME: smart_open.local_file}
 _ERRORS = {}
+_MISSING_DEPS_ERROR = """You are trying to use the %(module)s functionality of smart_open
+but you do not have the correct %(module)s dependencies installed. Try:
+
+    pip install smart_open[%(module)s]
+
+"""
 
 
-def register_transport(submodule, blind_schemes):
+def register_transport(submodule):
     """Register a submodule as a transport mechanism for ``smart_open``.
 
     This module **must** have:
@@ -37,14 +43,16 @@ def register_transport(submodule, blind_schemes):
 
     """
     global _REGISTRY, _ERRORS
-    blind_schemes = blind_schemes if isinstance(blind_schemes, list) else [blind_schemes]
+    module_name = submodule
     if isinstance(submodule, str):
         try:
             submodule = importlib.import_module(submodule)
-        except ImportError as error:
-            for scheme in blind_schemes:
-                _ERRORS[scheme] = str(error)
+        except ImportError:
             return
+    else:
+        module_name = submodule.__name__
+    # Save only the last module name piece
+    module_name = module_name.rsplit(".")[-1]
 
     if hasattr(submodule, 'SCHEME'):
         schemes = [submodule.SCHEME]
@@ -53,17 +61,15 @@ def register_transport(submodule, blind_schemes):
     else:
         raise ValueError('%r does not have a .SCHEME or .SCHEMES attribute' % submodule)
 
-    # It's not ideal to repeat the schemes, but if we can't load a module because
-    # of an ImportError we can't know the schemes that are defined inside of it.
-    if "".join(sorted(blind_schemes)) != "".join(sorted(schemes[:])):
-        raise ValueError('%r schemes do not match the blind schemes listed in transport.py')
-
     for f in ('open', 'open_uri', 'parse_uri'):
         assert hasattr(submodule, f), '%r is missing %r' % (submodule, f)
 
     for scheme in schemes:
         assert scheme not in _REGISTRY
-        _REGISTRY[scheme] = submodule
+        if hasattr(submodule, "MISSING_DEPS") and getattr(submodule, "MISSING_DEPS") is True:
+            _ERRORS[scheme] = module_name
+        else:
+            _REGISTRY[scheme] = submodule
 
 
 def get_transport(scheme):
@@ -72,7 +78,7 @@ def get_transport(scheme):
     This submodule must have been previously registered via :func:`register_transport`.
 
     """
-    global _ERRORS
+    global _ERRORS, _MISSING_DEPS_ERROR, _REGISTRY, SUPPORTED_SCHEMES
     expected = SUPPORTED_SCHEMES
     readme_url = 'https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst'
     message = (
@@ -80,21 +86,21 @@ def get_transport(scheme):
         "Extra dependencies required by %(scheme)r may be missing. "
         "See <%(readme_url)s> for details." % locals()
     )
+    if scheme in _ERRORS:
+        raise ImportError(_MISSING_DEPS_ERROR % dict(module=_ERRORS[scheme]))
     if scheme in _REGISTRY:
         return _REGISTRY[scheme]
-    if scheme in _ERRORS:
-        raise ImportError(_ERRORS[scheme])
     raise NotImplementedError(message)
 
 
-register_transport(smart_open.local_file, ["file"])
-register_transport('smart_open.azure', ["azure"])
-register_transport('smart_open.gcs', ["gs"])
-register_transport('smart_open.hdfs', ["hdfs"])
-register_transport('smart_open.http', ['http', 'https'])
-register_transport('smart_open.s3', ["s3", "s3n", 's3u', "s3a"])
-register_transport('smart_open.ssh', ["ssh", "scp", "sftp"])
-register_transport('smart_open.webhdfs', ["webhdfs"])
+register_transport(smart_open.local_file)
+register_transport('smart_open.azure')
+register_transport('smart_open.gcs')
+register_transport('smart_open.hdfs')
+register_transport('smart_open.http')
+register_transport('smart_open.s3')
+register_transport('smart_open.ssh')
+register_transport('smart_open.webhdfs')
 
 SUPPORTED_SCHEMES = tuple(sorted(_REGISTRY.keys()))
 """The transport schemes that the local installation of ``smart_open`` supports."""

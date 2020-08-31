@@ -46,6 +46,7 @@ tests_require = [
     'parameterizedtestcase',
     'pytest',
     'pytest-rerunfailures',
+    'python-jose'
 ]
 
 install_requires = [
@@ -86,7 +87,7 @@ setup(
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
-        'aws': aws_deps,
+        's3': aws_deps,
         'gcp': gcp_deps,
         'azure': azure_deps,
         'all': all_deps,

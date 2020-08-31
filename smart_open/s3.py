@@ -12,24 +12,18 @@ import functools
 import logging
 import time
 
-import smart_open.bytebuffer
-import smart_open.concurrency
-import smart_open.utils
-
-from smart_open import constants
-
-import_error = """You are trying to use the S3 functionality of smart_open
-but you do not have the correct AWS dependencies installed. Try:
-
-    pip install smart_open[aws]
-
-"""
 try:
     import boto3
     import botocore.client
     import botocore.exceptions
 except ImportError:
-    raise ImportError(import_error)
+    MISSING_DEPS = True
+
+import smart_open.bytebuffer
+import smart_open.concurrency
+import smart_open.utils
+
+from smart_open import constants
 
 logger = logging.getLogger(__name__)
 
@@ -970,7 +964,9 @@ def _retry_if_failed(
         partial,
         attempts=_UPLOAD_ATTEMPTS,
         sleep_seconds=_SLEEP_SECONDS,
-        exceptions=(botocore.exceptions.EndpointConnectionError, )):
+        exceptions=None):
+    if exceptions is None:
+        exceptions = (botocore.exceptions.EndpointConnectionError, )
     for attempt in range(attempts):
         try:
             return partial()

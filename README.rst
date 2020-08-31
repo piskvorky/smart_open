@@ -113,7 +113,7 @@ Installation
 ::
 
     pip install smart_open  // Install with no cloud dependencies
-    pip install smart_open[aws] // Install AWS deps
+    pip install smart_open[s3] // Install S3 deps
     pip install smart_open[gcp] // Install GCP deps
     pip install smart_open[all] // Installs all cloud dependencies
 
@@ -129,7 +129,7 @@ If you're upgrading from ``smart_open`` versions 1.8.0 and below, please check o
 
 Version ``2.0`` will introduce a backwards incompatible installation method with regards to the cloud dependencies. A migration path to minimize breaking
 was introduced in version ``x.x.x``. If you want to maintain backwards compatibility (installing all dependencies) install this package via ``smart_open[all]`` now
-and once the change is made you should not have any issues. If all you care about is AWS dependencies for example you can install via ``smart_open[aws]`` and
+and once the change is made you should not have any issues. If all you care about is AWS dependencies for example you can install via ``smart_open[s3]`` and
 once the dependency change is made you will simply drop the unwanted dependencies. You can read more about the motivations `here <https://github.com/RaRe-Technologies/smart_open/issues/443>`_
 
 
