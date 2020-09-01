@@ -24,7 +24,7 @@ assert _SO_KEY is not None, 'please set the SO_KEY environment variable'
 
 @contextlib.contextmanager
 def temporary():
-    """Yields a bucket/URL than can be used for temporary writing.
+    """Yields a URL than can be used for temporary writing.
 
     Removes all content under the URL when exiting.
     """
