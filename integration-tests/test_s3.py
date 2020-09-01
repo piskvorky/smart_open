@@ -36,7 +36,7 @@ def temporary():
 
 def _test_case(function):
     def inner(benchmark):
-        with temporary() as (url):
+        with temporary() as url:
             return function(benchmark, url)
     return inner
 
