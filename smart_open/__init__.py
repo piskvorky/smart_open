@@ -49,7 +49,8 @@ def s3_iter_bucket(
         key_limit=None,
         workers=16,
         retries=3,
-        **session_kwargs):
+        **session_kwargs
+):
     global _WARNED
     from .s3 import iter_bucket
     if not _WARNED:
