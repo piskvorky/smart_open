@@ -45,8 +45,7 @@ tests_require = [
     'paramiko',
     'parameterizedtestcase',
     'pytest',
-    'pytest-rerunfailures',
-    'python-jose'
+    'pytest-rerunfailures'
 ]
 
 install_requires = [

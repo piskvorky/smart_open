@@ -66,7 +66,7 @@ def register_transport(submodule):
 
     for scheme in schemes:
         assert scheme not in _REGISTRY
-        if hasattr(submodule, "MISSING_DEPS") and getattr(submodule, "MISSING_DEPS") is True:
+        if getattr(submodule, "MISSING_DEPS", False):
             _ERRORS[scheme] = module_name
         else:
             _REGISTRY[scheme] = submodule
