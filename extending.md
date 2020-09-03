@@ -30,6 +30,13 @@ This is the part that goes before the `://` in a URL, e.g. `s3://`."""
 URI_EXAMPLES = ('xxx://foo/bar', 'zzz://baz/boz')
 """This will appear in the documentation of the the `parse_uri` function."""
 
+MISSING_DEPS = False
+"""Wrap transport-specific imports in a try/catch and set this to True if
+any imports are not found. Seting MISSING_DEPS to True will cause the library
+to suggest installing its dependencies with an example pip command.
+
+If your transport has no external dependencies, you can omit this variable.
+"""
 
 def parse_uri(uri_as_str):
     """Parse the specified URI into a dict.

@@ -45,7 +45,7 @@ tests_require = [
     'paramiko',
     'parameterizedtestcase',
     'pytest',
-    'pytest-rerunfailures',
+    'pytest-rerunfailures'
 ]
 
 install_requires = [
@@ -82,14 +82,11 @@ setup(
     license='MIT',
     platforms='any',
 
-    # Concatenating the lists together is temporary and will
-    # eventually simply be install_requires dropping the cloud
-    # dependencies from being installed without explicitly being declared.
-    install_requires=install_requires + aws_deps,
+    install_requires=install_requires,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
-        'aws': aws_deps,
+        's3': aws_deps,
         'gcp': gcp_deps,
         'azure': azure_deps,
         'all': all_deps,

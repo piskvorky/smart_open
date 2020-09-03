@@ -604,6 +604,18 @@ class IterBucketTest(unittest.TestCase):
         results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
         self.assertEqual(len(results), 10)
 
+    def test_deprecated_top_level_s3_iter_bucket(self):
+        populate_bucket()
+        with self.assertLogs(smart_open.logger.name, level='WARN') as cm:
+            # invoking once will generate a warning
+            smart_open.s3_iter_bucket(BUCKET_NAME)
+            # invoking again will not (to reduce spam)
+            smart_open.s3_iter_bucket(BUCKET_NAME)
+            # verify only one output
+            assert len(cm.output) == 1
+            # verify the suggested new import is in the warning
+            assert "from smart_open.s3 import iter_bucket as s3_iter_bucket" in cm.output[0]
+
     def test_accepts_boto3_bucket(self):
         populate_bucket()
         bucket = boto3.resource('s3').Bucket(BUCKET_NAME)

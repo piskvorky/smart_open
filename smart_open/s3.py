@@ -12,9 +12,12 @@ import functools
 import logging
 import time
 
-import boto3
-import botocore.client
-import botocore.exceptions
+try:
+    import boto3
+    import botocore.client
+    import botocore.exceptions
+except ImportError:
+    MISSING_DEPS = True
 
 import smart_open.bytebuffer
 import smart_open.concurrency
@@ -961,7 +964,9 @@ def _retry_if_failed(
         partial,
         attempts=_UPLOAD_ATTEMPTS,
         sleep_seconds=_SLEEP_SECONDS,
-        exceptions=(botocore.exceptions.EndpointConnectionError, )):
+        exceptions=None):
+    if exceptions is None:
+        exceptions = (botocore.exceptions.EndpointConnectionError, )
     for attempt in range(attempts):
         try:
             return partial()
