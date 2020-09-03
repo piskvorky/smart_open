@@ -1,8 +1,23 @@
 # Unreleased
 
+This release modifies the behavior of setup.py with respect to dependencies.
+Previously, `boto3` and other AWS-related packages were installed by default.
+Now, in order to install them, you need to run either:
+
+    pip install smart_open[aws]
+    
+to install the AWS dependencies only, or
+
+    pip install smart_open[all]
+    
+to install all dependencies, including AWS, GCS, etc.
+
+Summary of changes:
+
   - Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
   - Remove boto as a dependency (PR [#523](https://github.com/RaRe-Technologies/smart_open/pull/523), [@isobit](https://github.com/isobit))
   - Performance improvement: avoid redundant GetObject API queries in s3.Reader (PR [#495](https://github.com/RaRe-Technologies/smart_open/pull/495), [@jcushman](https://github.com/jcushman))
+  - Support installing smart_open without AWS dependencies (PR [#534](https://github.com/RaRe-Technologies/smart_open/pull/534), [@justindujardin](https://github.com/justindujardin))
 
 # 2.1.1, 27 Aug 2020
 
