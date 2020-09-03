@@ -18,6 +18,13 @@ Summary of changes:
   - Remove boto as a dependency (PR [#523](https://github.com/RaRe-Technologies/smart_open/pull/523), [@isobit](https://github.com/isobit))
   - Performance improvement: avoid redundant GetObject API queries in s3.Reader (PR [#495](https://github.com/RaRe-Technologies/smart_open/pull/495), [@jcushman](https://github.com/jcushman))
   - Support installing smart_open without AWS dependencies (PR [#534](https://github.com/RaRe-Technologies/smart_open/pull/534), [@justindujardin](https://github.com/justindujardin))
+  
+## Deprecations
+
+Functionality on the left hand side will be removed in future releases.
+Use the functions on the right hand side instead.
+
+- `smart_open.s3_iter_bucket` → `smart_open.s3.iter_bucket`
 
 # 2.1.1, 27 Aug 2020
 
