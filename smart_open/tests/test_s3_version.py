@@ -126,7 +126,6 @@ class TestVersionId(unittest.TestCase):
         with open(self.url, mode='rb', transport_params=params) as fin:
             returned_obj = fin.to_boto3()
 
-        #print("type returned_obj", (returned_obj['Body'].read()))
         boto3_body = boto3_body = returned_obj.get()['Body'].read()
         self.assertEqual(boto3_body, self.test_ver1)
 
