@@ -522,7 +522,11 @@ class Reader(io.BufferedIOBase):
 
         """
         s3 = self._session.resource('s3', **self._resource_kwargs)
-        return s3.Object(self._object.bucket_name, self._object.key)
+        if self._version_id is not None:
+            return s3.Object(self._object.bucket_name, self._object.key).Version(self._version_id)
+        else:
+            return s3.Object(self._object.bucket_name, self._object.key)
+        #s3.Object(self._object.bucket_name, self._object.key)
 
     #
     # Internal methods.
