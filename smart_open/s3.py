@@ -526,7 +526,6 @@ class Reader(io.BufferedIOBase):
             return s3.Object(self._object.bucket_name, self._object.key).Version(self._version_id)
         else:
             return s3.Object(self._object.bucket_name, self._object.key)
-        #s3.Object(self._object.bucket_name, self._object.key)
 
     #
     # Internal methods.
