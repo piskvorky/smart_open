@@ -116,6 +116,35 @@ text/plain
 
 This works only when reading and writing via S3.
 
+## Specific S3 object version
+
+The ``version_id`` transport parameter enables you to get the desired version of the object from an S3 bucket.
+
+.. Important::
+    S3 disables version control by default.
+    Before using the ``version_id`` parameter, you must explicitly enable version control for your S3 bucket.
+    Read https://docs.aws.amazon.com/AmazonS3/latest/dev/Versioning.html for details.
+
+```python
+>>> from smart_open import open
+>>> versions = [v.id for v in boto3.resource('s3').Bucket('commoncrawl').object_versions.filter(Prefix='robots.txt')]
+>>> params = {'version_id': self.versions[0]}
+>>> with open('s3://commoncrawl/robots.txt', transport_params=params) as fin:
+...    print(fin.readline().rstrip())
+...    boto3_s3_object = fin.to_boto3()
+...    print(repr(boto3_s3_object))
+...    print(boto3_s3_object.get()) # Using the boto3 API here
+            
+b'String version 1.0'
+s3.ObjectVersion(bucket_name='commoncrawl', object_key='test-write-key-b84e7803aa104cea86818c617855e24f', id='350efac3-3910-42dc-89e7-881010cb33dc')
+{'ResponseMetadata': {'HTTPStatusCode': 200, 'HTTPHeaders': {'content-md5': '0WSzLhqv2inmHrC2deWDLg==', 'etag': '"d164b32e1aafda29e61eb0b675e5832e"', 'last-modified': 'Fri, 18 Sep 2020 14:22:13 GMT', 'content-length': '18', 'x-amz-version-id': '350efac3-3910-42dc-89e7-881010cb33dc'}, 'RetryAttempts': 0}, 'LastModified': datetime.datetime(2020, 9, 18, 14, 22, 13, tzinfo=tzutc()), 'ContentLength': 18, 'ETag': '"d164b32e1aafda29e61eb0b675e5832e"', 'VersionId': '350efac3-3910-42dc-89e7-881010cb33dc', 'Metadata': {}, 'Body': <botocore.response.StreamingBody object at 0x7fd02c98e1c0>}
+
+
+```
+  Be careful: object s3.ObjectVersion is returned.
+  
+  This works only when reading via S3.
+
 ## How to Specify the Request Payer (S3 only)
 
 Some public buckets require you to [pay for S3 requests for the data in the bucket](https://docs.aws.amazon.com/AmazonS3/latest/dev/RequesterPaysBuckets.html).
