@@ -1,6 +1,9 @@
 language: python
 dist: xenial
 os: linux
+env:
+  - SO_BUCKET: smart-open
+  - SO_KEY: integration-tests
 
 jobs:
   include:
@@ -13,15 +16,13 @@ jobs:
 
     - python: '3.6'
       env:
-        - SO_S3_URL: "s3://smart-open-py36-benchmark"
-        - SO_S3_RESULT_URL: "s3://smart-open-py36-benchmark-results"
+        - SO_RESULT_KEY: benchmark-results-py36
         - BOTO_CONFIG: "/dev/null"
         - TOXENV: "check_keys,py36-doctest,py36-test,py36-benchmark,py36-integration"
 
     - python: '3.7'
       env:
-        - SO_S3_URL: "s3://smart-open-py37-benchmark"
-        - SO_S3_RESULT_URL: "s3://smart-open-py37-benchmark-results"
+        - SO_RESULT_KEY: benchmark-results-py37
         - BOTO_CONFIG: "/dev/null"
         - SO_ENABLE_MOTO_SERVER: "1"
         - TOXENV: "check_keys,py37-doctest,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"

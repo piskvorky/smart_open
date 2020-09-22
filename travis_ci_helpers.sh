@@ -23,8 +23,7 @@ benchmark(){
 
   pytest integration-tests/test_s3.py --benchmark-save="${COMMIT_HASH}";
 
-  aws s3 cp .benchmarks/*/*.json "${SO_S3_RESULT_URL}";
-  aws s3 rm --recursive "${SO_S3_URL}";
+  aws s3 cp .benchmarks/*/*.json s3://"${SO_BUCKET}/${SO_RESULT_KEY}/";
 }
 
 integration(){
