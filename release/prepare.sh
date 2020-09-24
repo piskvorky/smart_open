@@ -39,6 +39,12 @@ cd ..
 python -m doctest README.rst
 cd "$script_dir"
 
+#
+# These seem to be messing with moto, so get rid of them
+#
+export AWS_ACCESS_KEY_ID=
+export AWS_SECRET_ACCESS_KEY=
+
 rm -rf sandbox.venv
 virtualenv sandbox.venv -p $(which python3)
 
