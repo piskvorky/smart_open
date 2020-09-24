@@ -54,7 +54,7 @@ def s3_iter_bucket(
     global _WARNED
     from .s3 import iter_bucket
     if not _WARNED:
-        logger.warn(_WARNING)
+        logger.warning(_WARNING)
         _WARNED = True
     return iter_bucket(
         bucket_name=bucket_name,
