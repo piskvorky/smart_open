@@ -47,9 +47,8 @@ source sandbox.venv/bin/activate
 set -u
 
 cd ..
-pip install -e .[test]  # for smart_open
-pip install -e .[all]  # for smart_open
-python setup.py test
+pip install -e .[all,test]
+pytest smart_open
 
 #
 # Delete the release branch in case one is left lying around.
