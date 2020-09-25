@@ -14,11 +14,12 @@ to install all dependencies, including AWS, GCS, etc.
 
 Summary of changes:
 
-  - Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
-  - Remove boto as a dependency (PR [#523](https://github.com/RaRe-Technologies/smart_open/pull/523), [@isobit](https://github.com/isobit))
-  - Performance improvement: avoid redundant GetObject API queries in s3.Reader (PR [#495](https://github.com/RaRe-Technologies/smart_open/pull/495), [@jcushman](https://github.com/jcushman))
-  - Support installing smart_open without AWS dependencies (PR [#534](https://github.com/RaRe-Technologies/smart_open/pull/534), [@justindujardin](https://github.com/justindujardin))
-  
+- Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
+- Remove boto as a dependency (PR [#523](https://github.com/RaRe-Technologies/smart_open/pull/523), [@isobit](https://github.com/isobit))
+- Performance improvement: avoid redundant GetObject API queries in s3.Reader (PR [#495](https://github.com/RaRe-Technologies/smart_open/pull/495), [@jcushman](https://github.com/jcushman))
+- Support installing smart_open without AWS dependencies (PR [#534](https://github.com/RaRe-Technologies/smart_open/pull/534), [@justindujardin](https://github.com/justindujardin))
+- Version accounting when executing to_boto3() (PR [#539](https://github.com/RaRe-Technologies/smart_open/pull/539), [@interpolatio](https://github.com/interpolatio))
+
 ## Deprecations
 
 Functionality on the left hand side will be removed in future releases.

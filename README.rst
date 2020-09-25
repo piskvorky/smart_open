@@ -326,32 +326,6 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
   annual/monthly_rain/2011.monthly_rain.nc 13
   annual/monthly_rain/2012.monthly_rain.nc 13
 
-Specific S3 object version
---------------------------
-
-The ``version_id`` transport parameter enables you to get the desired version of the object from an S3 bucket.
-
-.. Important::
-    S3 disables version control by default.
-    Before using the ``version_id`` parameter, you must explicitly enable version control for your S3 bucket.
-    Read https://docs.aws.amazon.com/AmazonS3/latest/dev/Versioning.html for details.
-
-.. code-block:: python
-
-  >>> # Read previous versions of an object in a versioned bucket
-  >>> bucket, key = 'smart-open-versioned', 'demo.txt'
-  >>> versions = [v.id for v in boto3.resource('s3').Bucket(bucket).object_versions.filter(Prefix=key)]
-  >>> for v in versions:
-  ...     with open('s3://%s/%s' % (bucket, key), transport_params={'version_id': v}) as fin:
-  ...         print(v, repr(fin.read()))
-  KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg 'second version\n'
-  N0GJcE3TQCKtkaS.gF.MUBZS85Gs3hzn 'first version\n'
-
-  >>> # If you don't specify a version, smart_open will read the most recent one
-  >>> with open('s3://%s/%s' % (bucket, key)) as fin:
-  ...     print(repr(fin.read()))
-  'second version\n'
-
 GCS Credentials
 ---------------
 ``smart_open`` uses the ``google-cloud-storage`` library to talk to GCS.
@@ -461,6 +435,11 @@ This can be helpful when e.g. working with compressed files.
     >>> with path.open("r") as infile:
     ...     print(infile.readline()[:41])
     В начале июля, в чрезвычайно жаркое время
+
+How do I ...?
+=============
+
+See `this document <howto.md>`__.
 
 Extending ``smart_open``
 ========================

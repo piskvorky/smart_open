@@ -116,6 +116,63 @@ text/plain
 
 This works only when reading and writing via S3.
 
+## How to Access a Specific Version of an S3 Object
+
+The ``version_id`` transport parameter enables you to get the desired version of the object from an S3 bucket.
+
+.. Important::
+    S3 disables version control by default.
+    Before using the ``version_id`` parameter, you must explicitly enable version control for your S3 bucket.
+    Read https://docs.aws.amazon.com/AmazonS3/latest/dev/Versioning.html for details.
+
+```python
+>>> import boto3
+>>> from smart_open import open
+>>> versions = ['KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg', 'N0GJcE3TQCKtkaS.gF.MUBZS85Gs3hzn']
+>>> for v in versions:
+...     with open('s3://smart-open-versioned/demo.txt', transport_params={'version_id': v}) as fin:
+...         print(v, repr(fin.read()))
+KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg 'second version\n'
+N0GJcE3TQCKtkaS.gF.MUBZS85Gs3hzn 'first version\n'
+
+>>> # If you don't specify a version, smart_open will read the most recent one
+>>> with open('s3://smart-open-versioned/demo.txt') as fin:
+...     print(repr(fin.read()))
+'second version\n'
+
+```
+
+This works only when reading via S3.
+
+## How to Access the Underlying boto3 Object
+
+At some stage in your workflow, you may opt to work with `boto3` directly.
+You can do this by calling to the `to_boto3()` method.
+You can then interact with the object using the `boto3` API:
+
+
+```python
+>>> with open('s3://commoncrawl/robots.txt') as fin:
+...     boto3_object = fin.to_boto3()
+...     print(boto3_object)
+...     print(boto3_object.get()['LastModified'])
+s3.Object(bucket_name='commoncrawl', key='robots.txt')
+2016-05-21 18:17:43+00:00
+
+```
+
+This works only when reading and writing via S3.
+
+For versioned objects, the returned object will be slightly different:
+
+```
+>>> params = {'version_id': 'KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg'}
+>>> with open('s3://smart-open-versioned/demo.txt', transport_params=params) as fin:
+...     print(fin.to_boto3())
+s3.ObjectVersion(bucket_name='smart-open-versioned', object_key='demo.txt', id='KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg')
+
+```
+
 ## How to Specify the Request Payer (S3 only)
 
 Some public buckets require you to [pay for S3 requests for the data in the bucket](https://docs.aws.amazon.com/AmazonS3/latest/dev/RequesterPaysBuckets.html).
@@ -125,10 +182,11 @@ To access such buckets, you need to pass some special transport parameters:
 
 ```python
 >>> from smart_open import open
->>> p = {'object_kwargs': {'RequestPayer': 'requester'}}
->>> with open('s3://arxiv/pdf/arXiv_pdf_manifest.xml', transport_params=p) as fin:
-...    print(fin.read(1024))
+>>> params = {'object_kwargs': {'RequestPayer': 'requester'}}
+>>> with open('s3://arxiv/pdf/arXiv_pdf_manifest.xml', transport_params=params) as fin:
+...    print(fin.readline())
 <?xml version='1.0' standalone='yes'?>
+<BLANKLINE>
 
 ```
 

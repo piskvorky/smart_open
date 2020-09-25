@@ -119,6 +119,16 @@ class TestVersionId(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(actual, self.test_ver1)
 
+    def test_version_to_boto3(self):
+        """Passing in the oldest version gives the oldest content?"""
+        self.versions = get_versions(BUCKET_NAME, self.key)
+        params = {'version_id': self.versions[0]}
+        with open(self.url, mode='rb', transport_params=params) as fin:
+            returned_obj = fin.to_boto3()
+
+        boto3_body = boto3_body = returned_obj.get()['Body'].read()
+        self.assertEqual(boto3_body, self.test_ver1)
+
 
 if __name__ == '__main__':
     unittest.main()
