@@ -315,56 +315,8 @@ FUNCTIONS
         >>>
         >>> register_compressor('.xz', _handle_xz)
     
-    s3_iter_bucket = iter_bucket(bucket_name, prefix='', accept_key=None, key_limit=None, workers=16, retries=3, **session_kwargs)
-        Iterate and download all S3 objects under `s3://bucket_name/prefix`.
-        
-        Parameters
-        ----------
-        bucket_name: str
-            The name of the bucket.
-        prefix: str, optional
-            Limits the iteration to keys starting wit the prefix.
-        accept_key: callable, optional
-            This is a function that accepts a key name (unicode string) and
-            returns True/False, signalling whether the given key should be downloaded.
-            The default behavior is to accept all keys.
-        key_limit: int, optional
-            If specified, the iterator will stop after yielding this many results.
-        workers: int, optional
-            The number of subprocesses to use.
-        retries: int, optional
-            The number of time to retry a failed download.
-        session_kwargs: dict, optional
-            Keyword arguments to pass when creating a new session.
-            For a list of available names and values, see:
-            https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html#boto3.session.Session
-        
-        
-        Yields
-        ------
-        str
-            The full key name (does not include the bucket name).
-        bytes
-            The full contents of the key.
-        
-        Notes
-        -----
-        The keys are processed in parallel, using `workers` processes (default: 16),
-        to speed up downloads greatly. If multiprocessing is not available, thus
-        _MULTIPROCESSING is False, this parameter will be ignored.
-        
-        Examples
-        --------
-        
-          >>> # get all JSON files under "mybucket/foo/"
-          >>> for key, content in iter_bucket(
-          ...         bucket_name, prefix='foo/',
-          ...         accept_key=lambda key: key.endswith('.json')):
-          ...     print key, len(content)
-        
-          >>> # limit to 10k files, using 32 parallel workers (default is 16)
-          >>> for key, content in iter_bucket(bucket_name, key_limit=10000, workers=32):
-          ...     print key, len(content)
+    s3_iter_bucket(bucket_name, prefix='', accept_key=None, key_limit=None, workers=16, retries=3, **session_kwargs)
+        Deprecated.  Use smart_open.s3.iter_bucket instead.
     
     smart_open(uri, mode='rb', **kw)
 
@@ -375,6 +327,6 @@ VERSION
     2.1.1
 
 FILE
-    /Users/misha/git/smart_open/smart_open/__init__.py
+    /home/misha/git/smart_open/smart_open/__init__.py
 
 
