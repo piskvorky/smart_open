@@ -1,5 +1,7 @@
 # Unreleased
 
+  - Version accounting when executing to_boto3() (PR [#539](https://github.com/RaRe-Technologies/smart_open/pull/539), [@interpolatio](https://github.com/interpolatio))
+
 # 2.1.1, 27 Aug 2020
 
   - Bypass unnecessary GCS storage.buckets.get permission (PR [#516](https://github.com/RaRe-Technologies/smart_open/pull/516), [@gelioz](https://github.com/gelioz))
