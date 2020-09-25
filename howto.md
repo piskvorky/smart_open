@@ -116,7 +116,7 @@ text/plain
 
 This works only when reading and writing via S3.
 
-## Specific S3 object version
+## How to Access a Specific Version of an S3 Object
 
 The ``version_id`` transport parameter enables you to get the desired version of the object from an S3 bucket.
 
@@ -126,24 +126,52 @@ The ``version_id`` transport parameter enables you to get the desired version of
     Read https://docs.aws.amazon.com/AmazonS3/latest/dev/Versioning.html for details.
 
 ```python
+>>> import boto3
 >>> from smart_open import open
->>> versions = [v.id for v in boto3.resource('s3').Bucket('commoncrawl').object_versions.filter(Prefix='robots.txt')]
->>> params = {'version_id': self.versions[0]}
->>> with open('s3://commoncrawl/robots.txt', transport_params=params) as fin:
-...    print(fin.readline().rstrip())
-...    boto3_s3_object = fin.to_boto3()
-...    print(repr(boto3_s3_object))
-...    print(boto3_s3_object.get()) # Using the boto3 API here
-            
-b'String version 1.0'
-s3.ObjectVersion(bucket_name='commoncrawl', object_key='test-write-key-b84e7803aa104cea86818c617855e24f', id='350efac3-3910-42dc-89e7-881010cb33dc')
-{'ResponseMetadata': {'HTTPStatusCode': 200, 'HTTPHeaders': {'content-md5': '0WSzLhqv2inmHrC2deWDLg==', 'etag': '"d164b32e1aafda29e61eb0b675e5832e"', 'last-modified': 'Fri, 18 Sep 2020 14:22:13 GMT', 'content-length': '18', 'x-amz-version-id': '350efac3-3910-42dc-89e7-881010cb33dc'}, 'RetryAttempts': 0}, 'LastModified': datetime.datetime(2020, 9, 18, 14, 22, 13, tzinfo=tzutc()), 'ContentLength': 18, 'ETag': '"d164b32e1aafda29e61eb0b675e5832e"', 'VersionId': '350efac3-3910-42dc-89e7-881010cb33dc', 'Metadata': {}, 'Body': <botocore.response.StreamingBody object at 0x7fd02c98e1c0>}
+>>> versions = ['KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg', 'N0GJcE3TQCKtkaS.gF.MUBZS85Gs3hzn']
+>>> for v in versions:
+...     with open('s3://smart-open-versioned/demo.txt', transport_params={'version_id': v}) as fin:
+...         print(v, repr(fin.read()))
+KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg 'second version\n'
+N0GJcE3TQCKtkaS.gF.MUBZS85Gs3hzn 'first version\n'
 
+>>> # If you don't specify a version, smart_open will read the most recent one
+>>> with open('s3://smart-open-versioned/demo.txt') as fin:
+...     print(repr(fin.read()))
+'second version\n'
 
 ```
-  Be careful: object s3.ObjectVersion is returned.
-  
-  This works only when reading via S3.
+
+This works only when reading via S3.
+
+## How to Access the Underlying boto3 Object
+
+At some stage in your workflow, you may opt to work with `boto3` directly.
+You can do this by calling to the `to_boto3()` method.
+You can then interact with the object using the `boto3` API:
+
+
+```python
+>>> with open('s3://commoncrawl/robots.txt') as fin:
+...     boto3_object = fin.to_boto3()
+...     print(boto3_object)
+...     print(boto3_object.get()['LastModified'])
+s3.Object(bucket_name='commoncrawl', key='robots.txt')
+2016-05-21 18:17:43+00:00
+
+```
+
+This works only when reading and writing via S3.
+
+For versioned objects, the returned object will be slightly different:
+
+```
+>>> params = {'version_id': 'KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg'}
+>>> with open('s3://smart-open-versioned/demo.txt', transport_params=params) as fin:
+...     print(fin.to_boto3())
+s3.ObjectVersion(bucket_name='smart-open-versioned', object_key='demo.txt', id='KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg')
+
+```
 
 ## How to Specify the Request Payer (S3 only)
 
@@ -154,10 +182,11 @@ To access such buckets, you need to pass some special transport parameters:
 
 ```python
 >>> from smart_open import open
->>> p = {'object_kwargs': {'RequestPayer': 'requester'}}
->>> with open('s3://arxiv/pdf/arXiv_pdf_manifest.xml', transport_params=p) as fin:
-...    print(fin.read(1024))
+>>> params = {'object_kwargs': {'RequestPayer': 'requester'}}
+>>> with open('s3://arxiv/pdf/arXiv_pdf_manifest.xml', transport_params=params) as fin:
+...    print(fin.readline())
 <?xml version='1.0' standalone='yes'?>
+<BLANKLINE>
 
 ```
 
