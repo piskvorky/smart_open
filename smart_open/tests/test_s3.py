@@ -33,6 +33,10 @@ KEY_NAME = 'test-key'
 WRITE_KEY_NAME = 'test-write-key'
 ENABLE_MOTO_SERVER = os.environ.get("SO_ENABLE_MOTO_SERVER") == "1"
 
+#
+# This is a hack to keep moto happy
+# See https://github.com/spulec/moto/issues/1941
+#
 os.environ["AWS_ACCESS_KEY_ID"] = "test"
 os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
 
