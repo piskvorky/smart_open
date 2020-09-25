@@ -22,39 +22,9 @@ version="$SMART_OPEN_RELEASE"
 echo "version: $version"
 
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
-cd "$script_dir"
-
-#
-# We will need these for the doctests.
-#
-export AWS_ACCESS_KEY_ID=$(aws --profile smart_open configure get aws_access_key_id)
-export AWS_SECRET_ACCESS_KEY=$(aws --profile smart_open configure get aws_secret_access_key)
+cd "$script_dir/.."
 
 git fetch upstream
-
-#
-# Using the current environment, that has smart_open installed
-#
-cd ..
-python -m doctest README.rst
-cd "$script_dir"
-
-#
-# These seem to be messing with moto, so get rid of them
-#
-export AWS_ACCESS_KEY_ID=
-export AWS_SECRET_ACCESS_KEY=
-
-rm -rf sandbox.venv
-virtualenv sandbox.venv -p $(which python3)
-
-set +u  # work around virtualenv awkwardness
-source sandbox.venv/bin/activate
-set -u
-
-cd ..
-pip install -e .[all,test]
-pytest smart_open
 
 #
 # Delete the release branch in case one is left lying around.
@@ -77,17 +47,4 @@ set +e
 git commit CHANGELOG.md -m "updated CHANGELOG.md for version $version"
 set -e
 
-python -c 'help("smart_open")' > help.txt
-
-#
-# The below command will fail if there are no changes to help.txt.
-# We can safely ignore that failure.
-#
-set +e
-git commit help.txt -m "updated help.txt for version $version"
-set -e
-
 echo "Have a look at the current branch, and if all looks good, run merge.sh"
-
-cd "$script_dir"
-rm -rf sandbox.venv
