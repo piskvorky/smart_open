@@ -51,6 +51,7 @@ def s3_iter_bucket(
         retries=3,
         **session_kwargs
 ):
+    """Deprecated.  Use smart_open.s3.iter_bucket instead."""
     global _WARNED
     from .s3 import iter_bucket
     if not _WARNED:
