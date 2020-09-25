@@ -94,13 +94,13 @@ def clamp(value, minval, maxval):
     return max(min(value, maxval), minval)
 
 
-def make_range_string(start, stop=None):
+def make_range_string(start=None, stop=None):
     """Create a byte range specifier in accordance with RFC-2616.
 
     Parameters
     ----------
-    start: int
-        The start of the byte range
+    start: int, optional
+        The start of the byte range.  If unspecified, stop indicated offset from EOF.
 
     stop: int, optional
         The end of the byte range.  If unspecified, indicates EOF.
@@ -114,9 +114,32 @@ def make_range_string(start, stop=None):
     #
     # https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.35
     #
-    if stop is None:
-        return 'bytes=%d-' % start
-    return 'bytes=%d-%d' % (start, stop)
+    if start is None and stop is None:
+        raise ValueError("make_range_string requires either a stop or start value")
+    return 'bytes=%s-%s' % ('' if start is None else start, '' if stop is None else stop)
+
+
+def parse_content_range(content_range):
+    """Extract units, start, stop, and length from a content range header like "bytes 0-846981/846982".
+
+    Assumes a properly formatted content-range header from S3.
+    See werkzeug.http.parse_content_range_header for a more robust version.
+
+    Parameters
+    ----------
+    content_range: str
+        The content-range header to parse.
+
+    Returns
+    -------
+    tuple (units: str, start: int, stop: int, length: int)
+        The units and three integers from the content-range header.
+
+    """
+    units, numbers = content_range.split(' ', 1)
+    range, length = numbers.split('/', 1)
+    start, stop = range.split('-', 1)
+    return units, int(start), int(stop), int(length)
 
 
 def safe_urlsplit(url):

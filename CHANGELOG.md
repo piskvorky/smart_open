@@ -1,5 +1,34 @@
 # Unreleased
 
+# 2.2.0, 25 Sep 2020
+
+This release modifies the behavior of setup.py with respect to dependencies.
+Previously, `boto3` and other AWS-related packages were installed by default.
+Now, in order to install them, you need to run either:
+
+    pip install smart_open[aws]
+
+to install the AWS dependencies only, or
+
+    pip install smart_open[all]
+
+to install all dependencies, including AWS, GCS, etc.
+
+Summary of changes:
+
+- Correctly pass `newline` parameter to built-in `open` function (PR [#478](https://github.com/RaRe-Technologies/smart_open/pull/478), [@burkovae](https://github.com/burkovae))
+- Remove boto as a dependency (PR [#523](https://github.com/RaRe-Technologies/smart_open/pull/523), [@isobit](https://github.com/isobit))
+- Performance improvement: avoid redundant GetObject API queries in s3.Reader (PR [#495](https://github.com/RaRe-Technologies/smart_open/pull/495), [@jcushman](https://github.com/jcushman))
+- Support installing smart_open without AWS dependencies (PR [#534](https://github.com/RaRe-Technologies/smart_open/pull/534), [@justindujardin](https://github.com/justindujardin))
+- Take object version into account in `to_boto3` method (PR [#539](https://github.com/RaRe-Technologies/smart_open/pull/539), [@interpolatio](https://github.com/interpolatio))
+
+## Deprecations
+
+Functionality on the left hand side will be removed in future releases.
+Use the functions on the right hand side instead.
+
+- `smart_open.s3_iter_bucket` → `smart_open.s3.iter_bucket`
+
 # 2.1.1, 27 Aug 2020
 
   - Bypass unnecessary GCS storage.buckets.get permission (PR [#516](https://github.com/RaRe-Technologies/smart_open/pull/516), [@gelioz](https://github.com/gelioz))

@@ -20,6 +20,13 @@ logger = logging.getLogger(__name__)
 NO_SCHEME = ''
 
 _REGISTRY = {NO_SCHEME: smart_open.local_file}
+_ERRORS = {}
+_MISSING_DEPS_ERROR = """You are trying to use the %(module)s functionality of smart_open
+but you do not have the correct %(module)s dependencies installed. Try:
+
+    pip install smart_open[%(module)s]
+
+"""
 
 
 def register_transport(submodule):
@@ -35,12 +42,17 @@ def register_transport(submodule):
     Once registered, you can get the submodule by calling :func:`get_transport`.
 
     """
-    global _REGISTRY
+    global _REGISTRY, _ERRORS
+    module_name = submodule
     if isinstance(submodule, str):
         try:
             submodule = importlib.import_module(submodule)
         except ImportError:
             return
+    else:
+        module_name = submodule.__name__
+    # Save only the last module name piece
+    module_name = module_name.rsplit(".")[-1]
 
     if hasattr(submodule, 'SCHEME'):
         schemes = [submodule.SCHEME]
@@ -54,7 +66,10 @@ def register_transport(submodule):
 
     for scheme in schemes:
         assert scheme not in _REGISTRY
-        _REGISTRY[scheme] = submodule
+        if getattr(submodule, "MISSING_DEPS", False):
+            _ERRORS[scheme] = module_name
+        else:
+            _REGISTRY[scheme] = submodule
 
 
 def get_transport(scheme):
@@ -63,6 +78,7 @@ def get_transport(scheme):
     This submodule must have been previously registered via :func:`register_transport`.
 
     """
+    global _ERRORS, _MISSING_DEPS_ERROR, _REGISTRY, SUPPORTED_SCHEMES
     expected = SUPPORTED_SCHEMES
     readme_url = 'https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst'
     message = (
@@ -70,12 +86,11 @@ def get_transport(scheme):
         "Extra dependencies required by %(scheme)r may be missing. "
         "See <%(readme_url)s> for details." % locals()
     )
-    try:
-        submodule = _REGISTRY[scheme]
-    except KeyError as e:
-        raise NotImplementedError(message) from e
-    else:
-        return submodule
+    if scheme in _ERRORS:
+        raise ImportError(_MISSING_DEPS_ERROR % dict(module=_ERRORS[scheme]))
+    if scheme in _REGISTRY:
+        return _REGISTRY[scheme]
+    raise NotImplementedError(message)
 
 
 register_transport(smart_open.local_file)

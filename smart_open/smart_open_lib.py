@@ -25,8 +25,6 @@ import urllib.parse
 import warnings
 import sys
 
-import boto3
-
 #
 # This module defines a function called smart_open so we cannot use
 # smart_open.submodule to reference to the submodules.
@@ -289,6 +287,8 @@ def smart_open(uri, mode="rb", **kw):
         logger.error('profile_name and s3_session are mutually exclusive, ignoring the former')
 
     if 'profile_name' in kw:
+        import boto3
+
         transport_params['session'] = boto3.Session(profile_name=kw.pop('profile_name'))
 
     if 's3_session' in kw:
