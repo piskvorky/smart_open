@@ -29,10 +29,8 @@ What?
 Why?
 ====
 
-Working with large remote files, for example using Amazon's `boto <http://docs.pythonboto.org/en/latest/>`_ and `boto3 <https://boto3.readthedocs.io/en/latest/>`_ Python library, is a pain.
-``boto``'s ``key.set_contents_from_string()`` and ``key.get_contents_as_string()`` methods only work for small files, because they're loaded fully into RAM, no streaming.
-There are nasty hidden gotchas when using ``boto``'s multipart upload functionality that is needed for large files, and a lot of boilerplate.
-
+Working with large remote files, for example using Amazon's `boto3 <https://boto3.amazonaws.com/v1/documentation/api/latest/index.html>`_ Python library, is a pain.
+``boto3``'s ``Object.upload_fileobj()`` and ``Object.download_fileobj()`` methods require gotcha-prone boilerplate to use successfully, such as constructing file-like object wrappers.
 ``smart_open`` shields you from that. It builds on boto3 and other remote storage libraries, but offers a **clean unified Pythonic API**. The result is less code for you to write and fewer bugs to make.
 
 
@@ -115,7 +113,7 @@ Installation
 ::
 
     pip install smart_open  // Install with no cloud dependencies
-    pip install smart_open[aws] // Install AWS deps
+    pip install smart_open[s3] // Install S3 deps
     pip install smart_open[gcp] // Install GCP deps
     pip install smart_open[all] // Installs all cloud dependencies
 
@@ -131,7 +129,7 @@ If you're upgrading from ``smart_open`` versions 1.8.0 and below, please check o
 
 Version ``2.0`` will introduce a backwards incompatible installation method with regards to the cloud dependencies. A migration path to minimize breaking
 was introduced in version ``x.x.x``. If you want to maintain backwards compatibility (installing all dependencies) install this package via ``smart_open[all]`` now
-and once the change is made you should not have any issues. If all you care about is AWS dependencies for example you can install via ``smart_open[aws]`` and
+and once the change is made you should not have any issues. If all you care about is AWS dependencies for example you can install via ``smart_open[s3]`` and
 once the dependency change is made you will simply drop the unwanted dependencies. You can read more about the motivations `here <https://github.com/RaRe-Technologies/smart_open/issues/443>`_
 
 
@@ -313,16 +311,16 @@ Port your old ``boto`` settings to ``boto3`` in order to use them with ``smart_o
 Iterating Over an S3 Bucket's Contents
 --------------------------------------
 
-Since going over all (or select) keys in an S3 bucket is a very common operation, there's also an extra function ``smart_open.s3_iter_bucket()`` that does this efficiently, **processing the bucket keys in parallel** (using multiprocessing):
+Since going over all (or select) keys in an S3 bucket is a very common operation, there's also an extra function ``smart_open.s3.iter_bucket()`` that does this efficiently, **processing the bucket keys in parallel** (using multiprocessing):
 
 .. code-block:: python
 
-  >>> from smart_open import s3_iter_bucket
+  >>> from smart_open import s3
   >>> # get data corresponding to 2010 and later under "silo-open-data/annual/monthly_rain"
   >>> # we use workers=1 for reproducibility; you should use as many workers as you have cores
   >>> bucket = 'silo-open-data'
   >>> prefix = 'annual/monthly_rain/'
-  >>> for key, content in s3_iter_bucket(bucket, prefix=prefix, accept_key=lambda key: '/201' in key, workers=1, key_limit=3):
+  >>> for key, content in s3.iter_bucket(bucket, prefix=prefix, accept_key=lambda key: '/201' in key, workers=1, key_limit=3):
   ...     print(key, round(len(content) / 2**20))
   annual/monthly_rain/2010.monthly_rain.nc 13
   annual/monthly_rain/2011.monthly_rain.nc 13

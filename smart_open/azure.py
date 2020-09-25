@@ -15,8 +15,11 @@ import logging
 import smart_open.bytebuffer
 import smart_open.constants
 
-import azure.storage.blob
-import azure.core.exceptions
+try:
+    import azure.storage.blob
+    import azure.core.exceptions
+except ImportError:
+    MISSING_DEPS = True
 
 logger = logging.getLogger(__name__)
 

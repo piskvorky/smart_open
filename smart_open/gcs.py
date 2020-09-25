@@ -11,9 +11,12 @@
 import io
 import logging
 
-import google.cloud.exceptions
-import google.cloud.storage
-import google.auth.transport.requests
+try:
+    import google.cloud.exceptions
+    import google.cloud.storage
+    import google.auth.transport.requests
+except ImportError:
+    MISSING_DEPS = True
 
 import smart_open.bytebuffer
 import smart_open.utils
