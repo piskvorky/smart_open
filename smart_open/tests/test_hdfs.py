@@ -17,6 +17,7 @@ import mock
 
 import smart_open.hdfs
 
+from sys import platform
 
 CURR_DIR = P.dirname(P.abspath(__file__))
 
@@ -31,23 +32,25 @@ CURR_DIR = P.dirname(P.abspath(__file__))
 # such as Windows.
 #
 class CliRawInputBaseTest(unittest.TestCase):
-    def test_read(self):
-        path = P.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
-        cat = subprocess.Popen(['cat', path], stdout=subprocess.PIPE)
+    def setUp(self):
+        if platform == "linux" or platform == "linux2":
+            path = P.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
+            self.cat = subprocess.Popen(['cat', path], stdout=subprocess.PIPE)
+        elif platform == "win32":
+            path = P.join(CURR_DIR, 'test_data\crime-and-punishment.txt')
+            self.cat = subprocess.Popen(['type', path], stdout=subprocess.PIPE, shell=True)
 
-        with mock.patch('subprocess.Popen', return_value=cat):
+    def test_read(self):
+        with mock.patch('subprocess.Popen', return_value=self.cat):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read()
 
         as_text = as_bytes.decode('utf-8')
         self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
-        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
+        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.'))
 
     def test_read_100(self):
-        path = P.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
-        cat = subprocess.Popen(['cat', path], stdout=subprocess.PIPE)
-
-        with mock.patch('subprocess.Popen', return_value=cat):
+        with mock.patch('subprocess.Popen', return_value=self.cat):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read(75)
 
@@ -65,18 +68,16 @@ class CliRawInputBaseTest(unittest.TestCase):
 
         as_text = as_bytes.decode('utf-8')
         self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
-        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
+        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.'))
 
     def test_context_manager(self):
-        path = P.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
-        cat = subprocess.Popen(['cat', path], stdout=subprocess.PIPE)
-        with mock.patch('subprocess.Popen', return_value=cat):
+        with mock.patch('subprocess.Popen', return_value=self.cat):
             with smart_open.hdfs.CliRawInputBase('hdfs://dummy/url') as fin:
                 as_bytes = fin.read()
 
         as_text = as_bytes.decode('utf-8')
         self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
-        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
+        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.'))
 
 
 class CliRawOutputBaseTest(unittest.TestCase):
