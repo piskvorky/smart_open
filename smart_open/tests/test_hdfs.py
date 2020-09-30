@@ -32,15 +32,17 @@ CURR_DIR = P.dirname(P.abspath(__file__))
 # such as Windows.
 #
 class CliRawInputBaseTest(unittest.TestCase):
-    def setUp(self):
+    def _setUp(self, test_file):
         if platform == "linux" or platform == "linux2":
-            path = P.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
+            path = P.join(CURR_DIR, 'test_data/'+test_file)
             self.cat = subprocess.Popen(['cat', path], stdout=subprocess.PIPE)
         elif platform == "win32":
-            path = P.join(CURR_DIR, 'test_data\crime-and-punishment.txt')
+            path = P.join(CURR_DIR, 'test_data\\'+test_file)
             self.cat = subprocess.Popen(['type', path], stdout=subprocess.PIPE, shell=True)
 
     def test_read(self):
+        self._setUp(test_file = 'crime-and-punishment.txt')
+
         with mock.patch('subprocess.Popen', return_value=self.cat):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read()
@@ -50,6 +52,8 @@ class CliRawInputBaseTest(unittest.TestCase):
         self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.'))
 
     def test_read_100(self):
+        self._setUp(test_file='crime-and-punishment.txt')
+
         with mock.patch('subprocess.Popen', return_value=self.cat):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read(75)
@@ -59,10 +63,9 @@ class CliRawInputBaseTest(unittest.TestCase):
         self.assertEqual(expected, as_text)
 
     def test_unzip(self):
-        path = P.join(CURR_DIR, 'test_data/crime-and-punishment.txt.gz')
-        cat = subprocess.Popen(['cat', path], stdout=subprocess.PIPE)
+        self._setUp(test_file='crime-and-punishment.txt.gz')
 
-        with mock.patch('subprocess.Popen', return_value=cat):
+        with mock.patch('subprocess.Popen', return_value=self.cat):
             with gzip.GzipFile(fileobj=smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')) as fin:
                 as_bytes = fin.read()
 
@@ -71,6 +74,8 @@ class CliRawInputBaseTest(unittest.TestCase):
         self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.'))
 
     def test_context_manager(self):
+        self._setUp(test_file='crime-and-punishment.txt')
+
         with mock.patch('subprocess.Popen', return_value=self.cat):
             with smart_open.hdfs.CliRawInputBase('hdfs://dummy/url') as fin:
                 as_bytes = fin.read()
