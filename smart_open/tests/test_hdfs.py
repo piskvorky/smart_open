@@ -84,13 +84,13 @@ class CliRawInputBaseTest(unittest.TestCase):
         self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
         self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.'))
 
-
+@unittest.skipIf(platform == 'win32',reason="does not run on windows")
 class CliRawOutputBaseTest(unittest.TestCase):
     def test_write(self):
-        cat = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        cat = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
         as_text = 'мы в ответе за тех, кого приручили'
 
-        with mock.patch('subprocess.Popen', return_value=cat):
+        with mock.patch('subprocess.Popen', return_value=self.cat):
             with smart_open.hdfs.CliRawOutputBase('hdfs://dummy/url') as fout:
                 fout.write(as_text.encode('utf-8'))
 
