@@ -47,9 +47,9 @@ class CliRawInputBaseTest(unittest.TestCase):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read()
 
-        as_text = as_bytes.decode('utf-8')
+        as_text = as_bytes.decode('utf-8').replace('\r\n','\n')
         self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
-        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.'))
+        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
 
     def test_read_100(self):
         self._setUp(test_file='crime-and-punishment.txt')
@@ -69,9 +69,9 @@ class CliRawInputBaseTest(unittest.TestCase):
             with gzip.GzipFile(fileobj=smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')) as fin:
                 as_bytes = fin.read()
 
-        as_text = as_bytes.decode('utf-8')
+        as_text = as_bytes.decode('utf-8').replace('\r\n','\n')
         self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
-        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.'))
+        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
 
     def test_context_manager(self):
         self._setUp(test_file='crime-and-punishment.txt')
@@ -80,9 +80,9 @@ class CliRawInputBaseTest(unittest.TestCase):
             with smart_open.hdfs.CliRawInputBase('hdfs://dummy/url') as fin:
                 as_bytes = fin.read()
 
-        as_text = as_bytes.decode('utf-8')
+        as_text = as_bytes.decode('utf-8').replace('\r\n','\n')
         self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
-        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.'))
+        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
 
 @unittest.skipIf(platform == 'win32',reason="does not run on windows")
 class CliRawOutputBaseTest(unittest.TestCase):
