@@ -1,5 +1,7 @@
 # Unreleased
 
+# 2.2.1, 1 Oct 2020
+
 - Include S3 dependencies by default, because removing them in the 2.2.0 minor release was a mistake.
 
 # 2.2.0, 25 Sep 2020
