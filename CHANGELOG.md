@@ -10,7 +10,7 @@ This release modifies the behavior of setup.py with respect to dependencies.
 Previously, `boto3` and other AWS-related packages were installed by default.
 Now, in order to install them, you need to run either:
 
-    pip install smart_open[aws]
+    pip install smart_open[s3]
 
 to install the AWS dependencies only, or
 
