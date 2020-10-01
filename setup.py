@@ -82,7 +82,7 @@ setup(
     license='MIT',
     platforms='any',
 
-    install_requires=install_requires,
+    install_requires=install_requires + aws_deps,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
