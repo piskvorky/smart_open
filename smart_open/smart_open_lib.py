@@ -34,7 +34,6 @@ import smart_open.local_file as so_file
 from smart_open import compression
 from smart_open import doctools
 from smart_open import transport
-from smart_open import utils
 
 #
 # For backwards compatibility and keeping old unit tests happy.
