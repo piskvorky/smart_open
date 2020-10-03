@@ -396,22 +396,31 @@ def smart_open(
         newline=None,
         closefd=True,
         opener=None,
-        ignore_ext=False,
+        ignore_extension=False,
         **kwargs,
-        ):
+    ):
     #
     # This is a thin wrapper of smart_open.open.  It's here for backward
     # compatibility.  It works exactly like smart_open.open when the passed
     # parameters are identical.  Otherwise, it raises a DeprecationWarning.
     #
+    # For completeness, the main differences of the old smart_open function:
+    #
+    # 1. Default mode was read binary (mode='rb')
+    # 2. ignore_ext parameter was called ignore_extension
+    # 3. Transport parameters were passed directly as kwargs
+    #
+    url = 'https://github.com/RaRe-Technologies/smart_open/blob/develop/MIGRATING_FROM_OLDER_VERSIONS.rst'
     if kwargs:
         raise DeprecationWarning(
             'The following keyword parameters are not supported: %r. '
-            'See https://github.com/RaRe-Technologies/smart_open/blob'
-            '/develop/MIGRATING_FROM_OLDER_VERSIONS.rst '
-            'for more information.' % sorted(kwargs)
+            'See  %s for more information.' % (sorted(kwargs), url)
         )
-    del kwargs
+    message = 'This function is deprecated.  See %s for more information' % url
+    warnings.warn(message, category=DeprecationWarning)
+
+    ignore_ext = ignore_extension
+    del kwargs, url, message, ignore_extension
     return open(**locals())
 
 
