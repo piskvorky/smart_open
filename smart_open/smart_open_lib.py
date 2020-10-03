@@ -400,8 +400,7 @@ def _open_binary_stream(uri, mode, transport_params):
     submodule = transport.get_transport(scheme)
     fobj = submodule.open_uri(uri, mode, transport_params)
     if not hasattr(fobj, 'name'):
-        logger.critical('TODO')
-        fobj.name = 'unknown'
+        fobj.name = uri
 
     return fobj
 
