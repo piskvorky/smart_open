@@ -387,6 +387,34 @@ def _patch_pathlib(func):
     return old_impl
 
 
+def smart_open(
+        uri,
+        mode='rb',
+        buffering=-1,
+        encoding=None,
+        errors=None,
+        newline=None,
+        closefd=True,
+        opener=None,
+        ignore_ext=False,
+        **kwargs,
+        ):
+    #
+    # This is a thin wrapper of smart_open.open.  It's here for backward
+    # compatibility.  It works exactly like smart_open.open when the passed
+    # parameters are identical.  Otherwise, it raises a DeprecationWarning.
+    #
+    if kwargs:
+        raise DeprecationWarning(
+            'The following keyword parameters are not supported: %r. '
+            'See https://github.com/RaRe-Technologies/smart_open/blob'
+            '/develop/MIGRATING_FROM_OLDER_VERSIONS.rst '
+            'for more information.' % sorted(kwargs)
+        )
+    del kwargs
+    return open(**locals())
+
+
 #
 # Prevent failures with doctools from messing up the entire library.  We don't
 # expect such failures, but contributed modules (e.g. new transport mechanisms)
