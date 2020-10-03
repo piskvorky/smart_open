@@ -15,12 +15,14 @@ import logging
 import tempfile
 import os
 import hashlib
+import warnings
 
 import boto3
 import mock
 from moto import mock_s3
 import responses
 import gzip
+import pytest
 
 import smart_open
 from smart_open import smart_open_lib
@@ -1615,6 +1617,23 @@ class CheckKwargsTest(unittest.TestCase):
         expected = {'foo': 123}
         actual = smart_open.smart_open_lib._check_kwargs(function, kwargs)
         self.assertEqual(expected, actual)
+
+
+def test_backwards_compatibility_wrapper():
+    fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
+    expected = open(fpath, 'rb').readline()
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+
+        actual = smart_open.smart_open(fpath).readline()
+        assert expected == actual
+
+        actual = smart_open.smart_open(fpath, ignore_extension=True).readline()
+        assert expected == actual
+
+    with pytest.raises(DeprecationWarning):
+        smart_open.smart_open(fpath, unsupported_keyword_param=123)
 
 
 if __name__ == '__main__':
