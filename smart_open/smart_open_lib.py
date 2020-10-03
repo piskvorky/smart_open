@@ -396,7 +396,7 @@ def smart_open(
         closefd=True,
         opener=None,
         ignore_extension=False,
-        **kwargs,
+        **kwargs
     ):
     #
     # This is a thin wrapper of smart_open.open.  It's here for backward
