@@ -162,15 +162,14 @@ class Reader(io.BufferedIOBase):
 
     """
     def __init__(
-            self,
-            container,
-            blob,
-            client,  # type: azure.storage.blob.BlobServiceClient
-            buffer_size=DEFAULT_BUFFER_SIZE,
-            line_terminator=smart_open.constants.BINARY_NEWLINE,
-    ):
-        self._container_client = client.get_container_client(container)
-        # type: azure.storage.blob.ContainerClient
+        self,
+        container,
+        blob,
+        client: azure.storage.blob.BlobServiceClient,
+        buffer_size: int = DEFAULT_BUFFER_SIZE,
+        line_terminator: str = smart_open.constants.BINARY_NEWLINE,
+    ) -> None:
+        self._container_client: azure.storage.blob.ContainerClient = client.get_container_client(container)
 
         self._blob = self._container_client.get_blob_client(blob)
         if self._blob is None:
@@ -349,16 +348,15 @@ class Writer(io.BufferedIOBase):
     Implements the io.BufferedIOBase interface of the standard library."""
 
     def __init__(
-            self,
-            container,
-            blob,
-            client,  # type: azure.storage.blob.BlobServiceClient
-            min_part_size=_DEFAULT_MIN_PART_SIZE,
+        self,
+        container,
+        blob,
+        client: azure.storage.blob.BlobServiceClient,
+        min_part_size=_DEFAULT_MIN_PART_SIZE,
     ):
         self._client = client
-        self._container_client = self._client.get_container_client(container)
-        # type: azure.storage.blob.ContainerClient
-        self._blob = self._container_client.get_blob_client(blob)  # type: azure.storage.blob.BlobClient
+        self._container_client: azure.storage.blob.ContainerClient = self._client.get_container_client(container)
+        self._blob:  azure.storage.blob.BlobClient = self._container_client.get_blob_client(blob)
         self._min_part_size = min_part_size
 
         self._total_size = 0

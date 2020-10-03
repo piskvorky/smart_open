@@ -45,9 +45,11 @@ from smart_open.utils import inspect_kwargs as _inspect_kwargs  # noqa: F401
 
 from typing import (
     Any,
+    Callable,
     Dict,
     IO,
     Optional,
+    Tuple,
     Union,
 )
 
@@ -74,7 +76,7 @@ def _sniff_scheme(uri_as_string: str) -> str:
     return urllib.parse.urlsplit(uri_as_string).scheme
 
 
-def parse_uri(uri_as_string: str) -> collections.namedtuple:
+def parse_uri(uri_as_string: str) -> Tuple:
     """
     Parse the given URI from a string.
 
@@ -90,8 +92,8 @@ def parse_uri(uri_as_string: str) -> collections.namedtuple:
     # The conversion to a namedtuple is just to keep the old tests happy while
     # I'm still refactoring.
     #
-    Uri = collections.namedtuple('Uri', sorted(as_dict.keys()))
-    return Uri(**as_dict)
+    Uri = collections.namedtuple('Uri', sorted(as_dict.keys()))  # type: ignore
+    return Uri(**as_dict)  # type: ignore
 
 
 #
@@ -285,7 +287,7 @@ def smart_open(uri, mode="rb", **kw):
         logger.error('profile_name and s3_session are mutually exclusive, ignoring the former')
 
     if 'profile_name' in kw:
-        import boto3
+        import boto3  # type: ignore
 
         transport_params['session'] = boto3.Session(profile_name=kw.pop('profile_name'))
 
@@ -316,7 +318,7 @@ def _shortcut_open(
     encoding: Optional[str] = None,
     errors: Optional[str] = None,
     newline: Optional[str] = None,
-) -> IO:
+) -> Optional[IO]:
     """Try to open the URI using the standard library io.open function.
 
     This can be much faster than the alternative of opening in binary mode and
@@ -329,10 +331,9 @@ def _shortcut_open(
 
     If it is not possible to use the built-in open for the specified URI, returns None.
 
-    :param str uri: A string indicating what to open.
-    :param str mode: The mode to pass to the open function.
+    :param uri: A string indicating what to open.
+    :param mode: The mode to pass to the open function.
     :returns: The opened file
-    :rtype: file
     """
     if not isinstance(uri, str):
         return None
@@ -359,7 +360,7 @@ def _shortcut_open(
     if errors and 'b' not in mode:
         open_kwargs['errors'] = errors
 
-    return _builtin_open(local_path, mode, buffering=buffering, **open_kwargs)
+    return _builtin_open(local_path, mode, buffering=buffering, **open_kwargs)  # type: ignore
 
 
 def _open_binary_stream(uri: Union[str, IO], mode: str, transport_params: Dict[str, Any]) -> IO:
@@ -387,8 +388,8 @@ def _open_binary_stream(uri: Union[str, IO], mode: str, transport_params: Dict[s
         # if there is no such an attribute, we return "unknown" - this
         # effectively disables any compression
         if not hasattr(uri, 'name'):
-            uri.name = getattr(uri, 'name', 'unknown')
-        return uri
+            uri.name = getattr(uri, 'name', 'unknown')  # type: ignore
+        return uri  # type: ignore
 
     if not isinstance(uri, str):
         raise TypeError("don't know how to handle uri %r" % uri)
@@ -438,9 +439,9 @@ def _encoding_wrapper(
 
     kw = {'errors': errors} if errors else {}
     if mode[0] == 'r' or mode.endswith('+'):
-        fileobj = codecs.getreader(encoding)(fileobj, **kw)
+        fileobj = codecs.getreader(encoding)(fileobj, **kw)  # type: ignore
     if mode[0] in ('w', 'a') or mode.endswith('+'):
-        fileobj = codecs.getwriter(encoding)(fileobj, **kw)
+        fileobj = codecs.getwriter(encoding)(fileobj, **kw)  # type: ignore
     return fileobj
 
 
@@ -460,7 +461,7 @@ class patch_pathlib(object):
 def _patch_pathlib(func: Callable) -> Callable:
     """Replace `Path.open` with `func`"""
     old_impl = pathlib.Path.open
-    pathlib.Path.open = func
+    pathlib.Path.open = func  # type: ignore
     return old_impl
 
 
