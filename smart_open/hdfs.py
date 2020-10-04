@@ -14,6 +14,7 @@ Uses the command-line hdfs utility under the covers.
 
 """
 
+import collections
 import io
 import logging
 import subprocess
@@ -30,8 +31,10 @@ URI_EXAMPLES = (
     'hdfs://path/file',
 )
 
+Uri = collections.namedtuple('Uri', 'scheme uri_path')
 
-def parse_uri(uri_as_string):
+
+def parse_uri(uri_as_string: str) -> Uri:
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme == SCHEME
 
@@ -40,15 +43,15 @@ def parse_uri(uri_as_string):
     if not uri_path:
         raise RuntimeError("invalid HDFS URI: %r" % uri_as_string)
 
-    return dict(scheme=SCHEME, uri_path=uri_path)
+    return Uri(scheme=SCHEME, uri_path=uri_path)
 
 
 def open_uri(uri, mode, transport_params):
     utils.check_kwargs(open, transport_params)
 
     parsed_uri = parse_uri(uri)
-    fobj = open(parsed_uri['uri_path'], mode)
-    fobj.name = parsed_uri['uri_path'].split('/')[-1]
+    fobj = open(parsed_uri.uri_path, mode)
+    fobj.name = parsed_uri.uri_path.split('/')[-1]
     return fobj
 
 

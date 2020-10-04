@@ -7,10 +7,17 @@
 #
 """Implements file-like objects for reading and writing from/to AWS S3."""
 
+import collections
 import io
 import functools
 import logging
 import time
+
+from typing import (
+    Dict,
+    IO,
+    Tuple,
+)
 
 try:
     import boto3  # type: ignore
@@ -50,8 +57,22 @@ _SLEEP_SECONDS = 10
 # Returned by AWS when we try to seek beyond EOF.
 _OUT_OF_RANGE = 'Requested Range Not Satisfiable'
 
+Uri = collections.namedtuple(
+    'Uri',
+    [
+        'scheme',
+        'bucket_id',
+        'key_id',
+        'port',
+        'host',
+        'ordinary_calling_format',
+        'access_id',
+        'access_secret',
+    ]
+)
 
-def parse_uri(uri_as_string):
+
+def parse_uri(uri_as_string: str) -> Uri:
     #
     # Restrictions on bucket names and labels:
     #
@@ -99,7 +120,7 @@ def parse_uri(uri_as_string):
     else:
         bucket_id = head
 
-    return dict(
+    return Uri(
         scheme=split_uri.scheme,
         bucket_id=bucket_id,
         key_id=key_id,
@@ -111,7 +132,7 @@ def parse_uri(uri_as_string):
     )
 
 
-def _consolidate_params(uri, transport_params):
+def _consolidate_params(uri: Uri, transport_params: Dict) -> Tuple[Uri, Dict]:
     """Consolidates the parsed Uri with the additional parameters.
 
     This is necessary because the user can pass some of the parameters can in
@@ -127,22 +148,22 @@ def _consolidate_params(uri, transport_params):
     transport_params = dict(transport_params)
 
     session = transport_params.get('session')
-    if session is not None and (uri['access_id'] or uri['access_secret']):
+    if session is not None and (uri.access_id or uri.access_secret):
         logger.warning(
             'ignoring credentials parsed from URL because they conflict with '
             'transport_params.session. Set transport_params.session to None '
             'to suppress this warning.'
         )
-        uri.update(access_id=None, access_secret=None)
-    elif (uri['access_id'] and uri['access_secret']):
+        uri = uri._replace(access_id=None, access_secret=None)
+    elif (uri.access_id and uri.access_secret):
         transport_params['session'] = boto3.Session(
-            aws_access_key_id=uri['access_id'],
-            aws_secret_access_key=uri['access_secret'],
+            aws_access_key_id=uri.access_id,
+            aws_secret_access_key=uri.access_secret,
         )
-        uri.update(access_id=None, access_secret=None)
+        uri = uri._replace(access_id=None, access_secret=None)
 
-    if uri['host'] != DEFAULT_HOST:
-        endpoint_url = 'https://%(host)s:%(port)d' % uri
+    if uri.host != DEFAULT_HOST:
+        endpoint_url = 'https://%s:%d' % (uri.host, uri.port)
         _override_endpoint_url(transport_params, endpoint_url)
 
     return uri, transport_params
@@ -163,11 +184,11 @@ def _override_endpoint_url(transport_params, url):
         resource_kwargs.update(endpoint_url=url)
 
 
-def open_uri(uri, mode, transport_params):
+def open_uri(uri: str, mode: str, transport_params: Dict) -> IO:
     parsed_uri = parse_uri(uri)
     parsed_uri, transport_params = _consolidate_params(parsed_uri, transport_params)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
-    return open(parsed_uri['bucket_id'], parsed_uri['key_id'], mode, **kwargs)
+    return open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
 
 def open(

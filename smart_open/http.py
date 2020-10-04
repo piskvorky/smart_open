@@ -7,6 +7,7 @@
 #
 """Implements file-like objects for reading from http."""
 
+import collections
 import io
 import logging
 import os.path
@@ -22,6 +23,7 @@ SCHEMES = ('http', 'https')
 
 logger = logging.getLogger(__name__)
 
+Uri = collections.namedtuple('Uri', 'scheme uri_path')
 
 _HEADERS = {'Accept-Encoding': 'identity'}
 """The headers we send to the server with every HTTP request.
@@ -32,13 +34,13 @@ the client (us) has to decompress them with the appropriate algorithm.
 """
 
 
-def parse_uri(uri_as_string):
+def parse_uri(uri_as_string: str) -> Uri:
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
 
     uri_path = split_uri.netloc + split_uri.path
     uri_path = "/" + uri_path.lstrip("/")
-    return dict(scheme=split_uri.scheme, uri_path=uri_path)
+    return Uri(scheme=split_uri.scheme, uri_path=uri_path)
 
 
 def open_uri(uri, mode, transport_params):

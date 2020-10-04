@@ -31,10 +31,12 @@ import sys
 #
 import smart_open.local_file as so_file
 
-from smart_open import compression
-from smart_open import doctools
-from smart_open import transport
-from smart_open import utils
+from smart_open import (
+    compression,
+    doctools,
+    transport,
+    utils,
+)
 
 #
 # For backwards compatibility and keeping old unit tests happy.
@@ -86,14 +88,7 @@ def parse_uri(uri_as_string: str) -> Tuple:
     """
     scheme = _sniff_scheme(uri_as_string)
     submodule = transport.get_transport(scheme)
-    as_dict = submodule.parse_uri(uri_as_string)
-
-    #
-    # The conversion to a namedtuple is just to keep the old tests happy while
-    # I'm still refactoring.
-    #
-    Uri = collections.namedtuple('Uri', sorted(as_dict.keys()))  # type: ignore
-    return Uri(**as_dict)  # type: ignore
+    return submodule.parse_uri(uri_as_string)
 
 
 #

@@ -9,8 +9,14 @@
 """Implements file-like objects for reading and writing to/from Azure Blob Storage."""
 
 import base64
+import collections
 import io
 import logging
+
+from typing import (
+    Dict,
+    IO,
+)
 
 import smart_open.bytebuffer
 import smart_open.constants
@@ -37,8 +43,10 @@ DEFAULT_BUFFER_SIZE = 4 * 1024**2
 https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs
 """
 
+Uri = collections.namedtuple('Uri', 'scheme container_id blob_id')
 
-def parse_uri(uri_as_string):
+
+def parse_uri(uri_as_string: str) -> Uri:
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
     first = sr.netloc
@@ -52,39 +60,33 @@ def parse_uri(uri_as_string):
         container_id = first
         blob_id = second
 
-    return dict(scheme=SCHEME, container_id=container_id, blob_id=blob_id)
+    return Uri(scheme=SCHEME, container_id=container_id, blob_id=blob_id)
 
 
-def open_uri(uri, mode, transport_params):
+def open_uri(uri: str, mode: str, transport_params: Dict) -> IO:
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
-    return open(parsed_uri['container_id'], parsed_uri['blob_id'], mode, **kwargs)
+    return open(parsed_uri.container_id, parsed_uri.blob_id, mode, **kwargs)
 
 
 def open(
-        container_id,
-        blob_id,
-        mode,
-        client=None,  # type: azure.storage.blob.BlobServiceClient
-        buffer_size=DEFAULT_BUFFER_SIZE,
-        min_part_size=_DEFAULT_MIN_PART_SIZE
-        ):
+    container_id: str,
+    blob_id: str,
+    mode: str,
+    client: 'azure.storage.blob.BlobServiceClient' = None,
+    buffer_size: int = DEFAULT_BUFFER_SIZE,
+    min_part_size: int = _DEFAULT_MIN_PART_SIZE,
+):
     """Open an Azure Blob Storage blob for reading or writing.
 
     Parameters
     ----------
-    container_id: str
-        The name of the container this object resides in.
-    blob_id: str
-        The name of the blob within the bucket.
-    mode: str
-        The mode for opening the object.  Must be either "rb" or "wb".
-    client: azure.storage.blob.BlobServiceClient
-        The Azure Blob Storage client to use when working with azure-storage-blob.
-    buffer_size: int, optional
-        The buffer size to use when performing I/O. For reading only.
-    min_part_size: int, optional
-        The minimum part size for multipart uploads.  For writing only.
+    :param container_id: The name of the container this object resides in.
+    :param blob_id: The name of the blob within the bucket.
+    :param mode: The mode for opening the object.  Must be either "rb" or "wb".
+    :param client: The Azure Blob Storage client to use when working with azure-storage-blob.
+    :param buffer_size: The buffer size to use when performing I/O. For reading only.
+    :param min_part_size: The minimum part size for multipart uploads.  For writing only.
 
     """
     if not client:
@@ -112,30 +114,29 @@ def open(
 class _RawReader(object):
     """Read an Azure Blob Storage file."""
 
-    def __init__(self, blob, size):
-        # type: (azure.storage.blob.BlobClient, int) -> None
+    def __init__(self, blob: 'azure.storage.blob.BlobClient', size: int) -> None:
         self._blob = blob
         self._size = size
         self._position = 0
 
-    def seek(self, position):
+    def seek(self, position: int) -> int:
         """Seek to the specified position (byte offset) in the Azure Blob Storage blob.
 
-        :param int position: The byte offset from the beginning of the blob.
+        :param position: The byte offset from the beginning of the blob.
 
         Returns the position after seeking.
         """
         self._position = position
         return self._position
 
-    def read(self, size=-1):
+    def read(self, size: int = -1) -> bytes:
         if self._position >= self._size:
             return b''
         binary = self._download_blob_chunk(size)
         self._position += len(binary)
         return binary
 
-    def _download_blob_chunk(self, size):
+    def _download_blob_chunk(self, size: int) -> bytes:
         if self._size == self._position:
             #
             # When reading, we can't seek to the first byte of an empty file.
@@ -163,9 +164,9 @@ class Reader(io.BufferedIOBase):
     """
     def __init__(
         self,
-        container,
-        blob,
-        client: azure.storage.blob.BlobServiceClient,
+        container: str,
+        blob: str,
+        client: 'azure.storage.blob.BlobServiceClient',
         buffer_size: int = DEFAULT_BUFFER_SIZE,
         line_terminator: str = smart_open.constants.BINARY_NEWLINE,
     ) -> None:
@@ -308,7 +309,7 @@ class Reader(io.BufferedIOBase):
     #
     # Internal methods.
     #
-    def _read_from_buffer(self, size=-1):
+    def _read_from_buffer(self, size: int = -1) -> bytes:
         """Remove at most size bytes from our buffer and return them."""
         # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._current_part))
         size = size if size >= 0 else len(self._current_part)
@@ -317,13 +318,14 @@ class Reader(io.BufferedIOBase):
         # logger.debug('part: %r', part)
         return part
 
-    def _fill_buffer(self, size=-1):
+    def _fill_buffer(self, size: int = -1) -> bool:
         size = max(size, self._current_part._chunk_size)
         while len(self._current_part) < size and not self._position == self._size:
             bytes_read = self._current_part.fill(self._raw_reader)
             if bytes_read == 0:
                 logger.debug('reached EOF while filling buffer')
                 return True
+        return False
 
     def __enter__(self):
         return self
@@ -349,14 +351,14 @@ class Writer(io.BufferedIOBase):
 
     def __init__(
         self,
-        container,
-        blob,
-        client: azure.storage.blob.BlobServiceClient,
-        min_part_size=_DEFAULT_MIN_PART_SIZE,
-    ):
+        container: str,
+        blob: str,
+        client: 'azure.storage.blob.BlobServiceClient',
+        min_part_size: int = _DEFAULT_MIN_PART_SIZE,
+    ) -> None:
         self._client = client
         self._container_client: azure.storage.blob.ContainerClient = self._client.get_container_client(container)
-        self._blob:  azure.storage.blob.BlobClient = self._container_client.get_blob_client(blob)
+        self._blob: azure.storage.blob.BlobClient = self._container_client.get_blob_client(blob)
         self._min_part_size = min_part_size
 
         self._total_size = 0
@@ -421,7 +423,7 @@ class Writer(io.BufferedIOBase):
 
         return len(b)
 
-    def _upload_part(self):
+    def _upload_part(self) -> None:
         part_num = self._total_parts + 1
         content_length = self._current_part.tell()
         range_stop = self._bytes_uploaded + content_length - 1

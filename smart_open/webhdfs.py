@@ -12,6 +12,7 @@ The main entry point is the :func:`~smart_open.webhdfs.open` function.
 
 """
 
+import collections
 import io
 import logging
 import urllib.parse
@@ -32,9 +33,11 @@ URI_EXAMPLES = (
 
 MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
+Uri = collections.namedtuple('Uri', 'scheme uri')
+
 
 def parse_uri(uri_as_str):
-    return dict(scheme=SCHEME, uri=uri_as_str)
+    return Uri(scheme=SCHEME, uri=uri_as_str)
 
 
 def open_uri(uri, mode, transport_params):

@@ -8,6 +8,7 @@
 
 """Implements file-like objects for reading and writing to/from GCS."""
 
+import collections
 import io
 import logging
 
@@ -17,6 +18,11 @@ try:
     import google.auth.transport.requests
 except ImportError:
     MISSING_DEPS = True
+
+from typing import (
+    Dict,
+    IO,
+)
 
 import smart_open.bytebuffer
 import smart_open.utils
@@ -44,6 +50,9 @@ DEFAULT_BUFFER_SIZE = 256 * 1024
 
 _UPLOAD_INCOMPLETE_STATUS_CODES = (308, )
 _UPLOAD_COMPLETE_STATUS_CODES = (200, 201)
+
+
+Uri = collections.namedtuple('Uri', 'scheme bucket_id blob_id')
 
 
 def _make_range_string(start, stop=None, end=None):
@@ -91,18 +100,18 @@ def _fail(response, part_num, content_length, total_size, headers):
     raise UploadFailedError(msg, response.status_code, response.text)
 
 
-def parse_uri(uri_as_string):
+def parse_uri(uri_as_string: str) -> Uri:
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
     bucket_id = sr.netloc
     blob_id = sr.path.lstrip('/')
-    return dict(scheme=SCHEME, bucket_id=bucket_id, blob_id=blob_id)
+    return Uri(scheme=SCHEME, bucket_id=bucket_id, blob_id=blob_id)
 
 
-def open_uri(uri, mode, transport_params):
+def open_uri(uri: str, mode: str, transport_params: Dict) -> IO:
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
-    return open(parsed_uri['bucket_id'], parsed_uri['blob_id'], mode, **kwargs)
+    return open(parsed_uri.bucket_id, parsed_uri.blob_id, mode, **kwargs)
 
 
 def open(
