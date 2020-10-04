@@ -8,7 +8,7 @@ jobs:
       name: "flake8"
       env: TOXENV="flake8"
 
-    - python: '3.7'
+    - python: '3.6'
       env:
         - SO_BUCKET: smart-open
         - SO_KEY: integration-tests
