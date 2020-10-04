@@ -127,7 +127,7 @@ The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe
 
 If you're upgrading from ``smart_open`` versions 1.8.0 and below, please check out the `Migration Guide <MIGRATING_FROM_OLDER_VERSIONS.rst>`_.
 
-Version ``2.0`` will introduce a backwards incompatible installation method with regards to the cloud dependencies.
+Version ``3.0`` will introduce a backwards incompatible installation method with regards to the cloud dependencies.
 If you want to maintain backwards compatibility (installing all dependencies) install this package via ``smart_open[all]`` now
 and once the change is made you should not have any issues. If all you care about is AWS dependencies for example you can install via ``smart_open[s3]`` and
 once the dependency change is made you will simply drop the unwanted dependencies. You can read more about the motivations `here <https://github.com/RaRe-Technologies/smart_open/issues/443>`_
