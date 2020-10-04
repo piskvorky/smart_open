@@ -1,5 +1,7 @@
 # Unreleased
 
+- Dropped support for Python 3.5, introduced type annotations
+
 # 2.2.1, 1 Oct 2020
 
 - Include S3 dependencies by default, because removing them in the 2.2.0 minor release was a mistake.
