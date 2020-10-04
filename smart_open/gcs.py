@@ -22,6 +22,9 @@ except ImportError:
 from typing import (
     Dict,
     IO,
+    Optional,
+    Tuple,
+    Union,
 )
 
 import smart_open.bytebuffer
@@ -55,32 +58,30 @@ _UPLOAD_COMPLETE_STATUS_CODES = (200, 201)
 Uri = collections.namedtuple('Uri', 'scheme bucket_id blob_id')
 
 
-def _make_range_string(start, stop=None, end=None):
+def _make_range_string(start: int, stop: Optional[int] = None, end: Optional[int] = None) -> str:
     #
     # GCS seems to violate RFC-2616 (see utils.make_range_string), so we
     # need a separate implementation.
     #
     # https://cloud.google.com/storage/docs/xml-api/resumable-upload#step_3upload_the_file_blocks
     #
+    end_str = str(end)
     if end is None:
-        end = _UNKNOWN
+        end_str = _UNKNOWN
     if stop is None:
-        return 'bytes %d-/%s' % (start, end)
-    return 'bytes %d-%d/%s' % (start, stop, end)
+        return 'bytes %d-/%s' % (start, end_str)
+    return 'bytes %d-%d/%s' % (start, stop, end_str)
 
 
 class UploadFailedError(Exception):
-    def __init__(self, message, status_code, text):
+    def __init__(self, message: str, status_code: int, text: str) -> None:
         """Raise when a multi-part upload to GCS returns a failed response status code.
 
         Parameters
         ----------
-        message: str
-            The error message to display.
-        status_code: int
-            The status code returned from the upload response.
-        text: str
-            The text returned from the upload response.
+        :param message: The error message to display.
+        :param status_code: The status code returned from the upload response.
+        :param text: The text returned from the upload response.
 
         """
         super(UploadFailedError, self).__init__(message)
@@ -108,38 +109,34 @@ def parse_uri(uri_as_string: str) -> Uri:
     return Uri(scheme=SCHEME, bucket_id=bucket_id, blob_id=blob_id)
 
 
-def open_uri(uri: str, mode: str, transport_params: Dict) -> IO:
+def open_uri(uri: str, mode: str, transport_params: Dict) -> IO[bytes]:
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     return open(parsed_uri.bucket_id, parsed_uri.blob_id, mode, **kwargs)
 
 
 def open(
-        bucket_id,
-        blob_id,
-        mode,
-        buffer_size=DEFAULT_BUFFER_SIZE,
-        min_part_size=_MIN_MIN_PART_SIZE,
-        client=None,  # type: google.cloud.storage.Client
-        ):
+    bucket_id: str,
+    blob_id: str,
+    mode: str,
+    buffer_size: int = DEFAULT_BUFFER_SIZE,
+    min_part_size: int = _MIN_MIN_PART_SIZE,
+    client: Optional['google.cloud.storage.Client'] = None,
+) -> IO[bytes]:
     """Open an GCS blob for reading or writing.
 
     Parameters
     ----------
-    bucket_id: str
-        The name of the bucket this object resides in.
-    blob_id: str
-        The name of the blob within the bucket.
-    mode: str
-        The mode for opening the object.  Must be either "rb" or "wb".
-    buffer_size: int, optional
-        The buffer size to use when performing I/O. For reading only.
-    min_part_size: int, optional
-        The minimum part size for multipart uploads.  For writing only.
-    client: google.cloud.storage.Client, optional
-        The GCS client to use when working with google-cloud-storage.
+    :param bucket_id: The name of the bucket this object resides in.
+    :param blob_id: The name of the blob within the bucket.
+    :param mode: The mode for opening the object.  Must be either "rb" or "wb".
+    :param buffer_size: The buffer size to use when performing I/O. For reading only.
+    :param min_part_size: The minimum part size for multipart uploads.  For writing only.
+    :param client: The GCS client to use when working with google-cloud-storage.
 
     """
+    fileobj: Union[Reader, Writer, None] = None
+
     if mode == constants.READ_BINARY:
         fileobj = Reader(
             bucket_id,
@@ -158,15 +155,20 @@ def open(
     else:
         raise NotImplementedError('GCS support for mode %r not implemented' % mode)
 
-    fileobj.name = blob_id
-    return fileobj
+    assert hasattr(fileobj, 'name')
+
+    #
+    # FIXME: not sure why mypy is unhappy about the line below.
+    # Both Writer and Reader inherit from io.BufferedIOBase, so they should
+    # behave like IO objects as far as typing is concerned.
+    #
+    return fileobj  # type: ignore
 
 
 class _RawReader(object):
     """Read an GCS object."""
 
-    def __init__(self, gcs_blob, size):
-        # type: (google.cloud.storage.Blob, int) -> None
+    def __init__(self, gcs_blob: 'google.cloud.storage.Blob', size: int) -> None:
         self._blob = gcs_blob
         self._size = size
         self._position = 0
@@ -188,7 +190,7 @@ class _RawReader(object):
         self._position += len(binary)
         return binary
 
-    def _download_blob_chunk(self, size):
+    def _download_blob_chunk(self, size: int) -> bytes:
         start = position = self._position
         if position == self._size:
             #
@@ -213,17 +215,17 @@ class Reader(io.BufferedIOBase):
 
     """
     def __init__(
-            self,
-            bucket,
-            key,
-            buffer_size=DEFAULT_BUFFER_SIZE,
-            line_terminator=constants.BINARY_NEWLINE,
-            client=None,  # type: google.cloud.storage.Client
+        self,
+        bucket: str,
+        key: str,
+        buffer_size: int = DEFAULT_BUFFER_SIZE,
+        line_terminator: bytes = constants.BINARY_NEWLINE,
+        client: Optional['google.cloud.storage.Client'] =None,
     ):
         if client is None:
             client = google.cloud.storage.Client()
 
-        self._blob = client.bucket(bucket).get_blob(key)  # type: google.cloud.storage.Blob
+        self._blob: google.cloud.storage.Blob = client.bucket(bucket).get_blob(key)
 
         if self._blob is None:
             raise google.cloud.exceptions.NotFound('blob %s not found in %s' % (key, bucket))
@@ -240,7 +242,11 @@ class Reader(io.BufferedIOBase):
         #
         # This member is part of the io.BufferedIOBase interface.
         #
-        self.raw = None
+        self.raw = None  # type: ignore
+
+    @property
+    def name(self) -> str:
+        return self._blob
 
     #
     # Override some methods from io.IOBase.
@@ -368,7 +374,7 @@ class Reader(io.BufferedIOBase):
     #
     # Internal methods.
     #
-    def _read_from_buffer(self, size=-1):
+    def _read_from_buffer(self, size: int = -1) -> bytes:
         """Remove at most size bytes from our buffer and return them."""
         # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._current_part))
         size = size if size >= 0 else len(self._current_part)
@@ -377,7 +383,7 @@ class Reader(io.BufferedIOBase):
         # logger.debug('part: %r', part)
         return part
 
-    def _fill_buffer(self, size=-1):
+    def _fill_buffer(self, size: int = -1) -> None:
         size = size if size >= 0 else self._current_part._chunk_size
         while len(self._current_part) < size and not self._eof:
             bytes_read = self._current_part.fill(self._raw_reader)
@@ -400,16 +406,16 @@ class Writer(io.BufferedIOBase):
     Implements the io.BufferedIOBase interface of the standard library."""
 
     def __init__(
-            self,
-            bucket,
-            blob,
-            min_part_size=_DEFAULT_MIN_PART_SIZE,
-            client=None,  # type: google.cloud.storage.Client
+        self,
+        bucket: str,
+        blob: str,
+        min_part_size: int = _DEFAULT_MIN_PART_SIZE,
+        client: Optional['google.cloud.storage.Client'] = None,
     ):
         if client is None:
             client = google.cloud.storage.Client()
         self._client = client
-        self._blob = self._client.bucket(bucket).blob(blob)  # type: google.cloud.storage.Blob
+        self._blob: google.cloud.storage.Blob = self._client.bucket(bucket).blob(blob)
         assert min_part_size % _REQUIRED_CHUNK_MULTIPLE == 0, 'min part size must be a multiple of 256KB'
         assert min_part_size >= _MIN_MIN_PART_SIZE, 'min part size must be greater than 256KB'
         self._min_part_size = min_part_size
@@ -429,7 +435,11 @@ class Writer(io.BufferedIOBase):
         #
         # This member is part of the io.BufferedIOBase interface.
         #
-        self.raw = None
+        self.raw = None  # type: ignore
+
+    @property
+    def name(self) -> str:
+        return self._blob
 
     def flush(self):
         pass
@@ -498,7 +508,7 @@ class Writer(io.BufferedIOBase):
     #
     # Internal methods.
     #
-    def _upload_part(self, is_last=False):
+    def _upload_part(self, is_last: bool = False) -> None:
         part_num = self._total_parts + 1
 
         #
@@ -514,6 +524,8 @@ class Writer(io.BufferedIOBase):
         #
         content_length = self._current_part.tell()
         remainder = content_length % self._min_part_size
+
+        end: Optional[int] = None
         if is_last:
             end = self._bytes_uploaded + content_length
         elif remainder == 0:
@@ -540,10 +552,10 @@ class Writer(io.BufferedIOBase):
             headers=headers,
         )
 
+        expected: Tuple = _UPLOAD_INCOMPLETE_STATUS_CODES
         if is_last:
             expected = _UPLOAD_COMPLETE_STATUS_CODES
-        else:
-            expected = _UPLOAD_INCOMPLETE_STATUS_CODES
+
         if response.status_code not in expected:
             _fail(response, part_num, content_length, self._total_size, headers)
         logger.debug("upload of part #%i finished" % part_num)
@@ -557,7 +569,7 @@ class Writer(io.BufferedIOBase):
         self._current_part = io.BytesIO(self._current_part.read())
         self._current_part.seek(0, io.SEEK_END)
 
-    def _upload_empty_part(self):
+    def _upload_empty_part(self) -> None:
         logger.debug("creating empty file")
         headers = {'Content-Length': '0'}
         response = self._session.put(self._resumable_upload_url, headers=headers)

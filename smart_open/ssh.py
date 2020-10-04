@@ -28,6 +28,12 @@ import logging
 import urllib.parse
 import warnings
 
+from typing import (
+    Any,
+    Dict,
+    Tuple,
+)
+
 import smart_open.utils
 
 logger = logging.getLogger(__name__)
@@ -35,7 +41,7 @@ logger = logging.getLogger(__name__)
 #
 # Global storage for SSH connections.
 #
-_SSH = {}
+_SSH: Dict[Tuple[str, str], Any] = {}
 
 SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""

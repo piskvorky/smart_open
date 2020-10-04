@@ -282,7 +282,7 @@ def smart_open(uri, mode="rb", **kw):
         logger.error('profile_name and s3_session are mutually exclusive, ignoring the former')
 
     if 'profile_name' in kw:
-        import boto3  # type: ignore
+        import boto3
 
         transport_params['session'] = boto3.Session(profile_name=kw.pop('profile_name'))
 

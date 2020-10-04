@@ -20,9 +20,9 @@ from typing import (
 )
 
 try:
-    import boto3  # type: ignore
-    import botocore.client  # type: ignore
-    import botocore.exceptions  # type: ignore
+    import boto3
+    import botocore.client
+    import botocore.exceptions
 except ImportError:
     MISSING_DEPS = True
 

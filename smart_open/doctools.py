@@ -17,86 +17,81 @@ import io
 import os.path
 import re
 
-from . import compression
-from . import transport
+from typing import (
+    Callable,
+    List,
+    Tuple,
+)
+
+from smart_open import (
+    compression,
+    transport,
+)
 
 PLACEHOLDER = '    smart_open/doctools.py magic goes here'
 
 
-def extract_kwargs(docstring):
+def extract_kwargs(function: Callable) -> List[Tuple[str, str, List[str]]]:
     """Extract keyword argument documentation from a function's docstring.
 
     Parameters
     ----------
-    docstring: str
-        The docstring to extract keyword arguments from.
+    :param function: The function to extract keyword arguments from.
 
     Returns
     -------
-    list of (str, str, list str)
-
-    str
-        The name of the keyword argument.
-    str
-        Its type.
-    str
-        Its documentation as a list of lines.
-
-    Notes
-    -----
-    The implementation is rather fragile.  It expects the following:
-
-    1. The parameters are under an underlined Parameters section
-    2. Keyword parameters have the literal ", optional" after the type
-    3. Names and types are not indented
-    4. Descriptions are indented with 4 spaces
-    5. The Parameters section ends with an empty line.
+    A list containing a tuple for each keyword argument: its name, type,
+    and documentation as a list of lines.
 
     Examples
     --------
 
-    >>> docstring = '''The foo function.
-    ... Parameters
-    ... ----------
-    ... bar: str, optional
-    ...     This parameter is the bar.
-    ... baz: int, optional
-    ...     This parameter is the baz.
-    ...
-    ... '''
-    >>> kwargs = extract_kwargs(docstring)
+    >>> def fun(bar: str = 'bar', baz: int = 0) -> str:
+    ...     '''The foo function.
+    ...     :param bar: This parameter is the bar.
+    ...       It does stuff.
+    ...     :param baz: This parameter is the baz.
+    ...     '''
+    ...     
+    >>> kwargs = extract_kwargs(fun)
     >>> kwargs[0]
-    ('bar', 'str, optional', ['This parameter is the bar.'])
+    ('bar', 'str', ['This parameter is the bar.', 'It does stuff.'])
 
     """
+    docstring = getattr(function, '__doc__')
     if not docstring:
         return []
 
+    #
+    # NB v.annotation can either be a class or a string.
+    #
+    signature = inspect.signature(function)
+    types = {
+        k: getattr(v.annotation, '__name__', v.annotation) 
+        for (k, v) in signature.parameters.items()
+    }
     lines = inspect.cleandoc(docstring).split('\n')
-    retval = []
 
-    #
-    # 1. Find the underlined 'Parameters' section
-    # 2. Once there, continue parsing parameters until we hit an empty line
-    #
-    while lines and lines[0] != 'Parameters':
-        lines.pop(0)
+    def g():
+        name = None
+        description = None
 
-    if not lines:
-        return []
+        for l in lines:
+            if l.startswith(':param '):
+                if name and description:
+                    yield name, types[name], description
 
-    lines.pop(0)
-    lines.pop(0)
+                name, tmp_description = l[6:].split(':', 1)
+                name = name.strip()
+                description = [tmp_description.strip()]
 
-    while lines and lines[0]:
-        name, type_ = lines.pop(0).split(':', 1)
-        description = []
-        while lines and lines[0].startswith('    '):
-            description.append(lines.pop(0).strip())
-        if 'optional' in type_:
-            retval.append((name.strip(), type_.strip(), description))
+            elif l and l[0].isspace() and description:
+                description.append(l.strip())
 
-    return retval
+        if name and description:
+            yield name, types[name], description
+
+    return list(g())
 
 
 def to_docstring(kwargs, lpad=''):
@@ -132,7 +127,7 @@ def to_docstring(kwargs, lpad=''):
     """
     buf = io.StringIO()
     for name, type_, description in kwargs:
-        buf.write('%s%s: %s\n' % (lpad, name, type_))
+        buf.write('%s:param %s %s:\n' % (lpad, type_, name))
         for line in description:
             buf.write('%s    %s\n' % (lpad, line))
     return buf.getvalue()
@@ -168,7 +163,7 @@ def extract_examples_from_readme_rst(indent='    '):
         return indent + 'See README.rst'
 
 
-def tweak_open_docstring(f):
+def tweak_open_docstring(f: Callable) -> None:
     buf = io.StringIO()
     seen = set()
 
@@ -180,16 +175,23 @@ def tweak_open_docstring(f):
         for scheme, submodule in sorted(transport._REGISTRY.items()):
             if scheme == transport.NO_SCHEME or submodule in seen:
                 continue
+
             seen.add(submodule)
+
+            if not submodule.__doc__ or not hasattr(submodule, 'open'):
+                continue
 
             relpath = os.path.relpath(submodule.__file__, start=root_path)
             heading = '%s (%s)' % (scheme, relpath)
             print('    %s' % heading)
             print('    %s' % ('~' * len(heading)))
+
+            assert submodule.__doc__
             print('    %s' % submodule.__doc__.split('\n')[0])
             print()
 
-            kwargs = extract_kwargs(submodule.open.__doc__)
+            assert hasattr(submodule, 'open')
+            kwargs = extract_kwargs(submodule.open)  # type: ignore
             if kwargs:
                 print(to_docstring(kwargs, lpad=u'    '))
 

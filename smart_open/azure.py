@@ -16,6 +16,7 @@ import logging
 from typing import (
     Dict,
     IO,
+    List,
 )
 
 import smart_open.bytebuffer
@@ -63,7 +64,7 @@ def parse_uri(uri_as_string: str) -> Uri:
     return Uri(scheme=SCHEME, container_id=container_id, blob_id=blob_id)
 
 
-def open_uri(uri: str, mode: str, transport_params: Dict) -> IO:
+def open_uri(uri: str, mode: str, transport_params: Dict) -> IO[bytes]:
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     return open(parsed_uri.container_id, parsed_uri.blob_id, mode, **kwargs)
@@ -76,7 +77,7 @@ def open(
     client: 'azure.storage.blob.BlobServiceClient' = None,
     buffer_size: int = DEFAULT_BUFFER_SIZE,
     min_part_size: int = _DEFAULT_MIN_PART_SIZE,
-):
+) -> IO[bytes]:
     """Open an Azure Blob Storage blob for reading or writing.
 
     Parameters
@@ -93,15 +94,14 @@ def open(
         raise ValueError('you must specify the client to connect to Azure')
 
     if mode == smart_open.constants.READ_BINARY:
-        return Reader(
+        return Reader(  # type: ignore
             container_id,
             blob_id,
             client,
             buffer_size=buffer_size,
-            line_terminator=smart_open.constants.BINARY_NEWLINE,
         )
     elif mode == smart_open.constants.WRITE_BINARY:
-        return Writer(
+        return Writer(  # type: ignore
             container_id,
             blob_id,
             client,
@@ -168,10 +168,11 @@ class Reader(io.BufferedIOBase):
         blob: str,
         client: 'azure.storage.blob.BlobServiceClient',
         buffer_size: int = DEFAULT_BUFFER_SIZE,
-        line_terminator: str = smart_open.constants.BINARY_NEWLINE,
+        line_terminator: bytes = smart_open.constants.BINARY_NEWLINE,
     ) -> None:
         self._container_client: azure.storage.blob.ContainerClient = client.get_container_client(container)
 
+        self.name = blob
         self._blob = self._container_client.get_blob_client(blob)
         if self._blob is None:
             raise azure.core.exceptions.ResourceNotFoundError(
@@ -190,7 +191,7 @@ class Reader(io.BufferedIOBase):
         #
         # This member is part of the io.BufferedIOBase interface.
         #
-        self.raw = None
+        self.raw = None  # type: ignore
 
     #
     # Override some methods from io.IOBase.
@@ -358,6 +359,7 @@ class Writer(io.BufferedIOBase):
     ) -> None:
         self._client = client
         self._container_client: azure.storage.blob.ContainerClient = self._client.get_container_client(container)
+        self.name = blob
         self._blob: azure.storage.blob.BlobClient = self._container_client.get_blob_client(blob)
         self._min_part_size = min_part_size
 
@@ -365,12 +367,12 @@ class Writer(io.BufferedIOBase):
         self._total_parts = 0
         self._bytes_uploaded = 0
         self._current_part = io.BytesIO()
-        self._block_list = []
+        self._block_list: List['azure.storage.blob.BlobBlock'] = []
 
         #
         # This member is part of the io.BufferedIOBase interface.
         #
-        self.raw = None
+        self.raw = None  # type: ignore
 
     def flush(self):
         pass
