@@ -225,6 +225,7 @@ class Reader(io.BufferedIOBase):
         if client is None:
             client = google.cloud.storage.Client()
 
+        self.name = key
         self._blob: google.cloud.storage.Blob = client.bucket(bucket).get_blob(key)
 
         if self._blob is None:
@@ -243,10 +244,6 @@ class Reader(io.BufferedIOBase):
         # This member is part of the io.BufferedIOBase interface.
         #
         self.raw = None  # type: ignore
-
-    @property
-    def name(self) -> str:
-        return self._blob
 
     #
     # Override some methods from io.IOBase.
@@ -412,6 +409,7 @@ class Writer(io.BufferedIOBase):
         min_part_size: int = _DEFAULT_MIN_PART_SIZE,
         client: Optional['google.cloud.storage.Client'] = None,
     ):
+        self.name = blob
         if client is None:
             client = google.cloud.storage.Client()
         self._client = client
@@ -436,10 +434,6 @@ class Writer(io.BufferedIOBase):
         # This member is part of the io.BufferedIOBase interface.
         #
         self.raw = None  # type: ignore
-
-    @property
-    def name(self) -> str:
-        return self._blob
 
     def flush(self):
         pass
