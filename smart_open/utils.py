@@ -12,6 +12,11 @@ import inspect
 import logging
 import urllib.parse
 
+from typing import (
+    Optional,
+    Tuple,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -71,7 +76,7 @@ def check_kwargs(kallable, kwargs):
     return supported_kwargs
 
 
-def clamp(value, minval, maxval):
+def clamp(value: int, minval: int, maxval: int) -> int:
     """Clamp a numeric value to a specific range.
 
     Parameters
@@ -94,22 +99,16 @@ def clamp(value, minval, maxval):
     return max(min(value, maxval), minval)
 
 
-def make_range_string(start=None, stop=None):
+def make_range_string(start: Optional[int] = None, stop: Optional[int] = None) -> str:
     """Create a byte range specifier in accordance with RFC-2616.
 
     Parameters
     ----------
-    start: int, optional
+    :param start:
         The start of the byte range.  If unspecified, stop indicated offset from EOF.
 
-    stop: int, optional
+    :param stop:
         The end of the byte range.  If unspecified, indicates EOF.
-
-    Returns
-    -------
-    str
-        A byte range specifier.
-
     """
     #
     # https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.35
@@ -119,16 +118,11 @@ def make_range_string(start=None, stop=None):
     return 'bytes=%s-%s' % ('' if start is None else start, '' if stop is None else stop)
 
 
-def parse_content_range(content_range):
+def parse_content_range(content_range: str) -> Tuple[str, int, int, int]:
     """Extract units, start, stop, and length from a content range header like "bytes 0-846981/846982".
 
     Assumes a properly formatted content-range header from S3.
     See werkzeug.http.parse_content_range_header for a more robust version.
-
-    Parameters
-    ----------
-    content_range: str
-        The content-range header to parse.
 
     Returns
     -------
@@ -142,7 +136,7 @@ def parse_content_range(content_range):
     return units, int(start), int(stop), int(length)
 
 
-def safe_urlsplit(url):
+def safe_urlsplit(url: str) -> urllib.parse.SplitResult:
     """This is a hack to prevent the regular urlsplit from splitting around question marks.
 
     A question mark (?) in a URL typically indicates the start of a
