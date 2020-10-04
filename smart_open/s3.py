@@ -25,8 +25,6 @@ from typing import (
     Union,
 )
 
-Kwargs = Dict[str, Any]
-
 try:
     import boto3
     import botocore.client
@@ -39,6 +37,8 @@ import smart_open.concurrency
 import smart_open.utils
 
 from smart_open import constants
+
+Kwargs = Dict[str, Any]
 
 logger = logging.getLogger(__name__)
 
@@ -376,7 +376,7 @@ class _SeekableRawReader(object):
 
         if reached_eof:
             self._body = io.BytesIO()
-            
+
             assert self._content_length
             self._position = self._content_length
         else:

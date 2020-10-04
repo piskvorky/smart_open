@@ -358,7 +358,7 @@ class Writer(io.BufferedIOBase):
         min_part_size: int = _DEFAULT_MIN_PART_SIZE,
     ) -> None:
         self._client = client
-        self._container_client: azure.storage.blob.ContainerClient = self._client.get_container_client(container)
+        self._container_client: azure.storage.blob.ContainerClient = self._client.get_container_client(container)  # noqa
         self.name = blob
         self._blob: azure.storage.blob.BlobClient = self._container_client.get_blob_client(blob)
         self._min_part_size = min_part_size

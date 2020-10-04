@@ -16,7 +16,6 @@ The main functions are:
 """
 
 import codecs
-import collections
 import logging
 import os
 import os.path as P

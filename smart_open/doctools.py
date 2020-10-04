@@ -52,7 +52,7 @@ def extract_kwargs(function: Callable) -> List[Tuple[str, str, List[str]]]:
     ...       It does stuff.
     ...     :param baz: This parameter is the baz.
     ...     '''
-    ...     
+    ...
     >>> kwargs = extract_kwargs(fun)
     >>> kwargs[0]
     ('bar', 'str', ['This parameter is the bar.', 'It does stuff.'])
@@ -67,7 +67,7 @@ def extract_kwargs(function: Callable) -> List[Tuple[str, str, List[str]]]:
     #
     signature = inspect.signature(function)
     types = {
-        k: getattr(v.annotation, '__name__', v.annotation) 
+        k: getattr(v.annotation, '__name__', v.annotation)
         for (k, v) in signature.parameters.items()
     }
     lines = inspect.cleandoc(docstring).split('\n')
@@ -76,17 +76,16 @@ def extract_kwargs(function: Callable) -> List[Tuple[str, str, List[str]]]:
         name = None
         description = None
 
-        for l in lines:
-            if l.startswith(':param '):
+        for line in lines:
+            if line.startswith(':param '):
                 if name and description:
                     yield name, types[name], description
 
-                name, tmp_description = l[6:].split(':', 1)
+                name, tmp_description = line[6:].split(':', 1)
                 name = name.strip()
                 description = [tmp_description.strip()]
-
-            elif l and l[0].isspace() and description:
-                description.append(l.strip())
+            elif line and line[0].isspace() and description:
+                description.append(line.strip())
 
         if name and description:
             yield name, types[name], description

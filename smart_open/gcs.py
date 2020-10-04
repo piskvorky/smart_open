@@ -220,7 +220,7 @@ class Reader(io.BufferedIOBase):
         key: str,
         buffer_size: int = DEFAULT_BUFFER_SIZE,
         line_terminator: bytes = constants.BINARY_NEWLINE,
-        client: Optional['google.cloud.storage.Client'] =None,
+        client: Optional['google.cloud.storage.Client'] = None,
     ):
         if client is None:
             client = google.cloud.storage.Client()
