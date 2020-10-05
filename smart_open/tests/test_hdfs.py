@@ -34,20 +34,20 @@ CURR_DIR = P.dirname(P.abspath(__file__))
 class CliRawInputBaseTest(unittest.TestCase):
     def _setUp(self, test_file):
         if platform == "linux" or platform == "linux2":
-            path = P.join(CURR_DIR, 'test_data/'+test_file)
+            path = P.join(CURR_DIR, 'test_data/' + test_file)
             self.cat = subprocess.Popen(['cat', path], stdout=subprocess.PIPE)
         elif platform == "win32":
-            path = P.join(CURR_DIR, 'test_data\\'+test_file)
+            path = P.join(CURR_DIR, 'test_data\\' + test_file)
             self.cat = subprocess.Popen(['type', path], stdout=subprocess.PIPE, shell=True)
 
     def test_read(self):
-        self._setUp(test_file = 'crime-and-punishment.txt')
+        self._setUp(test_file='crime-and-punishment.txt')
 
         with mock.patch('subprocess.Popen', return_value=self.cat):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read()
 
-        as_text = as_bytes.decode('utf-8').replace('\r\n','\n')
+        as_text = as_bytes.decode('utf-8').replace('\r\n', '\n')
         self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
         self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
 
@@ -69,7 +69,7 @@ class CliRawInputBaseTest(unittest.TestCase):
             with gzip.GzipFile(fileobj=smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')) as fin:
                 as_bytes = fin.read()
 
-        as_text = as_bytes.decode('utf-8').replace('\r\n','\n')
+        as_text = as_bytes.decode('utf-8').replace('\r\n', '\n')
         self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
         self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
 
@@ -80,11 +80,12 @@ class CliRawInputBaseTest(unittest.TestCase):
             with smart_open.hdfs.CliRawInputBase('hdfs://dummy/url') as fin:
                 as_bytes = fin.read()
 
-        as_text = as_bytes.decode('utf-8').replace('\r\n','\n')
+        as_text = as_bytes.decode('utf-8').replace('\r\n', '\n')
         self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
         self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
 
-@unittest.skipIf(platform == 'win32',reason="does not run on windows")
+
+@unittest.skipIf(platform == 'win32', reason="does not run on windows")
 class CliRawOutputBaseTest(unittest.TestCase):
     def test_write(self):
         cat = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)

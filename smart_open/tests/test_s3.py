@@ -599,7 +599,6 @@ ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operatio
     'This test is disabled on AppVeyor, see '
     '<https://github.com/RaRe-Technologies/smart_open/issues/482>'
 )
-#@unittest.skipIf(sys.platform == 'win32',reason="does not run on windows")
 @moto.mock_s3
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
@@ -654,7 +653,7 @@ class IterBucketTest(unittest.TestCase):
 
 @moto.mock_s3
 @unittest.skipIf(not smart_open.concurrency._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
-@unittest.skipIf(sys.platform == 'win32',reason="does not run on windows")
+@unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
 class IterBucketConcurrentFuturesTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
@@ -682,7 +681,7 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
 )
 @moto.mock_s3
 @unittest.skipIf(not smart_open.concurrency._MULTIPROCESSING, 'multiprocessing unavailable')
-@unittest.skipIf(sys.platform == 'win32',reason="does not run on windows")
+@unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
 class IterBucketMultiprocessingTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_concurrent = smart_open.concurrency._CONCURRENT_FUTURES

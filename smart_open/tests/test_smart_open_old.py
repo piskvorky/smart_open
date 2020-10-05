@@ -156,7 +156,7 @@ class SmartOpenReadTest(unittest.TestCase):
         """This test captures Issue #142."""
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
         with open(fpath, 'rb') as fin:
-            expected = fin.read().decode('cp852').replace('\r\n','\n')
+            expected = fin.read().decode('cp852').replace('\r\n', '\n')
         with smart_open.smart_open(fpath, encoding='cp852') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
