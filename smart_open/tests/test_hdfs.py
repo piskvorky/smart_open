@@ -91,7 +91,7 @@ class CliRawOutputBaseTest(unittest.TestCase):
         cat = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
         as_text = 'мы в ответе за тех, кого приручили'
 
-        with mock.patch('subprocess.Popen', return_value=self.cat):
+        with mock.patch('subprocess.Popen', return_value=cat):
             with smart_open.hdfs.CliRawOutputBase('hdfs://dummy/url') as fout:
                 fout.write(as_text.encode('utf-8'))
 
