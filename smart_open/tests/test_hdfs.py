@@ -33,11 +33,10 @@ CURR_DIR = P.dirname(P.abspath(__file__))
 #
 class CliRawInputBaseTest(unittest.TestCase):
     def _setUp(self, test_file):
+        path = P.join(CURR_DIR, 'test_data', test_file)
         if sys.platform == "win32":
-            path = P.join(CURR_DIR, 'test_data\\' + test_file)
             self.cat = subprocess.Popen(['type', path], stdout=subprocess.PIPE, shell=True)
         else:
-            path = P.join(CURR_DIR, 'test_data/' + test_file)
             self.cat = subprocess.Popen(['cat', path], stdout=subprocess.PIPE)
 
     def test_read(self):
