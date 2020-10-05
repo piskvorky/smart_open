@@ -17,7 +17,7 @@ import mock
 
 import smart_open.hdfs
 
-from sys import platform
+import sys
 
 CURR_DIR = P.dirname(P.abspath(__file__))
 
@@ -33,7 +33,7 @@ CURR_DIR = P.dirname(P.abspath(__file__))
 #
 class CliRawInputBaseTest(unittest.TestCase):
     def _setUp(self, test_file):
-        if platform == "win32":
+        if sys.platform == "win32":
             path = P.join(CURR_DIR, 'test_data\\' + test_file)
             self.cat = subprocess.Popen(['type', path], stdout=subprocess.PIPE, shell=True)
         else:
@@ -85,7 +85,7 @@ class CliRawInputBaseTest(unittest.TestCase):
         self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
 
 
-@unittest.skipIf(platform == 'win32', reason="does not run on windows")
+@unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
 class CliRawOutputBaseTest(unittest.TestCase):
     def test_write(self):
         cat = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
