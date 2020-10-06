@@ -661,7 +661,7 @@ def _open_buffer(diskbuffer=False):
     if diskbuffer:
         #
         # NB We will be both writing _and_ reading (in that order, but that's
-        # purely and implementation detail) from the buffer.
+        # purely an implementation detail) from the buffer.
         #
         return tempfile.NamedTemporaryFile(prefix='smart_open.s3.', mode='wb+')
     else:

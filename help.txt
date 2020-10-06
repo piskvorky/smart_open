@@ -165,6 +165,10 @@ FUNCTIONS
             If set to `True` on a file opened for reading, GetObject will not be
             called until the first seek() or read().
             Avoids redundant API queries when seeking before reading.
+        diskbuffer: boolean, optional
+            Default: `False`
+            If set to `True`, buffers to local disk instead of in RAM.
+            Use this to keep RAM usage low at the expense of additional disk IO.
         
         scp (smart_open/ssh.py)
         ~~~~~~~~~~~~~~~~~~~~~~~
@@ -324,9 +328,9 @@ DATA
     __all__ = ['open', 'parse_uri', 'register_compressor', 's3_iter_bucket...
 
 VERSION
-    2.1.1
+    2.2.1
 
 FILE
-    /home/misha/git/smart_open/smart_open/__init__.py
+    /Users/misha/git/smart_open/smart_open/__init__.py
 
 
