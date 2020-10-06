@@ -810,8 +810,14 @@ multipart upload may fail")
     #
     def _upload_next_part(self):
         part_num = self._total_parts + 1
-        logger.info("uploading part #%i, %i bytes (total %.3fGB)",
-                    part_num, self._buf.tell(), self._total_bytes / 1024.0 ** 3)
+        logger.info(
+            "uploading bucket %r key %r part #%i, %i bytes (total %.3fGB)",
+            self.object.bucket_name,
+            self.object.key,
+            part_num,
+            self._buf.tell(),
+            self._total_bytes / 1024.0 ** 3,
+        )
         self._buf.seek(0)
         part = self._mp.Part(part_num)
 
