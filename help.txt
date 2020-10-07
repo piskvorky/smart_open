@@ -165,10 +165,13 @@ FUNCTIONS
             If set to `True` on a file opened for reading, GetObject will not be
             called until the first seek() or read().
             Avoids redundant API queries when seeking before reading.
-        diskbuffer: boolean, optional
-            Default: `False`
-            If set to `True`, buffers to local disk instead of in RAM.
-            Use this to keep RAM usage low at the expense of additional disk IO.
+        writebuffer: IO[bytes], optional
+            By default, this module will buffer data in memory using io.BytesIO
+            when writing. Pass another binary IO instance here to use it instead.
+            For example, you may pass a file object to buffer to local disk instead
+            of in RAM. Use this to keep RAM usage low at the expense of additional
+            disk IO. If you pass in an open file, then you are responsible for
+            cleaning it up after writing completes.
         
         scp (smart_open/ssh.py)
         ~~~~~~~~~~~~~~~~~~~~~~~
