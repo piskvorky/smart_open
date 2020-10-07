@@ -10,7 +10,6 @@
 import io
 import functools
 import logging
-import tempfile
 import time
 
 try:
