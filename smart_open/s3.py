@@ -667,15 +667,15 @@ class MultipartWriter(io.BufferedIOBase):
     Implements the io.BufferedIOBase interface of the standard library."""
 
     def __init__(
-            self,
-            bucket,
-            key,
-            min_part_size=DEFAULT_MIN_PART_SIZE,
-            session=None,
-            resource_kwargs=None,
-            upload_kwargs=None,
-            writebuffer=None,
-        ):
+        self,
+        bucket,
+        key,
+        min_part_size=DEFAULT_MIN_PART_SIZE,
+        session=None,
+        resource_kwargs=None,
+        upload_kwargs=None,
+        writebuffer=None,
+    ):
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
@@ -870,15 +870,14 @@ class SinglepartWriter(io.BufferedIOBase):
     the data be written to S3 and the buffer is released."""
 
     def __init__(
-            self,
-            bucket,
-            key,
-            session=None,
-            resource_kwargs=None,
-            upload_kwargs=None,
-            writebuffer=None,
-        ):
-
+        self,
+        bucket,
+        key,
+        session=None,
+        resource_kwargs=None,
+        upload_kwargs=None,
+        writebuffer=None,
+    ):
         self._session = session
         self._resource_kwargs = resource_kwargs
 
