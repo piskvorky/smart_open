@@ -1,5 +1,19 @@
 # Unreleased
 
+# 3.0.0, 8 Oct 2020
+
+This release modifies the behavior of setup.py with respect to dependencies.
+Previously, `boto3` and other AWS-related packages were installed by default.
+Now, in order to install them, you need to run either:
+
+    pip install smart_open[s3]
+
+to install the AWS dependencies only, or
+
+    pip install smart_open[all]
+
+to install all dependencies, including AWS, GCS, etc.
+
 # 2.2.1, 1 Oct 2020
 
 - Include S3 dependencies by default, because removing them in the 2.2.0 minor release was a mistake.

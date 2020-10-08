@@ -34,7 +34,6 @@ import smart_open.local_file as so_file
 from smart_open import compression
 from smart_open import doctools
 from smart_open import transport
-from smart_open import utils
 
 #
 # For backwards compatibility and keeping old unit tests happy.
@@ -234,82 +233,6 @@ def open(
     return decoded
 
 
-_MIGRATION_NOTES_URL = (
-    'https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst'
-    '#migrating-to-the-new-open-function'
-)
-
-
-def smart_open(uri, mode="rb", **kw):
-    """Deprecated, use smart_open.open instead.
-
-    See the migration instructions: %s
-
-    """ % _MIGRATION_NOTES_URL
-
-    warnings.warn(
-        'This function is deprecated, use smart_open.open instead. '
-        'See the migration notes for details: %s' % _MIGRATION_NOTES_URL
-    )
-
-    #
-    # The new function uses a shorter name for this parameter, handle it separately.
-    #
-    ignore_extension = kw.pop('ignore_extension', False)
-
-    expected_kwargs = utils.inspect_kwargs(open)
-    scrubbed_kwargs = {}
-    transport_params = {}
-
-    #
-    # Handle renamed keyword arguments.  This is required to maintain backward
-    # compatibility.  See test_smart_open_old.py for tests.
-    #
-    if 'host' in kw or 's3_upload' in kw:
-        transport_params['multipart_upload_kwargs'] = {}
-        transport_params['resource_kwargs'] = {}
-
-    if 'host' in kw:
-        url = kw.pop('host')
-        if not url.startswith('http'):
-            url = 'http://' + url
-        transport_params['resource_kwargs'].update(endpoint_url=url)
-
-    if 's3_upload' in kw and kw['s3_upload']:
-        transport_params['multipart_upload_kwargs'].update(**kw.pop('s3_upload'))
-
-    #
-    # Providing the entire Session object as opposed to just the profile name
-    # is more flexible and powerful, and thus preferable in the case of
-    # conflict.
-    #
-    if 'profile_name' in kw and 's3_session' in kw:
-        logger.error('profile_name and s3_session are mutually exclusive, ignoring the former')
-
-    if 'profile_name' in kw:
-        import boto3
-
-        transport_params['session'] = boto3.Session(profile_name=kw.pop('profile_name'))
-
-    if 's3_session' in kw:
-        transport_params['session'] = kw.pop('s3_session')
-
-    for key, value in kw.items():
-        if key in expected_kwargs:
-            scrubbed_kwargs[key] = value
-        else:
-            #
-            # Assume that anything not explicitly supported by the new function
-            # is a transport layer keyword argument.  This is safe, because if
-            # the argument ends up being unsupported in the transport layer,
-            # it will only cause a logging warning, not a crash.
-            #
-            transport_params[key] = value
-
-    return open(uri, mode, ignore_ext=ignore_extension,
-                transport_params=transport_params, **scrubbed_kwargs)
-
-
 def _shortcut_open(
         uri,
         mode,
@@ -400,8 +323,7 @@ def _open_binary_stream(uri, mode, transport_params):
     submodule = transport.get_transport(scheme)
     fobj = submodule.open_uri(uri, mode, transport_params)
     if not hasattr(fobj, 'name'):
-        logger.critical('TODO')
-        fobj.name = 'unknown'
+        fobj.name = uri
 
     return fobj
 
@@ -461,6 +383,43 @@ def _patch_pathlib(func):
     old_impl = pathlib.Path.open
     pathlib.Path.open = func
     return old_impl
+
+
+def smart_open(
+        uri,
+        mode='rb',
+        buffering=-1,
+        encoding=None,
+        errors=None,
+        newline=None,
+        closefd=True,
+        opener=None,
+        ignore_extension=False,
+        **kwargs
+    ):
+    #
+    # This is a thin wrapper of smart_open.open.  It's here for backward
+    # compatibility.  It works exactly like smart_open.open when the passed
+    # parameters are identical.  Otherwise, it raises a DeprecationWarning.
+    #
+    # For completeness, the main differences of the old smart_open function:
+    #
+    # 1. Default mode was read binary (mode='rb')
+    # 2. ignore_ext parameter was called ignore_extension
+    # 3. Transport parameters were passed directly as kwargs
+    #
+    url = 'https://github.com/RaRe-Technologies/smart_open/blob/develop/MIGRATING_FROM_OLDER_VERSIONS.rst'
+    if kwargs:
+        raise DeprecationWarning(
+            'The following keyword parameters are not supported: %r. '
+            'See  %s for more information.' % (sorted(kwargs), url)
+        )
+    message = 'This function is deprecated.  See %s for more information' % url
+    warnings.warn(message, category=DeprecationWarning)
+
+    ignore_ext = ignore_extension
+    del kwargs, url, message, ignore_extension
+    return open(**locals())
 
 
 #

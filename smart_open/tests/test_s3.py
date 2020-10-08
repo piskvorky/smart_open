@@ -374,7 +374,7 @@ class MultipartWriterTest(unittest.TestCase):
             fout.write(test_string)
 
         # read key and test content
-        output = list(smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME), "rb"))
+        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb"))
 
         self.assertEqual(output, [test_string])
 
@@ -416,7 +416,7 @@ class MultipartWriterTest(unittest.TestCase):
             self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content
-        output = list(smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)))
+        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
         self.assertEqual(output, [b"testtest\n", b"test"])
 
     def test_write_04(self):
@@ -426,7 +426,7 @@ class MultipartWriterTest(unittest.TestCase):
             pass
 
         # read back the same key and check its content
-        output = list(smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)))
+        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
 
         self.assertEqual(output, [])
 
@@ -453,7 +453,7 @@ class MultipartWriterTest(unittest.TestCase):
             with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 
-        with smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)) as fin:
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
             with io.TextIOWrapper(fin, encoding='utf-8') as text:
                 actual = text.read()
 
@@ -516,7 +516,7 @@ class SinglepartWriterTest(unittest.TestCase):
             fout.write(test_string)
 
         # read key and test content
-        output = list(smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME), "rb"))
+        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb"))
 
         self.assertEqual(output, [test_string])
 
@@ -548,8 +548,7 @@ class SinglepartWriterTest(unittest.TestCase):
             pass
 
         # read back the same key and check its content
-        output = list(smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)))
-
+        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
         self.assertEqual(output, [])
 
     def test_buffered_writer_wrapper_works(self):
@@ -563,7 +562,7 @@ class SinglepartWriterTest(unittest.TestCase):
             with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 
-        with smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)) as fin:
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
             with io.TextIOWrapper(fin, encoding='utf-8') as text:
                 actual = text.read()
 
@@ -814,9 +813,6 @@ class OpenTest(unittest.TestCase):
 
 
 def populate_bucket(num_keys=10):
-    # fake (or not) connection, bucket and key
-    logger.debug('%r', locals())
-
     s3 = boto3.resource('s3')
     for key_number in range(num_keys):
         key_name = 'key_%d' % key_number
