@@ -36,7 +36,7 @@ def cat(path):
     shell = False
     if sys.platform == 'win32':
         executable = 'type'
-        shell = 'True'
+        shell = True
     return subprocess.Popen([executable, path], stdout=subprocess.PIPE, shell=shell)
 
 class CliRawInputBaseTest(unittest.TestCase):
