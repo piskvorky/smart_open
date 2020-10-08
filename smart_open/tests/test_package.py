@@ -25,10 +25,6 @@ class PackageTests(unittest.TestCase):
         match = r"pip install smart_open\[s3\]"
         with pytest.raises(ImportError, match=match):
             open("s3://foo/bar")
-        # With the DRY errors in transport, this no longer gets a nice error message
-        with pytest.raises(ImportError):
-            from smart_open import smart_open
-            smart_open('fake-name', profile_name="will produce an error importing s3")
 
     @pytest.mark.skipif(skip_tests, reason="requires missing dependencies")
     def test_gcs_raises_helpful_error_with_missing_deps(self):
