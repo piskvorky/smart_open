@@ -28,6 +28,7 @@ import smart_open
 from smart_open import smart_open_lib
 from smart_open import webhdfs
 from smart_open.smart_open_lib import patch_pathlib, _patch_pathlib
+from smart_open.tests.test_s3 import patch_invalid_range_response
 
 logger = logging.getLogger(__name__)
 
@@ -758,11 +759,12 @@ class SmartOpenReadTest(unittest.TestCase):
         with smart_open.open("s3://mybucket/mykey", "wb"):
             pass
 
-        reader = smart_open.open("s3://mybucket/mykey", "rb")
+        with patch_invalid_range_response('0'):
+            reader = smart_open.open("s3://mybucket/mykey", "rb")
 
-        self.assertEqual(reader.readline(), b"")
-        self.assertEqual(reader.readline(), b"")
-        self.assertEqual(reader.readline(), b"")
+            self.assertEqual(reader.readline(), b"")
+            self.assertEqual(reader.readline(), b"")
+            self.assertEqual(reader.readline(), b"")
 
     @mock_s3
     def test_s3_iter_lines(self):
