@@ -115,6 +115,7 @@ Installation
     pip install smart_open  // Install with no cloud dependencies
     pip install smart_open[s3] // Install S3 deps
     pip install smart_open[gcp] // Install GCP deps
+    pip install smart_open[azure] // Install Azure deps
     pip install smart_open[all] // Installs all cloud dependencies
 
 Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pypi/smart_open>`_::
