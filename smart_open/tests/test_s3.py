@@ -262,7 +262,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=content)
 
         with self.assertApiCalls(GetObject=1), patch_invalid_range_response(str(len(content))):
-            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
             seek = fin.seek(60)
             self.assertEqual(seek, len(content))
 
@@ -386,7 +386,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=b'')
 
         with self.assertApiCalls(GetObject=1), patch_invalid_range_response('0'):
-            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
                 data = fin.read()
 
         self.assertEqual(data, b'')
