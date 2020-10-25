@@ -300,13 +300,20 @@ class _SeekableRawReader(object):
     This class is internal to the S3 submodule.
     """
 
-    def __init__(self, s3_object, version_id=None, object_kwargs=None):
+    def __init__(
+        self,
+        s3_object,
+        version_id=None,
+        object_kwargs=None,
+        sleep_seconds=(1, 5, 15, 30, 60, None),
+    ):
         self._object = s3_object
         self._content_length = None
         self._version_id = version_id
         self._position = 0
         self._body = None
         self._object_kwargs = object_kwargs if object_kwargs else {}
+        self._sleep_seconds = sleep_seconds
 
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
@@ -419,12 +426,29 @@ class _SeekableRawReader(object):
         if self._position >= self._content_length:
             return b''
 
-        try:
-            binary = self._read_from_body(size)
-        except botocore.exceptions.IncompleteReadError:
-            # The underlying connection of the self._body was closed by the remote peer.
-            self._open_body()
-            binary = self._read_from_body(size)
+        binary = None
+        for attempt, seconds in enumerate(self._sleep_seconds, 1):
+            try:
+                binary = self._read_from_body(size)
+            except botocore.exceptions.BotoCoreError as error:
+                if attempt == len(self._sleep_seconds):
+                    raise
+
+                #
+                # Encountered a low-level connection error.  Attempt to
+                # recover by sleeping it off and retrying.
+                #
+                logger.error(
+                    'caught %r, retrying %d more times',
+                    error,
+                    len(self._sleep_seconds) - attempt,
+                )
+                time.sleep(seconds)
+                self._open_body()
+            else:
+                break
+
+        assert binary is not None, 'the for loop should have initialized this!'
         self._position += len(binary)
         return binary
 

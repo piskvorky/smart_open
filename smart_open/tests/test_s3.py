@@ -133,6 +133,78 @@ class SeekableRawReaderTest(unittest.TestCase):
         self.assertEqual(reader.read(2), b'23')
 
 
+class CrapStream(io.BytesIO):
+    """Raises an exception on every second read call."""
+    def __init__(self, *args, modulus=2, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._count = 0
+        self._modulus = modulus
+
+    def read(self, size=-1):
+        self._count += 1
+        if self._count % self._modulus == 0:
+            raise botocore.exceptions.BotoCoreError()
+        the_bytes = super().read(size)
+        return the_bytes
+
+
+class CrapObject:
+    def __init__(self, data, modulus=2):
+        self._datasize = len(data)
+        self._body = CrapStream(data, modulus=modulus)
+
+    def get(self, *args, **kwargs):
+        return {
+            'ActualObjectSize': self._datasize,
+            'ContentLength': self._datasize,
+            'ContentRange': 'bytes 0-%d/%d' % (self._datasize, self._datasize),
+            'Body': self._body,
+        }
+
+
+class IncrementalBackoffTest(unittest.TestCase):
+    def test_every_read_fails(self):
+        reader = smart_open.s3._SeekableRawReader(CrapObject(b'hello', 1))
+        with mock.patch('time.sleep') as mock_sleep:
+            with self.assertRaises(botocore.exceptions.BotoCoreError):
+                reader.read()
+
+            #
+            # Make sure our incremental backoff is actually happening here.
+            #
+            mock_sleep.assert_has_calls(
+                [
+                    mock.call(1),
+                    mock.call(5),
+                    mock.call(15),
+                    mock.call(30),
+                    mock.call(60),
+                ]
+            )
+
+    def test_every_second_read_fails(self):
+        """Can we read from a stream that raises exceptions from time to time?"""
+        reader = smart_open.s3._SeekableRawReader(CrapObject(b'hello'))
+        with mock.patch('time.sleep') as mock_sleep:
+            assert reader.read(1) == b'h'
+            mock_sleep.assert_not_called()
+
+            assert reader.read(1) == b'e'
+            mock_sleep.assert_called_with(1)
+            mock_sleep.reset_mock()
+
+            assert reader.read(1) == b'l'
+            mock_sleep.reset_mock()
+
+            assert reader.read(1) == b'l'
+            mock_sleep.assert_called_with(1)
+            mock_sleep.reset_mock()
+
+            assert reader.read(1) == b'o'
+            mock_sleep.assert_called_with(1)
+            mock_sleep.reset_mock()
+
+
 @moto.mock_s3
 class SeekableBufferedInputBaseTest(BaseTest):
     def setUp(self):
