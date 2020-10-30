@@ -1,5 +1,7 @@
 # Unreleased
 
+  - Fix reading empty file or seeking past end of file for s3 backend (PR [#549](https://github.com/RaRe-Technologies/smart_open/pull/549), [@jcushman](https://github.com/jcushman))
+
 # 3.0.0, 8 Oct 2020
 
 This release modifies the behavior of setup.py with respect to dependencies.

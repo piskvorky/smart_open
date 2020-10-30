@@ -48,7 +48,7 @@ _UPLOAD_ATTEMPTS = 6
 _SLEEP_SECONDS = 10
 
 # Returned by AWS when we try to seek beyond EOF.
-_OUT_OF_RANGE = 'Requested Range Not Satisfiable'
+_OUT_OF_RANGE = 'InvalidRange'
 
 
 def parse_uri(uri_as_string):
@@ -385,18 +385,9 @@ class _SeekableRawReader(object):
         except IOError as ioe:
             # Handle requested content range exceeding content size.
             error_response = _unwrap_ioerror(ioe)
-            if error_response is None or error_response.get('Message') != _OUT_OF_RANGE:
+            if error_response is None or error_response.get('Code') != _OUT_OF_RANGE:
                 raise
-            try:
-                self._position = self._content_length = int(error_response['ActualObjectSize'])
-            except KeyError:
-                # This shouldn't happen with real S3, but moto lacks ActualObjectSize.
-                # Reported at https://github.com/spulec/moto/issues/2981
-                self._position = self._content_length = _get(
-                    self._object,
-                    version=self._version_id,
-                    **self._object_kwargs,
-                )['ContentLength']
+            self._position = self._content_length = int(error_response['ActualObjectSize'])
             self._body = io.BytesIO()
         else:
             units, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
