@@ -214,7 +214,12 @@ class Reader(io.BufferedIOBase):
         if client is None:
             client = google.cloud.storage.Client()
 
-        self._blob = client.bucket(bucket).get_blob(key)  # type: google.cloud.storage.Blob
+        parts = key.split('#')
+        if len(parts) == 2:
+            item, gen_id = parts
+        else:
+            item, gen_id = parts[0], None
+        self._blob = client.bucket(bucket).get_blob(item, if_generation_match=gen_id)  # type: google.cloud.storage.Blob
 
         if self._blob is None:
             raise google.cloud.exceptions.NotFound('blob %s not found in %s' % (key, bucket))
@@ -400,7 +405,9 @@ class Writer(io.BufferedIOBase):
         if client is None:
             client = google.cloud.storage.Client()
         self._client = client
-        self._blob = self._client.bucket(bucket).blob(blob)  # type: google.cloud.storage.Blob
+        item = blob.split('#')[0]  # ignore generation id for writing
+        self._blob = self._client.bucket(bucket).blob(item)  # type: google.cloud.storage.Blob
+        # self._blob = self._client.bucket(bucket).blob(blob)  # type: google.cloud.storage.Blob
         assert min_part_size % _REQUIRED_CHUNK_MULTIPLE == 0, 'min part size must be a multiple of 256KB'
         assert min_part_size >= _MIN_MIN_PART_SIZE, 'min part size must be greater than 256KB'
         self._min_part_size = min_part_size
