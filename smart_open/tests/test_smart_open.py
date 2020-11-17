@@ -10,18 +10,19 @@ import bz2
 import csv
 import contextlib
 import io
-import unittest
-import logging
-import tempfile
-import os
+import gzip
 import hashlib
+import logging
+import os
+import tempfile
+import unittest
 import warnings
 
 import boto3
 import mock
 from moto import mock_s3
 import responses
-import gzip
+import parameterizedtestcase
 import pytest
 
 import smart_open
@@ -1325,6 +1326,14 @@ class CompressionFormatTest(unittest.TestCase):
         """Can write and read bz2?"""
         self.write_read_assertion('.bz2')
 
+    def test_gzip_text(self):
+        with tempfile.NamedTemporaryFile(suffix='.gz') as f:
+            with smart_open.open(f.name, 'wt') as fout:
+                fout.write('hello world')
+
+            with smart_open.open(f.name, 'rt') as fin:
+                assert fin.read() == 'hello world'
+
 
 class MultistreamsBZ2Test(unittest.TestCase):
     """
@@ -1619,6 +1628,32 @@ class CheckKwargsTest(unittest.TestCase):
         expected = {'foo': 123}
         actual = smart_open.smart_open_lib._check_kwargs(function, kwargs)
         self.assertEqual(expected, actual)
+
+
+class GetBinaryModeTest(parameterizedtestcase.ParameterizedTestCase):
+    @parameterizedtestcase.ParameterizedTestCase.parameterize(
+        ('mode', 'expected'),
+        [
+            ('r', 'rb'),
+            ('r+', 'rb+'),
+            ('rt', 'rb'),
+            ('rt+', 'rb+'),
+            ('r+t', 'rb+'),
+            ('w', 'wb'),
+            ('w+', 'wb+'),
+            ('wt', 'wb'),
+            ('wt+', 'wb+'),
+            ('w+t', 'wb+'),
+            ('a', 'ab'),
+            ('a+', 'ab+'),
+            ('at', 'ab'),
+            ('at+', 'ab+'),
+            ('a+t', 'ab+'),
+        ]
+    )
+    def test(self, mode, expected):
+        actual = smart_open.smart_open_lib._get_binary_mode(mode)
+        assert actual == expected
 
 
 def test_backwards_compatibility_wrapper():
