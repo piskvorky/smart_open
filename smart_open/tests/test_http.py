@@ -39,7 +39,7 @@ def request_callback(request):
     return (200, HEADERS, BYTES[start:end])
 
 
-@unittest.skipIf(os.environ.get('CI'), 'This test does not work on TravisCI for some reason')
+@unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
 class HttpTest(unittest.TestCase):
 
     @responses.activate

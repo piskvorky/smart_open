@@ -385,7 +385,7 @@ class ParseUriTest(unittest.TestCase):
             _patch_pathlib(obj.old_impl)
 
 
-@unittest.skipIf(os.environ.get('CI'), 'This test does not work on TravisCI for some reason')
+@unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
 class SmartOpenHttpTest(unittest.TestCase):
     """
     Test reading from HTTP connections in various ways.
@@ -861,7 +861,7 @@ class SmartOpenReadTest(unittest.TestCase):
             stdout=mock_subprocess.PIPE,
         )
 
-    @unittest.skipIf(os.environ.get('CI'), 'This test does not work on TravisCI for some reason')
+    @unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
     @responses.activate
     def test_webhdfs(self):
         """Is webhdfs line iterator called correctly"""
@@ -872,7 +872,7 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(next(iterator).decode("utf-8"), "line1\n")
         self.assertEqual(next(iterator).decode("utf-8"), "line2")
 
-    @unittest.skipIf(os.environ.get('CI'), 'This test does not work on TravisCI for some reason')
+    @unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
     @responses.activate
     def test_webhdfs_encoding(self):
         """Is HDFS line iterator called correctly?"""
@@ -885,7 +885,7 @@ class SmartOpenReadTest(unittest.TestCase):
         actual = smart_open.open(input_url, encoding='utf-8').read()
         self.assertEqual(text, actual)
 
-    @unittest.skipIf(os.environ.get('CI'), 'This test does not work on TravisCI for some reason')
+    @unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
     @responses.activate
     def test_webhdfs_read(self):
         """Does webhdfs read method work correctly"""
@@ -1231,7 +1231,7 @@ class SmartOpenTest(unittest.TestCase):
         self.assertEqual(expected, actual)
 
 
-@unittest.skipIf(os.environ.get('CI'), 'This test does not work on TravisCI for some reason')
+@unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
 class WebHdfsWriteTest(unittest.TestCase):
     """
     Test writing into webhdfs files.
