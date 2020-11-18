@@ -213,7 +213,11 @@ def open(
     #                          binary             decompressed       decode
     #
 
-    binary_mode = _get_binary_mode(mode)
+    try:
+        binary_mode = _get_binary_mode(mode)
+    except ValueError as ve:
+        raise NotImplementedError(ve.args[0])
+
     binary = _open_binary_stream(uri, binary_mode, transport_params)
     if ignore_ext:
         decompressed = binary
@@ -228,26 +232,56 @@ def open(
     return decoded
 
 
-def _get_binary_mode(mode):
+def _get_binary_mode(mode_str):
     #
     # https://docs.python.org/3/library/functions.html#open
     #
     # The order of characters in the mode parameter appears to be unspecified.
     # The implementation follows the examples, just to be safe.
     #
+    mode = list(mode_str)
     binmode = []
 
-    if 'a' in mode:
-        binmode.append('a')
-    elif 'w' in mode:
-        binmode.append('w')
-    else:
-        binmode.append('r')
+    if 't' in mode and 'b' in mode:
+        raise ValueError("can't have text and binary mode at once")
 
-    binmode.append('b')
+    counts = [mode.count(x) for x in 'rwa']
+    if sum(counts) > 1:
+        raise ValueError("must have exactly one of create/read/write/append mode")
+
+    def transfer(char):
+        binmode.append(mode.pop(mode.index(char)))
+
+    if 'a' in mode:
+        transfer('a')
+    elif 'w' in mode:
+        transfer('w')
+    elif 'r' in mode:
+        transfer('r')
+    else:
+        raise ValueError(
+            "Must have exactly one of create/read/write/append "
+            "mode and at most one plus"
+        )
+
+    if 'b' in mode:
+        transfer('b')
+    elif 't' in mode:
+        mode.pop(mode.index('t'))
+        binmode.append('b')
+    else:
+        binmode.append('b')
 
     if '+' in mode:
-        binmode.append('+')
+        transfer('+')
+
+    #
+    # There shouldn't be anything left in the mode list at this stage.
+    # If there is, then either we've missed something and the implementation
+    # of this function is broken, or the original input mode is invalid.
+    #
+    if mode:
+        raise ValueError('invalid mode: %r' % mode_str)
 
     return ''.join(binmode)
 
@@ -336,7 +370,7 @@ def _open_binary_stream(uri, mode, transport_params):
         return uri
 
     if not isinstance(uri, str):
-        raise TypeError("don't know how to handle uri %r" % uri)
+        raise TypeError("don't know how to handle uri %s" % repr(uri))
 
     scheme = _sniff_scheme(uri)
     submodule = transport.get_transport(scheme)
