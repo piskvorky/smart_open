@@ -1661,7 +1661,7 @@ class GetBinaryModeTest(parameterizedtestcase.ParameterizedTestCase):
         assert actual == expected
 
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ('mode', 'expected'),
+        ('mode', ),
         [
             ('rw', ),
             ('rwa', ),
