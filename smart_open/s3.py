@@ -1003,7 +1003,7 @@ def iter_bucket(
     bucket_name: str
         The name of the bucket.
     prefix: str, optional
-        Limits the iteration to keys starting wit the prefix.
+        Limits the iteration to keys starting with the prefix.
     accept_key: callable, optional
         This is a function that accepts a key name (unicode string) and
         returns True/False, signalling whether the given key should be downloaded.
