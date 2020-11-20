@@ -46,12 +46,6 @@ logger = logging.getLogger(__name__)
 
 SYSTEM_ENCODING = sys.getdefaultencoding()
 
-_TO_BINARY_LUT = {
-    'r': 'rb', 'r+': 'rb+', 'rt': 'rb', 'rt+': 'rb+',
-    'w': 'wb', 'w+': 'wb+', 'wt': 'wb', "wt+": 'wb+',
-    'a': 'ab', 'a+': 'ab+', 'at': 'ab', 'at+': 'ab+',
-}
-
 
 def _sniff_scheme(uri_as_string):
     """Returns the scheme of the URL only, as a string."""
@@ -218,12 +212,17 @@ def open(
     # filename ---------------> bytes -------------> bytes ---------> text
     #                          binary             decompressed       decode
     #
-    binary_mode = _TO_BINARY_LUT.get(mode, mode)
+
+    try:
+        binary_mode = _get_binary_mode(mode)
+    except ValueError as ve:
+        raise NotImplementedError(ve.args[0])
+
     binary = _open_binary_stream(uri, binary_mode, transport_params)
     if ignore_ext:
         decompressed = binary
     else:
-        decompressed = compression.compression_wrapper(binary, mode)
+        decompressed = compression.compression_wrapper(binary, binary_mode)
 
     if 'b' not in mode or explicit_encoding is not None:
         decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
@@ -231,6 +230,60 @@ def open(
         decoded = decompressed
 
     return decoded
+
+
+def _get_binary_mode(mode_str):
+    #
+    # https://docs.python.org/3/library/functions.html#open
+    #
+    # The order of characters in the mode parameter appears to be unspecified.
+    # The implementation follows the examples, just to be safe.
+    #
+    mode = list(mode_str)
+    binmode = []
+
+    if 't' in mode and 'b' in mode:
+        raise ValueError("can't have text and binary mode at once")
+
+    counts = [mode.count(x) for x in 'rwa']
+    if sum(counts) > 1:
+        raise ValueError("must have exactly one of create/read/write/append mode")
+
+    def transfer(char):
+        binmode.append(mode.pop(mode.index(char)))
+
+    if 'a' in mode:
+        transfer('a')
+    elif 'w' in mode:
+        transfer('w')
+    elif 'r' in mode:
+        transfer('r')
+    else:
+        raise ValueError(
+            "Must have exactly one of create/read/write/append "
+            "mode and at most one plus"
+        )
+
+    if 'b' in mode:
+        transfer('b')
+    elif 't' in mode:
+        mode.pop(mode.index('t'))
+        binmode.append('b')
+    else:
+        binmode.append('b')
+
+    if '+' in mode:
+        transfer('+')
+
+    #
+    # There shouldn't be anything left in the mode list at this stage.
+    # If there is, then either we've missed something and the implementation
+    # of this function is broken, or the original input mode is invalid.
+    #
+    if mode:
+        raise ValueError('invalid mode: %r' % mode_str)
+
+    return ''.join(binmode)
 
 
 def _shortcut_open(
@@ -317,7 +370,7 @@ def _open_binary_stream(uri, mode, transport_params):
         return uri
 
     if not isinstance(uri, str):
-        raise TypeError("don't know how to handle uri %r" % uri)
+        raise TypeError("don't know how to handle uri %s" % repr(uri))
 
     scheme = _sniff_scheme(uri)
     submodule = transport.get_transport(scheme)
