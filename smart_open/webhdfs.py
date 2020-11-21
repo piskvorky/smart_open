@@ -16,7 +16,10 @@ import io
 import logging
 import urllib.parse
 
-import requests
+try:
+    import requests
+except ImportError:
+    MISSING_DEPS = True
 
 from smart_open import utils, constants
 
