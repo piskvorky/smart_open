@@ -4,13 +4,6 @@ os: linux
 
 jobs:
   include:
-    - python: '3.7'
-      name: "flake8"
-      env: TOXENV="flake8"
-
-    - python: '3.5'
-      env: TOXENV="check_keys,py35-test,py35-integration"
-
     - python: '3.6'
       env:
         - SO_BUCKET: smart-open
@@ -27,10 +20,15 @@ jobs:
         - BOTO_CONFIG: "/dev/null"
         - SO_ENABLE_MOTO_SERVER: "1"
         - TOXENV: "check_keys,py37-doctest,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
+
     - python: '3.8'
       env:
         - BOTO_CONFIG: "/dev/null"
         - TOXENV: "check_keys,py38-doctest,test_coverage,py38-integration"
+
+    - python: '3.8'
+      name: "flake8"
+      env: TOXENV="flake8"
 
 install:
   - pip install tox

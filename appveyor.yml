@@ -3,7 +3,6 @@ environment:
     TOX_PARALLEL_NO_SPINNER: 1
 
   matrix:
-  - TOXENV: "check_keys,py35-test"
   - TOXENV: "check_keys,py36-test"
   - TOXENV: "check_keys,py37-test"
   - TOXENV: "check_keys,py38-test"
