@@ -1,5 +1,11 @@
 # Unreleased
 
+# 4.0.0, 24 Nov 2020
+
+- Fix reading empty file or seeking past end of file for s3 backend (PR [#549](https://github.com/RaRe-Technologies/smart_open/pull/549), [@jcushman](https://github.com/jcushman))
+- Fix handling of rt/wt mode when working with gzip compression (PR [#559](https://github.com/RaRe-Technologies/smart_open/pull/559), [@mpenkov](https://github.com/mpenkov))
+- Bump minimum Python version to 3.6 (PR [#562](https://github.com/RaRe-Technologies/smart_open/pull/562), [@mpenkov](https://github.com/mpenkov))
+
 # 3.0.0, 8 Oct 2020
 
 This release modifies the behavior of setup.py with respect to dependencies.
