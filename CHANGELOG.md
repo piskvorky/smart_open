@@ -1,6 +1,9 @@
 # Unreleased
 
-- Exclude `requests` from `install_requires` dependency list
+# 4.0.1, 27 Nov 2020
+
+- Exclude `requests` from `install_requires` dependency list.
+  If you need it, use `pip install smart_open[http]` or `pip install smart_open[webhdfs]`.
 
 # 4.0.0, 24 Nov 2020
 
