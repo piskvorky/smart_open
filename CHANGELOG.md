@@ -1,5 +1,7 @@
 # Unreleased
 
+- Exclude `requests` from `install_requires` dependency list
+
 # 4.0.0, 24 Nov 2020
 
 - Fix reading empty file or seeking past end of file for s3 backend (PR [#549](https://github.com/RaRe-Technologies/smart_open/pull/549), [@jcushman](https://github.com/jcushman))
