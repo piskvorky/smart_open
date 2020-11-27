@@ -48,16 +48,12 @@ tests_require = [
     'pytest-rerunfailures'
 ]
 
-install_requires = [
-    'requests',
-]
-
 aws_deps = ['boto3']
 gcp_deps = ['google-cloud-storage']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 http_deps = ['requests']
 
-all_deps = install_requires + aws_deps + gcp_deps + azure_deps + http_deps
+all_deps = aws_deps + gcp_deps + azure_deps + http_deps
 
 setup(
     name='smart_open',
@@ -83,7 +79,6 @@ setup(
     license='MIT',
     platforms='any',
 
-    install_requires=install_requires,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
