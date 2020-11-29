@@ -38,7 +38,7 @@ def read(fname):
 
 tests_require = [
     'mock',
-    'moto[server]',
+    'moto[server]==1.3.14',  # Older versions of moto appear broken
     'pathlib2',
     'responses',
     'boto3',
