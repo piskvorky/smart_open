@@ -1,3 +1,13 @@
+Migrating to the new dependency management subsystem
+====================================================
+
+Smart_open has grown over the years to cover a lot of different storages, each with a different set of library dependencies. Not everybody needs *all* of them, so to make each smart_open installation leaner and faster, version 3.0.0 introduced a new, backward-incompatible installation method:
+
+* smart_open < 3.0.0: All dependencies were installed by default. No way to select just a subset during installation.
+* smart_open >= 3.0.0: No dependencies installed by default. Install the ones you need with e.g. ``pip install smart_open[s3]`` (only AWS), or ``smart_open[all]`` (install everything = same behaviour as < 3.0.0; use this for backward compatibility). 
+
+You can read more about the motivation and internal discussions for this change  `here <https://github.com/RaRe-Technologies/smart_open/issues/443>`_.
+
 Migrating to the new ``open`` function
 ======================================
 
