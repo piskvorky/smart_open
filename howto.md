@@ -191,3 +191,39 @@ To access such buckets, you need to pass some special transport parameters:
 ```
 
 This works only when reading and writing via S3.
+
+## How to Read/Write from localstack
+
+[localstack](https://github.com/localstack/localstack) is a convenient test framework for developing cloud apps.
+You run it locally on your machine and behaves almost identically to the real AWS.
+This makes it useful for testing your code offline, without requiring you to set up mocks or test harnesses.
+
+First, install localstack and start it:
+
+    $ pip install localstack
+    $ localstack start
+
+The start command is blocking, so you'll need to run it in a separate terminal session or run it in the background.
+Before we can read/write, we'll need to create a bucket:
+
+    $ aws --endpoint-url http://localhost:4566 s3api create-bucket --bucket-name mybucket
+
+where `http://localhost:4566` is the default host/port that localstack uses to listen for requests.
+
+You can now read/write to the bucket the same way you would to a real S3 bucket:
+
+```python
+>>> from smart_open import open
+>>> tparams = {'resource_kwargs': {'endpoint_url': 'http://localhost:4566'}}
+>>> with open('s3://mybucket/hello.txt', 'wt', transport_params=tparams) as fout:
+...     fout.write('hello world!')
+>>> with open('s3://mybucket/hello.txt', 'rt', transport_params=tparams) as fin:
+...     fin.read()
+'hello world!'
+
+```
+
+You can also access it using the CLI:
+
+    $ aws --endpoint-url http://localhost:4566 s3 ls s3://mybucket/
+    2020-12-09 15:56:22         12 hello.txt
