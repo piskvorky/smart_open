@@ -6,7 +6,7 @@ import smart_open
 urls = [line.strip() for line in sys.stdin]
 
 tp = {}
-if 'create_session_and_resource':
+if 'create_session_and_resource' in sys.argv:
     tp['session'] = boto3.Session()
     tp['resource'] = tp['session'].resource('s3')
 elif 'create_resource' in sys.argv:
