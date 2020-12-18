@@ -203,7 +203,7 @@ def open(
     session: object, optional
         The S3 session to use when working with boto3.
         If you don't specify this, then smart_open will create a new session for you.
-    resource: object, optonal
+    resource: object, optional
         The S3 resource to use when working with boto3.
         If you don't specify this, then smart_open will create a new resource for you.
     resource_kwargs: dict, optional
