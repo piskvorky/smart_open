@@ -14,6 +14,5 @@ elif 'create_resource' in sys.argv:
 elif 'create_session' in sys.argv:
     tp['session'] = boto3.Session()
 
-for i, url in enumerate(urls, 1):
-    # print('%d/%d %s' % (i, len(urls), url))
+for url in urls:
     smart_open.open(url, transport_params=tp).read()
