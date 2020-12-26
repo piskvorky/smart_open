@@ -173,6 +173,32 @@ s3.ObjectVersion(bucket_name='smart-open-versioned', object_key='demo.txt', id='
 
 ```
 
+## How to Read from S3 Efficiently
+
+Under the covers, `smart_open` uses the [boto3 resource API](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/resources.html) to read from S3.
+By default, calling `smart_open.open` with an S3 URL will create its own boto3 session and resource.
+These are expensive operations: they require both CPU time to construct the objects from a low-level API definition, and memory to store the objects once they have been created.
+It is possible to save both CPU time and memory by sharing the same resource across multiple `smart_open.open` calls, for example:
+
+```
+>>> import boto3
+>>> tp = {'resource': boto3.resoure('s3')}
+>>> urls = ['s3://commoncrawl/robots.txt'] * 3  # These URLs can be unique
+>>> for url in urls:
+...     with smart_open.open(url) as fin:
+...         print(fin.readline())
+'User-Agent: *\n'
+'User-Agent: *\n'
+```
+
+The above sharing is safe because it is all happening in the same thread and subprocess.
+
+## How to Work in a Parallelized Environment
+
+Under the covers, `smart_open` uses the [boto3 resource API](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/resources.html) to read from S3.
+This API is not thread-safe or multiprocess-safe.
+Do not share the same `smart_open` objects across different threads or subprocesses.
+
 ## How to Specify the Request Payer (S3 only)
 
 Some public buckets require you to [pay for S3 requests for the data in the bucket](https://docs.aws.amazon.com/AmazonS3/latest/dev/RequesterPaysBuckets.html).
