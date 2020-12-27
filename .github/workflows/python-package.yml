@@ -1,0 +1,32 @@
+name: Test smart_open using tox
+on: push
+jobs:
+  env:
+    BOTO_CONFIG: "/dev/null"
+    SO_BUCKET: smart-open
+    SO_KEY: integration-tests
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - toxenv: "check_keys,py36-doctest,py36-test,py36-benchmark,py36-integration"
+            result_key: benchmark-results-py36
+
+          - toxenv: "check_keys,py37-doctest,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
+            enable_moto_server: "1"
+
+          - toxenv: "check_keys,py38-doctest,test_coverage,py38-integration"
+
+          - toxenv: "flake8"
+
+    steps:
+      - name: Install tox
+        run: pip install tox
+      - name: Build
+        env:
+          SO_RESULT_KEY: ${{ matrix.result_key }}
+          SO_ENABLE_MOTO_SERVER: ${{ matrix.enable_moto_server }}
+          TOXENV: ${{ matrix.toxenv }}
+        run: tox -vv
