@@ -165,7 +165,7 @@ This works only when reading and writing via S3.
 
 For versioned objects, the returned object will be slightly different:
 
-```
+```python
 >>> params = {'version_id': 'KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg'}
 >>> with open('s3://smart-open-versioned/demo.txt', transport_params=params) as fin:
 ...     print(fin.to_boto3())
@@ -180,7 +180,7 @@ By default, calling `smart_open.open` with an S3 URL will create its own boto3 s
 These are expensive operations: they require both CPU time to construct the objects from a low-level API definition, and memory to store the objects once they have been created.
 It is possible to save both CPU time and memory by sharing the same resource across multiple `smart_open.open` calls, for example:
 
-```
+```python
 >>> import boto3
 >>> from smart_open import open
 >>> tp = {'resource': boto3.resource('s3')}
