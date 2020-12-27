@@ -40,4 +40,5 @@ jobs:
           SO_RESULT_KEY: ${{ matrix.result_key }}
           SO_ENABLE_MOTO_SERVER: ${{ matrix.enable_moto_server }}
           TOXENV: ${{ matrix.toxenv }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: tox -vv
