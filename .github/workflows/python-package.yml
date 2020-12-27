@@ -1,12 +1,12 @@
 name: Test smart_open using tox
 on: push
 jobs:
-  env:
-    BOTO_CONFIG: "/dev/null"
-    SO_BUCKET: smart-open
-    SO_KEY: integration-tests
-
   build:
+    env:
+      BOTO_CONFIG: "/dev/null"
+      SO_BUCKET: smart-open
+      SO_KEY: integration-tests
+
     runs-on: ubuntu-latest
     strategy:
       matrix:
