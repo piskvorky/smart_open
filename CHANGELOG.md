@@ -1,5 +1,7 @@
 # Unreleased
 
+- Refactor s3 submodule to minimize resource usage (PR [#569](https://github.com/RaRe-Technologies/smart_open/pull/569), [@mpenkov](https://github.com/mpenkov))
+
 # 4.0.1, 27 Nov 2020
 
 - Exclude `requests` from `install_requires` dependency list.
