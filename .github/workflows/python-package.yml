@@ -11,19 +11,30 @@ jobs:
     strategy:
       matrix:
         include:
-          - toxenv: "check_keys,py36-doctest,py36-test,py36-benchmark,py36-integration"
+          - python-version: '3.6'
+            toxenv: "check_keys,py36-doctest,py36-test,py36-benchmark,py36-integration"
             result_key: benchmark-results-py36
 
-          - toxenv: "check_keys,py37-doctest,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
+          - python-version: '3.7'
+            toxenv: "check_keys,py37-doctest,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
             enable_moto_server: "1"
 
-          - toxenv: "check_keys,py38-doctest,test_coverage,py38-integration"
+          - python-version: '3.8'
+            toxenv: "check_keys,py38-doctest,test_coverage,py38-integration"
 
-          - toxenv: "flake8"
+          - python-version: '3.8'
+            toxenv: "flake8"
 
     steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Install tox
         run: pip install tox
+
       - name: Build
         env:
           SO_RESULT_KEY: ${{ matrix.result_key }}
