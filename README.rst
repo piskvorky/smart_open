@@ -329,12 +329,12 @@ GCS Credentials
 ---------------
 ``smart_open`` uses the ``google-cloud-storage`` library to talk to GCS.
 ``google-cloud-storage`` uses the ``google-cloud`` package under the hood to handle authentication.
-There are several `options <https://google-cloud-python.readthedocs.io/en/0.32.0/core/auth.html>`__ to provide
+There are several `options <https://googleapis.dev/python/google-api-core/latest/auth.html>`__ to provide
 credentials.
 By default, ``smart_open`` will defer to ``google-cloud-storage`` and let it take care of the credentials.
 
 To override this behavior, pass a ``google.cloud.storage.Client`` object as a transport parameter to the ``open`` function.
-You can `customize the credentials <https://google-cloud-python.readthedocs.io/en/0.32.0/core/client.html>`__
+You can `customize the credentials <https://googleapis.dev/python/storage/latest/client.html>`__
 when constructing the client. ``smart_open`` will then use the client when talking to GCS. To follow allow with
 the example below, `refer to Google's guide <https://cloud.google.com/storage/docs/reference/libraries#setting_up_authentication>`__
 to setting up GCS authentication with a service account.
