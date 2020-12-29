@@ -112,7 +112,7 @@ Installation
 ------------
 
 ``smart_open`` supports a wide range of storage solutions, including AWS S3, Google Cloud and Azure.
-Each individul solution has its own dependencies.
+Each individual solution has its own dependencies.
 By default, ``smart_open`` does not install any dependencies, in order to keep the installation size small.
 You can install these dependencies explicitly using::
 
