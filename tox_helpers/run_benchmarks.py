@@ -29,6 +29,7 @@ if os.environ.get('AWS_ACCESS_KEY_ID') and os.environ.get('AWS_SECRET_ACCESS_KEY
     subprocess.check_call(
         [
             'pytest',
+            '-v',
             'integration-tests/test_s3.py',
             '--benchmark-save=%s' % commit_hash,
         ]

@@ -13,4 +13,4 @@ subprocess.check_call(
 )
 
 if os.environ.get('AWS_ACCESS_KEY_ID') and os.environ.get('AWS_SECRET_ACCESS_KEY'):
-    subprocess.check_call(['pytest', 'integration-tests/test_s3_ported.py'])
+    subprocess.check_call(['pytest', '-v', 'integration-tests/test_s3_ported.py'])
