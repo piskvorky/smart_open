@@ -34,7 +34,7 @@ jobs:
       - name: Install tox
         run: pip install tox
 
-      - name: Build
+      - name: Test using Tox
         env:
           SO_RESULT_KEY: ${{ matrix.result_key }}
           SO_ENABLE_MOTO_SERVER: ${{ matrix.enable_moto_server }}
