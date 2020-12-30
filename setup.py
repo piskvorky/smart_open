@@ -35,10 +35,15 @@ __version__ = _get_version()
 def read(fname):
     return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
 
+aws_deps = ['boto3']
+gcp_deps = ['google-cloud-storage']
+azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
+http_deps = ['requests']
 
-tests_require = [
+all_deps = aws_deps + gcp_deps + azure_deps + http_deps
+tests_require = all_deps + [
     'mock',
-    'moto[server]',
+    'moto[server]==1.3.14',  # Older versions of moto appear broken
     'pathlib2',
     'responses',
     'boto3',
@@ -47,13 +52,6 @@ tests_require = [
     'pytest',
     'pytest-rerunfailures'
 ]
-
-aws_deps = ['boto3']
-gcp_deps = ['google-cloud-storage']
-azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
-http_deps = ['requests']
-
-all_deps = aws_deps + gcp_deps + azure_deps + http_deps
 
 setup(
     name='smart_open',

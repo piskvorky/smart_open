@@ -110,29 +110,23 @@ Documentation
 
 Installation
 ------------
-::
 
-    pip install smart_open  // Install with no cloud dependencies
-    pip install smart_open[s3] // Install S3 deps
-    pip install smart_open[gcp] // Install GCP deps
-    pip install smart_open[azure] // Install Azure deps
-    pip install smart_open[all] // Installs all cloud dependencies
+``smart_open`` supports a wide range of storage solutions, including AWS S3, Google Cloud and Azure.
+Each individual solution has its own dependencies.
+By default, ``smart_open`` does not install any dependencies, in order to keep the installation size small.
+You can install these dependencies explicitly using::
 
-Or, if you prefer to install from the `source tar.gz <http://pypi.python.org/pypi/smart_open>`_::
+    pip install smart_open[azure] # Install Azure deps
+    pip install smart_open[gcp] # Install GCP deps
+    pip install smart_open[s3] # Install S3 deps
 
-    python setup.py test  # run unit tests
-    python setup.py install
+Or, if you don't mind installing a large number of third party libraries, you can install all dependencies using::
 
-To run the unit tests (optional), you'll also need to install some other dependencies: see setup.py or run `pip install .[test]`.
-The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
+    pip install smart_open[all]
 
-If you're upgrading from ``smart_open`` versions 1.8.0 and below, please check out the `Migration Guide <MIGRATING_FROM_OLDER_VERSIONS.rst>`_.
+Be warned that this option increases the installation size significantly, e.g. over 100MB.
 
-Version ``3.0`` will introduce a backwards incompatible installation method with regards to the cloud dependencies.
-If you want to maintain backwards compatibility (installing all dependencies) install this package via ``smart_open[all]`` now
-and once the change is made you should not have any issues. If all you care about is AWS dependencies for example you can install via ``smart_open[s3]`` and
-once the dependency change is made you will simply drop the unwanted dependencies. You can read more about the motivations `here <https://github.com/RaRe-Technologies/smart_open/issues/443>`_
-
+If you're upgrading from ``smart_open`` versions 2.x and below, please check out the `Migration Guide <MIGRATING_FROM_OLDER_VERSIONS.rst>`_.
 
 Built-in help
 -------------
@@ -147,6 +141,10 @@ or click `here <https://github.com/RaRe-Technologies/smart_open/blob/master/help
 
 More examples
 -------------
+
+For the sake of simplicity, the examples below assume you have all the dependencies installed, i.e. you have done::
+
+    pip install smart_open[all]
 
 .. code-block:: python
 
@@ -331,12 +329,12 @@ GCS Credentials
 ---------------
 ``smart_open`` uses the ``google-cloud-storage`` library to talk to GCS.
 ``google-cloud-storage`` uses the ``google-cloud`` package under the hood to handle authentication.
-There are several `options <https://google-cloud-python.readthedocs.io/en/0.32.0/core/auth.html>`__ to provide
+There are several `options <https://googleapis.dev/python/google-api-core/latest/auth.html>`__ to provide
 credentials.
 By default, ``smart_open`` will defer to ``google-cloud-storage`` and let it take care of the credentials.
 
 To override this behavior, pass a ``google.cloud.storage.Client`` object as a transport parameter to the ``open`` function.
-You can `customize the credentials <https://google-cloud-python.readthedocs.io/en/0.32.0/core/client.html>`__
+You can `customize the credentials <https://googleapis.dev/python/storage/latest/client.html>`__
 when constructing the client. ``smart_open`` will then use the client when talking to GCS. To follow allow with
 the example below, `refer to Google's guide <https://cloud.google.com/storage/docs/reference/libraries#setting_up_authentication>`__
 to setting up GCS authentication with a service account.
@@ -446,6 +444,20 @@ Extending ``smart_open``
 ========================
 
 See `this document <extending.md>`__.
+
+Testing ``smart_open``
+======================
+
+``smart_open`` comes with a comprehensive suite of unit tests.
+Before you can run the test suite, install the test dependencies::
+
+    pip install -e .[test]
+
+Now, you can run the unit tests::
+
+    pytest smart_open
+
+The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
 
 Comments, bug reports
 =====================

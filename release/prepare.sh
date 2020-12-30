@@ -1,15 +1,13 @@
 #
 # Prepare a new release of smart_open.  Use it like this:
 #
-#     export SMART_OPEN_RELEASE=2.3.4
-#     bash release/prepare.sh
+#     bash release/prepare.sh 1.2.3
 #
 # where 1.2.3 is the new version to release.
 #
 # Does the following:
 #
 # - Creates a clean virtual environment
-# - Runs tests
 # - Creates a local release git branch
 # - Bumps VERSION accordingly
 # - Opens CHANGELOG.md for editing, commits updates
@@ -18,7 +16,7 @@
 #
 set -euxo pipefail
 
-version="$SMART_OPEN_RELEASE"
+version="$1"
 echo "version: $version"
 
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
@@ -35,7 +33,7 @@ git branch -D release-"$version"
 set -e
 
 git checkout upstream/develop -b release-"$version"
-echo "__version__ = '$version'" > smart_open/version.py
+sed -i '' s/$(python smart_open/version.py)/$version/ smart_open/version.py
 git commit smart_open/version.py -m "bump version to $version"
 
 echo "Next, update CHANGELOG.md."
