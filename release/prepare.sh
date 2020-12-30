@@ -16,7 +16,7 @@
 #
 set -euxo pipefail
 
-version="$SMART_OPEN_RELEASE"
+version="$1"
 echo "version: $version"
 
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
