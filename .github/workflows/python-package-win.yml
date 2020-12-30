@@ -8,11 +8,9 @@ jobs:
         include:
           - python-version: '3.6'
             toxenv: "py36-doctest,py36-test"
-            result_key: benchmark-results-py36
 
           - python-version: '3.7'
             toxenv: "py37-doctest,py37-test"
-            enable_moto_server: "1"
 
           - python-version: '3.8'
             toxenv: "py38-doctest,py38-test"
