@@ -1,4 +1,4 @@
-name: Test smart_open using tox under Windows
+name: Test under Windows
 on: push
 jobs:
   build:
