@@ -22,9 +22,9 @@ def copy_to_clipboard(text):
         pyperclip.copy(text)
 
 
-with open(os.path.join(curr_dir, 'CHANGELOG.md')) as fin:
+with open(os.path.join(curr_dir, '../CHANGELOG.md')) as fin:
     copy_to_clipboard(fin.read())
 
 
-url = "https://github.com/RaRe-Technologies/smart_open/releases/tag/%s" % version
+url = "https://github.com/RaRe-Technologies/smart_open/releases/tag/v%s" % version
 webbrowser.open(url)
