@@ -38,4 +38,4 @@ jobs:
         run: pip install tox
 
       - name: Test using Tox
-        run: tox -vv
+        run: tox
