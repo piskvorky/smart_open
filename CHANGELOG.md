@@ -1,6 +1,7 @@
 # Unreleased
 
 - Refactor s3 submodule to minimize resource usage (PR [#569](https://github.com/RaRe-Technologies/smart_open/pull/569), [@mpenkov](https://github.com/mpenkov))
+- Change download_as_bytes to download_as_string in gcs submodule (PR [#571](https://github.com/RaRe-Technologies/smart_open/pull/571), [@alexandreyc](https://github.com/alexandreyc))
 
 # 4.0.1, 27 Nov 2020
 
