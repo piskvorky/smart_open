@@ -7,13 +7,22 @@ jobs:
       matrix:
         include:
           - python-version: '3.6'
-            toxenv: "py36-doctest,py36-test"
+            toxenv: "py36-doctest"
+
+          - python-version: '3.6'
+            toxenv: "py36-test"
 
           - python-version: '3.7'
-            toxenv: "py37-doctest,py37-test"
+            toxenv: "py37-doctest"
+
+          - python-version: '3.7'
+            toxenv: "py37-test"
 
           - python-version: '3.8'
-            toxenv: "py38-doctest,py38-test"
+            toxenv: "py38-doctest"
+
+          - python-version: '3.8'
+            toxenv: "py38-test"
 
     steps:
       - uses: actions/checkout@v2
