@@ -3,6 +3,11 @@ on: push
 jobs:
   build:
     runs-on: windows-2019
+    env:
+      #
+      # Windows seems to use cp1252 by default.
+      #
+      PYTHONIOENCODING: 'utf-8'
     strategy:
       matrix:
         include:

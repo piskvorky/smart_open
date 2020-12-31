@@ -385,7 +385,6 @@ class ParseUriTest(unittest.TestCase):
             _patch_pathlib(obj.old_impl)
 
 
-@unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
 class SmartOpenHttpTest(unittest.TestCase):
     """
     Test reading from HTTP connections in various ways.
@@ -682,19 +681,27 @@ class SmartOpenReadTest(unittest.TestCase):
             smart_open.open(fpath, 'r').read()
         mock_open.assert_called_with(fpath, 'r', buffering=-1)
 
+    def test_open_binary(self):
+        fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
+        with open(fpath, 'rb') as fin:
+            expected = fin.read()
+        with smart_open.open(fpath, 'rb') as fin:
+            actual = fin.read()
+        self.assertEqual(expected, actual)
+
     def test_open_with_keywords(self):
         """This test captures Issue #142."""
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
-        with open(fpath, 'rb') as fin:
-            expected = fin.read().decode('cp852')
+        with open(fpath, 'r', encoding='cp852') as fin:
+            expected = fin.read()
         with smart_open.open(fpath, encoding='cp852') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
 
     def test_open_with_keywords_explicit_r(self):
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
-        with open(fpath, 'rb') as fin:
-            expected = fin.read().decode('cp852')
+        with open(fpath, 'r', encoding='cp852') as fin:
+            expected = fin.read()
         with smart_open.open(fpath, mode='r', encoding='cp852') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
@@ -861,7 +868,6 @@ class SmartOpenReadTest(unittest.TestCase):
             stdout=mock_subprocess.PIPE,
         )
 
-    @unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
     @responses.activate
     def test_webhdfs(self):
         """Is webhdfs line iterator called correctly"""
@@ -872,7 +878,6 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(next(iterator).decode("utf-8"), "line1\n")
         self.assertEqual(next(iterator).decode("utf-8"), "line2")
 
-    @unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
     @responses.activate
     def test_webhdfs_encoding(self):
         """Is HDFS line iterator called correctly?"""
@@ -885,7 +890,6 @@ class SmartOpenReadTest(unittest.TestCase):
         actual = smart_open.open(input_url, encoding='utf-8').read()
         self.assertEqual(text, actual)
 
-    @unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
     @responses.activate
     def test_webhdfs_read(self):
         """Does webhdfs read method work correctly"""
@@ -1231,7 +1235,6 @@ class SmartOpenTest(unittest.TestCase):
         self.assertEqual(expected, actual)
 
 
-@unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
 class WebHdfsWriteTest(unittest.TestCase):
     """
     Test writing into webhdfs files.
@@ -1332,7 +1335,7 @@ class CompressionFormatTest(unittest.TestCase):
         self.write_read_assertion('.bz2')
 
     def test_gzip_text(self):
-        with tempfile.NamedTemporaryFile(suffix='.gz') as f:
+        with named_temporary_file(suffix='.gz') as f:
             with smart_open.open(f.name, 'wt') as fout:
                 fout.write('hello world')
 
