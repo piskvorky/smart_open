@@ -31,10 +31,14 @@ CURR_DIR = P.dirname(P.abspath(__file__))
 # Since these tests use cat, they will not work in an environment without cat,
 # such as Windows.  The main line of this test submodule contains a simple
 # cat implementation.  We need this because Windows' analog, type, does
-# weird stuff with line endings (inserts CRLF).
-def cat(path):
-    command = [sys.executable, P.abspath(__file__), path]
-    return subprocess.Popen(command, stdout=subprocess.PIPE)
+# weird stuff with line endings (inserts CRLF).  Also, I don't know of a way
+# to get type to echo standard input.
+#
+def cat(path=None):
+    command = [sys.executable, P.abspath(__file__)]
+    if path:
+        command.append(path)
+    return subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
 
 class CliRawInputBaseTest(unittest.TestCase):
@@ -79,31 +83,31 @@ class CliRawInputBaseTest(unittest.TestCase):
         assert as_text == self.expected
 
 
-@unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
 class CliRawOutputBaseTest(unittest.TestCase):
     def test_write(self):
-        cat = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
-        as_text = 'мы в ответе за тех, кого приручили'
+        expected = 'мы в ответе за тех, кого приручили'
+        mocked_cat = cat()
 
-        with mock.patch('subprocess.Popen', return_value=cat):
+        with mock.patch('subprocess.Popen', return_value=mocked_cat):
             with smart_open.hdfs.CliRawOutputBase('hdfs://dummy/url') as fout:
-                fout.write(as_text.encode('utf-8'))
+                fout.write(expected.encode('utf-8'))
 
-        actual = cat.stdout.read().decode('utf-8')
-        self.assertEqual(as_text, actual)
+        actual = mocked_cat.stdout.read().decode('utf-8')
+        assert actual == expected
 
     def test_zip(self):
-        cat = subprocess.Popen(['cat'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        as_text = 'мы в ответе за тех, кого приручили'
+        expected = 'мы в ответе за тех, кого приручили'
+        mocked_cat = cat()
 
-        with mock.patch('subprocess.Popen', return_value=cat):
+        with mock.patch('subprocess.Popen', return_value=mocked_cat):
             with smart_open.hdfs.CliRawOutputBase('hdfs://dummy/url') as fout:
                 with gzip.GzipFile(fileobj=fout, mode='wb') as gz_fout:
-                    gz_fout.write(as_text.encode('utf-8'))
+                    gz_fout.write(expected.encode('utf-8'))
 
-        with gzip.GzipFile(fileobj=cat.stdout) as fin:
+        with gzip.GzipFile(fileobj=mocked_cat.stdout) as fin:
             actual = fin.read().decode('utf-8')
-        self.assertEqual(as_text, actual)
+
+        assert actual == expected
 
 
 def main():
