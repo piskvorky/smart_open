@@ -29,38 +29,36 @@ CURR_DIR = P.dirname(P.abspath(__file__))
 # use.
 #
 # Since these tests use cat, they will not work in an environment without cat,
-# such as Windows.
-#
+# such as Windows.  The main line of this test submodule contains a simple
+# cat implementation.  We need this because Windows' analog, type, does
+# weird stuff with line endings (inserts CRLF).
 def cat(path):
-    executable = 'cat'
-    shell = False
-    if sys.platform == 'win32':
-        executable = 'type'
-        shell = True
-    return subprocess.Popen([executable, path], stdout=subprocess.PIPE, shell=shell)
+    command = [sys.executable, P.abspath(__file__), path]
+    return subprocess.Popen(command, stdout=subprocess.PIPE)
+
 
 class CliRawInputBaseTest(unittest.TestCase):
-    def test_read(self):
-        path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
+    def setUp(self):
+        self.path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
+        with open(self.path) as fin:
+            self.expected = fin.read()
+        self.cat = cat(self.path)
 
-        with mock.patch('subprocess.Popen', return_value=cat(path)):
+    def test_read(self):
+        with mock.patch('subprocess.Popen', return_value=self.cat):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read()
 
-        as_text = as_bytes.decode('utf-8').replace('\r\n', '\n')
-        self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
-        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
+        as_text = as_bytes.decode('utf-8')
+        assert as_text == self.expected
 
-    def test_read_100(self):
-        path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
-
-        with mock.patch('subprocess.Popen', return_value=cat(path)):
+    def test_read_75(self):
+        with mock.patch('subprocess.Popen', return_value=self.cat):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read(75)
 
         as_text = as_bytes.decode('utf-8')
-        expected = 'В начале июля, в чрезвычайно жаркое время'
-        self.assertEqual(expected, as_text)
+        assert as_text == self.expected[:len(as_text)]
 
     def test_unzip(self):
         path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt.gz')
@@ -69,20 +67,16 @@ class CliRawInputBaseTest(unittest.TestCase):
             with gzip.GzipFile(fileobj=smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')) as fin:
                 as_bytes = fin.read()
 
-        as_text = as_bytes.decode('utf-8').replace('\r\n', '\n')
-        self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
-        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
+        as_text = as_bytes.decode('utf-8')
+        assert as_text == self.expected
 
     def test_context_manager(self):
-        path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
-
-        with mock.patch('subprocess.Popen', return_value=cat(path)):
+        with mock.patch('subprocess.Popen', return_value=self.cat):
             with smart_open.hdfs.CliRawInputBase('hdfs://dummy/url') as fin:
                 as_bytes = fin.read()
 
         as_text = as_bytes.decode('utf-8').replace('\r\n', '\n')
-        self.assertTrue(as_text.startswith('В начале июля, в чрезвычайно жаркое время'))
-        self.assertTrue(as_text.endswith('улизнуть, чтобы никто не видал.\n'))
+        assert as_text == self.expected
 
 
 @unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
@@ -110,3 +104,20 @@ class CliRawOutputBaseTest(unittest.TestCase):
         with gzip.GzipFile(fileobj=cat.stdout) as fin:
             actual = fin.read().decode('utf-8')
         self.assertEqual(as_text, actual)
+
+
+def main():
+    try:
+        path = sys.argv[1]
+    except IndexError:
+        bytez = sys.stdin.buffer.read()
+    else:
+        with open(path, 'rb') as fin:
+            bytez = fin.read()
+
+    sys.stdout.buffer.write(bytez)
+    sys.stdout.flush()
+
+
+if __name__ == '__main__':
+    main()
