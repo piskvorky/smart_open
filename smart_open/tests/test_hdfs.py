@@ -88,6 +88,10 @@ class SanityTest(unittest.TestCase):
         """Is the default encoding set correctly?"""
         assert sys.getdefaultencoding() == 'utf-8'
 
+    def test_filesystem_encoding(self):
+        """Is the default encoding set correctly?"""
+        assert sys.getfilesystemencoding() == 'utf-8'
+
     def test_read_bytes(self):
         path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
         with open(path, 'rb') as fin:
@@ -96,7 +100,7 @@ class SanityTest(unittest.TestCase):
 
     def test_read_text(self):
         path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
-        with open(path, 'rb') as fin:
+        with open(path, 'r') as fin:
             text = fin.read()
 
         expected = 'В начале июля, в чрезвычайно жаркое время'

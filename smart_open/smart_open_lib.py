@@ -302,7 +302,7 @@ def _shortcut_open(
 
     This is only possible under the following conditions:
 
-        1. Opening a local file
+        1. Opening a local file; and
         2. Ignore extension is set to True
 
     If it is not possible to use the built-in open for the specified URI, returns None.
