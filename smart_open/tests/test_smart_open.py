@@ -59,7 +59,13 @@ def named_temporary_file(mode='w+b', prefix=None, suffix=None, delete=True):
         yield f
 
     if delete:
-        os.unlink(pathname)
+        try:
+            os.unlink(pathname)
+        except PermissionError as e:
+            #
+            # This can happen on Windows for unknown reasons.
+            #
+            logger.error(e)
 
 
 class ParseUriTest(unittest.TestCase):

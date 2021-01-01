@@ -83,6 +83,26 @@ class CliRawInputBaseTest(unittest.TestCase):
         assert as_text == self.expected
 
 
+class SanityTest(unittest.TestCase):
+    def test_default_encoding(self):
+        """Is the default encoding set correctly?"""
+        assert sys.getdefaultencoding() == 'utf-8'
+
+    def test_read_bytes(self):
+        path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
+        with open(path, 'rb') as fin:
+            lines = [line for line in fin]
+        assert len(lines) == 3
+
+    def test_read_text(self):
+        path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
+        with open(path, 'rb') as fin:
+            text = fin.read()
+
+        expected = 'В начале июля, в чрезвычайно жаркое время'
+        assert text[:len(expected)] == expected
+
+
 class CliRawOutputBaseTest(unittest.TestCase):
     def test_write(self):
         expected = 'мы в ответе за тех, кого приручили'
