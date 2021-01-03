@@ -260,6 +260,7 @@ def open(
                 key_id,
                 min_part_size=min_part_size,
                 session=session,
+                resource=resource,
                 upload_kwargs=multipart_upload_kwargs,
                 resource_kwargs=resource_kwargs,
             )
@@ -268,6 +269,7 @@ def open(
                 bucket_id,
                 key_id,
                 session=session,
+                resource=resource,
                 upload_kwargs=singlepart_upload_kwargs,
                 resource_kwargs=resource_kwargs,
             )
