@@ -407,6 +407,17 @@ class _SeekableRawReader(object):
                 )['ContentLength']
             self._body = io.BytesIO()
         else:
+            #
+            # Keep track of how many times boto3's built-in retry mechanism
+            # activated.
+            #
+            # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html#checking-retry-attempts-in-an-aws-service-response
+            #
+            logger.debug(
+                '%s: RetryAttempts: %d',
+                self,
+                response['ResponseMetadata']['RetryAttempts'],
+            )
             units, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
             self._content_length = length
             self._position = start
