@@ -11,6 +11,7 @@ import io
 import functools
 import logging
 import time
+import urllib3.exceptions
 
 try:
     import boto3
@@ -426,31 +427,39 @@ class _SeekableRawReader(object):
         if self._position >= self._content_length:
             return b''
 
-        binary = None
-        for attempt, seconds in enumerate(self._sleep_seconds, 1):
+        #
+        # Boto3 has built-in error handling and retry mechanisms:
+        # 
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/error-handling.html
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html
+        #
+        # Unfortunately, it isn't always enough. There is still a non-zero
+        # possibility that an exception will slip past these mechanisms and
+        # terminate the read prematurely.  Luckily, at this stage, it's very
+        # simple to recover from the problem: wait a little bit, reopen the
+        # HTTP connection and try again.
+        #
+        for attempt, seconds in enumerate([1, 2, 4, 8, 16], 1):
             try:
                 binary = self._read_from_body(size)
-            except botocore.exceptions.BotoCoreError as error:
-                if attempt == len(self._sleep_seconds):
-                    raise
-
-                #
-                # Encountered a low-level connection error.  Attempt to
-                # recover by sleeping it off and retrying.
-                #
+            except (
+                ConnectionResetError,
+                botocore.exceptions.BotoCoreError,
+                urllib3.exceptions.HTTPError,
+            ) as err:
                 logger.error(
-                    'caught %r, retrying %d more times',
-                    error,
-                    len(self._sleep_seconds) - attempt,
+                    '%s: caught %r while reading, sleeping %ds before retry',
+                    self,
+                    err,
+                    seconds,
                 )
                 time.sleep(seconds)
                 self._open_body()
             else:
-                break
+                self._position += len(binary)
+                return binary
 
-        assert binary is not None, 'the for loop should have initialized this!'
-        self._position += len(binary)
-        return binary
+        raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, attempt))
 
 
 class Reader(io.BufferedIOBase):
