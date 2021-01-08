@@ -5,20 +5,22 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-from __future__ import print_function
-from __future__ import unicode_literals
-
 import gzip
 import os
 import os.path as P
 import subprocess
 import unittest
+import sys
 
 import mock
 
 import smart_open.hdfs
 
-import sys
+#
+# Workaround for https://bugs.python.org/issue37380
+#
+if sys.version_info[:2] == (3, 6):
+    subprocess._cleanup = lambda: None
 
 CURR_DIR = P.dirname(P.abspath(__file__))
 
