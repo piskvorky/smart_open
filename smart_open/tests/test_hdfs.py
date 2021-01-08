@@ -44,7 +44,13 @@ def cat(path=None):
 class CliRawInputBaseTest(unittest.TestCase):
     def setUp(self):
         self.path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
-        with open(self.path) as fin:
+
+        #
+        # We have to specify the encoding explicitly, because different
+        # platforms like Windows may be using something other than unicode
+        # by default.
+        #
+        with open(self.path, encoding='utf-8') as fin:
             self.expected = fin.read()
         self.cat = cat(self.path)
 

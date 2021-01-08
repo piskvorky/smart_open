@@ -24,7 +24,6 @@ import os.path as P
 import pathlib
 import urllib.parse
 import warnings
-import sys
 
 #
 # This module defines a function called smart_open so we cannot use
