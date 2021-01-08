@@ -371,7 +371,7 @@ class ParseUriTest(unittest.TestCase):
         _patch_pathlib(obj.old_impl)
         assert pathlib.Path.open != smart_open.open
 
-    def test_pathlib_monkeypath_read_gz(self):
+    def test_pathlib_monkeypatch_read_gz(self):
         from smart_open.smart_open_lib import pathlib
 
         path = pathlib.Path(CURR_DIR) / 'test_data' / 'crime-and-punishment.txt.gz'
@@ -384,7 +384,7 @@ class ParseUriTest(unittest.TestCase):
         # Check that our implementation works with gzip
         obj = patch_pathlib()
         try:
-            with path.open("r") as infile:
+            with path.open("r", encoding='utf-8') as infile:
                 lines = infile.readlines()
             self.assertEqual(len(lines), 3)
         finally:
