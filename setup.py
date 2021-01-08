@@ -35,10 +35,15 @@ __version__ = _get_version()
 def read(fname):
     return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
 
+aws_deps = ['boto3']
+gcp_deps = ['google-cloud-storage']
+azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
+http_deps = ['requests']
 
-tests_require = [
+all_deps = aws_deps + gcp_deps + azure_deps + http_deps
+tests_require = all_deps + [
     'mock',
-    'moto[server]',
+    'moto[server]==1.3.14',  # Older versions of moto appear broken
     'pathlib2',
     'responses',
     'boto3',
@@ -47,16 +52,6 @@ tests_require = [
     'pytest',
     'pytest-rerunfailures'
 ]
-
-install_requires = [
-    'requests',
-]
-
-aws_deps = ['boto3']
-gcp_deps = ['google-cloud-storage']
-azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
-
-all_deps = install_requires + aws_deps + gcp_deps + azure_deps
 
 setup(
     name='smart_open',
@@ -82,7 +77,6 @@ setup(
     license='MIT',
     platforms='any',
 
-    install_requires=install_requires,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
@@ -90,8 +84,10 @@ setup(
         'gcp': gcp_deps,
         'azure': azure_deps,
         'all': all_deps,
+        'http': http_deps,
+        'webhdfs': http_deps,
     },
-    python_requires=">=3.5.*",
+    python_requires=">=3.6.*",
 
     test_suite="smart_open.tests",
 
@@ -101,9 +97,9 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Topic :: System :: Distributed Computing',
         'Topic :: Database :: Front-Ends',
     ],

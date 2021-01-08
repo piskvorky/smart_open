@@ -5,6 +5,7 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
+import os
 import unittest
 
 import responses
@@ -38,6 +39,7 @@ def request_callback(request):
     return (200, HEADERS, BYTES[start:end])
 
 
+@unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
 class HttpTest(unittest.TestCase):
 
     @responses.activate

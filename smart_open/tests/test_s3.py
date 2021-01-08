@@ -15,6 +15,7 @@ import unittest
 import warnings
 from contextlib import contextmanager
 from unittest.mock import patch
+import sys
 
 import boto3
 import botocore.client
@@ -87,6 +88,27 @@ def ignore_resource_warnings():
     # Py2 doesn't have ResourceWarning, so do nothing.
     #
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
+
+
+@contextmanager
+def patch_invalid_range_response(actual_size):
+    """ Work around a bug in moto (https://github.com/spulec/moto/issues/2981) where the
+     API response doesn't match when requesting an invalid range of bytes from an S3 GetObject. """
+    _real_get = smart_open.s3._get
+
+    def mock_get(*args, **kwargs):
+        try:
+            return _real_get(*args, **kwargs)
+        except IOError as ioe:
+            error_response = smart_open.s3._unwrap_ioerror(ioe)
+            if error_response and error_response.get('Message') == 'Requested Range Not Satisfiable':
+                error_response['ActualObjectSize'] = actual_size
+                error_response['Code'] = 'InvalidRange'
+                error_response['Message'] = 'The requested range is not satisfiable'
+            raise
+
+    with patch('smart_open.s3._get', new=mock_get):
+        yield
 
 
 class BaseTest(unittest.TestCase):
@@ -300,6 +322,15 @@ class SeekableBufferedInputBaseTest(BaseTest):
             self.assertEqual(seek, len(content) - 4)
             self.assertEqual(fin.read(), b'you?')
 
+    def test_seek_past_end(self):
+        content = u"hello wořld\nhow are you?".encode('utf8')
+        put_to_bucket(contents=content)
+
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response(str(len(content))):
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            seek = fin.seek(60)
+            self.assertEqual(seek, len(content))
+
     def test_detect_eof(self):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
@@ -416,6 +447,15 @@ class SeekableBufferedInputBaseTest(BaseTest):
             fin.seek(10)
             self.assertEqual(fin.read(), content[10:])
 
+    def test_read_empty_file(self):
+        put_to_bucket(contents=b'')
+
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response('0'):
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
+                data = fin.read()
+
+        self.assertEqual(data, b'')
+
 
 @moto.mock_s3
 class MultipartWriterTest(unittest.TestCase):
@@ -490,7 +530,8 @@ class MultipartWriterTest(unittest.TestCase):
             pass
 
         # read back the same key and check its content
-        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
+        with patch_invalid_range_response('0'):
+            output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
 
         self.assertEqual(output, [])
 
@@ -612,7 +653,8 @@ class SinglepartWriterTest(unittest.TestCase):
             pass
 
         # read back the same key and check its content
-        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
+        with patch_invalid_range_response('0'):
+            output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
         self.assertEqual(output, [])
 
     def test_buffered_writer_wrapper_works(self):
@@ -669,6 +711,7 @@ class IterBucketTest(unittest.TestCase):
     def tearDown(self):
         cleanup_bucket()
 
+    @unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
     def test_iter_bucket(self):
         populate_bucket()
         results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
@@ -686,6 +729,7 @@ class IterBucketTest(unittest.TestCase):
             # verify the suggested new import is in the warning
             assert "from smart_open.s3 import iter_bucket as s3_iter_bucket" in cm.output[0]
 
+    @unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
     def test_accepts_boto3_bucket(self):
         populate_bucket()
         bucket = boto3.resource('s3').Bucket(BUCKET_NAME)
@@ -713,6 +757,7 @@ class IterBucketTest(unittest.TestCase):
 
 @moto.mock_s3
 @unittest.skipIf(not smart_open.concurrency._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
+@unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
 class IterBucketConcurrentFuturesTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
@@ -740,6 +785,7 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
 )
 @moto.mock_s3
 @unittest.skipIf(not smart_open.concurrency._MULTIPROCESSING, 'multiprocessing unavailable')
+@unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
 class IterBucketMultiprocessingTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_concurrent = smart_open.concurrency._CONCURRENT_FUTURES

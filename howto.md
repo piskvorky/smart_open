@@ -165,13 +165,45 @@ This works only when reading and writing via S3.
 
 For versioned objects, the returned object will be slightly different:
 
-```
+```python
 >>> params = {'version_id': 'KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg'}
 >>> with open('s3://smart-open-versioned/demo.txt', transport_params=params) as fin:
 ...     print(fin.to_boto3())
 s3.ObjectVersion(bucket_name='smart-open-versioned', object_key='demo.txt', id='KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg')
 
 ```
+
+## How to Read from S3 Efficiently
+
+Under the covers, `smart_open` uses the [boto3 resource API](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/resources.html) to read from S3.
+By default, calling `smart_open.open` with an S3 URL will create its own boto3 session and resource.
+These are expensive operations: they require both CPU time to construct the objects from a low-level API definition, and memory to store the objects once they have been created.
+It is possible to save both CPU time and memory by sharing the same resource across multiple `smart_open.open` calls, for example:
+
+```python
+>>> import boto3
+>>> from smart_open import open
+>>> tp = {'resource': boto3.resource('s3')}
+>>> for month in (1, 2, 3):
+...     url = 's3://nyc-tlc/trip data/yellow_tripdata_2020-%02d.csv' % month
+...     with open(url, transport_params=tp) as fin:
+...         _ = fin.readline()  # skip CSV header
+...         print(fin.readline().strip())
+1,2020-01-01 00:28:15,2020-01-01 00:33:03,1,1.20,1,N,238,239,1,6,3,0.5,1.47,0,0.3,11.27,2.5
+1,2020-02-01 00:17:35,2020-02-01 00:30:32,1,2.60,1,N,145,7,1,11,0.5,0.5,2.45,0,0.3,14.75,0
+1,2020-03-01 00:31:13,2020-03-01 01:01:42,1,4.70,1,N,88,255,1,22,3,0.5,2,0,0.3,27.8,2.5
+
+```
+
+The above sharing is safe because it is all happening in the same thread and subprocess (see below for details).
+
+## How to Work in a Parallelized Environment
+
+Under the covers, `smart_open` uses the [boto3 resource API](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/resources.html) to read from S3.
+This API is not thread-safe or multiprocess-safe.
+Do not share the same `smart_open` objects across different threads or subprocesses.
+`smart_open` will create its own session and resource objects for each individual `open` call, so you don't have to worry about managing boto3 objects.
+This comes at a price: each session and resource requires CPU time to create and memory to store, so be wary of keeping hundreds of threads or subprocesses reading/writing from/to S3.
 
 ## How to Specify the Request Payer (S3 only)
 
@@ -232,3 +264,39 @@ logging.getLogger('smart_open.s3').setLevel(logging.DEBUG)
 ```
 
 and check the log output of your code.
+
+## How to Read/Write from localstack
+
+[localstack](https://github.com/localstack/localstack) is a convenient test framework for developing cloud apps.
+You run it locally on your machine and behaves almost identically to the real AWS.
+This makes it useful for testing your code offline, without requiring you to set up mocks or test harnesses.
+
+First, install localstack and start it:
+
+    $ pip install localstack
+    $ localstack start
+
+The start command is blocking, so you'll need to run it in a separate terminal session or run it in the background.
+Before we can read/write, we'll need to create a bucket:
+
+    $ aws --endpoint-url http://localhost:4566 s3api create-bucket --bucket mybucket
+
+where `http://localhost:4566` is the default host/port that localstack uses to listen for requests.
+
+You can now read/write to the bucket the same way you would to a real S3 bucket:
+
+```python
+>>> from smart_open import open
+>>> tparams = {'resource_kwargs': {'endpoint_url': 'http://localhost:4566'}}
+>>> with open('s3://mybucket/hello.txt', 'wt', transport_params=tparams) as fout:
+...     fout.write('hello world!')
+>>> with open('s3://mybucket/hello.txt', 'rt', transport_params=tparams) as fin:
+...     fin.read()
+'hello world!'
+
+```
+
+You can also access it using the CLI:
+
+    $ aws --endpoint-url http://localhost:4566 s3 ls s3://mybucket/
+    2020-12-09 15:56:22         12 hello.txt
