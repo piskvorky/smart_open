@@ -174,6 +174,7 @@ class CrapObject:
     def __init__(self, data, modulus=2):
         self._datasize = len(data)
         self._body = CrapStream(data, modulus=modulus)
+        self.bucket_name, self.key = 'crap', 'object'
 
     def get(self, *args, **kwargs):
         return {
@@ -181,6 +182,7 @@ class CrapObject:
             'ContentLength': self._datasize,
             'ContentRange': 'bytes 0-%d/%d' % (self._datasize, self._datasize),
             'Body': self._body,
+            'ResponseMetadata': {'RetryAttempts': 1},
         }
 
 
