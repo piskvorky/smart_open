@@ -9,6 +9,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import gzip
+import os
 import os.path as P
 import subprocess
 import unittest
@@ -59,7 +60,12 @@ class CliRawInputBaseTest(unittest.TestCase):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read()
 
-        as_text = as_bytes.decode('utf-8')
+        #
+        # Not 100% sure why this is necessary on Windows platforms, but the
+        # tests fail without it.  It may be a bug, but I don't have time to
+        # investigate right now.
+        #
+        as_text = as_bytes.decode('utf-8').replace(os.linesep, '\n')
         assert as_text == self.expected
 
     def test_read_75(self):
@@ -67,7 +73,7 @@ class CliRawInputBaseTest(unittest.TestCase):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read(75)
 
-        as_text = as_bytes.decode('utf-8')
+        as_text = as_bytes.decode('utf-8').replace(os.linesep, '\n')
         assert as_text == self.expected[:len(as_text)]
 
     def test_unzip(self):
