@@ -439,7 +439,8 @@ class _SeekableRawReader(object):
         # possibility that an exception will slip past these mechanisms and
         # terminate the read prematurely.  Luckily, at this stage, it's very
         # simple to recover from the problem: wait a little bit, reopen the
-        # HTTP connection and try again.
+        # HTTP connection and try again.  Usually, a single retry attempt is
+        # enough to recover, but we try multiple times "just in case".
         #
         for attempt, seconds in enumerate([1, 2, 4, 8, 16], 1):
             try:
@@ -452,10 +453,11 @@ class _SeekableRawReader(object):
                 botocore.exceptions.BotoCoreError,
                 urllib3.exceptions.HTTPError,
             ) as err:
-                logger.error(
-                    '%s: caught %r while reading, sleeping %ds before retry',
+                logger.warning(
+                    '%s: caught %r while reading %d bytes, sleeping %ds before retry',
                     self,
                     err,
+                    size,
                     seconds,
                 )
                 time.sleep(seconds)
