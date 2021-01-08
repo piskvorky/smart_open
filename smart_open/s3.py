@@ -313,7 +313,6 @@ class _SeekableRawReader(object):
         s3_object,
         version_id=None,
         object_kwargs=None,
-        sleep_seconds=(1, 5, 15, 30, 60, None),
     ):
         self._object = s3_object
         self._content_length = None
@@ -321,7 +320,6 @@ class _SeekableRawReader(object):
         self._position = 0
         self._body = None
         self._object_kwargs = object_kwargs if object_kwargs else {}
-        self._sleep_seconds = sleep_seconds
 
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
