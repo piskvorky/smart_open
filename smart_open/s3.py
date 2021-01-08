@@ -468,6 +468,12 @@ class _SeekableRawReader(object):
 
         raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, attempt))
 
+    def __str__(self):
+        return 'smart_open.s3._SeekableReader(%r, %r)' % (
+            self._object.bucket_name,
+            self._object.key,
+        )
+
 
 class Reader(io.BufferedIOBase):
     """Reads bytes from S3.
