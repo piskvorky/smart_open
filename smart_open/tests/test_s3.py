@@ -166,21 +166,13 @@ class IncrementalBackoffTest(unittest.TestCase):
     def test_every_read_fails(self):
         reader = smart_open.s3._SeekableRawReader(CrapObject(b'hello', 1))
         with mock.patch('time.sleep') as mock_sleep:
-            with self.assertRaises(botocore.exceptions.BotoCoreError):
+            with self.assertRaises(IOError):
                 reader.read()
 
             #
             # Make sure our incremental backoff is actually happening here.
             #
-            mock_sleep.assert_has_calls(
-                [
-                    mock.call(1),
-                    mock.call(5),
-                    mock.call(15),
-                    mock.call(30),
-                    mock.call(60),
-                ]
-            )
+            mock_sleep.assert_has_calls([mock.call(s) for s in (1, 2, 4, 8, 16)])
 
     def test_every_second_read_fails(self):
         """Can we read from a stream that raises exceptions from time to time?"""

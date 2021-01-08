@@ -412,13 +412,6 @@ class _SeekableRawReader(object):
             self._position = start
             self._body = response['Body']
 
-    def _read_from_body(self, size=-1):
-        if size == -1:
-            binary = self._body.read()
-        else:
-            binary = self._body.read(size)
-        return binary
-
     def read(self, size=-1):
         """Read from the continuous connection with the remote peer."""
         if self._body is None:
@@ -429,7 +422,7 @@ class _SeekableRawReader(object):
 
         #
         # Boto3 has built-in error handling and retry mechanisms:
-        # 
+        #
         # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/error-handling.html
         # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html
         #
@@ -441,7 +434,10 @@ class _SeekableRawReader(object):
         #
         for attempt, seconds in enumerate([1, 2, 4, 8, 16], 1):
             try:
-                binary = self._read_from_body(size)
+                if size == -1:
+                    binary = self._body.read()
+                else:
+                    binary = self._body.read(size)
             except (
                 ConnectionResetError,
                 botocore.exceptions.BotoCoreError,
