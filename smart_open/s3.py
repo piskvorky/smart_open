@@ -652,11 +652,7 @@ class Reader(io.BufferedIOBase):
         while len(self._buffer) < size and not self._eof:
             bytes_read = self._buffer.fill(self._raw_reader)
             if bytes_read == 0:
-                logger.debug(
-                    'bucket: %r key: %r reached EOF while filling buffer',
-                    self._object.bucket_name,
-                    self._object.key,
-                )
+                logger.debug('%s: reached EOF while filling buffer', self)
                 self._eof = True
 
     def __str__(self):
@@ -746,6 +742,7 @@ multipart upload may fail")
         if self._total_bytes and self._mp:
             partial = functools.partial(self._mp.complete, MultipartUpload={'Parts': self._parts})
             _retry_if_failed(partial)
+            logger.debug('%s: completed multipart upload', self)
         elif self._mp:
             #
             # AWS complains with "The XML you provided was not well-formed or
@@ -757,6 +754,7 @@ multipart upload may fail")
             assert self._mp, "no multipart upload in progress"
             self._mp.abort()
             self._object.put(Body=b'')
+            logger.debug('%s: wrote 0 bytes to imitate multipart upload', self)
         self._mp = None
 
     @property
@@ -817,9 +815,8 @@ multipart upload may fail")
     def _upload_next_part(self):
         part_num = self._total_parts + 1
         logger.info(
-            "uploading bucket: %r key: %r part_num: %i, %i bytes (total %.3fGB)",
-            self._object.bucket_name,
-            self._object.key,
+            "%s: uploading part_num: %i, %i bytes (total %.3fGB)",
+            self,
             part_num,
             self._buf.tell(),
             self._total_bytes / 1024.0 ** 3,
@@ -836,12 +833,7 @@ multipart upload may fail")
         upload = _retry_if_failed(functools.partial(part.upload, Body=self._buf))
 
         self._parts.append({'ETag': upload['ETag'], 'PartNumber': part_num})
-        logger.debug(
-            "upload of bucket: %r key: %r part_num #%i finished",
-            self._object.bucket_name,
-            self._object.key,
-            part_num,
-        )
+        logger.debug("%s: upload of part_num #%i finished", self, part_num)
 
         self._total_parts += 1
         self._buf = io.BytesIO()
@@ -931,7 +923,7 @@ class SinglepartWriter(io.BufferedIOBase):
             raise ValueError(
                 'the bucket %r does not exist, or is forbidden for access' % self._object.bucket_name) from e
 
-        logger.debug("direct upload finished")
+        logger.debug("%s: direct upload finished", self)
         self._buf = None
 
     @property
