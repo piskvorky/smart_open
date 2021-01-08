@@ -900,10 +900,10 @@ class OpenTest(unittest.TestCase):
     def test_round_trip(self):
         test_string = u"ветер по морю гуляет..."
         url = 'gs://%s/%s' % (BUCKET_NAME, BLOB_NAME)
-        with smart_open.open(url, "w") as fout:
+        with smart_open.open(url, "w", encoding='utf-8') as fout:
             fout.write(test_string)
 
-        with smart_open.open(url) as fin:
+        with smart_open.open(url, encoding='utf-8') as fin:
             actual = fin.read()
 
         self.assertEqual(test_string, actual)

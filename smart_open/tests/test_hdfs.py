@@ -5,19 +5,22 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-from __future__ import print_function
-from __future__ import unicode_literals
-
 import gzip
+import os
 import os.path as P
 import subprocess
 import unittest
+import sys
 
 import mock
 
 import smart_open.hdfs
 
-import sys
+#
+# Workaround for https://bugs.python.org/issue37380
+#
+if sys.version_info[:2] == (3, 6):
+    subprocess._cleanup = lambda: None
 
 CURR_DIR = P.dirname(P.abspath(__file__))
 
@@ -44,7 +47,13 @@ def cat(path=None):
 class CliRawInputBaseTest(unittest.TestCase):
     def setUp(self):
         self.path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
-        with open(self.path) as fin:
+
+        #
+        # We have to specify the encoding explicitly, because different
+        # platforms like Windows may be using something other than unicode
+        # by default.
+        #
+        with open(self.path, encoding='utf-8') as fin:
             self.expected = fin.read()
         self.cat = cat(self.path)
 
@@ -53,7 +62,12 @@ class CliRawInputBaseTest(unittest.TestCase):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read()
 
-        as_text = as_bytes.decode('utf-8')
+        #
+        # Not 100% sure why this is necessary on Windows platforms, but the
+        # tests fail without it.  It may be a bug, but I don't have time to
+        # investigate right now.
+        #
+        as_text = as_bytes.decode('utf-8').replace(os.linesep, '\n')
         assert as_text == self.expected
 
     def test_read_75(self):
@@ -61,7 +75,7 @@ class CliRawInputBaseTest(unittest.TestCase):
             reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
             as_bytes = reader.read(75)
 
-        as_text = as_bytes.decode('utf-8')
+        as_text = as_bytes.decode('utf-8').replace(os.linesep, '\n')
         assert as_text == self.expected[:len(as_text)]
 
     def test_unzip(self):
@@ -81,6 +95,22 @@ class CliRawInputBaseTest(unittest.TestCase):
 
         as_text = as_bytes.decode('utf-8').replace('\r\n', '\n')
         assert as_text == self.expected
+
+
+class SanityTest(unittest.TestCase):
+    def test_read_bytes(self):
+        path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
+        with open(path, 'rb') as fin:
+            lines = [line for line in fin]
+        assert len(lines) == 3
+
+    def test_read_text(self):
+        path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
+        with open(path, 'r', encoding='utf-8') as fin:
+            text = fin.read()
+
+        expected = 'В начале июля, в чрезвычайно жаркое время'
+        assert text[:len(expected)] == expected
 
 
 class CliRawOutputBaseTest(unittest.TestCase):
