@@ -130,7 +130,7 @@ def _consolidate_params(uri, transport_params):
     if session is not None and (uri['access_id'] or uri['access_secret']):
         logger.warning(
             'ignoring credentials parsed from URL because they conflict with '
-            'transport_params.session. Set transport_params.session to None '
+            'transport_params["session"]. Set transport_params["session"] to None '
             'to suppress this warning.'
         )
         uri.update(access_id=None, access_secret=None)
@@ -157,7 +157,7 @@ def _override_endpoint_url(transport_params, url):
     if resource_kwargs.get('endpoint_url'):
         logger.warning(
             'ignoring endpoint_url parsed from URL because it conflicts '
-            'with transport_params.resource_kwargs.endpoint_url. '
+            'with transport_params["resource_kwargs"]["endpoint_url"]'
         )
     else:
         resource_kwargs.update(endpoint_url=url)
@@ -379,7 +379,6 @@ class _SeekableRawReader(object):
         if start is None and stop is None:
             start = self._position
         range_string = smart_open.utils.make_range_string(start, stop)
-        logger.debug('range_string: %r', range_string)
 
         try:
             # Optimistically try to fetch the requested content range.
@@ -515,7 +514,6 @@ class Reader(io.BufferedIOBase):
 
     def close(self):
         """Flush and close this stream."""
-        logger.debug("close: called")
         self._object = None
 
     def readable(self):
@@ -594,8 +592,6 @@ class Reader(io.BufferedIOBase):
         :param int whence: Where the offset is from.
 
         Returns the position after seeking."""
-        logger.debug('seeking to offset: %r whence: %r', offset, whence)
-
         # Convert relative offset to absolute, since self._raw_reader
         # doesn't know our current position.
         if whence == constants.WHENCE_CURRENT:
@@ -603,7 +599,6 @@ class Reader(io.BufferedIOBase):
             offset += self._current_pos
 
         self._current_pos = self._raw_reader.seek(offset, whence)
-        logger.debug('new_position: %r', self._current_pos)
 
         self._buffer.empty()
         self._eof = self._current_pos == self._raw_reader._content_length
@@ -647,11 +642,9 @@ class Reader(io.BufferedIOBase):
     #
     def _read_from_buffer(self, size=-1):
         """Remove at most size bytes from our buffer and return them."""
-        # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._buffer))
         size = size if size >= 0 else len(self._buffer)
         part = self._buffer.read(size)
         self._current_pos += len(part)
-        # logger.debug('part: %r', part)
         return part
 
     def _fill_buffer(self, size=-1):
@@ -659,7 +652,7 @@ class Reader(io.BufferedIOBase):
         while len(self._buffer) < size and not self._eof:
             bytes_read = self._buffer.fill(self._raw_reader)
             if bytes_read == 0:
-                logger.debug('reached EOF while filling buffer')
+                logger.debug('%s: reached EOF while filling buffer', self)
                 self._eof = True
 
     def __str__(self):
@@ -743,14 +736,13 @@ multipart upload may fail")
     # Override some methods from io.IOBase.
     #
     def close(self):
-        logger.debug("closing")
         if self._buf.tell():
             self._upload_next_part()
 
         if self._total_bytes and self._mp:
             partial = functools.partial(self._mp.complete, MultipartUpload={'Parts': self._parts})
             _retry_if_failed(partial)
-            logger.debug("completed multipart upload")
+            logger.debug('%s: completed multipart upload', self)
         elif self._mp:
             #
             # AWS complains with "The XML you provided was not well-formed or
@@ -759,12 +751,11 @@ multipart upload may fail")
             #
             # We work around this by creating an empty file explicitly.
             #
-            logger.info("empty input, ignoring multipart upload")
             assert self._mp, "no multipart upload in progress"
             self._mp.abort()
             self._object.put(Body=b'')
+            logger.debug('%s: wrote 0 bytes to imitate multipart upload', self)
         self._mp = None
-        logger.debug("successfully closed")
 
     @property
     def closed(self):
@@ -823,8 +814,13 @@ multipart upload may fail")
     #
     def _upload_next_part(self):
         part_num = self._total_parts + 1
-        logger.info("uploading part #%i, %i bytes (total %.3fGB)",
-                    part_num, self._buf.tell(), self._total_bytes / 1024.0 ** 3)
+        logger.info(
+            "%s: uploading part_num: %i, %i bytes (total %.3fGB)",
+            self,
+            part_num,
+            self._buf.tell(),
+            self._total_bytes / 1024.0 ** 3,
+        )
         self._buf.seek(0)
         part = self._mp.Part(part_num)
 
@@ -837,7 +833,7 @@ multipart upload may fail")
         upload = _retry_if_failed(functools.partial(part.upload, Body=self._buf))
 
         self._parts.append({'ETag': upload['ETag'], 'PartNumber': part_num})
-        logger.debug("upload of part #%i finished" % part_num)
+        logger.debug("%s: upload of part_num #%i finished", self, part_num)
 
         self._total_parts += 1
         self._buf = io.BytesIO()
@@ -927,7 +923,7 @@ class SinglepartWriter(io.BufferedIOBase):
             raise ValueError(
                 'the bucket %r does not exist, or is forbidden for access' % self._object.bucket_name) from e
 
-        logger.debug("direct upload finished")
+        logger.debug("%s: direct upload finished", self)
         self._buf = None
 
     @property
