@@ -938,6 +938,64 @@ class RetryIfFailedTest(unittest.TestCase):
         self.assertEqual(partial.call_count, 3)
 
 
+@moto.mock_s3()
+def test_resource_propagation_singlepart():
+    """Does the resource parameter make it from the caller to Boto3?"""
+    #
+    # Not sure why we need to create the bucket here, as setUpModule should
+    # have done that for us by now.
+    #
+    session = boto3.Session()
+    resource = session.resource('s3')
+    bucket = resource.create_bucket(Bucket=BUCKET_NAME)
+    bucket.wait_until_exists()
+
+    with smart_open.s3.open(
+        BUCKET_NAME,
+        WRITE_KEY_NAME,
+        mode='wb',
+        resource=resource,
+        multipart_upload=False,
+    ) as writer:
+        assert writer._resource == resource
+        assert id(writer._resource) == id(resource)
+
+
+@moto.mock_s3()
+def test_resource_propagation_multipart():
+    """Does the resource parameter make it from the caller to Boto3?"""
+    session = boto3.Session()
+    resource = session.resource('s3')
+    bucket = resource.create_bucket(Bucket=BUCKET_NAME)
+    bucket.wait_until_exists()
+
+    with smart_open.s3.open(
+        BUCKET_NAME,
+        WRITE_KEY_NAME,
+        mode='wb',
+        resource=resource,
+        multipart_upload=True,
+    ) as writer:
+        assert writer._resource == resource
+        assert id(writer._resource) == id(resource)
+
+
+@moto.mock_s3()
+def test_resource_propagation_reader():
+    """Does the resource parameter make it from the caller to Boto3?"""
+    session = boto3.Session()
+    resource = session.resource('s3')
+    bucket = resource.create_bucket(Bucket=BUCKET_NAME)
+    bucket.wait_until_exists()
+
+    with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, mode='wb') as writer:
+        writer.write(b'hello world')
+
+    with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, mode='rb', resource=resource) as reader:
+        assert reader._resource == resource
+        assert id(reader._resource) == id(resource)
+
+
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
     unittest.main()
