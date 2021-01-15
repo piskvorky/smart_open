@@ -11,6 +11,7 @@ import io
 import functools
 import logging
 import time
+import urllib3.exceptions
 
 try:
     import boto3
@@ -307,7 +308,12 @@ class _SeekableRawReader(object):
     This class is internal to the S3 submodule.
     """
 
-    def __init__(self, s3_object, version_id=None, object_kwargs=None):
+    def __init__(
+        self,
+        s3_object,
+        version_id=None,
+        object_kwargs=None,
+    ):
         self._object = s3_object
         self._content_length = None
         self._version_id = version_id
@@ -396,17 +402,21 @@ class _SeekableRawReader(object):
             self._position = self._content_length = int(error_response['ActualObjectSize'])
             self._body = io.BytesIO()
         else:
+            #
+            # Keep track of how many times boto3's built-in retry mechanism
+            # activated.
+            #
+            # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html#checking-retry-attempts-in-an-aws-service-response
+            #
+            logger.debug(
+                '%s: RetryAttempts: %d',
+                self,
+                response['ResponseMetadata']['RetryAttempts'],
+            )
             units, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
             self._content_length = length
             self._position = start
             self._body = response['Body']
-
-    def _read_from_body(self, size=-1):
-        if size == -1:
-            binary = self._body.read()
-        else:
-            binary = self._body.read(size)
-        return binary
 
     def read(self, size=-1):
         """Read from the continuous connection with the remote peer."""
@@ -416,14 +426,50 @@ class _SeekableRawReader(object):
         if self._position >= self._content_length:
             return b''
 
-        try:
-            binary = self._read_from_body(size)
-        except botocore.exceptions.IncompleteReadError:
-            # The underlying connection of the self._body was closed by the remote peer.
-            self._open_body()
-            binary = self._read_from_body(size)
-        self._position += len(binary)
-        return binary
+        #
+        # Boto3 has built-in error handling and retry mechanisms:
+        #
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/error-handling.html
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html
+        #
+        # Unfortunately, it isn't always enough. There is still a non-zero
+        # possibility that an exception will slip past these mechanisms and
+        # terminate the read prematurely.  Luckily, at this stage, it's very
+        # simple to recover from the problem: wait a little bit, reopen the
+        # HTTP connection and try again.  Usually, a single retry attempt is
+        # enough to recover, but we try multiple times "just in case".
+        #
+        for attempt, seconds in enumerate([1, 2, 4, 8, 16], 1):
+            try:
+                if size == -1:
+                    binary = self._body.read()
+                else:
+                    binary = self._body.read(size)
+            except (
+                ConnectionResetError,
+                botocore.exceptions.BotoCoreError,
+                urllib3.exceptions.HTTPError,
+            ) as err:
+                logger.warning(
+                    '%s: caught %r while reading %d bytes, sleeping %ds before retry',
+                    self,
+                    err,
+                    size,
+                    seconds,
+                )
+                time.sleep(seconds)
+                self._open_body()
+            else:
+                self._position += len(binary)
+                return binary
+
+        raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, attempt))
+
+    def __str__(self):
+        return 'smart_open.s3._SeekableReader(%r, %r)' % (
+            self._object.bucket_name,
+            self._object.key,
+        )
 
 
 def _initialize_boto3(rw, session, resource, resource_kwargs):

@@ -224,6 +224,47 @@ To access such buckets, you need to pass some special transport parameters:
 
 This works only when reading and writing via S3.
 
+## How to Make S3 I/O Robust to Network Errors
+
+Boto3 has a [built-in mechanism](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html) for retrying after a recoverable error.
+You can fine-tune it using several ways:
+
+### Pre-configuring a boto3 resource and then passing the resource to smart_open
+
+```python
+>>> import boto3
+>>> import botocore.config
+>>> import smart_open
+>>> config = botocore.config.Config(retries={'mode': 'standard'})
+>>> resource = boto3.resource('s3', config=config)
+>>> tp = {'resource': resource}
+>>> with smart_open.open('s3://commoncrawl/robots.txt', transport_params=tp) as fin:
+...     print(fin.readline())
+User-Agent: *
+```
+
+### Directly passing configuration as transport parameters to smart_open
+
+```python
+>>> import boto3
+>>> import botocore.config
+>>> import smart_open
+>>> config = botocore.config.Config(retries={'mode': 'standard'})
+>>> tp = {'resource_kwargs': {'config': config}}
+>>> with smart_open.open('s3://commoncrawl/robots.txt', transport_params=tp) as fin:
+...     print(fin.readline())
+User-Agent: *
+```
+
+To verify your settings have effect:
+
+```python
+import logging
+logging.getLogger('smart_open.s3').setLevel(logging.DEBUG)
+```
+
+and check the log output of your code.
+
 ## How to Read/Write from localstack
 
 [localstack](https://github.com/localstack/localstack) is a convenient test framework for developing cloud apps.

@@ -1,5 +1,7 @@
 # Unreleased
 
+- Improve robustness of S3 reading (PR [#552](https://github.com/RaRe-Technologies/smart_open/pull/552), [@mpenkov](https://github.com/mpenkov))
+
 # 4.1.0, 30 Dec 2020
 
 - Refactor `s3` submodule to minimize resource usage (PR [#569](https://github.com/RaRe-Technologies/smart_open/pull/569), [@mpenkov](https://github.com/mpenkov))
