@@ -55,6 +55,6 @@ jobs:
       - name: Upload code coverage to coveralls.io
         if: {{ matrix.coveralls }}
         continue-on-error: true
-		uses: coverallsapp/github-action@v1.1.2
-		with:
-		  github-token: ${{ github.token }}
+        uses: coverallsapp/github-action@v1.1.2
+        with:
+          github-token: ${{ github.token }}
