@@ -1,6 +1,7 @@
 # Unreleased
 
 - Correctly pass boto3 resource to writers (PR [#576](https://github.com/RaRe-Technologies/smart_open/pull/576), [@jackluo923](https://github.com/jackluo923))
+- Improve robustness of S3 reading (PR [#552](https://github.com/RaRe-Technologies/smart_open/pull/552), [@mpenkov](https://github.com/mpenkov))
 
 # 4.1.0, 30 Dec 2020
 
