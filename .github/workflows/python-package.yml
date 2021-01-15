@@ -52,10 +52,15 @@ jobs:
       # reasons (e.g. https://github.com/lemurheavy/coveralls-public/issues/1392)
       # and we don't want it to break the build.
       #
+      # Looks like there's a github action for this
+      # (https://github.com/coverallsapp/github-action/issues/30) but it does
+      # not work with pytest output.
+      #
       - name: Upload code coverage to coveralls.io
         if: ${{ matrix.coveralls }}
         continue-on-error: true
-        uses: coverallsapp/github-action@v1.1.2
-        with:
-          github-token: ${{ github.token }}
-          path-to-lcov: .tox/test_coverage/.coverage/lcov.info
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          pip install coveralls
+          coveralls
