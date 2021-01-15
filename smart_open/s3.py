@@ -11,12 +11,12 @@ import io
 import functools
 import logging
 import time
-import urllib3.exceptions
 
 try:
     import boto3
     import botocore.client
     import botocore.exceptions
+    import urllib3.exceptions
 except ImportError:
     MISSING_DEPS = True
 
