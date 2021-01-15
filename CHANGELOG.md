@@ -1,5 +1,7 @@
 # Unreleased
 
+- Correctly pass boto3 resource to writers (PR [#576](https://github.com/RaRe-Technologies/smart_open/pull/576), [@jackluo923](https://github.com/jackluo923))
+
 # 4.1.0, 30 Dec 2020
 
 - Refactor `s3` submodule to minimize resource usage (PR [#569](https://github.com/RaRe-Technologies/smart_open/pull/569), [@mpenkov](https://github.com/mpenkov))
