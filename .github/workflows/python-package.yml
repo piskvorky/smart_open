@@ -47,7 +47,7 @@ jobs:
 
       #
       # The test_coverage environment in tox.ini generates coverage data and
-      # saves it to .coverage.  This step uploads that data.  We do it
+      # saves it to disk.  This step uploads that data.  We do it
       # separately from the tox env because the upload can fail for various
       # reasons (e.g. https://github.com/lemurheavy/coveralls-public/issues/1392)
       # and we don't want it to break the build.
@@ -58,3 +58,4 @@ jobs:
         uses: coverallsapp/github-action@v1.1.2
         with:
           github-token: ${{ github.token }}
+          path-to-lcov: .tox/test_coverage/.coverage/lcov.info
