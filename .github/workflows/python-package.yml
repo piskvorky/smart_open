@@ -53,7 +53,7 @@ jobs:
       # and we don't want it to break the build.
       #
       - name: Upload code coverage to coveralls.io
-        if: {{ matrix.coveralls }}
+        if: ${{ matrix.coveralls }}
         continue-on-error: true
         uses: coverallsapp/github-action@v1.1.2
         with:
