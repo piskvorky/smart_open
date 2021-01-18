@@ -1,6 +1,6 @@
 # Unreleased
 
-# 4.1.1, 18 Jan 2021
+# 4.1.2, 18 Jan 2021
 
 - Correctly pass boto3 resource to writers (PR [#576](https://github.com/RaRe-Technologies/smart_open/pull/576), [@jackluo923](https://github.com/jackluo923))
 - Improve robustness of S3 reading (PR [#552](https://github.com/RaRe-Technologies/smart_open/pull/552), [@mpenkov](https://github.com/mpenkov))
