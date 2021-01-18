@@ -289,28 +289,18 @@ def open(
             min_part_size=min_part_size,
             session=session,
             upload_kwargs=multipart_upload_kwargs,
+            resource=resource,
             resource_kwargs=resource_kwargs,
         )
     elif mode == constants.WRITE_BINARY:
-        if multipart_upload:
-            fileobj = MultipartWriter(
-                bucket_id,
-                key_id,
-                min_part_size=min_part_size,
-                session=session,
-                resource=resource,
-                upload_kwargs=multipart_upload_kwargs,
-                resource_kwargs=resource_kwargs,
-            )
-        else:
-            fileobj = SinglepartWriter(
-                bucket_id,
-                key_id,
-                session=session,
-                resource=resource,
-                upload_kwargs=singlepart_upload_kwargs,
-                resource_kwargs=resource_kwargs,
-            )
+        fileobj = SinglepartWriter(
+            bucket_id,
+            key_id,
+            session=session,
+            upload_kwargs=singlepart_upload_kwargs,
+            resource=resource,
+            resource_kwargs=resource_kwargs,
+        )
     else:
         assert False, 'unexpected mode: %r' % mode
 
@@ -553,6 +543,7 @@ class Reader(io.BufferedIOBase):
         buffer_size: int = DEFAULT_BUFFER_SIZE,
         line_terminator: bytes = constants.BINARY_NEWLINE,
         session: Optional['boto3.Session'] = None,
+        resource: Optional['boto3.resource'] = None,
         resource_kwargs: Optional[Kwargs] = None,
         object_kwargs: Optional[Kwargs] = None,
         defer_seek: bool = False,
