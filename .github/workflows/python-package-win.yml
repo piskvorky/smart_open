@@ -1,5 +1,5 @@
 name: Test under Windows
-on: push
+on: [push, pull_request]
 jobs:
   build:
     runs-on: windows-2019
