@@ -15,8 +15,8 @@ The main functions are:
 
 """
 
-import codecs
 import collections
+import io
 import locale
 import logging
 import os
@@ -225,7 +225,13 @@ def open(
         decompressed = compression.compression_wrapper(binary, binary_mode)
 
     if 'b' not in mode or explicit_encoding is not None:
-        decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
+        decoded = _encoding_wrapper(
+            decompressed,
+            mode,
+            encoding=encoding,
+            errors=errors,
+            newline=newline,
+        )
     else:
         decoded = decompressed
 
@@ -381,7 +387,7 @@ def _open_binary_stream(uri, mode, transport_params):
     return fobj
 
 
-def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
+def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
@@ -410,11 +416,13 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
     if encoding is None:
         encoding = DEFAULT_ENCODING
 
-    kw = {'errors': errors} if errors else {}
-    if mode[0] == 'r' or mode.endswith('+'):
-        fileobj = codecs.getreader(encoding)(fileobj, **kw)
-    if mode[0] in ('w', 'a') or mode.endswith('+'):
-        fileobj = codecs.getwriter(encoding)(fileobj, **kw)
+    fileobj = io.TextIOWrapper(
+        fileobj,
+        encoding=encoding,
+        errors=errors,
+        newline=newline,
+        write_through=True,
+    )
     return fileobj
 
 
