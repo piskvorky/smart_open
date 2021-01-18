@@ -9,10 +9,17 @@
 import logging
 import os.path
 
+from typing import (
+    Callable,
+    Dict,
+    IO,
+)
+
 logger = logging.getLogger(__name__)
 
 
-_COMPRESSOR_REGISTRY = {}
+Compressor = Callable[[IO, str], IO]
+_COMPRESSOR_REGISTRY: Dict[str, Compressor] = {}
 
 
 def get_supported_extensions():

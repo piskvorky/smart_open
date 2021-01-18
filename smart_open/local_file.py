@@ -6,6 +6,7 @@
 # from the MIT License (MIT).
 #
 """Implements the transport for the file:// schema."""
+import collections
 import io
 import os.path
 
@@ -20,18 +21,19 @@ URI_EXAMPLES = (
     'file:///home/user/file.bz2',
 )
 
+Uri = collections.namedtuple('Uri', 'scheme uri_path')
 
 open = io.open
 
 
-def parse_uri(uri_as_string):
+def parse_uri(uri_as_string: str) -> Uri:
     local_path = extract_local_path(uri_as_string)
-    return dict(scheme=SCHEME, uri_path=local_path)
+    return Uri(scheme=SCHEME, uri_path=local_path)
 
 
 def open_uri(uri_as_string, mode, transport_params):
     parsed_uri = parse_uri(uri_as_string)
-    fobj = io.open(parsed_uri['uri_path'], mode)
+    fobj = io.open(parsed_uri.uri_path, mode)
     return fobj
 
 

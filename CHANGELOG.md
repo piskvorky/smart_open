@@ -1,5 +1,7 @@
 # Unreleased
 
+- Introduced type annotations
+
 # 4.1.2, 18 Jan 2021
 
 - Correctly pass boto3 resource to writers (PR [#576](https://github.com/RaRe-Technologies/smart_open/pull/576), [@jackluo923](https://github.com/jackluo923))
@@ -35,6 +37,7 @@ to install the AWS dependencies only, or
     pip install smart_open[all]
 
 to install all dependencies, including AWS, GCS, etc.
+>>>>>>> upstream/develop
 
 # 2.2.1, 1 Oct 2020
 

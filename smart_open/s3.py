@@ -7,10 +7,23 @@
 #
 """Implements file-like objects for reading and writing from/to AWS S3."""
 
+import collections
 import io
 import functools
 import logging
 import time
+
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    IO,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 try:
     import boto3
@@ -25,6 +38,8 @@ import smart_open.concurrency
 import smart_open.utils
 
 from smart_open import constants
+
+Kwargs = Dict[str, Any]
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +66,22 @@ _SLEEP_SECONDS = 10
 # Returned by AWS when we try to seek beyond EOF.
 _OUT_OF_RANGE = 'InvalidRange'
 
+Uri = collections.namedtuple(
+    'Uri',
+    [
+        'scheme',
+        'bucket_id',
+        'key_id',
+        'port',
+        'host',
+        'ordinary_calling_format',
+        'access_id',
+        'access_secret',
+    ]
+)
 
-def parse_uri(uri_as_string):
+
+def parse_uri(uri_as_string: str) -> Uri:
     #
     # Restrictions on bucket names and labels:
     #
@@ -92,15 +121,15 @@ def parse_uri(uri_as_string):
     if '@' in head and ':' in head:
         ordinary_calling_format = True
         host_port, bucket_id = head.split('@')
-        host, port = host_port.split(':', 1)
-        port = int(port)
+        host, port_str = host_port.split(':', 1)
+        port = int(port_str)
     elif '@' in head:
         ordinary_calling_format = True
         host, bucket_id = head.split('@')
     else:
         bucket_id = head
 
-    return dict(
+    return Uri(
         scheme=split_uri.scheme,
         bucket_id=bucket_id,
         key_id=key_id,
@@ -112,7 +141,7 @@ def parse_uri(uri_as_string):
     )
 
 
-def _consolidate_params(uri, transport_params):
+def _consolidate_params(uri: Uri, transport_params: Kwargs) -> Tuple[Uri, Kwargs]:
     """Consolidates the parsed Uri with the additional parameters.
 
     This is necessary because the user can pass some of the parameters can in
@@ -128,28 +157,28 @@ def _consolidate_params(uri, transport_params):
     transport_params = dict(transport_params)
 
     session = transport_params.get('session')
-    if session is not None and (uri['access_id'] or uri['access_secret']):
+    if session is not None and (uri.access_id or uri.access_secret):
         logger.warning(
             'ignoring credentials parsed from URL because they conflict with '
             'transport_params["session"]. Set transport_params["session"] to None '
             'to suppress this warning.'
         )
-        uri.update(access_id=None, access_secret=None)
-    elif (uri['access_id'] and uri['access_secret']):
+        uri = uri._replace(access_id=None, access_secret=None)
+    elif (uri.access_id and uri.access_secret):
         transport_params['session'] = boto3.Session(
-            aws_access_key_id=uri['access_id'],
-            aws_secret_access_key=uri['access_secret'],
+            aws_access_key_id=uri.access_id,
+            aws_secret_access_key=uri.access_secret,
         )
-        uri.update(access_id=None, access_secret=None)
+        uri = uri._replace(access_id=None, access_secret=None)
 
-    if uri['host'] != DEFAULT_HOST:
-        endpoint_url = 'https://%(host)s:%(port)d' % uri
+    if uri.host != DEFAULT_HOST:
+        endpoint_url = 'https://%s:%d' % (uri.host, uri.port)
         _override_endpoint_url(transport_params, endpoint_url)
 
     return uri, transport_params
 
 
-def _override_endpoint_url(transport_params, url):
+def _override_endpoint_url(transport_params: Kwargs, url: str) -> None:
     try:
         resource_kwargs = transport_params['resource_kwargs']
     except KeyError:
@@ -164,73 +193,70 @@ def _override_endpoint_url(transport_params, url):
         resource_kwargs.update(endpoint_url=url)
 
 
-def open_uri(uri, mode, transport_params):
+def open_uri(uri: str, mode: str, transport_params: Kwargs) -> IO[bytes]:
     parsed_uri = parse_uri(uri)
     parsed_uri, transport_params = _consolidate_params(parsed_uri, transport_params)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
-    return open(parsed_uri['bucket_id'], parsed_uri['key_id'], mode, **kwargs)
+    return open(parsed_uri.bucket_id, parsed_uri.key_id, mode, **kwargs)
 
 
 def open(
-    bucket_id,
-    key_id,
-    mode,
-    version_id=None,
-    buffer_size=DEFAULT_BUFFER_SIZE,
-    min_part_size=DEFAULT_MIN_PART_SIZE,
-    session=None,
-    resource=None,
-    resource_kwargs=None,
-    multipart_upload_kwargs=None,
-    multipart_upload=True,
-    singlepart_upload_kwargs=None,
-    object_kwargs=None,
-    defer_seek=False,
-):
+    bucket_id: str,
+    key_id: str,
+    mode: str,
+    version_id: Optional[str] = None,
+    buffer_size: int = DEFAULT_BUFFER_SIZE,
+    min_part_size: int = DEFAULT_MIN_PART_SIZE,
+    session: Optional['boto3.Session'] = None,
+    resource: Optional['boto3.resource'] = None,
+    resource_kwargs: dict = None,
+    multipart_upload_kwargs: Optional[dict] = None,
+    multipart_upload: bool = True,
+    singlepart_upload_kwargs: Optional[dict] = None,
+    object_kwargs: Optional[dict] = None,
+    defer_seek: bool = False,
+) -> IO[bytes]:
     """Open an S3 object for reading or writing.
 
     Parameters
     ----------
-    bucket_id: str
-        The name of the bucket this object resides in.
-    key_id: str
+    :param bucket_id: The name of the bucket this object resides in.
+    :param key_id:
         The name of the key within the bucket.
-    mode: str
+    :param mode:
         The mode for opening the object.  Must be either "rb" or "wb".
-    buffer_size: int, optional
+    :param buffer_size:
         The buffer size to use when performing I/O.
-    min_part_size: int, optional
+    :param min_part_size:
         The minimum part size for multipart uploads.  For writing only.
-    session: object, optional
+    :param session:
         The S3 session to use when working with boto3.
         If you don't specify this, then smart_open will create a new session for you.
-    resource: object, optional
+    :param resource:
         The S3 resource to use when working with boto3.
         If you don't specify this, then smart_open will create a new resource for you.
-    resource_kwargs: dict, optional
+    :param resource_kwargs:
         Keyword arguments to use when creating the S3 resource for reading or writing.
         Will be ignored if you specify the resource object explicitly.
-    multipart_upload_kwargs: dict, optional
+    :param multipart_upload_kwargs:
         Additional parameters to pass to boto3's initiate_multipart_upload function.
         For writing only.
-    singlepart_upload_kwargs: dict, optional
+    :param singlepart_upload_kwargs:
         Additional parameters to pass to boto3's S3.Object.put function when using single
         part upload.
         For writing only.
-    multipart_upload: bool, optional
-        Default: `True`
+    :param multipart_upload:
         If set to `True`, will use multipart upload for writing to S3. If set
         to `False`, S3 upload will use the S3 Single-Part Upload API, which
         is more ideal for small file sizes.
         For writing only.
-    version_id: str, optional
+    :param version_id:
         Version of the object, used when reading object.
         If None, will fetch the most recent version.
-    object_kwargs: dict, optional
+    :param object_kwargs:
         Additional parameters to pass to boto3's object.get function.
         Used during reading only.
-    defer_seek: boolean, optional
-        Default: `False`
+    :param defer_seek:
         If set to `True` on a file opened for reading, GetObject will not be
         called until the first seek() or read().
         Avoids redundant API queries when seeking before reading.
@@ -241,6 +267,8 @@ def open(
 
     if (mode == constants.WRITE_BINARY) and (version_id is not None):
         raise ValueError("version_id must be None when writing")
+
+    fileobj: Union[Reader, SinglepartWriter, MultipartWriter, None] = None
 
     if mode == constants.READ_BINARY:
         fileobj = Reader(
@@ -254,34 +282,33 @@ def open(
             object_kwargs=object_kwargs,
             defer_seek=defer_seek,
         )
+    elif mode == constants.WRITE_BINARY and multipart_upload:
+        fileobj = MultipartWriter(
+            bucket_id,
+            key_id,
+            min_part_size=min_part_size,
+            session=session,
+            upload_kwargs=multipart_upload_kwargs,
+            resource=resource,
+            resource_kwargs=resource_kwargs,
+        )
     elif mode == constants.WRITE_BINARY:
-        if multipart_upload:
-            fileobj = MultipartWriter(
-                bucket_id,
-                key_id,
-                min_part_size=min_part_size,
-                session=session,
-                resource=resource,
-                upload_kwargs=multipart_upload_kwargs,
-                resource_kwargs=resource_kwargs,
-            )
-        else:
-            fileobj = SinglepartWriter(
-                bucket_id,
-                key_id,
-                session=session,
-                resource=resource,
-                upload_kwargs=singlepart_upload_kwargs,
-                resource_kwargs=resource_kwargs,
-            )
+        fileobj = SinglepartWriter(
+            bucket_id,
+            key_id,
+            session=session,
+            upload_kwargs=singlepart_upload_kwargs,
+            resource=resource,
+            resource_kwargs=resource_kwargs,
+        )
     else:
         assert False, 'unexpected mode: %r' % mode
 
-    fileobj.name = key_id
-    return fileobj
+    assert fileobj
+    return fileobj  # type: ignore
 
 
-def _get(s3_object, version=None, **kwargs):
+def _get(s3_object: 'boto3.s3.Object', version: Optional[str] = None, **kwargs) -> Any:
     if version is not None:
         kwargs['VersionId'] = version
     try:
@@ -292,14 +319,14 @@ def _get(s3_object, version=None, **kwargs):
                 s3_object.bucket_name, s3_object.key, version, error
             )
         )
-        wrapped_error.backend_error = error
+        wrapped_error.backend_error = error  # type: ignore
         raise wrapped_error from error
 
 
-def _unwrap_ioerror(ioe):
+def _unwrap_ioerror(ioe: IOError) -> Optional[Dict]:
     """Given an IOError from _get, return the 'Error' dictionary from boto."""
     try:
-        return ioe.backend_error.response['Error']
+        return ioe.backend_error.response['Error']  # type: ignore
     except (AttributeError, KeyError):
         return None
 
@@ -312,28 +339,20 @@ class _SeekableRawReader(object):
 
     def __init__(
         self,
-        s3_object,
-        version_id=None,
-        object_kwargs=None,
-    ):
+        s3_object: 'boto3.s3.Object',
+        version_id: Optional[str] = None,
+        object_kwargs: Optional[Kwargs] = None,
+    ) -> None:
         self._object = s3_object
-        self._content_length = None
+        self._content_length: Optional[int] = None
         self._version_id = version_id
         self._position = 0
-        self._body = None
+        self._body: Optional[io.BytesIO] = None
         self._object_kwargs = object_kwargs if object_kwargs else {}
 
-    def seek(self, offset, whence=constants.WHENCE_START):
-        """Seek to the specified position.
-
-        :param int offset: The offset in bytes.
-        :param int whence: Where the offset is from.
-
-        :returns: the position after seeking.
-        :rtype: int
-        """
+    def seek(self, offset: int, whence: int = constants.WHENCE_START) -> int:
         if whence not in constants.WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % constants.WHENCE_CHOICES)
+            raise ValueError('invalid whence, expected one of %r' % list(constants.WHENCE_CHOICES))
 
         #
         # Close old body explicitly.
@@ -367,13 +386,15 @@ class _SeekableRawReader(object):
 
         if reached_eof:
             self._body = io.BytesIO()
+
+            assert self._content_length
             self._position = self._content_length
         else:
             self._open_body(start, stop)
 
         return self._position
 
-    def _open_body(self, start=None, stop=None):
+    def _open_body(self, start: Optional[int] = None, stop: Optional[int] = None) -> None:
         """Open a connection to download the specified range of bytes. Store
         the open file handle in self._body.
 
@@ -420,11 +441,13 @@ class _SeekableRawReader(object):
             self._position = start
             self._body = response['Body']
 
-    def read(self, size=-1):
+    def read(self, size: int = -1) -> bytes:
         """Read from the continuous connection with the remote peer."""
         if self._body is None:
             # This is necessary for the very first read() after __init__().
             self._open_body()
+
+        assert self._content_length
         if self._position >= self._content_length:
             return b''
 
@@ -514,17 +537,18 @@ class Reader(io.BufferedIOBase):
 
     def __init__(
         self,
-        bucket,
-        key,
-        version_id=None,
-        buffer_size=DEFAULT_BUFFER_SIZE,
-        line_terminator=constants.BINARY_NEWLINE,
-        session=None,
-        resource=None,
-        resource_kwargs=None,
-        object_kwargs=None,
-        defer_seek=False,
-    ):
+        bucket: str,
+        key: str,
+        version_id: Optional[str] = None,
+        buffer_size: int = DEFAULT_BUFFER_SIZE,
+        line_terminator: bytes = constants.BINARY_NEWLINE,
+        session: Optional['boto3.Session'] = None,
+        resource: Optional['boto3.resource'] = None,
+        resource_kwargs: Optional[Kwargs] = None,
+        object_kwargs: Optional[Kwargs] = None,
+        defer_seek: bool = False,
+    ) -> None:
+        self.name = key
         self._buffer_size = buffer_size
 
         if resource_kwargs is None:
@@ -551,7 +575,7 @@ class Reader(io.BufferedIOBase):
         #
         # This member is part of the io.BufferedIOBase interface.
         #
-        self.raw = None
+        self.raw = None  # type: ignore
 
         if not defer_seek:
             self.seek(0)
@@ -636,8 +660,8 @@ class Reader(io.BufferedIOBase):
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
 
-        :param int offset: The offset in bytes.
-        :param int whence: Where the offset is from.
+        :param offset: The offset in bytes.
+        :param whence: Where the offset is from.
 
         Returns the position after seeking."""
         # Convert relative offset to absolute, since self._raw_reader
@@ -668,7 +692,7 @@ class Reader(io.BufferedIOBase):
         """Do nothing."""
         pass
 
-    def to_boto3(self):
+    def to_boto3(self) -> 'boto3.s3.Object':
         """Create an **independent** `boto3.s3.Object` instance that points to
         the same resource as this instance.
 
@@ -688,14 +712,14 @@ class Reader(io.BufferedIOBase):
     #
     # Internal methods.
     #
-    def _read_from_buffer(self, size=-1):
+    def _read_from_buffer(self, size: int = -1) -> bytes:
         """Remove at most size bytes from our buffer and return them."""
         size = size if size >= 0 else len(self._buffer)
         part = self._buffer.read(size)
         self._current_pos += len(part)
         return part
 
-    def _fill_buffer(self, size=-1):
+    def _fill_buffer(self, size: int = -1) -> None:
         size = max(size, self._buffer._chunk_size)
         while len(self._buffer) < size and not self._eof:
             bytes_read = self._buffer.fill(self._raw_reader)
@@ -736,14 +760,14 @@ class MultipartWriter(io.BufferedIOBase):
 
     def __init__(
         self,
-        bucket,
-        key,
-        min_part_size=DEFAULT_MIN_PART_SIZE,
-        session=None,
-        resource=None,
-        resource_kwargs=None,
-        upload_kwargs=None,
-    ):
+        bucket: str,
+        key: str,
+        min_part_size: int = DEFAULT_MIN_PART_SIZE,
+        session: Optional['boto3.Session'] = None,
+        resource: Optional['boto3.resource'] = None,
+        resource_kwargs: Optional[Kwargs] = None,
+        upload_kwargs: Optional[Kwargs] = None,
+    ) -> None:
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
@@ -770,12 +794,12 @@ multipart upload may fail")
         self._buf = io.BytesIO()
         self._total_bytes = 0
         self._total_parts = 0
-        self._parts = []
+        self._parts: List[Dict] = []
 
         #
         # This member is part of the io.BufferedIOBase interface.
         #
-        self.raw = None
+        self.raw = None  # type: ignore
 
     def flush(self):
         pass
@@ -846,7 +870,7 @@ multipart upload may fail")
         self._mp.abort()
         self._mp = None
 
-    def to_boto3(self):
+    def to_boto3(self) -> 'boto3.s3.Object':
         """Create an **independent** `boto3.s3.Object` instance that points to
         the same resource as this instance.
 
@@ -860,7 +884,7 @@ multipart upload may fail")
     #
     # Internal methods.
     #
-    def _upload_next_part(self):
+    def _upload_next_part(self) -> None:
         part_num = self._total_parts + 1
         logger.info(
             "%s: uploading part_num: %i, %i bytes (total %.3fGB)",
@@ -923,14 +947,15 @@ class SinglepartWriter(io.BufferedIOBase):
     the data be written to S3 and the buffer is released."""
 
     def __init__(
-            self,
-            bucket,
-            key,
-            session=None,
-            resource=None,
-            resource_kwargs=None,
-            upload_kwargs=None,
-            ):
+        self,
+        bucket: str,
+        key: str,
+        session: Optional['boto3.Session'] = None,
+        resource: Optional['boto3.resource'] = None,
+        resource_kwargs: Optional[Kwargs] = None,
+        upload_kwargs: Optional[Kwargs] = None,
+    ) -> None:
+        self.name = key
 
         _initialize_boto3(self, session, resource, resource_kwargs)
 
@@ -951,7 +976,7 @@ class SinglepartWriter(io.BufferedIOBase):
         #
         # This member is part of the io.BufferedIOBase interface.
         #
-        self.raw = None
+        self.raw = None  # type: ignore
 
     def flush(self):
         pass
@@ -992,7 +1017,7 @@ class SinglepartWriter(io.BufferedIOBase):
     def detach(self):
         raise io.UnsupportedOperation("detach() not supported")
 
-    def write(self, b):
+    def write(self, b: bytes) -> int:
         """Write the given buffer (bytes, bytearray, memoryview or any buffer
         interface implementation) into the buffer. Content of the buffer will be
         written to S3 on close as a single-part upload.
@@ -1003,7 +1028,7 @@ class SinglepartWriter(io.BufferedIOBase):
         self._total_bytes += length
         return length
 
-    def terminate(self):
+    def terminate(self) -> None:
         """Nothing to cancel in single-part uploads."""
         return
 
@@ -1036,16 +1061,17 @@ class SinglepartWriter(io.BufferedIOBase):
 
 
 def _retry_if_failed(
-        partial,
-        attempts=_UPLOAD_ATTEMPTS,
-        sleep_seconds=_SLEEP_SECONDS,
-        exceptions=None):
+    partial: Callable,
+    attempts: int = _UPLOAD_ATTEMPTS,
+    sleep_seconds: int = _SLEEP_SECONDS,
+    exceptions: Optional[List[Exception]] = None,
+) -> Any:
     if exceptions is None:
-        exceptions = (botocore.exceptions.EndpointConnectionError, )
+        exceptions = [botocore.exceptions.EndpointConnectionError]
     for attempt in range(attempts):
         try:
             return partial()
-        except exceptions:
+        except tuple(exceptions):  # type: ignore
             logger.critical(
                 'Unable to connect to the endpoint. Check your network connection. '
                 'Sleeping and retrying %d more times '
@@ -1069,37 +1095,37 @@ def _accept_all(key):
 
 
 def iter_bucket(
-        bucket_name,
-        prefix='',
-        accept_key=None,
-        key_limit=None,
-        workers=16,
-        retries=3,
-        **session_kwargs):
+    bucket_name: str,
+    prefix: str = '',
+    accept_key: Callable = None,
+    key_limit: Optional[int] = None,
+    workers: int = 16,
+    retries: int = 3,
+    **session_kwargs: Any,
+) -> Iterator[Tuple[str, bytes]]:
     """
     Iterate and download all S3 objects under `s3://bucket_name/prefix`.
 
     Parameters
     ----------
-    bucket_name: str
+    :param bucket_name:
         The name of the bucket.
-    prefix: str, optional
-        Limits the iteration to keys starting with the prefix.
-    accept_key: callable, optional
+    :param prefix:
+        Limits the iteration to keys starting wit the prefix.
+    :param accept_key:
         This is a function that accepts a key name (unicode string) and
         returns True/False, signalling whether the given key should be downloaded.
         The default behavior is to accept all keys.
-    key_limit: int, optional
+    :param key_limit:
         If specified, the iterator will stop after yielding this many results.
-    workers: int, optional
+    :param workers:
         The number of subprocesses to use.
-    retries: int, optional
+    :param retries:
         The number of time to retry a failed download.
-    session_kwargs: dict, optional
+    :param session_kwargs:
         Keyword arguments to pass when creating a new session.
         For a list of available names and values, see:
         https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html#boto3.session.Session
-
 
     Yields
     ------
@@ -1135,7 +1161,7 @@ def iter_bucket(
     # before moving on.  Works for boto3 as well as boto.
     #
     try:
-        bucket_name = bucket_name.name
+        bucket_name = bucket_name.name  # type: ignore
     except AttributeError:
         pass
 
@@ -1169,10 +1195,10 @@ def iter_bucket(
 
 
 def _list_bucket(
-        bucket_name,
-        prefix='',
-        accept_key=lambda k: True,
-        **session_kwargs):
+    bucket_name: str,
+    prefix: str = '',
+    accept_key=lambda k: True,
+**session_kwargs) -> Iterator[str]:
     session = boto3.session.Session(**session_kwargs)
     client = session.client('s3')
     ctoken = None
@@ -1199,7 +1225,12 @@ def _list_bucket(
             break
 
 
-def _download_key(key_name, bucket_name=None, retries=3, **session_kwargs):
+def _download_key(
+    key_name: str,
+    bucket_name: Optional[str] = None,
+    retries: int = 3,
+    **session_kwargs,
+) -> Optional[Tuple[str, bytes]]:
     if bucket_name is None:
         raise ValueError('bucket_name may not be None')
 
@@ -1225,8 +1256,10 @@ def _download_key(key_name, bucket_name=None, retries=3, **session_kwargs):
         else:
             return key_name, content_bytes
 
+    return None
 
-def _download_fileobj(bucket, key_name):
+
+def _download_fileobj(bucket: 'boto3.s3.Bucket', key_name: str) -> bytes:
     #
     # This is a separate function only because it makes it easier to inject
     # exceptions during tests.

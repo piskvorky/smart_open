@@ -31,9 +31,12 @@ import warnings
 #
 import smart_open.local_file as so_file
 
-from smart_open import compression
-from smart_open import doctools
-from smart_open import transport
+from smart_open import (
+    compression,
+    doctools,
+    transport,
+    utils,
+)
 
 #
 # For backwards compatibility and keeping old unit tests happy.
@@ -42,12 +45,22 @@ from smart_open.compression import register_compressor  # noqa: F401
 from smart_open.utils import check_kwargs as _check_kwargs  # noqa: F401
 from smart_open.utils import inspect_kwargs as _inspect_kwargs  # noqa: F401
 
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    IO,
+    Optional,
+    Tuple,
+    Union,
+)
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_ENCODING = locale.getpreferredencoding(do_setlocale=False)
 
 
-def _sniff_scheme(uri_as_string):
+def _sniff_scheme(uri_as_string: str) -> str:
     """Returns the scheme of the URL only, as a string."""
     #
     # urlsplit doesn't work on Windows -- it parses the drive as the scheme...
@@ -59,19 +72,9 @@ def _sniff_scheme(uri_as_string):
     return urllib.parse.urlsplit(uri_as_string).scheme
 
 
-def parse_uri(uri_as_string):
+def parse_uri(uri_as_string: str) -> Tuple:
     """
     Parse the given URI from a string.
-
-    Parameters
-    ----------
-    uri_as_string: str
-        The URI to parse.
-
-    Returns
-    -------
-    collections.namedtuple
-        The parsed URI.
 
     Notes
     -----
@@ -79,14 +82,7 @@ def parse_uri(uri_as_string):
     """
     scheme = _sniff_scheme(uri_as_string)
     submodule = transport.get_transport(scheme)
-    as_dict = submodule.parse_uri(uri_as_string)
-
-    #
-    # The conversion to a namedtuple is just to keep the old tests happy while
-    # I'm still refactoring.
-    #
-    Uri = collections.namedtuple('Uri', sorted(as_dict.keys()))
-    return Uri(**as_dict)
+    return submodule.parse_uri(uri_as_string)
 
 
 #
@@ -98,17 +94,17 @@ _builtin_open = open
 
 
 def open(
-        uri,
-        mode='r',
-        buffering=-1,
-        encoding=None,
-        errors=None,
-        newline=None,
-        closefd=True,
-        opener=None,
-        ignore_ext=False,
-        transport_params=None,
-        ):
+    uri: Union[str, IO],
+    mode: str = 'r',
+    buffering: int = -1,
+    encoding: Optional[str] = None,
+    errors: Optional[str] = None,
+    newline: Optional[str] = None,
+    closefd: bool = True,
+    opener: Optional[Any] = None,
+    ignore_ext: bool = False,
+    transport_params: Dict[str, Any] = None,
+) -> IO:
     r"""Open the URI object, returning a file-like object.
 
     The URI is usually a string in a variety of formats.
@@ -293,14 +289,14 @@ def _get_binary_mode(mode_str):
 
 
 def _shortcut_open(
-        uri,
-        mode,
-        ignore_ext=False,
-        buffering=-1,
-        encoding=None,
-        errors=None,
-        newline=None,
-        ):
+    uri: Union[str, IO],
+    mode: str,
+    ignore_ext: bool = False,
+    buffering: int = -1,
+    encoding: Optional[str] = None,
+    errors: Optional[str] = None,
+    newline: Optional[str] = None,
+) -> Optional[IO]:
     """Try to open the URI using the standard library io.open function.
 
     This can be much faster than the alternative of opening in binary mode and
@@ -313,10 +309,9 @@ def _shortcut_open(
 
     If it is not possible to use the built-in open for the specified URI, returns None.
 
-    :param str uri: A string indicating what to open.
-    :param str mode: The mode to pass to the open function.
+    :param uri: A string indicating what to open.
+    :param mode: The mode to pass to the open function.
     :returns: The opened file
-    :rtype: file
     """
     if not isinstance(uri, str):
         return None
@@ -343,19 +338,18 @@ def _shortcut_open(
     if errors and 'b' not in mode:
         open_kwargs['errors'] = errors
 
-    return _builtin_open(local_path, mode, buffering=buffering, **open_kwargs)
+    return _builtin_open(local_path, mode, buffering=buffering, **open_kwargs)  # type: ignore
 
 
-def _open_binary_stream(uri, mode, transport_params):
+def _open_binary_stream(uri: Union[str, IO], mode: str, transport_params: Dict[str, Any]) -> IO:
     """Open an arbitrary URI in the specified binary mode.
 
     Not all modes are supported for all protocols.
 
     :arg uri: The URI to open.  May be a string, or something else.
-    :arg str mode: The mode to open with.  Must be rb, wb or ab.
+    :arg mode: The mode to open with.  Must be rb, wb or ab.
     :arg transport_params: Keyword argumens for the transport layer.
     :returns: A named file object
-    :rtype: file-like object with a .name attribute
     """
     if mode not in ('rb', 'rb+', 'wb', 'wb+', 'ab', 'ab+'):
         #
@@ -372,8 +366,8 @@ def _open_binary_stream(uri, mode, transport_params):
         # if there is no such an attribute, we return "unknown" - this
         # effectively disables any compression
         if not hasattr(uri, 'name'):
-            uri.name = getattr(uri, 'name', 'unknown')
-        return uri
+            uri.name = getattr(uri, 'name', 'unknown')  # type: ignore
+        return uri  # type: ignore
 
     if not isinstance(uri, str):
         raise TypeError("don't know how to handle uri %s" % repr(uri))
@@ -387,17 +381,22 @@ def _open_binary_stream(uri, mode, transport_params):
     return fobj
 
 
-def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
+def _encoding_wrapper(
+    fileobj: IO[bytes],
+    mode: str,
+    encoding: Optional[str] = None,
+    errors: Optional[str] = None,
+    newline: Optional[str] = None,
+) -> IO[Union[bytes, str]]:
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
     specified.  A non-null encoding implies text mode.
 
     :arg fileobj: must quack like a filehandle object.
-    :arg str mode: is the mode which was originally requested by the user.
-    :arg str encoding: The text encoding to use.  If mode is binary, overrides mode.
-    :arg str errors: The method to use when handling encoding/decoding errors.
-    :returns: a file object
+    :arg mode: is the mode which was originally requested by the user.
+    :arg encoding: The text encoding to use.  If mode is binary, overrides mode.
+    :arg errors: The method to use when handling encoding/decoding errors.
     """
     logger.debug('encoding_wrapper: %r', locals())
 
@@ -439,10 +438,10 @@ class patch_pathlib(object):
         _patch_pathlib(self.old_impl)
 
 
-def _patch_pathlib(func):
+def _patch_pathlib(func: Callable) -> Callable:
     """Replace `Path.open` with `func`"""
     old_impl = pathlib.Path.open
-    pathlib.Path.open = func
+    pathlib.Path.open = func  # type: ignore
     return old_impl
 
 

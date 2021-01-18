@@ -4,7 +4,7 @@ import io
 
 
 try:
-    import this_module_does_not_exist_but_we_need_it # noqa
+    import this_module_does_not_exist_but_we_need_it # type: ignore # noqa
 except ImportError:
     MISSING_DEPS = True
 

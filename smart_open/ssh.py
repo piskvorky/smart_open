@@ -22,10 +22,17 @@ Similarly, from a command line::
 
 """
 
+import collections
 import getpass
 import logging
 import urllib.parse
 import warnings
+
+from typing import (
+    Any,
+    Dict,
+    Tuple,
+)
 
 import smart_open.utils
 
@@ -34,7 +41,7 @@ logger = logging.getLogger(__name__)
 #
 # Global storage for SSH connections.
 #
-_SSH = {}
+_SSH: Dict[Tuple[str, str], Any] = {}
 
 SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""
@@ -48,15 +55,17 @@ URI_EXAMPLES = (
     'sftp://username@host/path/file',
 )
 
+Uri = collections.namedtuple('Uri', 'scheme uri_path user host port password')
+
 
 def _unquote(text):
     return text and urllib.parse.unquote(text)
 
 
-def parse_uri(uri_as_string):
+def parse_uri(uri_as_string: str) -> Uri:
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
-    return dict(
+    return Uri(
         scheme=split_uri.scheme,
         uri_path=_unquote(split_uri.path),
         user=_unquote(split_uri.username),
@@ -68,7 +77,7 @@ def parse_uri(uri_as_string):
 
 def open_uri(uri, mode, transport_params):
     smart_open.utils.check_kwargs(open, transport_params)
-    parsed_uri = parse_uri(uri)
+    parsed_uri = parse_uri(uri)._asdict()
     uri_path = parsed_uri.pop('uri_path')
     parsed_uri.pop('scheme')
     return open(uri_path, mode, transport_params=transport_params, **parsed_uri)

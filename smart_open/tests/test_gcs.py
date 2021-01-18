@@ -5,6 +5,7 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
+import collections
 import gzip
 import inspect
 import io
@@ -13,15 +14,11 @@ import os
 import time
 import uuid
 import unittest
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 import warnings
-from collections import OrderedDict
 
 import google.cloud
 import google.api_core.exceptions
+import mock
 
 import smart_open
 import smart_open.constants
@@ -49,7 +46,7 @@ class FakeBucket(object):
     def __init__(self, client, name=None):
         self.client = client  # type: FakeClient
         self.name = name
-        self.blobs = OrderedDict()
+        self.blobs = collections.OrderedDict()
         self._exists = True
 
         #
@@ -239,8 +236,8 @@ class FakeClient(object):
         if credentials is None:
             credentials = FakeCredentials(self)
         self._credentials = credentials  # type: FakeCredentials
-        self.uploads = OrderedDict()
-        self.__buckets = OrderedDict()
+        self.uploads = collections.OrderedDict()
+        self.__buckets = collections.OrderedDict()
 
     def bucket(self, bucket_id):
         try:
