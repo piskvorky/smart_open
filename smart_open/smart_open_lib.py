@@ -225,8 +225,13 @@ def open(
         decompressed = compression.compression_wrapper(binary, binary_mode)
 
     if 'b' not in mode or explicit_encoding is not None:
-        decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors,
-                                    newline=newline)
+        decoded = _encoding_wrapper(
+            decompressed,
+            mode,
+            encoding=encoding,
+            errors=errors,
+            newline=newline,
+        )
     else:
         decoded = decompressed
 
@@ -411,8 +416,13 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
     if encoding is None:
         encoding = DEFAULT_ENCODING
 
-    fileobj = io.TextIOWrapper(fileobj, encoding=encoding, errors=errors, newline=newline,
-                               write_through=True)
+    fileobj = io.TextIOWrapper(
+        fileobj,
+        encoding=encoding,
+        errors=errors,
+        newline=newline,
+        write_through=True,
+    )
     return fileobj
 
 
