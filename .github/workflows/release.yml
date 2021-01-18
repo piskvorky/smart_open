@@ -2,6 +2,8 @@ name: Release to PyPI
 
 on:
   push:
+    branches:
+      - release
     tags:
       - 'v*.*.*'
 jobs:
@@ -35,7 +37,7 @@ jobs:
       - name: Build tarball
         run: |
           . venv/bin/activate
-          python setup.py sdist
+          python setup.py sdist bdist_wheel
 
       - name: Upload tarball to PyPI
         run: |

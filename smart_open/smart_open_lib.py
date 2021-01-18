@@ -15,15 +15,15 @@ The main functions are:
 
 """
 
-import codecs
 import collections
+import io
+import locale
 import logging
 import os
 import os.path as P
 import pathlib
 import urllib.parse
 import warnings
-import sys
 
 #
 # This module defines a function called smart_open so we cannot use
@@ -44,7 +44,7 @@ from smart_open.utils import inspect_kwargs as _inspect_kwargs  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_ENCODING = sys.getdefaultencoding()
+DEFAULT_ENCODING = locale.getpreferredencoding(do_setlocale=False)
 
 
 def _sniff_scheme(uri_as_string):
@@ -198,7 +198,7 @@ def open(
         uri = str(uri)
 
     explicit_encoding = encoding
-    encoding = explicit_encoding if explicit_encoding else SYSTEM_ENCODING
+    encoding = explicit_encoding if explicit_encoding else DEFAULT_ENCODING
 
     #
     # This is how we get from the filename to the end result.  Decompression is
@@ -225,7 +225,13 @@ def open(
         decompressed = compression.compression_wrapper(binary, binary_mode)
 
     if 'b' not in mode or explicit_encoding is not None:
-        decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
+        decoded = _encoding_wrapper(
+            decompressed,
+            mode,
+            encoding=encoding,
+            errors=errors,
+            newline=newline,
+        )
     else:
         decoded = decompressed
 
@@ -302,7 +308,7 @@ def _shortcut_open(
 
     This is only possible under the following conditions:
 
-        1. Opening a local file
+        1. Opening a local file; and
         2. Ignore extension is set to True
 
     If it is not possible to use the built-in open for the specified URI, returns None.
@@ -381,7 +387,7 @@ def _open_binary_stream(uri, mode, transport_params):
     return fobj
 
 
-def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
+def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
@@ -408,13 +414,15 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None):
         return fileobj
 
     if encoding is None:
-        encoding = SYSTEM_ENCODING
+        encoding = DEFAULT_ENCODING
 
-    kw = {'errors': errors} if errors else {}
-    if mode[0] == 'r' or mode.endswith('+'):
-        fileobj = codecs.getreader(encoding)(fileobj, **kw)
-    if mode[0] in ('w', 'a') or mode.endswith('+'):
-        fileobj = codecs.getwriter(encoding)(fileobj, **kw)
+    fileobj = io.TextIOWrapper(
+        fileobj,
+        encoding=encoding,
+        errors=errors,
+        newline=newline,
+        write_through=True,
+    )
     return fileobj
 
 

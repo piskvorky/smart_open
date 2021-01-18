@@ -1,11 +1,10 @@
-name: Test smart_open using tox
-on: push
+name: Test
+on: [push, pull_request]
 jobs:
   build:
     env:
       BOTO_CONFIG: "/dev/null"
       SO_BUCKET: smart-open
-      SO_KEY: integration-tests
 
     runs-on: ubuntu-latest
     strategy:
@@ -21,6 +20,7 @@ jobs:
 
           - python-version: '3.8'
             toxenv: "check_keys,py38-doctest,test_coverage,py38-integration"
+            coveralls: true
 
           - python-version: '3.8'
             toxenv: "flake8"
@@ -32,13 +32,35 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install tox
-        run: pip install tox
+      - name: Update pip
+        run: python -m pip install -U pip
 
-      - name: Build
+      - name: Install tox
+        run: python -m pip install tox
+
+      - name: Test using Tox
         env:
           SO_RESULT_KEY: ${{ matrix.result_key }}
           SO_ENABLE_MOTO_SERVER: ${{ matrix.enable_moto_server }}
           TOXENV: ${{ matrix.toxenv }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: tox -vv
+        run: tox
+
+      #
+      # The test_coverage environment in tox.ini generates coverage data and
+      # saves it to disk.  This step uploads that data.  We do it
+      # separately from the tox env because the upload can fail for various
+      # reasons (e.g. https://github.com/lemurheavy/coveralls-public/issues/1392)
+      # and we don't want it to break the build.
+      #
+      # Looks like there's a github action for this
+      # (https://github.com/coverallsapp/github-action/issues/30) but it does
+      # not work with pytest output.
+      #
+      - name: Upload code coverage to coveralls.io
+        if: ${{ matrix.coveralls }}
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          pip install coveralls
+          coveralls

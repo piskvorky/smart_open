@@ -1,9 +1,15 @@
 # Unreleased
 
+# 4.1.1, 18 Jan 2021
+
+- Correctly pass boto3 resource to writers (PR [#576](https://github.com/RaRe-Technologies/smart_open/pull/576), [@jackluo923](https://github.com/jackluo923))
+- Improve robustness of S3 reading (PR [#552](https://github.com/RaRe-Technologies/smart_open/pull/552), [@mpenkov](https://github.com/mpenkov))
+- Replace codecs with TextIOWrapper to fix newline issues when reading text files (PR [#578](https://github.com/RaRe-Technologies/smart_open/pull/578), [@markopy](https://github.com/markopy))
+
 # 4.1.0, 30 Dec 2020
 
 - Refactor `s3` submodule to minimize resource usage (PR [#569](https://github.com/RaRe-Technologies/smart_open/pull/569), [@mpenkov](https://github.com/mpenkov))
-- Change `download_as_bytes` to `download_as_string` in `gcs` submodule (PR [#571](https://github.com/RaRe-Technologies/smart_open/pull/571), [@alexandreyc](https://github.com/alexandreyc))
+- Change `download_as_string` to `download_as_bytes` in `gcs` submodule (PR [#571](https://github.com/RaRe-Technologies/smart_open/pull/571), [@alexandreyc](https://github.com/alexandreyc))
 
 # 4.0.1, 27 Nov 2020
 

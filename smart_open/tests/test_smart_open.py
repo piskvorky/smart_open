@@ -59,7 +59,13 @@ def named_temporary_file(mode='w+b', prefix=None, suffix=None, delete=True):
         yield f
 
     if delete:
-        os.unlink(pathname)
+        try:
+            os.unlink(pathname)
+        except PermissionError as e:
+            #
+            # This can happen on Windows for unknown reasons.
+            #
+            logger.error(e)
 
 
 class ParseUriTest(unittest.TestCase):
@@ -365,7 +371,7 @@ class ParseUriTest(unittest.TestCase):
         _patch_pathlib(obj.old_impl)
         assert pathlib.Path.open != smart_open.open
 
-    def test_pathlib_monkeypath_read_gz(self):
+    def test_pathlib_monkeypatch_read_gz(self):
         from smart_open.smart_open_lib import pathlib
 
         path = pathlib.Path(CURR_DIR) / 'test_data' / 'crime-and-punishment.txt.gz'
@@ -378,14 +384,13 @@ class ParseUriTest(unittest.TestCase):
         # Check that our implementation works with gzip
         obj = patch_pathlib()
         try:
-            with path.open("r") as infile:
+            with path.open("r", encoding='utf-8') as infile:
                 lines = infile.readlines()
             self.assertEqual(len(lines), 3)
         finally:
             _patch_pathlib(obj.old_impl)
 
 
-@unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
 class SmartOpenHttpTest(unittest.TestCase):
     """
     Test reading from HTTP connections in various ways.
@@ -422,9 +427,11 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_https_readline(self):
         """Does https readline method work correctly"""
         responses.add(responses.GET, "https://127.0.0.1/index.html",
-                      body='line1\nline2', stream=True)
+                      body=u'line1\u2028still line1\nline2', stream=True)
         smart_open_object = smart_open.open("https://127.0.0.1/index.html", 'rb')
-        self.assertEqual(smart_open_object.readline().decode("utf-8"), "line1\n")
+        self.assertEqual(smart_open_object.readline().decode("utf-8"), u"line1\u2028still line1\n")
+        smart_open_object = smart_open.open("https://127.0.0.1/index.html", 'r', encoding='utf-8')
+        self.assertEqual(smart_open_object.readline(), u"line1\u2028still line1\n")
 
     @responses.activate
     def test_http_pass(self):
@@ -582,7 +589,11 @@ class SmartOpenFileObjTest(unittest.TestCase):
         """Attempts to write directly to a text stream should fail."""
         buf = make_buffer(io.StringIO)
         with smart_open.open(buf, 'w') as sf:
-            self.assertRaises(TypeError, sf.write, SAMPLE_TEXT)  # we expect binary mode
+            with self.assertRaises(TypeError):
+                sf.write(SAMPLE_TEXT)  # we expect binary mode
+                # Need to flush because TextIOWrapper may buffer and we need
+                # to write to the underlying StringIO to get the TypeError.
+                sf.flush()
 
     def test_read_text_from_bytestream(self):
         buf = make_buffer(initial_value=SAMPLE_BYTES)
@@ -682,19 +693,27 @@ class SmartOpenReadTest(unittest.TestCase):
             smart_open.open(fpath, 'r').read()
         mock_open.assert_called_with(fpath, 'r', buffering=-1)
 
+    def test_open_binary(self):
+        fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
+        with open(fpath, 'rb') as fin:
+            expected = fin.read()
+        with smart_open.open(fpath, 'rb') as fin:
+            actual = fin.read()
+        self.assertEqual(expected, actual)
+
     def test_open_with_keywords(self):
         """This test captures Issue #142."""
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
-        with open(fpath, 'rb') as fin:
-            expected = fin.read().decode('cp852')
+        with open(fpath, 'r', encoding='cp852') as fin:
+            expected = fin.read()
         with smart_open.open(fpath, encoding='cp852') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
 
     def test_open_with_keywords_explicit_r(self):
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
-        with open(fpath, 'rb') as fin:
-            expected = fin.read().decode('cp852')
+        with open(fpath, 'r', encoding='cp852') as fin:
+            expected = fin.read()
         with smart_open.open(fpath, mode='r', encoding='cp852') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
@@ -706,7 +725,7 @@ class SmartOpenReadTest(unittest.TestCase):
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
         with open(fpath, 'rb') as fin:
             expected = fin.read().decode('cp852')
-        with smart_open.open(pathlib.Path(fpath), mode='r', encoding='cp852') as fin:
+        with smart_open.open(pathlib.Path(fpath), mode='r', encoding='cp852', newline='') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
 
@@ -726,23 +745,197 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(r.read(), b"")
 
     @mock_s3
+    def test_read_newline_none(self):
+        """Does newline open() parameter for reading work according to
+           https://docs.python.org/3/library/functions.html#open-newline-parameter
+        """
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        # Unicode line separator and various others must never split lines
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # No newline parameter means newline=None i.e. universal newline mode with all
+        # line endings translated to '\n'
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8') as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\n",
+                u"line\x1c CR\n",
+                u"line\x85 CRLF\n",
+                u"last line"
+            ])
+
+    @mock_s3
+    def test_read_newline_empty(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # If newline='' universal newline mode is enabled but line separators are not replaced
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='') as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\n",
+                u"line\x1c CR\r",
+                u"line\x85 CRLF\r\n",
+                u"last line"
+            ])
+
+    @mock_s3
+    def test_read_newline_cr(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # If newline='\r' only CR splits lines
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='\r') as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\nline\x1c CR\r",
+                u"line\x85 CRLF\r",
+                u"\nlast line"
+            ])
+
+    @mock_s3
+    def test_read_newline_lf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # If newline='\n' only LF splits lines
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='\n') as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\n",
+                u"line\x1c CR\rline\x85 CRLF\r\n",
+                u"last line"
+            ])
+
+    @mock_s3
+    def test_read_newline_crlf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # If newline='\r\n' only CRLF splits lines
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='\r\n') as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\n",
+                u"last line"
+            ])
+
+    @mock_s3
+    def test_read_newline_slurp(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # Even reading the whole file with read() must replace newlines
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline=None) as fin:
+            self.assertEqual(
+                fin.read(),
+                u"line\u2028 LF\nline\x1c CR\nline\x85 CRLF\nlast line"
+            )
+
+    @mock_s3
+    def test_read_newline_binary(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # If the file is opened in binary mode only LF splits lines
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\n".encode('utf-8'),
+                u"line\x1c CR\rline\x85 CRLF\r\n".encode('utf-8'),
+                u"last line".encode('utf-8')
+            ])
+
+    @mock_s3
+    def test_write_newline_none(self):
+        """Does newline open() parameter for writing work according to
+           https://docs.python.org/3/library/functions.html#open-newline-parameter
+        """
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        # Unicode line separator and various others must never split lines
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        # No newline parameter means newline=None, all LF are translatest to os.linesep
+        with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8') as fout:
+            fout.write(test_file)
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(
+                fin.read().decode('utf-8'),
+                u"line\u2028 LF" + os.linesep
+                + u"line\x1c CR\rline\x85 CRLF\r" + os.linesep
+                + u"last line"
+            )
+
+    @mock_s3
+    def test_write_newline_empty(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        # If newline='' nothing is changed
+        with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='') as fout:
+            fout.write(test_file)
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(
+                fin.read().decode('utf-8'),
+                u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+            )
+
+    @mock_s3
+    def test_write_newline_lf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        # If newline='\n' nothing is changed
+        with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\n') as fout:
+            fout.write(test_file)
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(
+                fin.read().decode('utf-8'),
+                u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+            )
+
+    @mock_s3
+    def test_write_newline_cr(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        # If newline='\r' all LF are replaced by CR
+        with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\r') as fout:
+            fout.write(test_file)
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(
+                fin.read().decode('utf-8'),
+                u"line\u2028 LF\rline\x1c CR\rline\x85 CRLF\r\rlast line"
+            )
+
+    @mock_s3
+    def test_write_newline_crlf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        # If newline='\r\n' all LF are replaced by CRLF
+        with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\r\n') as fout:
+            fout.write(test_file)
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(
+                fin.read().decode('utf-8'),
+                u"line\u2028 LF\r\nline\x1c CR\rline\x85 CRLF\r\r\nlast line"
+            )
+
+    @mock_s3
     def test_readline(self):
         """Does readline() return the correct file content?"""
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
-        test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
+        test_string = u"hello žluťoučký\u2028world!\nhow are you?".encode('utf8')
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_string)
 
         reader = smart_open.open("s3://mybucket/mykey", "rb")
-        self.assertEqual(reader.readline(), u"hello žluťoučký world!\n".encode("utf-8"))
+        self.assertEqual(reader.readline(), u"hello žluťoučký\u2028world!\n".encode("utf-8"))
 
     @mock_s3
     def test_readline_iter(self):
         """Does __iter__ return the correct file content?"""
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
-        lines = [u"всем привет!\n", u"что нового?"]
+        lines = [u"всем\u2028привет!\n", u"что нового?"]
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write("".join(lines).encode("utf-8"))
 
@@ -774,13 +967,14 @@ class SmartOpenReadTest(unittest.TestCase):
         # create fake bucket and fake key
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
-        test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
+        test_string = u"hello žluťoučký\u2028world!\nhow are you?".encode('utf8')
         with smart_open.open("s3://mybucket/mykey", "wb") as fin:
             fin.write(test_string)
 
         # call s3_iter_lines and check output
         reader = smart_open.open("s3://mybucket/mykey", "rb")
         output = list(reader)
+        self.assertEqual(len(output), 2)
         self.assertEqual(b''.join(output), test_string)
 
     # TODO: add more complex test for file://
@@ -861,7 +1055,6 @@ class SmartOpenReadTest(unittest.TestCase):
             stdout=mock_subprocess.PIPE,
         )
 
-    @unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
     @responses.activate
     def test_webhdfs(self):
         """Is webhdfs line iterator called correctly"""
@@ -872,7 +1065,6 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(next(iterator).decode("utf-8"), "line1\n")
         self.assertEqual(next(iterator).decode("utf-8"), "line2")
 
-    @unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
     @responses.activate
     def test_webhdfs_encoding(self):
         """Is HDFS line iterator called correctly?"""
@@ -885,7 +1077,6 @@ class SmartOpenReadTest(unittest.TestCase):
         actual = smart_open.open(input_url, encoding='utf-8').read()
         self.assertEqual(text, actual)
 
-    @unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
     @responses.activate
     def test_webhdfs_read(self):
         """Does webhdfs read method work correctly"""
@@ -1116,16 +1307,19 @@ class SmartOpenTest(unittest.TestCase):
         #
         # See https://github.com/RaRe-Technologies/smart_open/issues/477
         #
-        rows = [{'name': 'alice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
-        expected = 'name,color\nalice,aqua\nbob,blue\n'
+        rows = [{'name': 'alice\u2028beatrice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
+        expected = 'name,color\r\nalice\u2028beatrice,aqua\r\nbob,blue\r\n'
 
         with named_temporary_file(mode='w') as tmp:
-            with smart_open.open(tmp.name, 'w+', newline='\n') as fout:
+            # The csv module recommends using newline='' when opening files and letting
+            # the csv writer handle line endings. By default it uses the 'excel' dialect which
+            # emits \r\n as line terminator.
+            with smart_open.open(tmp.name, 'w+', encoding='utf-8', newline='') as fout:
                 out = csv.DictWriter(fout, fieldnames=['name', 'color'])
                 out.writeheader()
                 out.writerows(rows)
 
-            with open(tmp.name, 'r') as fin:
+            with open(tmp.name, 'r', encoding='utf-8', newline='') as fin:
                 content = fin.read()
 
         assert content == expected
@@ -1231,7 +1425,6 @@ class SmartOpenTest(unittest.TestCase):
         self.assertEqual(expected, actual)
 
 
-@unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
 class WebHdfsWriteTest(unittest.TestCase):
     """
     Test writing into webhdfs files.
@@ -1332,7 +1525,7 @@ class CompressionFormatTest(unittest.TestCase):
         self.write_read_assertion('.bz2')
 
     def test_gzip_text(self):
-        with tempfile.NamedTemporaryFile(suffix='.gz') as f:
+        with named_temporary_file(suffix='.gz') as f:
             with smart_open.open(f.name, 'wt') as fout:
                 fout.write('hello world')
 
