@@ -10,22 +10,26 @@ import bz2
 import csv
 import contextlib
 import io
-import unittest
-import logging
-import tempfile
-import os
+import gzip
 import hashlib
+import logging
+import os
+import tempfile
+import unittest
+import warnings
 
 import boto3
 import mock
 from moto import mock_s3
 import responses
-import gzip
+import parameterizedtestcase
+import pytest
 
 import smart_open
 from smart_open import smart_open_lib
 from smart_open import webhdfs
 from smart_open.smart_open_lib import patch_pathlib, _patch_pathlib
+from smart_open.tests.test_s3 import patch_invalid_range_response
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +59,13 @@ def named_temporary_file(mode='w+b', prefix=None, suffix=None, delete=True):
         yield f
 
     if delete:
-        os.unlink(pathname)
+        try:
+            os.unlink(pathname)
+        except PermissionError as e:
+            #
+            # This can happen on Windows for unknown reasons.
+            #
+            logger.error(e)
 
 
 class ParseUriTest(unittest.TestCase):
@@ -361,7 +371,7 @@ class ParseUriTest(unittest.TestCase):
         _patch_pathlib(obj.old_impl)
         assert pathlib.Path.open != smart_open.open
 
-    def test_pathlib_monkeypath_read_gz(self):
+    def test_pathlib_monkeypatch_read_gz(self):
         from smart_open.smart_open_lib import pathlib
 
         path = pathlib.Path(CURR_DIR) / 'test_data' / 'crime-and-punishment.txt.gz'
@@ -374,7 +384,7 @@ class ParseUriTest(unittest.TestCase):
         # Check that our implementation works with gzip
         obj = patch_pathlib()
         try:
-            with path.open("r") as infile:
+            with path.open("r", encoding='utf-8') as infile:
                 lines = infile.readlines()
             self.assertEqual(len(lines), 3)
         finally:
@@ -389,9 +399,10 @@ class SmartOpenHttpTest(unittest.TestCase):
     @mock.patch('smart_open.ssh.open')
     def test_read_ssh(self, mock_open):
         """Is SSH line iterator called correctly?"""
-        obj = smart_open.smart_open(
+        obj = smart_open.open(
             "ssh://ubuntu:pass@ip_address:1022/some/path/lines.txt",
-            hello='world',
+            mode='rb',
+            transport_params=dict(hello='world'),
         )
         obj.__iter__()
         mock_open.assert_called_with(
@@ -409,23 +420,26 @@ class SmartOpenHttpTest(unittest.TestCase):
         """Does http read method work correctly"""
         responses.add(responses.GET, "http://127.0.0.1/index.html",
                       body='line1\nline2', stream=True)
-        smart_open_object = smart_open.smart_open("http://127.0.0.1/index.html")
+        smart_open_object = smart_open.open("http://127.0.0.1/index.html", 'rb')
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
     @responses.activate
     def test_https_readline(self):
         """Does https readline method work correctly"""
         responses.add(responses.GET, "https://127.0.0.1/index.html",
-                      body='line1\nline2', stream=True)
-        smart_open_object = smart_open.smart_open("https://127.0.0.1/index.html")
-        self.assertEqual(smart_open_object.readline().decode("utf-8"), "line1\n")
+                      body=u'line1\u2028still line1\nline2', stream=True)
+        smart_open_object = smart_open.open("https://127.0.0.1/index.html", 'rb')
+        self.assertEqual(smart_open_object.readline().decode("utf-8"), u"line1\u2028still line1\n")
+        smart_open_object = smart_open.open("https://127.0.0.1/index.html", 'r', encoding='utf-8')
+        self.assertEqual(smart_open_object.readline(), u"line1\u2028still line1\n")
 
     @responses.activate
     def test_http_pass(self):
         """Does http authentication work correctly"""
         responses.add(responses.GET, "http://127.0.0.1/index.html",
                       body='line1\nline2', stream=True)
-        _ = smart_open.smart_open("http://127.0.0.1/index.html", user='me', password='pass')
+        tp = dict(user='me', password='pass')
+        smart_open.open("http://127.0.0.1/index.html", transport_params=tp)
         self.assertEqual(len(responses.calls), 1)
         actual_request = responses.calls[0].request
         self.assertTrue('Authorization' in actual_request.headers)
@@ -436,15 +450,15 @@ class SmartOpenHttpTest(unittest.TestCase):
         """Can open <suffix> via http?"""
         raw_data = b'Hello World Compressed.' * 10000
         buf = make_buffer(name='data' + suffix)
-        with smart_open.smart_open(buf, 'wb') as outfile:
+        with smart_open.open(buf, 'wb') as outfile:
             outfile.write(raw_data)
         compressed_data = buf.getvalue()
         # check that the string was actually compressed
         self.assertNotEqual(compressed_data, raw_data)
 
         responses.add(responses.GET, 'http://127.0.0.1/data' + suffix, body=compressed_data, stream=True)
-        smart_open_object = smart_open.smart_open(
-            'http://127.0.0.1/data%s%s' % (suffix, '?some_param=some_val' if query else ''))
+        url = 'http://127.0.0.1/data%s%s' % (suffix, '?some_param=some_val' if query else '')
+        smart_open_object = smart_open.open(url, 'rb')
 
         # decompress the file and get the same md5 hash
         self.assertEqual(smart_open_object.read(), raw_data)
@@ -496,7 +510,7 @@ class RealFileSystemTests(unittest.TestCase):
         os.unlink(self.temp_file)
 
     def test_rt(self):
-        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+        with smart_open.open(self.temp_file, 'rt') as fin:
             data = fin.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
@@ -505,38 +519,38 @@ class RealFileSystemTests(unittest.TestCase):
         # The file already contains SAMPLE_TEXT, so write something different.
         #
         text = 'nippon budokan'
-        with smart_open.smart_open(self.temp_file, 'wt') as fout:
+        with smart_open.open(self.temp_file, 'wt') as fout:
             fout.write(text)
 
-        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+        with smart_open.open(self.temp_file, 'rt') as fin:
             data = fin.read()
         self.assertEqual(data, text)
 
     def test_ab(self):
-        with smart_open.smart_open(self.temp_file, 'ab') as fout:
+        with smart_open.open(self.temp_file, 'ab') as fout:
             fout.write(SAMPLE_BYTES)
-        with smart_open.smart_open(self.temp_file, 'rb') as fin:
+        with smart_open.open(self.temp_file, 'rb') as fin:
             data = fin.read()
         self.assertEqual(data, SAMPLE_BYTES * 2)
 
     def test_aplus(self):
-        with smart_open.smart_open(self.temp_file, 'a+') as fout:
+        with smart_open.open(self.temp_file, 'a+') as fout:
             fout.write(SAMPLE_TEXT)
-        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+        with smart_open.open(self.temp_file, 'rt') as fin:
             text = fin.read()
         self.assertEqual(text, SAMPLE_TEXT * 2)
 
     def test_at(self):
-        with smart_open.smart_open(self.temp_file, 'at') as fout:
+        with smart_open.open(self.temp_file, 'at') as fout:
             fout.write(SAMPLE_TEXT)
-        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+        with smart_open.open(self.temp_file, 'rt') as fin:
             text = fin.read()
         self.assertEqual(text, SAMPLE_TEXT * 2)
 
     def test_atplus(self):
-        with smart_open.smart_open(self.temp_file, 'at+') as fout:
+        with smart_open.open(self.temp_file, 'at+') as fout:
             fout.write(SAMPLE_TEXT)
-        with smart_open.smart_open(self.temp_file, 'rt') as fin:
+        with smart_open.open(self.temp_file, 'rt') as fin:
             text = fin.read()
         self.assertEqual(text, SAMPLE_TEXT * 2)
 
@@ -549,14 +563,14 @@ class SmartOpenFileObjTest(unittest.TestCase):
     def test_read_bytes(self):
         """Can we read bytes from a byte stream?"""
         buf = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buf, 'rb') as sf:
+        with smart_open.open(buf, 'rb') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_BYTES)
 
     def test_write_bytes(self):
         """Can we write bytes to a byte stream?"""
         buf = make_buffer()
-        with smart_open.smart_open(buf, 'wb') as sf:
+        with smart_open.open(buf, 'wb') as sf:
             sf.write(SAMPLE_BYTES)
             self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
 
@@ -568,37 +582,41 @@ class SmartOpenFileObjTest(unittest.TestCase):
         you can read from it directly.
         """
         buf = make_buffer(io.StringIO, initial_value=SAMPLE_TEXT)
-        with smart_open.smart_open(buf, 'r') as sf:
+        with smart_open.open(buf, 'r') as sf:
             self.assertRaises(TypeError, sf.read)  # we expect binary mode
 
     def test_write_text_stream_fails(self):
         """Attempts to write directly to a text stream should fail."""
         buf = make_buffer(io.StringIO)
-        with smart_open.smart_open(buf, 'w') as sf:
-            self.assertRaises(TypeError, sf.write, SAMPLE_TEXT)  # we expect binary mode
+        with smart_open.open(buf, 'w') as sf:
+            with self.assertRaises(TypeError):
+                sf.write(SAMPLE_TEXT)  # we expect binary mode
+                # Need to flush because TextIOWrapper may buffer and we need
+                # to write to the underlying StringIO to get the TypeError.
+                sf.flush()
 
     def test_read_text_from_bytestream(self):
         buf = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buf, 'r') as sf:
+        with smart_open.open(buf, 'r') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
     def test_read_text_from_bytestream_rt(self):
         buf = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buf, 'rt') as sf:
+        with smart_open.open(buf, 'rt') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
     def test_read_text_from_bytestream_rtplus(self):
         buf = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.smart_open(buf, 'rt+') as sf:
+        with smart_open.open(buf, 'rt+') as sf:
             data = sf.read()
         self.assertEqual(data, SAMPLE_TEXT)
 
     def test_write_text_to_bytestream(self):
         """Can we write strings to a byte stream?"""
         buf = make_buffer(noclose=True)
-        with smart_open.smart_open(buf, 'w') as sf:
+        with smart_open.open(buf, 'w') as sf:
             sf.write(SAMPLE_TEXT)
 
         self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
@@ -606,7 +624,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
     def test_write_text_to_bytestream_wt(self):
         """Can we write strings to a byte stream?"""
         buf = make_buffer(noclose=True)
-        with smart_open.smart_open(buf, 'wt') as sf:
+        with smart_open.open(buf, 'wt') as sf:
             sf.write(SAMPLE_TEXT)
 
         self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
@@ -614,7 +632,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
     def test_write_text_to_bytestream_wtplus(self):
         """Can we write strings to a byte stream?"""
         buf = make_buffer(noclose=True)
-        with smart_open.smart_open(buf, 'wt+') as sf:
+        with smart_open.open(buf, 'wt+') as sf:
             sf.write(SAMPLE_TEXT)
 
         self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
@@ -623,7 +641,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
         """Can we use the "name" attribute to decompress on the fly?"""
         data = SAMPLE_BYTES * 1000
         buf = make_buffer(initial_value=bz2.compress(data), name='data.bz2')
-        with smart_open.smart_open(buf, 'rb') as sf:
+        with smart_open.open(buf, 'rb') as sf:
             data = sf.read()
         self.assertEqual(data, data)
 
@@ -631,7 +649,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
         """Can we use the "name" attribute to compress on the fly?"""
         data = SAMPLE_BYTES * 1000
         buf = make_buffer(name='data.bz2')
-        with smart_open.smart_open(buf, 'wb') as sf:
+        with smart_open.open(buf, 'wb') as sf:
             sf.write(data)
         self.assertEqual(bz2.decompress(buf.getvalue()), data)
 
@@ -648,7 +666,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
             tmpf.write(bz2.compress(data))
         try:
             with open(tmpf.name, 'rb') as openf:
-                with smart_open.smart_open(openf) as smartf:
+                with smart_open.open(openf, 'rb') as smartf:
                     smart_data = smartf.read()
             self.assertEqual(data, smart_data)
         finally:
@@ -672,23 +690,31 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_shortcut(self):
         fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
         with mock.patch('smart_open.smart_open_lib._builtin_open') as mock_open:
-            smart_open.smart_open(fpath, 'r').read()
+            smart_open.open(fpath, 'r').read()
         mock_open.assert_called_with(fpath, 'r', buffering=-1)
+
+    def test_open_binary(self):
+        fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
+        with open(fpath, 'rb') as fin:
+            expected = fin.read()
+        with smart_open.open(fpath, 'rb') as fin:
+            actual = fin.read()
+        self.assertEqual(expected, actual)
 
     def test_open_with_keywords(self):
         """This test captures Issue #142."""
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
-        with open(fpath, 'rb') as fin:
-            expected = fin.read().decode('cp852')
-        with smart_open.smart_open(fpath, encoding='cp852') as fin:
+        with open(fpath, 'r', encoding='cp852') as fin:
+            expected = fin.read()
+        with smart_open.open(fpath, encoding='cp852') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
 
     def test_open_with_keywords_explicit_r(self):
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
-        with open(fpath, 'rb') as fin:
-            expected = fin.read().decode('cp852')
-        with smart_open.smart_open(fpath, mode='r', encoding='cp852') as fin:
+        with open(fpath, 'r', encoding='cp852') as fin:
+            expected = fin.read()
+        with smart_open.open(fpath, mode='r', encoding='cp852') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
 
@@ -699,7 +725,7 @@ class SmartOpenReadTest(unittest.TestCase):
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
         with open(fpath, 'rb') as fin:
             expected = fin.read().decode('cp852')
-        with smart_open.smart_open(pathlib.Path(fpath), mode='r', encoding='cp852') as fin:
+        with smart_open.open(pathlib.Path(fpath), mode='r', encoding='cp852', newline='') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
 
@@ -710,36 +736,210 @@ class SmartOpenReadTest(unittest.TestCase):
         s3.create_bucket(Bucket='mybucket')
 
         test_string = u"ветер по морю гуляет..."
-        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_string.encode('utf8'))
 
-        r = smart_open.smart_open("s3://mybucket/mykey", "rb")
+        r = smart_open.open("s3://mybucket/mykey", "rb")
         self.assertEqual(r.read(), test_string.encode("utf-8"))
         self.assertEqual(r.read(), b"")
         self.assertEqual(r.read(), b"")
+
+    @mock_s3
+    def test_read_newline_none(self):
+        """Does newline open() parameter for reading work according to
+           https://docs.python.org/3/library/functions.html#open-newline-parameter
+        """
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        # Unicode line separator and various others must never split lines
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # No newline parameter means newline=None i.e. universal newline mode with all
+        # line endings translated to '\n'
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8') as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\n",
+                u"line\x1c CR\n",
+                u"line\x85 CRLF\n",
+                u"last line"
+            ])
+
+    @mock_s3
+    def test_read_newline_empty(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # If newline='' universal newline mode is enabled but line separators are not replaced
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='') as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\n",
+                u"line\x1c CR\r",
+                u"line\x85 CRLF\r\n",
+                u"last line"
+            ])
+
+    @mock_s3
+    def test_read_newline_cr(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # If newline='\r' only CR splits lines
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='\r') as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\nline\x1c CR\r",
+                u"line\x85 CRLF\r",
+                u"\nlast line"
+            ])
+
+    @mock_s3
+    def test_read_newline_lf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # If newline='\n' only LF splits lines
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='\n') as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\n",
+                u"line\x1c CR\rline\x85 CRLF\r\n",
+                u"last line"
+            ])
+
+    @mock_s3
+    def test_read_newline_crlf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # If newline='\r\n' only CRLF splits lines
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='\r\n') as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\n",
+                u"last line"
+            ])
+
+    @mock_s3
+    def test_read_newline_slurp(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # Even reading the whole file with read() must replace newlines
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline=None) as fin:
+            self.assertEqual(
+                fin.read(),
+                u"line\u2028 LF\nline\x1c CR\nline\x85 CRLF\nlast line"
+            )
+
+    @mock_s3
+    def test_read_newline_binary(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
+        # If the file is opened in binary mode only LF splits lines
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(list(fin), [
+                u"line\u2028 LF\n".encode('utf-8'),
+                u"line\x1c CR\rline\x85 CRLF\r\n".encode('utf-8'),
+                u"last line".encode('utf-8')
+            ])
+
+    @mock_s3
+    def test_write_newline_none(self):
+        """Does newline open() parameter for writing work according to
+           https://docs.python.org/3/library/functions.html#open-newline-parameter
+        """
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        # Unicode line separator and various others must never split lines
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        # No newline parameter means newline=None, all LF are translatest to os.linesep
+        with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8') as fout:
+            fout.write(test_file)
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(
+                fin.read().decode('utf-8'),
+                u"line\u2028 LF" + os.linesep
+                + u"line\x1c CR\rline\x85 CRLF\r" + os.linesep
+                + u"last line"
+            )
+
+    @mock_s3
+    def test_write_newline_empty(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        # If newline='' nothing is changed
+        with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='') as fout:
+            fout.write(test_file)
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(
+                fin.read().decode('utf-8'),
+                u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+            )
+
+    @mock_s3
+    def test_write_newline_lf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        # If newline='\n' nothing is changed
+        with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\n') as fout:
+            fout.write(test_file)
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(
+                fin.read().decode('utf-8'),
+                u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+            )
+
+    @mock_s3
+    def test_write_newline_cr(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        # If newline='\r' all LF are replaced by CR
+        with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\r') as fout:
+            fout.write(test_file)
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(
+                fin.read().decode('utf-8'),
+                u"line\u2028 LF\rline\x1c CR\rline\x85 CRLF\r\rlast line"
+            )
+
+    @mock_s3
+    def test_write_newline_crlf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        # If newline='\r\n' all LF are replaced by CRLF
+        with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\r\n') as fout:
+            fout.write(test_file)
+        with smart_open.open("s3://mybucket/mykey", "rb") as fin:
+            self.assertEqual(
+                fin.read().decode('utf-8'),
+                u"line\u2028 LF\r\nline\x1c CR\rline\x85 CRLF\r\r\nlast line"
+            )
 
     @mock_s3
     def test_readline(self):
         """Does readline() return the correct file content?"""
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
-        test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
-        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+        test_string = u"hello žluťoučký\u2028world!\nhow are you?".encode('utf8')
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_string)
 
-        reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
-        self.assertEqual(reader.readline(), u"hello žluťoučký world!\n".encode("utf-8"))
+        reader = smart_open.open("s3://mybucket/mykey", "rb")
+        self.assertEqual(reader.readline(), u"hello žluťoučký\u2028world!\n".encode("utf-8"))
 
     @mock_s3
     def test_readline_iter(self):
         """Does __iter__ return the correct file content?"""
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
-        lines = [u"всем привет!\n", u"что нового?"]
-        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+        lines = [u"всем\u2028привет!\n", u"что нового?"]
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write("".join(lines).encode("utf-8"))
 
-        reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
+        reader = smart_open.open("s3://mybucket/mykey", "rb")
 
         actual_lines = [line.decode("utf-8") for line in reader]
         self.assertEqual(2, len(actual_lines))
@@ -751,14 +951,15 @@ class SmartOpenReadTest(unittest.TestCase):
         """Does readline() return empty string on EOF?"""
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
-        with smart_open.smart_open("s3://mybucket/mykey", "wb"):
+        with smart_open.open("s3://mybucket/mykey", "wb"):
             pass
 
-        reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
+        with patch_invalid_range_response('0'):
+            reader = smart_open.open("s3://mybucket/mykey", "rb")
 
-        self.assertEqual(reader.readline(), b"")
-        self.assertEqual(reader.readline(), b"")
-        self.assertEqual(reader.readline(), b"")
+            self.assertEqual(reader.readline(), b"")
+            self.assertEqual(reader.readline(), b"")
+            self.assertEqual(reader.readline(), b"")
 
     @mock_s3
     def test_s3_iter_lines(self):
@@ -766,13 +967,14 @@ class SmartOpenReadTest(unittest.TestCase):
         # create fake bucket and fake key
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
-        test_string = u"hello žluťoučký world!\nhow are you?".encode('utf8')
-        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fin:
+        test_string = u"hello žluťoučký\u2028world!\nhow are you?".encode('utf8')
+        with smart_open.open("s3://mybucket/mykey", "wb") as fin:
             fin.write(test_string)
 
         # call s3_iter_lines and check output
-        reader = smart_open.smart_open("s3://mybucket/mykey", "rb")
+        reader = smart_open.open("s3://mybucket/mykey", "rb")
         output = list(reader)
+        self.assertEqual(len(output), 2)
         self.assertEqual(b''.join(output), test_string)
 
     # TODO: add more complex test for file://
@@ -782,21 +984,21 @@ class SmartOpenReadTest(unittest.TestCase):
         prefix = "file://"
         full_path = '/tmp/test.txt'
         read_mode = "rb"
-        smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
+        smart_open_object = smart_open.open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
         mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
         full_path = '/tmp/test#hash##more.txt'
         read_mode = "rb"
-        smart_open_object = smart_open.smart_open(prefix+full_path, read_mode)
+        smart_open_object = smart_open.open(prefix+full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
         mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
         full_path = 'aa#aa'
         read_mode = "rb"
-        smart_open_object = smart_open.smart_open(full_path, read_mode)
+        smart_open_object = smart_open.open(full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
         mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
@@ -812,22 +1014,21 @@ class SmartOpenReadTest(unittest.TestCase):
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)
 
-        smart_open_object = smart_open.smart_open(prefix+short_path, read_mode, errors='strict')
+        smart_open_object = smart_open.open(prefix+short_path, read_mode, errors='strict')
         smart_open_object.__iter__()
         # called with the correct expanded path?
         mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1, errors='strict')
 
     @mock.patch(_BUILTIN_OPEN)
     def test_file_buffering(self, mock_smart_open):
-        smart_open_object = smart_open.smart_open('/tmp/somefile', 'rb', buffering=0)
+        smart_open_object = smart_open.open('/tmp/somefile', 'rb', buffering=0)
         smart_open_object.__iter__()
         # called with the correct expanded path?
         mock_smart_open.assert_called_with('/tmp/somefile', 'rb', buffering=0)
 
-    @unittest.skip('smart_open does not currently accept additional positional args')
     @mock.patch(_BUILTIN_OPEN)
     def test_file_buffering2(self, mock_smart_open):
-        smart_open_object = smart_open.smart_open('/tmp/somefile', 'rb', 0)
+        smart_open_object = smart_open.open('/tmp/somefile', 'rb', 0)
         smart_open_object.__iter__()
         # called with the correct expanded path?
         mock_smart_open.assert_called_with('/tmp/somefile', 'rb', buffering=0)
@@ -838,7 +1039,7 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_hdfs(self, mock_subprocess):
         """Is HDFS line iterator called correctly?"""
         mock_subprocess.PIPE.return_value = "test"
-        smart_open_object = smart_open.smart_open("hdfs:///tmp/test.txt")
+        smart_open_object = smart_open.open("hdfs:///tmp/test.txt")
         smart_open_object.__iter__()
         # called with the correct params?
         mock_subprocess.Popen.assert_called_with(
@@ -847,7 +1048,7 @@ class SmartOpenReadTest(unittest.TestCase):
         )
 
         # second possibility of schema
-        smart_open_object = smart_open.smart_open("hdfs://tmp/test.txt")
+        smart_open_object = smart_open.open("hdfs://tmp/test.txt")
         smart_open_object.__iter__()
         mock_subprocess.Popen.assert_called_with(
             ["hdfs", "dfs", "-cat", "/tmp/test.txt"],
@@ -859,7 +1060,7 @@ class SmartOpenReadTest(unittest.TestCase):
         """Is webhdfs line iterator called correctly"""
         responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file",
                       body='line1\nline2', stream=True)
-        smart_open_object = smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file")
+        smart_open_object = smart_open.open("webhdfs://127.0.0.1:8440/path/file", 'rb')
         iterator = iter(smart_open_object)
         self.assertEqual(next(iterator).decode("utf-8"), "line1\n")
         self.assertEqual(next(iterator).decode("utf-8"), "line2")
@@ -873,7 +1074,7 @@ class SmartOpenReadTest(unittest.TestCase):
         body = text.encode('utf-8')
         responses.add(responses.GET, actual_url, body=body, stream=True)
 
-        actual = smart_open.smart_open(input_url, encoding='utf-8').read()
+        actual = smart_open.open(input_url, encoding='utf-8').read()
         self.assertEqual(text, actual)
 
     @responses.activate
@@ -881,7 +1082,7 @@ class SmartOpenReadTest(unittest.TestCase):
         """Does webhdfs read method work correctly"""
         responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file",
                       body='line1\nline2', stream=True)
-        smart_open_object = smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file")
+        smart_open_object = smart_open.open("webhdfs://127.0.0.1:8440/path/file", 'rb')
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
     @mock_s3
@@ -894,7 +1095,8 @@ class SmartOpenReadTest(unittest.TestCase):
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
 
-        with smart_open.smart_open("s3://mybucket/mykey", "wb", s3_min_part_size=5 * 1024**2) as fout:
+        tp = dict(s3_min_part_size=5 * 1024**2)
+        with smart_open.open("s3://mybucket/mykey", "wb", transport_params=tp) as fout:
             # write a single huge line (=full multipart upload)
             fout.write(expected[0] + b'\n')
 
@@ -906,12 +1108,12 @@ class SmartOpenReadTest(unittest.TestCase):
             fout.write(expected[-1])
 
         # connect to fake s3 and read from the fake key we filled above
-        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
+        smart_open_object = smart_open.open("s3://mybucket/mykey", 'rb')
         output = [line.rstrip(b'\n') for line in smart_open_object]
         self.assertEqual(output, expected)
 
         # same thing but using a context manager
-        with smart_open.smart_open("s3://mybucket/mykey") as smart_open_object:
+        with smart_open.open("s3://mybucket/mykey", 'rb') as smart_open_object:
             output = [line.rstrip(b'\n') for line in smart_open_object]
             self.assertEqual(output, expected)
 
@@ -923,10 +1125,10 @@ class SmartOpenReadTest(unittest.TestCase):
 
         # write some bogus key so we can check it below
         content = u"hello wořld\nhow are you?".encode('utf8')
-        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(content)
 
-        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
+        smart_open_object = smart_open.open("s3://mybucket/mykey", 'rb')
         self.assertEqual(content[:6], smart_open_object.read(6))
         self.assertEqual(content[6:14], smart_open_object.read(8))  # ř is 2 bytes
 
@@ -940,10 +1142,10 @@ class SmartOpenReadTest(unittest.TestCase):
 
         # write some bogus key so we can check it below
         content = u"hello wořld\nhow are you?".encode('utf8')
-        with smart_open.smart_open("s3://mybucket/mykey", "wb") as fout:
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(content)
 
-        smart_open_object = smart_open.smart_open("s3://mybucket/mykey")
+        smart_open_object = smart_open.open("s3://mybucket/mykey", 'rb')
         self.assertEqual(content[:6], smart_open_object.read(6))
         self.assertEqual(content[6:14], smart_open_object.read(8))  # ř is 2 bytes
 
@@ -957,12 +1159,12 @@ class SmartOpenReadTest(unittest.TestCase):
 class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.Session')
     def test_no_kwargs(self, mock_session):
-        smart_open.smart_open('s3://mybucket/mykey', defer_seek=True)
+        smart_open.open('s3://mybucket/mykey', transport_params=dict(defer_seek=True))
         mock_session.return_value.resource.assert_called_with('s3')
 
     @mock.patch('boto3.Session')
     def test_credentials(self, mock_session):
-        smart_open.smart_open('s3://access_id:access_secret@mybucket/mykey', defer_seek=True)
+        smart_open.open('s3://access_id:access_secret@mybucket/mykey', transport_params=dict(defer_seek=True))
         mock_session.assert_called_with(aws_access_key_id='access_id', aws_secret_access_key='access_secret')
         mock_session.return_value.resource.assert_called_with('s3')
 
@@ -1045,13 +1247,13 @@ class SmartOpenTest(unittest.TestCase):
 
     def test_text(self):
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.smart_open("blah", "r", encoding='utf-8') as fin:
+            with smart_open.open("blah", "r", encoding='utf-8') as fin:
                 self.assertEqual(fin.read(), self.as_text)
                 mock_open.assert_called_with("blah", "r", buffering=-1, encoding='utf-8')
 
     def test_binary(self):
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
-            with smart_open.smart_open("blah", "rb") as fin:
+            with smart_open.open("blah", "rb") as fin:
                 self.assertEqual(fin.read(), self.as_bytes)
                 mock_open.assert_called_with("blah", "rb", buffering=-1)
 
@@ -1059,7 +1261,7 @@ class SmartOpenTest(unittest.TestCase):
         short_path = "~/blah"
         full_path = os.path.expanduser(short_path)
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.smart_open(short_path, "rb"):
+            with smart_open.open(short_path, "rb"):
                 mock_open.assert_called_with(full_path, "rb", buffering=-1)
 
     def test_incorrect(self):
@@ -1074,47 +1276,50 @@ class SmartOpenTest(unittest.TestCase):
     def test_write_utf8(self):
         # correct write mode, correct file:// URI
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.smart_open("blah", "w", encoding='utf-8') as fout:
+            with smart_open.open("blah", "w", encoding='utf-8') as fout:
                 mock_open.assert_called_with("blah", "w", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
 
     def test_write_utf8_absolute_path(self):
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.smart_open("/some/file.txt", "w", encoding='utf-8') as fout:
+            with smart_open.open("/some/file.txt", "w", encoding='utf-8') as fout:
                 mock_open.assert_called_with("/some/file.txt", "w", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
 
     def test_append_utf8(self):
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.smart_open("/some/file.txt", "w+", encoding='utf-8') as fout:
+            with smart_open.open("/some/file.txt", "w+", encoding='utf-8') as fout:
                 mock_open.assert_called_with("/some/file.txt", "w+", buffering=-1, encoding='utf-8')
                 fout.write(self.as_text)
 
     def test_append_binary_absolute_path(self):
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
-            with smart_open.smart_open("/some/file.txt", "wb+") as fout:
+            with smart_open.open("/some/file.txt", "wb+") as fout:
                 mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1)
                 fout.write(self.as_bytes)
 
     def test_newline(self):
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
-            smart_open.smart_open("/some/file.txt", "wb+", newline='\n')
+            smart_open.open("/some/file.txt", "wb+", newline='\n')
             mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1, newline='\n')
 
     def test_newline_csv(self):
         #
         # See https://github.com/RaRe-Technologies/smart_open/issues/477
         #
-        rows = [{'name': 'alice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
-        expected = 'name,color\nalice,aqua\nbob,blue\n'
+        rows = [{'name': 'alice\u2028beatrice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
+        expected = 'name,color\r\nalice\u2028beatrice,aqua\r\nbob,blue\r\n'
 
         with named_temporary_file(mode='w') as tmp:
-            with smart_open.open(tmp.name, 'w+', newline='\n') as fout:
+            # The csv module recommends using newline='' when opening files and letting
+            # the csv writer handle line endings. By default it uses the 'excel' dialect which
+            # emits \r\n as line terminator.
+            with smart_open.open(tmp.name, 'w+', encoding='utf-8', newline='') as fout:
                 out = csv.DictWriter(fout, fieldnames=['name', 'color'])
                 out.writeheader()
                 out.writerows(rows)
 
-            with open(tmp.name, 'r') as fin:
+            with open(tmp.name, 'r', encoding='utf-8', newline='') as fin:
                 content = fin.read()
 
         assert content == expected
@@ -1133,7 +1338,7 @@ class SmartOpenTest(unittest.TestCase):
     @mock.patch('smart_open.hdfs.subprocess')
     def test_hdfs(self, mock_subprocess):
         """Is HDFS write called correctly"""
-        smart_open_object = smart_open.smart_open("hdfs:///tmp/test.txt", 'wb')
+        smart_open_object = smart_open.open("hdfs:///tmp/test.txt", 'wb')
         smart_open_object.write("test")
         # called with the correct params?
         mock_subprocess.Popen.assert_called_with(
@@ -1141,7 +1346,7 @@ class SmartOpenTest(unittest.TestCase):
         )
 
         # second possibility of schema
-        smart_open_object = smart_open.smart_open("hdfs://tmp/test.txt", 'wb')
+        smart_open_object = smart_open.open("hdfs://tmp/test.txt", 'wb')
         smart_open_object.write("test")
         mock_subprocess.Popen.assert_called_with(
             ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"], stdin=mock_subprocess.PIPE
@@ -1156,13 +1361,13 @@ class SmartOpenTest(unittest.TestCase):
         raw_data = b"second test"
 
         # correct write mode, correct s3 URI
-        with smart_open.smart_open("s3://mybucket/newkey", "wb") as fout:
+        with smart_open.open("s3://mybucket/newkey", "wb") as fout:
             logger.debug('fout: %r', fout)
             fout.write(raw_data)
 
         logger.debug("write successfully completed")
 
-        output = list(smart_open.smart_open("s3://mybucket/newkey", "rb"))
+        output = list(smart_open.open("s3://mybucket/newkey", "rb"))
 
         self.assertEqual(output, [raw_data])
 
@@ -1171,7 +1376,7 @@ class SmartOpenTest(unittest.TestCase):
         # Read local file fixture
         path = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt.gz')
         data = ""
-        with smart_open.smart_open(path, 'rb') as fd:
+        with smart_open.open(path, 'rb') as fd:
             data = fd.read()
 
         # Create a test bucket
@@ -1202,8 +1407,7 @@ class SmartOpenTest(unittest.TestCase):
 
         with self.assertRaises(UnicodeEncodeError):
             with named_temporary_file('wb', delete=True) as infile:
-                with smart_open.smart_open(infile.name, 'w', encoding='koi8-r',
-                                           errors='strict') as fout:
+                with smart_open.open(infile.name, 'w', encoding='koi8-r', errors='strict') as fout:
                     fout.write(text)
 
     @mock_s3
@@ -1213,10 +1417,9 @@ class SmartOpenTest(unittest.TestCase):
         expected = u'?' * len(text)
 
         with named_temporary_file('wb', delete=True) as infile:
-            with smart_open.smart_open(infile.name, 'w', encoding='koi8-r',
-                                       errors='replace') as fout:
+            with smart_open.open(infile.name, 'w', encoding='koi8-r', errors='replace') as fout:
                 fout.write(text)
-            with smart_open.smart_open(infile.name, 'r', encoding='koi8-r') as fin:
+            with smart_open.open(infile.name, 'r', encoding='koi8-r') as fin:
                 actual = fin.read()
 
         self.assertEqual(expected, actual)
@@ -1245,7 +1448,7 @@ class WebHdfsWriteTest(unittest.TestCase):
             "http://127.0.0.1:8440/file",
             status=201,
         )
-        smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file", 'wb')
+        smart_open.open("webhdfs://127.0.0.1:8440/path/file", 'wb')
 
         assert len(responses.calls) == 2
         path, params = responses.calls[0].request.url.split("?")
@@ -1266,7 +1469,7 @@ class WebHdfsWriteTest(unittest.TestCase):
             callback=request_callback,
         )
         responses.add(responses.PUT, "http://127.0.0.1:8440/file", status=201)
-        smart_open_object = smart_open.smart_open("webhdfs://127.0.0.1:8440/path/file", 'wb')
+        smart_open_object = smart_open.open("webhdfs://127.0.0.1:8440/path/file", 'wb')
 
         def write_callback(request):
             assert request.body == u"žluťoučký koníček".encode('utf8')
@@ -1297,22 +1500,21 @@ class CompressionFormatTest(unittest.TestCase):
 
     def write_read_assertion(self, suffix):
         test_file = make_buffer(name='file' + suffix)
-        with smart_open.smart_open(test_file, 'wb') as fout:
+        with smart_open.open(test_file, 'wb') as fout:
             fout.write(SAMPLE_BYTES)
         self.assertNotEqual(SAMPLE_BYTES, test_file.getvalue())
         # we have to recreate the buffer because it is closed
         test_file = make_buffer(initial_value=test_file.getvalue(), name=test_file.name)
-        with smart_open.smart_open(test_file, 'rb') as fin:
+        with smart_open.open(test_file, 'rb') as fin:
             self.assertEqual(fin.read(), SAMPLE_BYTES)
 
     def test_open_gz(self):
         """Can open gzip?"""
         fpath = os.path.join(CURR_DIR, 'test_data/crlf_at_1k_boundary.warc.gz')
-        with smart_open.smart_open(fpath) as infile:
+        with smart_open.open(fpath, 'rb') as infile:
             data = infile.read()
         m = hashlib.md5(data)
-        assert m.hexdigest() == '18473e60f8c7c98d29d65bf805736a0d', \
-            'Failed to read gzip'
+        assert m.hexdigest() == '18473e60f8c7c98d29d65bf805736a0d', 'Failed to read gzip'
 
     def test_write_read_gz(self):
         """Can write and read gzip?"""
@@ -1321,6 +1523,14 @@ class CompressionFormatTest(unittest.TestCase):
     def test_write_read_bz2(self):
         """Can write and read bz2?"""
         self.write_read_assertion('.bz2')
+
+    def test_gzip_text(self):
+        with named_temporary_file(suffix='.gz') as f:
+            with smart_open.open(f.name, 'wt') as fout:
+                fout.write('hello world')
+
+            with smart_open.open(f.name, 'rt') as fin:
+                assert fin.read() == 'hello world'
 
 
 class MultistreamsBZ2Test(unittest.TestCase):
@@ -1392,7 +1602,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
 
     def test_file_smart_open_can_read_multistream_bz2(self):
         test_file = self.create_temp_bz2(streams=5)
-        with smart_open_lib.smart_open(test_file) as bz2f:
+        with smart_open_lib.open(test_file, 'rb') as bz2f:
             self.assertEqual(bz2f.read(), self.TEXT * 5)
         self.cleanup_temp_bz2(test_file)
 
@@ -1409,16 +1619,16 @@ class S3OpenTest(unittest.TestCase):
         key = s3.Object('bucket', 'key')
         key.put(Body=text.encode('utf-8'))
 
-        with smart_open.smart_open('s3://bucket/key', "rb") as fin:
+        with smart_open.open('s3://bucket/key', "rb") as fin:
             self.assertEqual(fin.read(), text.encode('utf-8'))
 
-        with smart_open.smart_open('s3://bucket/key', "r", encoding='utf-8') as fin:
+        with smart_open.open('s3://bucket/key', "r", encoding='utf-8') as fin:
             self.assertEqual(fin.read(), text)
 
     def test_bad_mode(self):
         """Bad mode should raise and exception."""
         uri = smart_open_lib._parse_uri("s3://bucket/key")
-        self.assertRaises(NotImplementedError, smart_open.smart_open, uri, "x")
+        self.assertRaises(NotImplementedError, smart_open.open, uri, "x")
 
     @mock_s3
     def test_rw_encoding(self):
@@ -1429,19 +1639,19 @@ class S3OpenTest(unittest.TestCase):
         key = "s3://bucket/key"
         text = u"расцветали яблони и груши"
 
-        with smart_open.smart_open(key, "w", encoding="koi8-r") as fout:
+        with smart_open.open(key, "w", encoding="koi8-r") as fout:
             fout.write(text)
 
-        with smart_open.smart_open(key, "r", encoding="koi8-r") as fin:
+        with smart_open.open(key, "r", encoding="koi8-r") as fin:
             self.assertEqual(text, fin.read())
 
-        with smart_open.smart_open(key, "rb") as fin:
+        with smart_open.open(key, "rb") as fin:
             self.assertEqual(text.encode("koi8-r"), fin.read())
 
-        with smart_open.smart_open(key, "r", encoding="euc-jp") as fin:
+        with smart_open.open(key, "r", encoding="euc-jp") as fin:
             self.assertRaises(UnicodeDecodeError, fin.read)
 
-        with smart_open.smart_open(key, "r", encoding="euc-jp", errors="replace") as fin:
+        with smart_open.open(key, "r", encoding="euc-jp", errors="replace") as fin:
             fin.read()
 
     @mock_s3
@@ -1452,20 +1662,20 @@ class S3OpenTest(unittest.TestCase):
         key = "s3://bucket/key.gz"
 
         text = u"не слышны в саду даже шорохи"
-        with smart_open.smart_open(key, "wb") as fout:
+        with smart_open.open(key, "wb") as fout:
             fout.write(text.encode("utf-8"))
 
         #
         # Check that what we've created is a gzip.
         #
-        with smart_open.smart_open(key, "rb", ignore_extension=True) as fin:
+        with smart_open.open(key, "rb", ignore_ext=True) as fin:
             gz = gzip.GzipFile(fileobj=fin)
             self.assertEqual(gz.read().decode("utf-8"), text)
 
         #
         # We should be able to read it back as well.
         #
-        with smart_open.smart_open(key, "rb") as fin:
+        with smart_open.open(key, "rb") as fin:
             self.assertEqual(fin.read().decode("utf-8"), text)
 
     @mock_s3
@@ -1476,7 +1686,7 @@ class S3OpenTest(unittest.TestCase):
         s3.create_bucket(Bucket='bucket')
 
         with mock.patch('smart_open.s3.open') as mock_open:
-            smart_open.smart_open("s3://bucket/key.gz", "wb")
+            smart_open.open("s3://bucket/key.gz", "wb")
             mock_open.assert_called_with('bucket', 'key.gz', 'wb')
 
     @mock_s3
@@ -1488,11 +1698,11 @@ class S3OpenTest(unittest.TestCase):
         key = "s3://bucket/key.gz"
 
         text = u"если-б я был султан и имел трёх жён, то тройной красотой был бы окружён"
-        with smart_open.smart_open(key, "wb") as fout:
+        with smart_open.open(key, "wb") as fout:
             fout.write(text.encode("utf-8"))
 
         with mock.patch('smart_open.s3.open') as mock_open:
-            smart_open.smart_open(key, "r")
+            smart_open.open(key, "r")
             mock_open.assert_called_with('bucket', 'key.gz', 'rb')
 
     @mock_s3
@@ -1502,9 +1712,9 @@ class S3OpenTest(unittest.TestCase):
         s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
-        with smart_open.smart_open(key, 'wb') as fout:
+        with smart_open.open(key, 'wb') as fout:
             fout.write(text.encode('koi8-r'))
-        with smart_open.smart_open(key, 'r', encoding='koi8-r') as fin:
+        with smart_open.open(key, 'r', encoding='koi8-r') as fin:
             actual = fin.read()
         self.assertEqual(text, actual)
 
@@ -1515,9 +1725,9 @@ class S3OpenTest(unittest.TestCase):
         s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
-        with smart_open.smart_open(key, 'wb') as fout:
+        with smart_open.open(key, 'wb') as fout:
             fout.write(text.encode('koi8-r'))
-        with smart_open.smart_open(key, encoding='koi8-r') as fin:
+        with smart_open.open(key, encoding='koi8-r') as fin:
             actual = fin.read()
         self.assertEqual(text, actual)
 
@@ -1529,9 +1739,9 @@ class S3OpenTest(unittest.TestCase):
         key = "s3://bucket/key.txt"
         text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
 
-        with smart_open.smart_open(key, 'w', encoding='koi8-r') as fout:
+        with smart_open.open(key, 'w', encoding='koi8-r') as fout:
             fout.write(text)
-        with smart_open.smart_open(key, encoding='koi8-r') as fin:
+        with smart_open.open(key, encoding='koi8-r') as fin:
             actual = fin.read()
         self.assertEqual(text, actual)
 
@@ -1544,7 +1754,7 @@ class S3OpenTest(unittest.TestCase):
         text = u'欲しい気持ちが成長しすぎて'
 
         with self.assertRaises(UnicodeEncodeError):
-            with smart_open.smart_open(key, 'w', encoding='koi8-r', errors='strict') as fout:
+            with smart_open.open(key, 'w', encoding='koi8-r', errors='strict') as fout:
                 fout.write(text)
 
     @mock_s3
@@ -1556,9 +1766,9 @@ class S3OpenTest(unittest.TestCase):
         text = u'欲しい気持ちが成長しすぎて'
         expected = u'?' * len(text)
 
-        with smart_open.smart_open(key, 'w', encoding='koi8-r', errors='replace') as fout:
+        with smart_open.open(key, 'w', encoding='koi8-r', errors='replace') as fout:
             fout.write(text)
-        with smart_open.smart_open(key, encoding='koi8-r') as fin:
+        with smart_open.open(key, encoding='koi8-r') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
 
@@ -1570,9 +1780,9 @@ class S3OpenTest(unittest.TestCase):
         key = "s3://bucket/key.txt.gz"
         text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
 
-        with smart_open.smart_open(key, 'w', encoding='utf-8') as fout:
+        with smart_open.open(key, 'w', encoding='utf-8') as fout:
             fout.write(text)
-        with smart_open.smart_open(key, 'r', encoding='utf-8') as fin:
+        with smart_open.open(key, 'r', encoding='utf-8') as fin:
             actual = fin.read()
         self.assertEqual(text, actual)
 
@@ -1616,6 +1826,63 @@ class CheckKwargsTest(unittest.TestCase):
         expected = {'foo': 123}
         actual = smart_open.smart_open_lib._check_kwargs(function, kwargs)
         self.assertEqual(expected, actual)
+
+
+class GetBinaryModeTest(parameterizedtestcase.ParameterizedTestCase):
+    @parameterizedtestcase.ParameterizedTestCase.parameterize(
+        ('mode', 'expected'),
+        [
+            ('r', 'rb'),
+            ('r+', 'rb+'),
+            ('rt', 'rb'),
+            ('rt+', 'rb+'),
+            ('r+t', 'rb+'),
+            ('w', 'wb'),
+            ('w+', 'wb+'),
+            ('wt', 'wb'),
+            ('wt+', 'wb+'),
+            ('w+t', 'wb+'),
+            ('a', 'ab'),
+            ('a+', 'ab+'),
+            ('at', 'ab'),
+            ('at+', 'ab+'),
+            ('a+t', 'ab+'),
+        ]
+    )
+    def test(self, mode, expected):
+        actual = smart_open.smart_open_lib._get_binary_mode(mode)
+        assert actual == expected
+
+    @parameterizedtestcase.ParameterizedTestCase.parameterize(
+        ('mode', ),
+        [
+            ('rw', ),
+            ('rwa', ),
+            ('rbt', ),
+            ('r++', ),
+            ('+', ),
+            ('x', ),
+        ]
+    )
+    def test_bad(self, mode):
+        self.assertRaises(ValueError, smart_open.smart_open_lib._get_binary_mode, mode)
+
+
+def test_backwards_compatibility_wrapper():
+    fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
+    expected = open(fpath, 'rb').readline()
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+
+        actual = smart_open.smart_open(fpath).readline()
+        assert expected == actual
+
+        actual = smart_open.smart_open(fpath, ignore_extension=True).readline()
+        assert expected == actual
+
+    with pytest.raises(DeprecationWarning):
+        smart_open.smart_open(fpath, unsupported_keyword_param=123)
 
 
 if __name__ == '__main__':

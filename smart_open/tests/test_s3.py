@@ -15,6 +15,7 @@ import unittest
 import warnings
 from contextlib import contextmanager
 from unittest.mock import patch
+import sys
 
 import boto3
 import botocore.client
@@ -89,6 +90,27 @@ def ignore_resource_warnings():
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
+@contextmanager
+def patch_invalid_range_response(actual_size):
+    """ Work around a bug in moto (https://github.com/spulec/moto/issues/2981) where the
+     API response doesn't match when requesting an invalid range of bytes from an S3 GetObject. """
+    _real_get = smart_open.s3._get
+
+    def mock_get(*args, **kwargs):
+        try:
+            return _real_get(*args, **kwargs)
+        except IOError as ioe:
+            error_response = smart_open.s3._unwrap_ioerror(ioe)
+            if error_response and error_response.get('Message') == 'Requested Range Not Satisfiable':
+                error_response['ActualObjectSize'] = actual_size
+                error_response['Code'] = 'InvalidRange'
+                error_response['Message'] = 'The requested range is not satisfiable'
+            raise
+
+    with patch('smart_open.s3._get', new=mock_get):
+        yield
+
+
 class BaseTest(unittest.TestCase):
     @contextmanager
     def assertApiCalls(self, **expected_api_calls):
@@ -131,6 +153,72 @@ class SeekableRawReaderTest(unittest.TestCase):
         self.assertEqual(reader.read(1), b'1')
         reader._body.close()
         self.assertEqual(reader.read(2), b'23')
+
+
+class CrapStream(io.BytesIO):
+    """Raises an exception on every second read call."""
+    def __init__(self, *args, modulus=2, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._count = 0
+        self._modulus = modulus
+
+    def read(self, size=-1):
+        self._count += 1
+        if self._count % self._modulus == 0:
+            raise botocore.exceptions.BotoCoreError()
+        the_bytes = super().read(size)
+        return the_bytes
+
+
+class CrapObject:
+    def __init__(self, data, modulus=2):
+        self._datasize = len(data)
+        self._body = CrapStream(data, modulus=modulus)
+        self.bucket_name, self.key = 'crap', 'object'
+
+    def get(self, *args, **kwargs):
+        return {
+            'ActualObjectSize': self._datasize,
+            'ContentLength': self._datasize,
+            'ContentRange': 'bytes 0-%d/%d' % (self._datasize, self._datasize),
+            'Body': self._body,
+            'ResponseMetadata': {'RetryAttempts': 1},
+        }
+
+
+class IncrementalBackoffTest(unittest.TestCase):
+    def test_every_read_fails(self):
+        reader = smart_open.s3._SeekableRawReader(CrapObject(b'hello', 1))
+        with mock.patch('time.sleep') as mock_sleep:
+            with self.assertRaises(IOError):
+                reader.read()
+
+            #
+            # Make sure our incremental backoff is actually happening here.
+            #
+            mock_sleep.assert_has_calls([mock.call(s) for s in (1, 2, 4, 8, 16)])
+
+    def test_every_second_read_fails(self):
+        """Can we read from a stream that raises exceptions from time to time?"""
+        reader = smart_open.s3._SeekableRawReader(CrapObject(b'hello'))
+        with mock.patch('time.sleep') as mock_sleep:
+            assert reader.read(1) == b'h'
+            mock_sleep.assert_not_called()
+
+            assert reader.read(1) == b'e'
+            mock_sleep.assert_called_with(1)
+            mock_sleep.reset_mock()
+
+            assert reader.read(1) == b'l'
+            mock_sleep.reset_mock()
+
+            assert reader.read(1) == b'l'
+            mock_sleep.assert_called_with(1)
+            mock_sleep.reset_mock()
+
+            assert reader.read(1) == b'o'
+            mock_sleep.assert_called_with(1)
+            mock_sleep.reset_mock()
 
 
 @moto.mock_s3
@@ -235,6 +323,15 @@ class SeekableBufferedInputBaseTest(BaseTest):
             seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
             self.assertEqual(seek, len(content) - 4)
             self.assertEqual(fin.read(), b'you?')
+
+    def test_seek_past_end(self):
+        content = u"hello wořld\nhow are you?".encode('utf8')
+        put_to_bucket(contents=content)
+
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response(str(len(content))):
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            seek = fin.seek(60)
+            self.assertEqual(seek, len(content))
 
     def test_detect_eof(self):
         content = u"hello wořld\nhow are you?".encode('utf8')
@@ -352,6 +449,15 @@ class SeekableBufferedInputBaseTest(BaseTest):
             fin.seek(10)
             self.assertEqual(fin.read(), content[10:])
 
+    def test_read_empty_file(self):
+        put_to_bucket(contents=b'')
+
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response('0'):
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
+                data = fin.read()
+
+        self.assertEqual(data, b'')
+
 
 @moto.mock_s3
 class MultipartWriterTest(unittest.TestCase):
@@ -374,7 +480,7 @@ class MultipartWriterTest(unittest.TestCase):
             fout.write(test_string)
 
         # read key and test content
-        output = list(smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME), "rb"))
+        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb"))
 
         self.assertEqual(output, [test_string])
 
@@ -416,7 +522,7 @@ class MultipartWriterTest(unittest.TestCase):
             self.assertEqual(fout._total_parts, 1)
 
         # read back the same key and check its content
-        output = list(smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)))
+        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
         self.assertEqual(output, [b"testtest\n", b"test"])
 
     def test_write_04(self):
@@ -426,7 +532,8 @@ class MultipartWriterTest(unittest.TestCase):
             pass
 
         # read back the same key and check its content
-        output = list(smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)))
+        with patch_invalid_range_response('0'):
+            output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
 
         self.assertEqual(output, [])
 
@@ -453,7 +560,7 @@ class MultipartWriterTest(unittest.TestCase):
             with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 
-        with smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)) as fin:
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
             with io.TextIOWrapper(fin, encoding='utf-8') as text:
                 actual = text.read()
 
@@ -516,7 +623,7 @@ class SinglepartWriterTest(unittest.TestCase):
             fout.write(test_string)
 
         # read key and test content
-        output = list(smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME), "rb"))
+        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb"))
 
         self.assertEqual(output, [test_string])
 
@@ -548,8 +655,8 @@ class SinglepartWriterTest(unittest.TestCase):
             pass
 
         # read back the same key and check its content
-        output = list(smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)))
-
+        with patch_invalid_range_response('0'):
+            output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
         self.assertEqual(output, [])
 
     def test_buffered_writer_wrapper_works(self):
@@ -563,7 +670,7 @@ class SinglepartWriterTest(unittest.TestCase):
             with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 
-        with smart_open.smart_open("s3://{}/{}".format(BUCKET_NAME, WRITE_KEY_NAME)) as fin:
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
             with io.TextIOWrapper(fin, encoding='utf-8') as text:
                 actual = text.read()
 
@@ -593,11 +700,6 @@ class SinglepartWriterTest(unittest.TestCase):
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
 
 
-@unittest.skipIf(
-    os.environ.get('APPVEYOR'),
-    'This test is disabled on AppVeyor, see '
-    '<https://github.com/RaRe-Technologies/smart_open/issues/482>'
-)
 @moto.mock_s3
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
@@ -606,6 +708,7 @@ class IterBucketTest(unittest.TestCase):
     def tearDown(self):
         cleanup_bucket()
 
+    @unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
     def test_iter_bucket(self):
         populate_bucket()
         results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
@@ -623,6 +726,7 @@ class IterBucketTest(unittest.TestCase):
             # verify the suggested new import is in the warning
             assert "from smart_open.s3 import iter_bucket as s3_iter_bucket" in cm.output[0]
 
+    @unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
     def test_accepts_boto3_bucket(self):
         populate_bucket()
         bucket = boto3.resource('s3').Bucket(BUCKET_NAME)
@@ -650,6 +754,7 @@ class IterBucketTest(unittest.TestCase):
 
 @moto.mock_s3
 @unittest.skipIf(not smart_open.concurrency._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
+@unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
 class IterBucketConcurrentFuturesTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
@@ -670,13 +775,9 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(expected))
 
 
-@unittest.skipIf(
-    os.environ.get('APPVEYOR'),
-    'This test is disabled on AppVeyor, see '
-    '<https://github.com/RaRe-Technologies/smart_open/issues/482>'
-)
 @moto.mock_s3
 @unittest.skipIf(not smart_open.concurrency._MULTIPROCESSING, 'multiprocessing unavailable')
+@unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
 class IterBucketMultiprocessingTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_concurrent = smart_open.concurrency._CONCURRENT_FUTURES
@@ -814,9 +915,6 @@ class OpenTest(unittest.TestCase):
 
 
 def populate_bucket(num_keys=10):
-    # fake (or not) connection, bucket and key
-    logger.debug('%r', locals())
-
     s3 = boto3.resource('s3')
     for key_number in range(num_keys):
         key_name = 'key_%d' % key_number
@@ -838,6 +936,64 @@ class RetryIfFailedTest(unittest.TestCase):
             smart_open.s3._retry_if_failed(partial, attempts=3, sleep_seconds=0, exceptions=exceptions)
 
         self.assertEqual(partial.call_count, 3)
+
+
+@moto.mock_s3()
+def test_resource_propagation_singlepart():
+    """Does the resource parameter make it from the caller to Boto3?"""
+    #
+    # Not sure why we need to create the bucket here, as setUpModule should
+    # have done that for us by now.
+    #
+    session = boto3.Session()
+    resource = session.resource('s3')
+    bucket = resource.create_bucket(Bucket=BUCKET_NAME)
+    bucket.wait_until_exists()
+
+    with smart_open.s3.open(
+        BUCKET_NAME,
+        WRITE_KEY_NAME,
+        mode='wb',
+        resource=resource,
+        multipart_upload=False,
+    ) as writer:
+        assert writer._resource == resource
+        assert id(writer._resource) == id(resource)
+
+
+@moto.mock_s3()
+def test_resource_propagation_multipart():
+    """Does the resource parameter make it from the caller to Boto3?"""
+    session = boto3.Session()
+    resource = session.resource('s3')
+    bucket = resource.create_bucket(Bucket=BUCKET_NAME)
+    bucket.wait_until_exists()
+
+    with smart_open.s3.open(
+        BUCKET_NAME,
+        WRITE_KEY_NAME,
+        mode='wb',
+        resource=resource,
+        multipart_upload=True,
+    ) as writer:
+        assert writer._resource == resource
+        assert id(writer._resource) == id(resource)
+
+
+@moto.mock_s3()
+def test_resource_propagation_reader():
+    """Does the resource parameter make it from the caller to Boto3?"""
+    session = boto3.Session()
+    resource = session.resource('s3')
+    bucket = resource.create_bucket(Bucket=BUCKET_NAME)
+    bucket.wait_until_exists()
+
+    with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, mode='wb') as writer:
+        writer.write(b'hello world')
+
+    with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, mode='rb', resource=resource) as reader:
+        assert reader._resource == resource
+        assert id(reader._resource) == id(resource)
 
 
 if __name__ == '__main__':

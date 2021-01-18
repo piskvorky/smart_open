@@ -15,14 +15,15 @@ The main functions are:
 
 """
 
-import codecs
+import collections
+import io
+import locale
 import logging
 import os
 import os.path as P
 import pathlib
 import urllib.parse
 import warnings
-import sys
 
 #
 # This module defines a function called smart_open so we cannot use
@@ -56,13 +57,7 @@ from typing import (
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_ENCODING = sys.getdefaultencoding()
-
-_TO_BINARY_LUT = {
-    'r': 'rb', 'r+': 'rb+', 'rt': 'rb', 'rt+': 'rb+',
-    'w': 'wb', 'w+': 'wb+', 'wt': 'wb', "wt+": 'wb+',
-    'a': 'ab', 'a+': 'ab+', 'at': 'ab', 'at+': 'ab+',
-}
+DEFAULT_ENCODING = locale.getpreferredencoding(do_setlocale=False)
 
 
 def _sniff_scheme(uri_as_string: str) -> str:
@@ -199,7 +194,7 @@ def open(
         uri = str(uri)
 
     explicit_encoding = encoding
-    encoding = explicit_encoding if explicit_encoding else SYSTEM_ENCODING
+    encoding = explicit_encoding if explicit_encoding else DEFAULT_ENCODING
 
     #
     # This is how we get from the filename to the end result.  Decompression is
@@ -213,95 +208,84 @@ def open(
     # filename ---------------> bytes -------------> bytes ---------> text
     #                          binary             decompressed       decode
     #
-    binary_mode = _TO_BINARY_LUT.get(mode, mode)
+
+    try:
+        binary_mode = _get_binary_mode(mode)
+    except ValueError as ve:
+        raise NotImplementedError(ve.args[0])
+
     binary = _open_binary_stream(uri, binary_mode, transport_params)
     if ignore_ext:
         decompressed = binary
     else:
-        decompressed = compression.compression_wrapper(binary, mode)
+        decompressed = compression.compression_wrapper(binary, binary_mode)
 
     if 'b' not in mode or explicit_encoding is not None:
-        decoded = _encoding_wrapper(decompressed, mode, encoding=encoding, errors=errors)
+        decoded = _encoding_wrapper(
+            decompressed,
+            mode,
+            encoding=encoding,
+            errors=errors,
+            newline=newline,
+        )
     else:
         decoded = decompressed
 
     return decoded
 
 
-_MIGRATION_NOTES_URL = (
-    'https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst'
-    '#migrating-to-the-new-open-function'
-)
+def _get_binary_mode(mode_str):
+    #
+    # https://docs.python.org/3/library/functions.html#open
+    #
+    # The order of characters in the mode parameter appears to be unspecified.
+    # The implementation follows the examples, just to be safe.
+    #
+    mode = list(mode_str)
+    binmode = []
 
+    if 't' in mode and 'b' in mode:
+        raise ValueError("can't have text and binary mode at once")
 
-def smart_open(uri, mode="rb", **kw):
-    """Deprecated, use smart_open.open instead.
+    counts = [mode.count(x) for x in 'rwa']
+    if sum(counts) > 1:
+        raise ValueError("must have exactly one of create/read/write/append mode")
 
-    See the migration instructions: %s
+    def transfer(char):
+        binmode.append(mode.pop(mode.index(char)))
 
-    """ % _MIGRATION_NOTES_URL
+    if 'a' in mode:
+        transfer('a')
+    elif 'w' in mode:
+        transfer('w')
+    elif 'r' in mode:
+        transfer('r')
+    else:
+        raise ValueError(
+            "Must have exactly one of create/read/write/append "
+            "mode and at most one plus"
+        )
 
-    warnings.warn(
-        'This function is deprecated, use smart_open.open instead. '
-        'See the migration notes for details: %s' % _MIGRATION_NOTES_URL
-    )
+    if 'b' in mode:
+        transfer('b')
+    elif 't' in mode:
+        mode.pop(mode.index('t'))
+        binmode.append('b')
+    else:
+        binmode.append('b')
+
+    if '+' in mode:
+        transfer('+')
 
     #
-    # The new function uses a shorter name for this parameter, handle it separately.
+    # There shouldn't be anything left in the mode list at this stage.
+    # If there is, then either we've missed something and the implementation
+    # of this function is broken, or the original input mode is invalid.
     #
-    ignore_extension = kw.pop('ignore_extension', False)
+    if mode:
+        raise ValueError('invalid mode: %r' % mode_str)
 
-    expected_kwargs = utils.inspect_kwargs(open)
-    scrubbed_kwargs = {}
-    transport_params = {}
-
-    #
-    # Handle renamed keyword arguments.  This is required to maintain backward
-    # compatibility.  See test_smart_open_old.py for tests.
-    #
-    if 'host' in kw or 's3_upload' in kw:
-        transport_params['multipart_upload_kwargs'] = {}
-        transport_params['resource_kwargs'] = {}
-
-    if 'host' in kw:
-        url = kw.pop('host')
-        if not url.startswith('http'):
-            url = 'http://' + url
-        transport_params['resource_kwargs'].update(endpoint_url=url)
-
-    if 's3_upload' in kw and kw['s3_upload']:
-        transport_params['multipart_upload_kwargs'].update(**kw.pop('s3_upload'))
-
-    #
-    # Providing the entire Session object as opposed to just the profile name
-    # is more flexible and powerful, and thus preferable in the case of
-    # conflict.
-    #
-    if 'profile_name' in kw and 's3_session' in kw:
-        logger.error('profile_name and s3_session are mutually exclusive, ignoring the former')
-
-    if 'profile_name' in kw:
-        import boto3
-
-        transport_params['session'] = boto3.Session(profile_name=kw.pop('profile_name'))
-
-    if 's3_session' in kw:
-        transport_params['session'] = kw.pop('s3_session')
-
-    for key, value in kw.items():
-        if key in expected_kwargs:
-            scrubbed_kwargs[key] = value
-        else:
-            #
-            # Assume that anything not explicitly supported by the new function
-            # is a transport layer keyword argument.  This is safe, because if
-            # the argument ends up being unsupported in the transport layer,
-            # it will only cause a logging warning, not a crash.
-            #
-            transport_params[key] = value
-
-    return open(uri, mode, ignore_ext=ignore_extension,
-                transport_params=transport_params, **scrubbed_kwargs)
+    return ''.join(binmode)
 
 
 def _shortcut_open(
@@ -320,7 +304,7 @@ def _shortcut_open(
 
     This is only possible under the following conditions:
 
-        1. Opening a local file
+        1. Opening a local file; and
         2. Ignore extension is set to True
 
     If it is not possible to use the built-in open for the specified URI, returns None.
@@ -386,24 +370,24 @@ def _open_binary_stream(uri: Union[str, IO], mode: str, transport_params: Dict[s
         return uri  # type: ignore
 
     if not isinstance(uri, str):
-        raise TypeError("don't know how to handle uri %r" % uri)
+        raise TypeError("don't know how to handle uri %s" % repr(uri))
 
     scheme = _sniff_scheme(uri)
     submodule = transport.get_transport(scheme)
     fobj = submodule.open_uri(uri, mode, transport_params)
     if not hasattr(fobj, 'name'):
-        logger.critical('TODO')
-        fobj.name = 'unknown'
+        fobj.name = uri
 
     return fobj
 
 
 def _encoding_wrapper(
-    fileobj: IO,
+    fileobj: IO[bytes],
     mode: str,
     encoding: Optional[str] = None,
     errors: Optional[str] = None,
-) -> IO:
+    newline: Optional[str] = None,
+) -> IO[Union[bytes, str]]:
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
@@ -429,13 +413,15 @@ def _encoding_wrapper(
         return fileobj
 
     if encoding is None:
-        encoding = SYSTEM_ENCODING
+        encoding = DEFAULT_ENCODING
 
-    kw = {'errors': errors} if errors else {}
-    if mode[0] == 'r' or mode.endswith('+'):
-        fileobj = codecs.getreader(encoding)(fileobj, **kw)  # type: ignore
-    if mode[0] in ('w', 'a') or mode.endswith('+'):
-        fileobj = codecs.getwriter(encoding)(fileobj, **kw)  # type: ignore
+    fileobj = io.TextIOWrapper(
+        fileobj,
+        encoding=encoding,
+        errors=errors,
+        newline=newline,
+        write_through=True,
+    )
     return fileobj
 
 
@@ -457,6 +443,43 @@ def _patch_pathlib(func: Callable) -> Callable:
     old_impl = pathlib.Path.open
     pathlib.Path.open = func  # type: ignore
     return old_impl
+
+
+def smart_open(
+        uri,
+        mode='rb',
+        buffering=-1,
+        encoding=None,
+        errors=None,
+        newline=None,
+        closefd=True,
+        opener=None,
+        ignore_extension=False,
+        **kwargs
+    ):
+    #
+    # This is a thin wrapper of smart_open.open.  It's here for backward
+    # compatibility.  It works exactly like smart_open.open when the passed
+    # parameters are identical.  Otherwise, it raises a DeprecationWarning.
+    #
+    # For completeness, the main differences of the old smart_open function:
+    #
+    # 1. Default mode was read binary (mode='rb')
+    # 2. ignore_ext parameter was called ignore_extension
+    # 3. Transport parameters were passed directly as kwargs
+    #
+    url = 'https://github.com/RaRe-Technologies/smart_open/blob/develop/MIGRATING_FROM_OLDER_VERSIONS.rst'
+    if kwargs:
+        raise DeprecationWarning(
+            'The following keyword parameters are not supported: %r. '
+            'See  %s for more information.' % (sorted(kwargs), url)
+        )
+    message = 'This function is deprecated.  See %s for more information' % url
+    warnings.warn(message, category=DeprecationWarning)
+
+    ignore_ext = ignore_extension
+    del kwargs, url, message, ignore_extension
+    return open(**locals())
 
 
 #

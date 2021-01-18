@@ -13,7 +13,10 @@ import logging
 import os.path
 import urllib.parse
 
-import requests
+try:
+    import requests
+except ImportError:
+    MISSING_DEPS = True
 
 from smart_open import bytebuffer, constants
 import smart_open.utils
