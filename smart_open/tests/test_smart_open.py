@@ -1308,15 +1308,18 @@ class SmartOpenTest(unittest.TestCase):
         # See https://github.com/RaRe-Technologies/smart_open/issues/477
         #
         rows = [{'name': 'alice\u2028beatrice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
-        expected = 'name,color\nalice\u2028beatrice,aqua\nbob,blue\n'
+        expected = 'name,color\r\nalice\u2028beatrice,aqua\r\nbob,blue\r\n'
 
         with named_temporary_file(mode='w') as tmp:
+            # The csv module recommends using newline='' when opening files and letting
+            # the csv writer handle line endings. By default it uses the 'excel' dialect which
+            # emits \r\n as line terminator.
             with smart_open.open(tmp.name, 'w+', encoding='utf-8', newline='') as fout:
                 out = csv.DictWriter(fout, fieldnames=['name', 'color'])
                 out.writeheader()
                 out.writerows(rows)
 
-            with open(tmp.name, 'r') as fin:
+            with open(tmp.name, 'r', encoding='utf-8', newline='') as fin:
                 content = fin.read()
 
         assert content == expected
