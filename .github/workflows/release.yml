@@ -2,6 +2,8 @@ name: Release to PyPI
 
 on:
   push:
+    branches:
+      - release
     tags:
       - 'v*.*.*'
 jobs:
