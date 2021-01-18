@@ -725,7 +725,7 @@ class SmartOpenReadTest(unittest.TestCase):
         fpath = os.path.join(CURR_DIR, 'test_data/cp852.tsv.txt')
         with open(fpath, 'rb') as fin:
             expected = fin.read().decode('cp852')
-        with smart_open.open(pathlib.Path(fpath), mode='r', encoding='cp852') as fin:
+        with smart_open.open(pathlib.Path(fpath), mode='r', encoding='cp852', newline='') as fin:
             actual = fin.read()
         self.assertEqual(expected, actual)
 
@@ -1311,7 +1311,7 @@ class SmartOpenTest(unittest.TestCase):
         expected = 'name,color\nalice\u2028beatrice,aqua\nbob,blue\n'
 
         with named_temporary_file(mode='w') as tmp:
-            with smart_open.open(tmp.name, 'w+', newline='\n') as fout:
+            with smart_open.open(tmp.name, 'w+', encoding='utf-8', newline='') as fout:
                 out = csv.DictWriter(fout, fieldnames=['name', 'color'])
                 out.writeheader()
                 out.writerows(rows)
