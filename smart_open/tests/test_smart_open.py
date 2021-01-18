@@ -745,17 +745,15 @@ class SmartOpenReadTest(unittest.TestCase):
         self.assertEqual(r.read(), b"")
 
     @mock_s3
-    def test_newline_read(self):
+    def test_read_newline_none(self):
         """Does newline open() parameter for reading work according to
            https://docs.python.org/3/library/functions.html#open-newline-parameter
         """
-        s3 = boto3.resource('s3')
-        s3.create_bucket(Bucket='mybucket')
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
         # Unicode line separator and various others must never split lines
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_file.encode("utf-8"))
-
         # No newline parameter means newline=None i.e. universal newline mode with all
         # line endings translated to '\n'
         with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8') as fin:
@@ -766,6 +764,12 @@ class SmartOpenReadTest(unittest.TestCase):
                 u"last line"
             ])
 
+    @mock_s3
+    def test_read_newline_empty(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
         # If newline='' universal newline mode is enabled but line separators are not replaced
         with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8',  newline='') as fin:
             self.assertEqual(list(fin), [
@@ -775,6 +779,12 @@ class SmartOpenReadTest(unittest.TestCase):
                 u"last line"
             ])
 
+    @mock_s3
+    def test_read_newline_cr(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
         # If newline='\r' only CR splits lines
         with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='\r') as fin:
             self.assertEqual(list(fin), [
@@ -783,6 +793,12 @@ class SmartOpenReadTest(unittest.TestCase):
                 u"\nlast line"
             ])
 
+    @mock_s3
+    def test_read_newline_lf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
         # If newline='\n' only LF splits lines
         with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='\n') as fin:
             self.assertEqual(list(fin), [
@@ -791,6 +807,12 @@ class SmartOpenReadTest(unittest.TestCase):
                 u"last line"
             ])
 
+    @mock_s3
+    def test_read_newline_crlf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
         # If newline='\r\n' only CRLF splits lines
         with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='\r\n') as fin:
             self.assertEqual(list(fin), [
@@ -798,6 +820,12 @@ class SmartOpenReadTest(unittest.TestCase):
                 u"last line"
             ])
 
+    @mock_s3
+    def test_read_newline_slurp(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
         # Even reading the whole file with read() must replace newlines
         with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline=None) as fin:
             self.assertEqual(
@@ -805,6 +833,12 @@ class SmartOpenReadTest(unittest.TestCase):
                 u"line\u2028 LF\nline\x1c CR\nline\x85 CRLF\nlast line"
             )
 
+    @mock_s3
+    def test_read_newline_binary(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
+        with smart_open.open("s3://mybucket/mykey", "wb") as fout:
+            fout.write(test_file.encode("utf-8"))
         # If the file is opened in binary mode only LF splits lines
         with smart_open.open("s3://mybucket/mykey", "rb") as fin:
             self.assertEqual(list(fin), [
@@ -814,15 +848,13 @@ class SmartOpenReadTest(unittest.TestCase):
             ])
 
     @mock_s3
-    def test_newline_write(self):
+    def test_write_newline_none(self):
         """Does newline open() parameter for writing work according to
            https://docs.python.org/3/library/functions.html#open-newline-parameter
         """
-        s3 = boto3.resource('s3')
-        s3.create_bucket(Bucket='mybucket')
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
         # Unicode line separator and various others must never split lines
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
-
         # No newline parameter means newline=None, all LF are translatest to os.linesep
         with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8') as fout:
             fout.write(test_file)
@@ -834,6 +866,10 @@ class SmartOpenReadTest(unittest.TestCase):
                 u"last line"
             )
 
+    @mock_s3
+    def test_write_newline_empty(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='' nothing is changed
         with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='') as fout:
             fout.write(test_file)
@@ -843,6 +879,10 @@ class SmartOpenReadTest(unittest.TestCase):
                 u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
             )
 
+    @mock_s3
+    def test_write_newline_lf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='\n' nothing is changed
         with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\n') as fout:
             fout.write(test_file)
@@ -852,6 +892,10 @@ class SmartOpenReadTest(unittest.TestCase):
                 u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
             )
 
+    @mock_s3
+    def test_write_newline_cr(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='\r' all LF are replaced by CR
         with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\r') as fout:
             fout.write(test_file)
@@ -861,6 +905,10 @@ class SmartOpenReadTest(unittest.TestCase):
                 u"line\u2028 LF\rline\x1c CR\rline\x85 CRLF\r\rlast line"
             )
 
+    @mock_s3
+    def test_write_newline_crlf(self):
+        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='\r\n' all LF are replaced by CRLF
         with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\r\n') as fout:
             fout.write(test_file)
