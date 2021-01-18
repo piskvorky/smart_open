@@ -33,7 +33,7 @@ git branch -D release-"$version"
 set -e
 
 git checkout upstream/develop -b release-"$version"
-sed -i '' s/$(python smart_open/version.py)/$version/ smart_open/version.py
+sed -i '' -e "s/$(python smart_open/version.py)/$version/" smart_open/version.py
 git commit smart_open/version.py -m "bump version to $version"
 
 echo "Next, update CHANGELOG.md."
