@@ -771,7 +771,7 @@ class SmartOpenReadTest(unittest.TestCase):
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_file.encode("utf-8"))
         # If newline='' universal newline mode is enabled but line separators are not replaced
-        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8',  newline='') as fin:
+        with smart_open.open("s3://mybucket/mykey", "r", encoding='utf-8', newline='') as fin:
             self.assertEqual(list(fin), [
                 u"line\u2028 LF\n",
                 u"line\x1c CR\r",
@@ -861,9 +861,9 @@ class SmartOpenReadTest(unittest.TestCase):
         with smart_open.open("s3://mybucket/mykey", "rb") as fin:
             self.assertEqual(
                 fin.read().decode('utf-8'),
-                u"line\u2028 LF" + os.linesep +
-                u"line\x1c CR\rline\x85 CRLF\r" + os.linesep +
-                u"last line"
+                u"line\u2028 LF" + os.linesep
+                + u"line\x1c CR\rline\x85 CRLF\r" + os.linesep
+                + u"last line"
             )
 
     @mock_s3
