@@ -2,8 +2,6 @@ name: Release to PyPI
 
 on:
   push:
-    branches:
-      - release
     tags:
       - 'v*.*.*'
 jobs:
@@ -34,9 +32,10 @@ jobs:
           . venv/bin/activate
           pip install twine
 
-      - name: Build tarball
+      - name: Build tarball and wheel
         run: |
           . venv/bin/activate
+          pip install wheel
           python setup.py sdist bdist_wheel
 
       - name: Upload tarball to PyPI
