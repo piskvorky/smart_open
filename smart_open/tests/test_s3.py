@@ -170,13 +170,12 @@ class CrapStream(io.BytesIO):
         return the_bytes
 
 
-class CrapObject:
+class CrapClient:
     def __init__(self, data, modulus=2):
         self._datasize = len(data)
         self._body = CrapStream(data, modulus=modulus)
-        self.bucket_name, self.key = 'crap', 'object'
 
-    def get(self, *args, **kwargs):
+    def get_object(self, *args, **kwargs):
         return {
             'ActualObjectSize': self._datasize,
             'ContentLength': self._datasize,
@@ -188,7 +187,7 @@ class CrapObject:
 
 class IncrementalBackoffTest(unittest.TestCase):
     def test_every_read_fails(self):
-        reader = smart_open.s3._SeekableRawReader(CrapObject(b'hello', 1))
+        reader = smart_open.s3._SeekableRawReader(CrapClient(b'hello', 1), 'bucket', 'key')
         with mock.patch('time.sleep') as mock_sleep:
             with self.assertRaises(IOError):
                 reader.read()
@@ -200,7 +199,7 @@ class IncrementalBackoffTest(unittest.TestCase):
 
     def test_every_second_read_fails(self):
         """Can we read from a stream that raises exceptions from time to time?"""
-        reader = smart_open.s3._SeekableRawReader(CrapObject(b'hello'))
+        reader = smart_open.s3._SeekableRawReader(CrapClient(b'hello'), 'bucket', 'key')
         with mock.patch('time.sleep') as mock_sleep:
             assert reader.read(1) == b'h'
             mock_sleep.assert_not_called()
@@ -222,7 +221,7 @@ class IncrementalBackoffTest(unittest.TestCase):
 
 
 @moto.mock_s3
-class SeekableBufferedInputBaseTest(BaseTest):
+class ReaderTest(BaseTest):
     def setUp(self):
         # lower the multipart upload size, to speed up these tests
         self.old_min_part_size = smart_open.s3.DEFAULT_MIN_PART_SIZE
@@ -244,7 +243,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
 
         # connect to fake s3 and read from the fake key we filled above
         with self.assertApiCalls(GetObject=1):
-            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
             output = [line.rstrip(b'\n') for line in fin]
         self.assertEqual(output, expected.split(b'\n'))
 
@@ -253,7 +252,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         expected = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=expected)
         with self.assertApiCalls(GetObject=1):
-            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
                 output = [line.rstrip(b'\n') for line in fin]
         self.assertEqual(output, expected.split(b'\n'))
 
@@ -264,7 +263,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         logger.debug('content: %r len: %r', content, len(content))
 
         with self.assertApiCalls(GetObject=1):
-            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
             self.assertEqual(content[:6], fin.read(6))
             self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
             self.assertEqual(content[14:], fin.read())  # read the rest
@@ -275,7 +274,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=content)
 
         with self.assertApiCalls(GetObject=1):
-            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
             self.assertEqual(content[:6], fin.read(6))
             self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
 
@@ -293,7 +292,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=content)
 
         with self.assertApiCalls(GetObject=1):
-            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
             seek = fin.seek(6)
             self.assertEqual(seek, 6)
             self.assertEqual(fin.tell(), 6)
@@ -305,7 +304,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=content)
 
         with self.assertApiCalls(GetObject=1):
-            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
             self.assertEqual(fin.read(5), b'hello')
 
         with self.assertApiCalls(GetObject=1):
@@ -319,7 +318,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=content)
 
         with self.assertApiCalls(GetObject=1):
-            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
             seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
             self.assertEqual(seek, len(content) - 4)
             self.assertEqual(fin.read(), b'you?')
@@ -338,7 +337,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=content)
 
         with self.assertApiCalls(GetObject=1):
-            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME)
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
             fin.read()
             eof = fin.tell()
             self.assertEqual(eof, len(content))
@@ -358,7 +357,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         #
         # Make sure we're reading things correctly.
         #
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+        with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
             self.assertEqual(fin.read(), buf.getvalue())
 
         #
@@ -370,7 +369,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
 
         logger.debug('starting actual test')
         with self.assertApiCalls(GetObject=1):
-            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
                 with gzip.GzipFile(fileobj=fin) as zipfile:
                     actual = zipfile.read()
 
@@ -381,7 +380,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=content)
 
         with self.assertApiCalls(GetObject=2):
-            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME) as fin:
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
                 fin.readline()
                 self.assertEqual(fin.tell(), content.index(b'\n')+1)
 
@@ -397,7 +396,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=content)
 
         with self.assertApiCalls(GetObject=1):
-            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, buffer_size=8) as fin:
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, buffer_size=8) as fin:
                 actual = list(fin)
 
         expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
@@ -409,7 +408,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
 
         with self.assertApiCalls():
             # set defer_seek to verify that read(0) doesn't trigger an unnecessary API call
-            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
                 data = fin.read(0)
 
         self.assertEqual(data, b'')
@@ -420,7 +419,7 @@ class SeekableBufferedInputBaseTest(BaseTest):
 
         with self.assertApiCalls():
             # set defer_seek to verify that to_boto3() doesn't trigger an unnecessary API call
-            with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
                 returned_obj = fin.to_boto3()
 
         boto3_body = returned_obj.get()['Body'].read()
@@ -439,12 +438,12 @@ class SeekableBufferedInputBaseTest(BaseTest):
         put_to_bucket(contents=content)
 
         with self.assertApiCalls():
-            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
         with self.assertApiCalls(GetObject=1):
             self.assertEqual(fin.read(), content)
 
         with self.assertApiCalls():
-            fin = smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
         with self.assertApiCalls(GetObject=1):
             fin.seek(10)
             self.assertEqual(fin.read(), content[10:])
@@ -543,7 +542,7 @@ class MultipartWriterTest(unittest.TestCase):
             with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
                 zipfile.write(expected)
 
-        with smart_open.s3.SeekableBufferedInputBase(BUCKET_NAME, WRITE_KEY_NAME) as fin:
+        with smart_open.s3.Reader(BUCKET_NAME, WRITE_KEY_NAME) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
@@ -939,8 +938,8 @@ class RetryIfFailedTest(unittest.TestCase):
 
 
 @moto.mock_s3()
-def test_resource_propagation_singlepart():
-    """Does the resource parameter make it from the caller to Boto3?"""
+def test_client_propagation_singlepart():
+    """Does the client parameter make it from the caller to Boto3?"""
     #
     # Not sure why we need to create the bucket here, as setUpModule should
     # have done that for us by now.
@@ -950,34 +949,38 @@ def test_resource_propagation_singlepart():
     bucket = resource.create_bucket(Bucket=BUCKET_NAME)
     bucket.wait_until_exists()
 
+    client = session.client('s3')
+
     with smart_open.s3.open(
         BUCKET_NAME,
         WRITE_KEY_NAME,
         mode='wb',
-        resource=resource,
+        client=client,
         multipart_upload=False,
     ) as writer:
-        assert writer._resource == resource
-        assert id(writer._resource) == id(resource)
+        assert writer._client == client
+        assert id(writer._client) == id(client)
 
 
 @moto.mock_s3()
-def test_resource_propagation_multipart():
+def test_client_propagation_multipart():
     """Does the resource parameter make it from the caller to Boto3?"""
     session = boto3.Session()
     resource = session.resource('s3')
     bucket = resource.create_bucket(Bucket=BUCKET_NAME)
     bucket.wait_until_exists()
 
+    client = session.client('s3')
+
     with smart_open.s3.open(
         BUCKET_NAME,
         WRITE_KEY_NAME,
         mode='wb',
-        resource=resource,
+        client=client,
         multipart_upload=True,
     ) as writer:
-        assert writer._resource == resource
-        assert id(writer._resource) == id(resource)
+        assert writer._client == client
+        assert id(writer._client) == id(client)
 
 
 @moto.mock_s3()
@@ -988,12 +991,14 @@ def test_resource_propagation_reader():
     bucket = resource.create_bucket(Bucket=BUCKET_NAME)
     bucket.wait_until_exists()
 
+    client = session.client('s3')
+
     with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, mode='wb') as writer:
         writer.write(b'hello world')
 
-    with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, mode='rb', resource=resource) as reader:
-        assert reader._resource == resource
-        assert id(reader._resource) == id(resource)
+    with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, mode='rb', client=client) as reader:
+        assert reader._client == client
+        assert id(reader._client) == id(client)
 
 
 if __name__ == '__main__':

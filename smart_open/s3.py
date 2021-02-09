@@ -127,41 +127,46 @@ def _consolidate_params(uri, transport_params):
     """
     transport_params = dict(transport_params)
 
-    session = transport_params.get('session')
-    if session is not None and (uri['access_id'] or uri['access_secret']):
+    def inject(**kwargs):
+        try:
+            client_kwargs = transport_params['client_kwargs']
+        except KeyError:
+            client_kwargs = transport_params['client_kwargs'] = {}
+
+        try:
+            ctor_kwargs = client_kwargs['S3.Client']
+        except KeyError:
+            ctor_kwargs = client_kwargs['S3.Client'] = {}
+
+        ctor_kwargs.update(**kwargs)
+
+    client = transport_params.get('client')
+    if client is not None and (uri['access_id'] or uri['access_secret']):
         logger.warning(
             'ignoring credentials parsed from URL because they conflict with '
-            'transport_params["session"]. Set transport_params["session"] to None '
+            'transport_params["client"]. Set transport_params["client"] to None '
             'to suppress this warning.'
         )
         uri.update(access_id=None, access_secret=None)
     elif (uri['access_id'] and uri['access_secret']):
-        transport_params['session'] = boto3.Session(
+        inject(
             aws_access_key_id=uri['access_id'],
             aws_secret_access_key=uri['access_secret'],
         )
         uri.update(access_id=None, access_secret=None)
 
-    if uri['host'] != DEFAULT_HOST:
-        endpoint_url = 'https://%(host)s:%(port)d' % uri
-        _override_endpoint_url(transport_params, endpoint_url)
+    if client is not None and uri['host'] != DEFAULT_HOST:
+        logger.warning(
+            'ignoring endpoint_url parsed from URL because they conflict with '
+            'transport_params["client"]. Set transport_params["client"] to None '
+            'to suppress this warning.'
+        )
+        uri.update(host=None)
+    elif uri['host'] != DEFAULT_HOST:
+        inject(endpoint_url='https://%(host)s:%(port)d' % uri)
+        uri.update(host=None)
 
     return uri, transport_params
-
-
-def _override_endpoint_url(transport_params, url):
-    try:
-        resource_kwargs = transport_params['resource_kwargs']
-    except KeyError:
-        resource_kwargs = transport_params['resource_kwargs'] = {}
-
-    if resource_kwargs.get('endpoint_url'):
-        logger.warning(
-            'ignoring endpoint_url parsed from URL because it conflicts '
-            'with transport_params["resource_kwargs"]["endpoint_url"]'
-        )
-    else:
-        resource_kwargs.update(endpoint_url=url)
 
 
 def open_uri(uri, mode, transport_params):
@@ -178,14 +183,10 @@ def open(
     version_id=None,
     buffer_size=DEFAULT_BUFFER_SIZE,
     min_part_size=DEFAULT_MIN_PART_SIZE,
-    session=None,
-    resource=None,
-    resource_kwargs=None,
-    multipart_upload_kwargs=None,
     multipart_upload=True,
-    singlepart_upload_kwargs=None,
-    object_kwargs=None,
     defer_seek=False,
+    client=None,
+    client_kwargs=None,
 ):
     """Open an S3 object for reading or writing.
 
@@ -201,22 +202,6 @@ def open(
         The buffer size to use when performing I/O.
     min_part_size: int, optional
         The minimum part size for multipart uploads.  For writing only.
-    session: object, optional
-        The S3 session to use when working with boto3.
-        If you don't specify this, then smart_open will create a new session for you.
-    resource: object, optional
-        The S3 resource to use when working with boto3.
-        If you don't specify this, then smart_open will create a new resource for you.
-    resource_kwargs: dict, optional
-        Keyword arguments to use when creating the S3 resource for reading or writing.
-        Will be ignored if you specify the resource object explicitly.
-    multipart_upload_kwargs: dict, optional
-        Additional parameters to pass to boto3's initiate_multipart_upload function.
-        For writing only.
-    singlepart_upload_kwargs: dict, optional
-        Additional parameters to pass to boto3's S3.Object.put function when using single
-        part upload.
-        For writing only.
     multipart_upload: bool, optional
         Default: `True`
         If set to `True`, will use multipart upload for writing to S3. If set
@@ -226,14 +211,16 @@ def open(
     version_id: str, optional
         Version of the object, used when reading object.
         If None, will fetch the most recent version.
-    object_kwargs: dict, optional
-        Additional parameters to pass to boto3's object.get function.
-        Used during reading only.
     defer_seek: boolean, optional
         Default: `False`
         If set to `True` on a file opened for reading, GetObject will not be
         called until the first seek() or read().
         Avoids redundant API queries when seeking before reading.
+    client: object, optional
+        The S3 client to use when working with boto3.
+        If you don't specify this, then smart_open will create a new client for you.
+    client_kwargs: dict, optional
+        Additional parameters to pass to the relevant functions of the client.
     """
     logger.debug('%r', locals())
     if mode not in constants.BINARY_MODES:
@@ -248,11 +235,9 @@ def open(
             key_id,
             version_id=version_id,
             buffer_size=buffer_size,
-            session=session,
-            resource=resource,
-            resource_kwargs=resource_kwargs,
-            object_kwargs=object_kwargs,
             defer_seek=defer_seek,
+            client=client,
+            client_kwargs=client_kwargs,
         )
     elif mode == constants.WRITE_BINARY:
         if multipart_upload:
@@ -260,19 +245,15 @@ def open(
                 bucket_id,
                 key_id,
                 min_part_size=min_part_size,
-                session=session,
-                resource=resource,
-                upload_kwargs=multipart_upload_kwargs,
-                resource_kwargs=resource_kwargs,
+                client=client,
+                client_kwargs=client_kwargs,
             )
         else:
             fileobj = SinglepartWriter(
                 bucket_id,
                 key_id,
-                session=session,
-                resource=resource,
-                upload_kwargs=singlepart_upload_kwargs,
-                resource_kwargs=resource_kwargs,
+                client=client,
+                client_kwargs=client_kwargs,
             )
     else:
         assert False, 'unexpected mode: %r' % mode
@@ -281,15 +262,16 @@ def open(
     return fileobj
 
 
-def _get(s3_object, version=None, **kwargs):
+def _get(client, bucket, key, version, **get_object_kwargs):
     if version is not None:
-        kwargs['VersionId'] = version
+        get_object_kwargs['VersionId'] = version
+
     try:
-        return s3_object.get(**kwargs)
+        return client.get_object(Bucket=bucket, Key=key, **get_object_kwargs)
     except botocore.client.ClientError as error:
         wrapped_error = IOError(
             'unable to access bucket: %r key: %r version: %r error: %s' % (
-                s3_object.bucket_name, s3_object.key, version, error
+                bucket, key, version, error
             )
         )
         wrapped_error.backend_error = error
@@ -312,16 +294,21 @@ class _SeekableRawReader(object):
 
     def __init__(
         self,
-        s3_object,
+        client,
+        bucket,
+        key,
         version_id=None,
-        object_kwargs=None,
+        client_kwargs=None,
     ):
-        self._object = s3_object
-        self._content_length = None
+        self._client = client
+        self._bucket = bucket
+        self._key = key
         self._version_id = version_id
+
+        self._content_length = None
         self._position = 0
         self._body = None
-        self._object_kwargs = object_kwargs if object_kwargs else {}
+        self._client_kwargs = client_kwargs if client_kwargs else {}
 
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
@@ -391,10 +378,12 @@ class _SeekableRawReader(object):
         try:
             # Optimistically try to fetch the requested content range.
             response = _get(
-                self._object,
+                self._client,
+                self._bucket,
+                self._key,
                 version=self._version_id,
                 Range=range_string,
-                **self._object_kwargs
+                **self._client_kwargs.get('S3.Client.get_object', {}),
             )
         except IOError as ioe:
             # Handle requested content range exceeding content size.
@@ -468,43 +457,20 @@ class _SeekableRawReader(object):
         raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, attempt))
 
     def __str__(self):
-        return 'smart_open.s3._SeekableReader(%r, %r)' % (
-            self._object.bucket_name,
-            self._object.key,
-        )
+        return 'smart_open.s3._SeekableReader(%r, %r)' % (self._bucket, self._key)
 
 
-def _initialize_boto3(rw, session, resource, resource_kwargs):
+def _initialize_boto3(rw, client, client_kwargs):
     """Created the required objects for accessing S3.  Ideally, they have
-    been already created for us and we can just reuse them.
+    been already created for us and we can just reuse them."""
+    if client_kwargs is None:
+        client_kwargs = {}
+    rw._client_kwargs = client_kwargs
 
-    We only really need one thing: the resource.  There are multiple ways of
-    getting one, in order of effort:
-
-    1) Directly from the user
-    2) From the session directly specified by the user
-    3) From an entirely new session
-
-    Once we have the resource, we no longer need the session.
-    """
-    if resource_kwargs is None:
-        resource_kwargs = {}
-
-    if resource:
-        if session:
-            logger.warning('ignoring session because resource was passed explicitly')
-        if resource_kwargs:
-            logger.warning('ignoring resource_kwargs because resource was passed explicitly')
-        rw._session = None
-        rw._resource = resource
-    elif session:
-        rw._session = session
-        rw._resource = rw._session.resource('s3', **resource_kwargs)
-        rw._resource_kwargs = resource_kwargs
+    if client:
+        rw._client = client
     else:
-        rw._session = boto3.Session()
-        rw._resource = rw._session.resource('s3', **resource_kwargs)
-        rw._resource_kwargs = resource_kwargs
+        rw._client = boto3.client('s3', **client_kwargs.get('S3.Client', {}))
 
 
 class Reader(io.BufferedIOBase):
@@ -519,29 +485,23 @@ class Reader(io.BufferedIOBase):
         version_id=None,
         buffer_size=DEFAULT_BUFFER_SIZE,
         line_terminator=constants.BINARY_NEWLINE,
-        session=None,
-        resource=None,
-        resource_kwargs=None,
-        object_kwargs=None,
         defer_seek=False,
+        client=None,
+        client_kwargs=None,
     ):
+        self._bucket = bucket
+        self._key = key
+        self._version_id = version_id
         self._buffer_size = buffer_size
 
-        if resource_kwargs is None:
-            resource_kwargs = {}
-        if object_kwargs is None:
-            object_kwargs = {}
-
-        _initialize_boto3(self, session, resource, resource_kwargs)
-
-        self._object_kwargs = object_kwargs
-        self._object = self._resource.Object(bucket, key)
-        self._version_id = version_id
+        _initialize_boto3(self, client, client_kwargs)
 
         self._raw_reader = _SeekableRawReader(
-            self._object,
+            self._client,
+            bucket,
+            key,
             self._version_id,
-            self._object_kwargs,
+            client_kwargs=self._client_kwargs,
         )
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
@@ -562,7 +522,7 @@ class Reader(io.BufferedIOBase):
 
     def close(self):
         """Flush and close this stream."""
-        self._object = None
+        pass
 
     def readable(self):
         """Return True if the stream can be read from."""
@@ -668,7 +628,7 @@ class Reader(io.BufferedIOBase):
         """Do nothing."""
         pass
 
-    def to_boto3(self):
+    def to_boto3(self, resource=None):
         """Create an **independent** `boto3.s3.Object` instance that points to
         the same resource as this instance.
 
@@ -677,13 +637,13 @@ class Reader(io.BufferedIOBase):
         `boto3.s3.Object` may not necessarily affect the current instance.
 
         """
+        if not resource:
+            resource = boto3.resource('s3')
+        obj = resource.Object(self._bucket, self._key)
         if self._version_id is not None:
-            return self._resource.Object(
-                self._object.bucket_name,
-                self._object.key,
-            ).Version(self._version_id)
+            return obj.Version(self._version_id)
         else:
-            return self._resource.Object(self._object.bucket_name, self._object.key)
+            return obj
 
     #
     # Internal methods.
@@ -704,9 +664,7 @@ class Reader(io.BufferedIOBase):
                 self._eof = True
 
     def __str__(self):
-        return "smart_open.s3.Reader(%r, %r)" % (
-            self._object.bucket_name, self._object.key
-        )
+        return "smart_open.s3.Reader(%r, %r)" % (self._bucket, self._key)
 
     def __repr__(self):
         return (
@@ -715,17 +673,13 @@ class Reader(io.BufferedIOBase):
             "key=%r, "
             "version_id=%r, "
             "buffer_size=%r, "
-            "line_terminator=%r, "
-            "session=%r, "
-            "resource_kwargs=%r)"
+            "line_terminator=%r)"
         ) % (
-            self._object.bucket_name,
-            self._object.key,
+            self._bucket,
+            self._key,
             self._version_id,
             self._buffer_size,
             self._line_terminator,
-            self._session,
-            self._resource_kwargs,
         )
 
 
@@ -739,27 +693,27 @@ class MultipartWriter(io.BufferedIOBase):
         bucket,
         key,
         min_part_size=DEFAULT_MIN_PART_SIZE,
-        session=None,
-        resource=None,
-        resource_kwargs=None,
-        upload_kwargs=None,
+        client=None,
+        client_kwargs=None,
     ):
+        self._bucket = bucket
+        self._key = key
+
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
+        self._min_part_size = min_part_size
 
-        _initialize_boto3(self, session, resource, resource_kwargs)
-
-        if upload_kwargs is None:
-            upload_kwargs = {}
-
-        self._upload_kwargs = upload_kwargs
+        _initialize_boto3(self, client, client_kwargs)
 
         try:
-            self._object = self._resource.Object(bucket, key)
-            self._min_part_size = min_part_size
-            partial = functools.partial(self._object.initiate_multipart_upload, **self._upload_kwargs)
-            self._mp = _retry_if_failed(partial)
+            partial = functools.partial(
+                self._client.create_multipart_upload,
+                Bucket=bucket,
+                Key=key,
+                **self._client_kwargs.get('S3.Client.create_multipart_upload', {}),
+            )
+            self._upload_id = _retry_if_failed(partial)['UploadId']
         except botocore.client.ClientError as error:
             raise ValueError(
                 'the bucket %r does not exist, or is forbidden for access (%r)' % (
@@ -787,11 +741,17 @@ multipart upload may fail")
         if self._buf.tell():
             self._upload_next_part()
 
-        if self._total_bytes and self._mp:
-            partial = functools.partial(self._mp.complete, MultipartUpload={'Parts': self._parts})
+        if self._total_bytes and self._upload_id:
+            partial = functools.partial(
+                self._client.complete_multipart_upload,
+                Bucket=self._bucket,
+                Key=self._key,
+                UploadId=self._upload_id,
+                MultipartUpload={'Parts': self._parts},
+            )
             _retry_if_failed(partial)
             logger.debug('%s: completed multipart upload', self)
-        elif self._mp:
+        elif self._upload_id:
             #
             # AWS complains with "The XML you provided was not well-formed or
             # did not validate against our published schema" when the input is
@@ -799,15 +759,19 @@ multipart upload may fail")
             #
             # We work around this by creating an empty file explicitly.
             #
-            assert self._mp, "no multipart upload in progress"
-            self._mp.abort()
-            self._object.put(Body=b'')
+            assert self._upload_id, "no multipart upload in progress"
+            self._client.abort_multipart_upload(
+                Bucket=self._bucket,
+                Key=self._key,
+                UploadId=self._upload_id,
+            )
+            self._client.put_object(Bucket=self._bucket, Key=self._key, Body=b'')
             logger.debug('%s: wrote 0 bytes to imitate multipart upload', self)
-        self._mp = None
+        self._upload_id = None
 
     @property
     def closed(self):
-        return self._mp is None
+        return self._upload_id is None
 
     def writable(self):
         """Return True if the stream supports writing."""
@@ -842,11 +806,15 @@ multipart upload may fail")
 
     def terminate(self):
         """Cancel the underlying multipart upload."""
-        assert self._mp, "no multipart upload in progress"
-        self._mp.abort()
-        self._mp = None
+        assert self._upload_id, "no multipart upload in progress"
+        self._client.abort_multipart_upload(
+            Bucket=self._bucket,
+            Key=self._key,
+            UploadId=self._upload_id,
+        )
+        self._upload_id = None
 
-    def to_boto3(self):
+    def to_boto3(self, resource=None):
         """Create an **independent** `boto3.s3.Object` instance that points to
         the same resource as this instance.
 
@@ -855,7 +823,9 @@ multipart upload may fail")
         `boto3.s3.Object` may not necessary affect the current instance.
 
         """
-        return self._resource.Object(self._object.bucket_name, self._object.key)
+        if not resource:
+            resource = boto3.resource('s3')
+        return resource.Object(self._bucket, self._key)
 
     #
     # Internal methods.
@@ -870,7 +840,6 @@ multipart upload may fail")
             self._total_bytes / 1024.0 ** 3,
         )
         self._buf.seek(0)
-        part = self._mp.Part(part_num)
 
         #
         # Network problems in the middle of an upload are particularly
@@ -878,7 +847,16 @@ multipart upload may fail")
         # of a temporary connection problem, so this part needs to be
         # especially robust.
         #
-        upload = _retry_if_failed(functools.partial(part.upload, Body=self._buf))
+        upload = _retry_if_failed(
+            functools.partial(
+                self._client.upload_part,
+                Bucket=self._bucket,
+                Key=self._key,
+                UploadId=self._upload_id,
+                PartNumber=part_num,
+                Body=self._buf,
+            )
+        )
 
         self._parts.append({'ETag': upload['ETag'], 'PartNumber': part_num})
         logger.debug("%s: upload of part_num #%i finished", self, part_num)
@@ -896,21 +874,13 @@ multipart upload may fail")
             self.close()
 
     def __str__(self):
-        return "smart_open.s3.MultipartWriter(%r, %r)" % (
-            self._object.bucket_name, self._object.key,
-        )
+        return "smart_open.s3.MultipartWriter(%r, %r)" % (self._bucket, self._key)
 
     def __repr__(self):
-        return (
-            "smart_open.s3.MultipartWriter(bucket=%r, key=%r, "
-            "min_part_size=%r, session=%r, resource_kwargs=%r, upload_kwargs=%r)"
-        ) % (
-            self._object.bucket_name,
-            self._object.key,
+        return "smart_open.s3.MultipartWriter(bucket=%r, key=%r, min_part_size=%r)" % (
+            self._bucket,
+            self._key,
             self._min_part_size,
-            self._session,
-            self._resource_kwargs,
-            self._upload_kwargs,
         )
 
 
@@ -923,25 +893,19 @@ class SinglepartWriter(io.BufferedIOBase):
     the data be written to S3 and the buffer is released."""
 
     def __init__(
-            self,
-            bucket,
-            key,
-            session=None,
-            resource=None,
-            resource_kwargs=None,
-            upload_kwargs=None,
-            ):
+        self,
+        bucket,
+        key,
+        client=None,
+        client_kwargs=None,
+    ):
+        self._bucket = bucket
+        self._key = key
 
-        _initialize_boto3(self, session, resource, resource_kwargs)
-
-        if upload_kwargs is None:
-            upload_kwargs = {}
-
-        self._upload_kwargs = upload_kwargs
+        _initialize_boto3(self, client, client_kwargs)
 
         try:
-            self._object = self._resource.Object(bucket, key)
-            self._resource.meta.client.head_bucket(Bucket=bucket)
+            self._object = self._client.head_bucket(Bucket=bucket)
         except botocore.client.ClientError as e:
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket) from e
 
@@ -966,10 +930,15 @@ class SinglepartWriter(io.BufferedIOBase):
         self._buf.seek(0)
 
         try:
-            self._object.put(Body=self._buf, **self._upload_kwargs)
+            self._client.put_object(
+                Bucket=self._bucket,
+                Key=self._key,
+                Body=self._buf,
+                **self._client_kwargs.get('S3.Client.put_object', {}),
+            )
         except botocore.client.ClientError as e:
             raise ValueError(
-                'the bucket %r does not exist, or is forbidden for access' % self._object.bucket_name) from e
+                'the bucket %r does not exist, or is forbidden for access' % self._bucket) from e
 
         logger.debug("%s: direct upload finished", self)
         self._buf = None
@@ -1023,16 +992,7 @@ class SinglepartWriter(io.BufferedIOBase):
         return "smart_open.s3.SinglepartWriter(%r, %r)" % (self._object.bucket_name, self._object.key)
 
     def __repr__(self):
-        return (
-            "smart_open.s3.SinglepartWriter(bucket=%r, key=%r, session=%r, "
-            "resource_kwargs=%r, upload_kwargs=%r)"
-        ) % (
-            self._object.bucket_name,
-            self._object.key,
-            self._session,
-            self._resource_kwargs,
-            self._upload_kwargs,
-        )
+        return "smart_open.s3.SinglepartWriter(bucket=%r, key=%r)" % (self._bucket, self._key)
 
 
 def _retry_if_failed(
@@ -1055,13 +1015,6 @@ def _retry_if_failed(
     else:
         logger.critical('Unable to connect to the endpoint. Giving up.')
         raise IOError('Unable to connect to the endpoint after %d attempts' % attempts)
-
-
-#
-# For backward compatibility
-#
-SeekableBufferedInputBase = Reader
-BufferedOutputBase = MultipartWriter
 
 
 def _accept_all(key):
