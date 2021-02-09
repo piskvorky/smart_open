@@ -446,6 +446,20 @@ class Writer(io.BufferedIOBase):
         """Return True if the stream supports writing."""
         return True
 
+    def seekable(self):
+        """If False, seek(), tell() and truncate() will raise IOError.
+
+        We offer only tell support, and no seek or truncate support."""
+        return True
+
+    def seek(self, offset, whence=constants.WHENCE_START):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def truncate(self, size=None):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
     def tell(self):
         """Return the current stream position."""
         return self._total_size
