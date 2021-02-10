@@ -73,11 +73,12 @@ The `boto3` library that `smart_open` uses for accessing S3 signs each request u
 If you'd like to access S3 without using an S3 account, then you need disable this signing mechanism.
 
 ```python
+>>> import boto3
 >>> import botocore
 >>> import botocore.client
 >>> from smart_open import open
 >>> config = botocore.client.Config(signature_version=botocore.UNSIGNED)
->>> params = {'resource_kwargs': {'config': config}}
+>>> params = {'client': boto3.client('s3', config=config)}
 >>> with open('s3://commoncrawl/robots.txt', transport_params=params) as fin:
 ...    fin.readline()
 'User-Agent: *\n'
@@ -175,15 +176,15 @@ s3.ObjectVersion(bucket_name='smart-open-versioned', object_key='demo.txt', id='
 
 ## How to Read from S3 Efficiently
 
-Under the covers, `smart_open` uses the [boto3 resource API](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/resources.html) to read from S3.
-By default, calling `smart_open.open` with an S3 URL will create its own boto3 session and resource.
+Under the covers, `smart_open` uses the [boto3 client API](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client) to read from S3.
+By default, calling `smart_open.open` with an S3 URL will create its own boto3 client.
 These are expensive operations: they require both CPU time to construct the objects from a low-level API definition, and memory to store the objects once they have been created.
 It is possible to save both CPU time and memory by sharing the same resource across multiple `smart_open.open` calls, for example:
 
 ```python
 >>> import boto3
 >>> from smart_open import open
->>> tp = {'resource': boto3.resource('s3')}
+>>> tp = {'client': boto3.client('s3')}
 >>> for month in (1, 2, 3):
 ...     url = 's3://nyc-tlc/trip data/yellow_tripdata_2020-%02d.csv' % month
 ...     with open(url, transport_params=tp) as fin:
@@ -195,15 +196,7 @@ It is possible to save both CPU time and memory by sharing the same resource acr
 
 ```
 
-The above sharing is safe because it is all happening in the same thread and subprocess (see below for details).
-
-## How to Work in a Parallelized Environment
-
-Under the covers, `smart_open` uses the [boto3 resource API](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/resources.html) to read from S3.
-This API is not thread-safe or multiprocess-safe.
-Do not share the same `smart_open` objects across different threads or subprocesses.
-`smart_open` will create its own session and resource objects for each individual `open` call, so you don't have to worry about managing boto3 objects.
-This comes at a price: each session and resource requires CPU time to create and memory to store, so be wary of keeping hundreds of threads or subprocesses reading/writing from/to S3.
+Clients are thread-safe and multiprocess-safe, so you may share them between other threads and subprocesses.
 
 ## How to Specify the Request Payer (S3 only)
 
@@ -214,7 +207,7 @@ To access such buckets, you need to pass some special transport parameters:
 
 ```python
 >>> from smart_open import open
->>> params = {'object_kwargs': {'RequestPayer': 'requester'}}
+>>> params = {'client_kwargs': {'S3.Client.get_object': {RequestPayer': 'requester'}}}
 >>> with open('s3://arxiv/pdf/arXiv_pdf_manifest.xml', transport_params=params) as fin:
 ...    print(fin.readline())
 <?xml version='1.0' standalone='yes'?>
@@ -229,28 +222,15 @@ This works only when reading and writing via S3.
 Boto3 has a [built-in mechanism](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html) for retrying after a recoverable error.
 You can fine-tune it using several ways:
 
-### Pre-configuring a boto3 resource and then passing the resource to smart_open
+### Pre-configuring a boto3 client and then passing the client to smart_open
 
 ```python
 >>> import boto3
 >>> import botocore.config
 >>> import smart_open
 >>> config = botocore.config.Config(retries={'mode': 'standard'})
->>> resource = boto3.resource('s3', config=config)
->>> tp = {'resource': resource}
->>> with smart_open.open('s3://commoncrawl/robots.txt', transport_params=tp) as fin:
-...     print(fin.readline())
-User-Agent: *
-```
-
-### Directly passing configuration as transport parameters to smart_open
-
-```python
->>> import boto3
->>> import botocore.config
->>> import smart_open
->>> config = botocore.config.Config(retries={'mode': 'standard'})
->>> tp = {'resource_kwargs': {'config': config}}
+>>> client = boto3.client('s3', config=config)
+>>> tp = {'client': client}
 >>> with smart_open.open('s3://commoncrawl/robots.txt', transport_params=tp) as fin:
 ...     print(fin.readline())
 User-Agent: *
@@ -286,8 +266,10 @@ where `http://localhost:4566` is the default host/port that localstack uses to l
 You can now read/write to the bucket the same way you would to a real S3 bucket:
 
 ```python
+>>> import boto3
 >>> from smart_open import open
->>> tparams = {'resource_kwargs': {'endpoint_url': 'http://localhost:4566'}}
+>>> client = boto3.client('s3', endpoint_url='http://localhost:4566')
+>>> tparams = {'client': client}
 >>> with open('s3://mybucket/hello.txt', 'wt', transport_params=tparams) as fout:
 ...     fout.write('hello world!')
 >>> with open('s3://mybucket/hello.txt', 'rt', transport_params=tparams) as fin:
