@@ -241,6 +241,8 @@ def open(
         If you don't specify this, then smart_open will create a new client for you.
     client_kwargs: dict, optional
         Additional parameters to pass to the relevant functions of the client.
+        The keys are fully qualified method names, e.g. `S3.Client.create_multipart_upload`.
+        The values are kwargs to pass to that method each time it is called.
     """
     logger.debug('%r', locals())
     if mode not in constants.BINARY_MODES:

@@ -245,6 +245,60 @@ logging.getLogger('smart_open.s3').setLevel(logging.DEBUG)
 
 and check the log output of your code.
 
+## How to Pass Additional Parameters to boto3
+
+`boto3` is a highly configurable library, and each function call accepts many optional parameters.
+`smart_open` does not attempt to replicate this behavior, since most of these parameters often do not influence the behavior of `smart_open` itself.
+Instead, `smart_open` offers the caller of the function to pass additional parameters as necessary:
+
+```python
+>>> import boto3
+>>> client_kwargs = {'S3.Client.get_object': {RequestPayer': 'requester'}}}
+>>> with open('s3://arxiv/pdf/arXiv_pdf_manifest.xml', transport_params=params) as fin:
+...     pass
+```
+
+The above example influences how the [S3.Client.get_object function](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.get_object) gets called by `smart_open` when reading the specified URL.
+More specifically, the `RequestPayer` parameter will be set to `requester` **for each call**.
+Influential functions include:
+
+- S3.Client (the initializer function)
+- S3.Client.abort_multipart_upload
+- S3.Client.complete_multipart_upload
+- S3.Client.create_multipart_upload
+- S3.Client.get_object
+- S3.Client.head_bucket
+- S3.Client.put_object
+- S3.Client.upload_part
+
+If you choose to pass additional parameters, keep the following in mind:
+
+1. Study the [boto3 client API](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client) and ensure the function and parameters are valid.
+2. Study the [code for the smart_open.s3 submodule](smart_open/s3.py) and ensure `smart_open` is actually calling the function you're passing additional parameters for.
+
+Finally, in some cases, it's possible to work directly with `boto3` without going through `smart_open`.
+For example, setting the ACL for an object is possible after the object is created (with `boto3`), as opposed to at creation time (with `smart_open`).
+More specifically, here's the direct method:
+
+```python
+import boto3
+import smart_open
+with smart_open.open('s3://bucket/key', 'wb') as fout:
+    fout.write(b'hello world!')
+client = boto3.client('s3').put_object_acl(ACL=acl_as_string)
+```
+
+Here's the same code that passes the above parameter via `smart_open`:
+
+```python
+import smart_open
+tp = {'client_kwargs': {'S3.Client.create_multipart_upload': {'ACL': acl_as_string}}}
+with smart_open.open('s3://bucket/key', 'wb', transport_params=tp) as fout:
+    fout.write(b'hello world!')
+```
+
+If passing everything via `smart_open` feels awkward, try passing part of the parameters directly to `boto3`.
+
 ## How to Read/Write from localstack
 
 [localstack](https://github.com/localstack/localstack) is a convenient test framework for developing cloud apps.

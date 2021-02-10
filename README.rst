@@ -278,8 +278,8 @@ S3 Credentials
 By default, ``smart_open`` will defer to ``boto3`` and let the latter take care of the credentials.
 There are several ways to override this behavior.
 
-The first is to pass a ``boto3.Session`` object as a transport parameter to the ``open`` function.
-You can customize the credentials when constructing the session.
+The first is to pass a ``boto3.Client`` object as a transport parameter to the ``open`` function.
+You can customize the credentials when constructing the session for the client.
 ``smart_open`` will then use the session when talking to S3.
 
 .. code-block:: python
@@ -289,7 +289,8 @@ You can customize the credentials when constructing the session.
         aws_secret_access_key=SECRET_KEY,
         aws_session_token=SESSION_TOKEN,
     )
-    fin = open('s3://bucket/key', transport_params=dict(client=session.client('s3')), ...)
+    client = session.client('s3', endpoint_url=..., config=...)
+    fin = open('s3://bucket/key', transport_params=dict(client=client))
 
 Your second option is to specify the credentials within the S3 URL itself:
 
@@ -297,7 +298,7 @@ Your second option is to specify the credentials within the S3 URL itself:
 
     fin = open('s3://aws_access_key_id:aws_secret_access_key@bucket/key', ...)
 
-*Important*: The two methods above are **mutually exclusive**. If you pass an AWS session *and* the URL contains credentials, ``smart_open`` will ignore the latter.
+*Important*: The two methods above are **mutually exclusive**. If you pass an AWS client *and* the URL contains credentials, ``smart_open`` will ignore the latter.
 
 *Important*: ``smart_open`` ignores configuration files from the older ``boto`` library.
 Port your old ``boto`` settings to ``boto3`` in order to use them with ``smart_open``.
