@@ -136,20 +136,19 @@ class BaseTest(unittest.TestCase):
     'The test case needs a Moto server running on the local 5000 port.'
 )
 class SeekableRawReaderTest(unittest.TestCase):
-
     def setUp(self):
         self._body = b'123456'
         self._local_resource = boto3.resource('s3', endpoint_url='http://localhost:5000')
         self._local_resource.Bucket(BUCKET_NAME).create()
         self._local_resource.Object(BUCKET_NAME, KEY_NAME).put(Body=self._body)
+        self._local_client('s3', endpoint_url='http://localhost:5000')
 
     def tearDown(self):
         self._local_resource.Object(BUCKET_NAME, KEY_NAME).delete()
         self._local_resource.Bucket(BUCKET_NAME).delete()
 
     def test_read_from_a_closed_body(self):
-        obj = self._local_resource.Object(BUCKET_NAME, KEY_NAME)
-        reader = smart_open.s3._SeekableRawReader(obj)
+        reader = smart_open.s3._SeekableRawReader(self._local_client, BUCKET_NAME, KEY_NAME)
         self.assertEqual(reader.read(1), b'1')
         reader._body.close()
         self.assertEqual(reader.read(2), b'23')
