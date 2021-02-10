@@ -285,7 +285,8 @@ import boto3
 import smart_open
 with smart_open.open('s3://bucket/key', 'wb') as fout:
     fout.write(b'hello world!')
-client = boto3.client('s3').put_object_acl(ACL=acl_as_string)
+client = boto3.client('s3')
+client.put_object_acl(ACL=acl_as_string)
 ```
 
 Here's the same code that passes the above parameter via `smart_open`:
