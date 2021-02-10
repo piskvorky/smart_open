@@ -52,6 +52,26 @@ _SLEEP_SECONDS = 10
 _OUT_OF_RANGE = 'InvalidRange'
 
 
+def _inject(client, method_name, client_kwargs, **kwargs):
+    """Inject the appropriate client keyword arguments for the method.
+
+    :param client: The client object to retrieve the method from.
+    :param method_name: The name of the method.
+    :param client_kwargs: A dictionary keyed by fully qualified method names.
+    :param kwargs: Keyword arguments to pass to the method directly.
+
+    The function names are as documented here:
+    https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
+
+    For example, S3.Client.create_multipart_upload.
+
+    Returns a callable.
+    """
+    method = getattr(client, method_name)
+    kwargs.update(client_kwargs.get('S3.Client.%s' % method_name, {}))
+    return functools.partial(method, **kwargs)
+
+
 def parse_uri(uri_as_string):
     #
     # Restrictions on bucket names and labels:
@@ -134,11 +154,11 @@ def _consolidate_params(uri, transport_params):
             client_kwargs = transport_params['client_kwargs'] = {}
 
         try:
-            ctor_kwargs = client_kwargs['S3.Client']
+            init_kwargs = client_kwargs['S3.Client']
         except KeyError:
-            ctor_kwargs = client_kwargs['S3.Client'] = {}
+            init_kwargs = client_kwargs['S3.Client'] = {}
 
-        ctor_kwargs.update(**kwargs)
+        init_kwargs.update(**kwargs)
 
     client = transport_params.get('client')
     if client is not None and (uri['access_id'] or uri['access_secret']):
@@ -262,12 +282,20 @@ def open(
     return fileobj
 
 
-def _get(client, bucket, key, version, **get_object_kwargs):
-    if version is not None:
-        get_object_kwargs['VersionId'] = version
-
+def _get(client, client_kwargs, bucket, key, version, range_string):
+    get_object = _inject(
+        client,
+        'get_object',
+        client_kwargs,
+        Bucket=bucket,
+        Key=key,
+        Range=range_string,
+    )
     try:
-        return client.get_object(Bucket=bucket, Key=key, **get_object_kwargs)
+        if version:
+            return get_object(VersionId=version)
+        else:
+            return get_object()
     except botocore.client.ClientError as error:
         wrapped_error = IOError(
             'unable to access bucket: %r key: %r version: %r error: %s' % (
@@ -379,11 +407,11 @@ class _SeekableRawReader(object):
             # Optimistically try to fetch the requested content range.
             response = _get(
                 self._client,
+                self._client_kwargs,
                 self._bucket,
                 self._key,
-                version=self._version_id,
-                Range=range_string,
-                **self._client_kwargs.get('S3.Client.get_object', {}),
+                self._version_id,
+                range_string,
             )
         except IOError as ioe:
             # Handle requested content range exceeding content size.
@@ -707,11 +735,12 @@ multipart upload may fail")
         _initialize_boto3(self, client, client_kwargs)
 
         try:
-            partial = functools.partial(
-                self._client.create_multipart_upload,
+            partial = _inject(
+                self._client,
+                'create_multipart_upload',
+                self._client_kwargs,
                 Bucket=bucket,
                 Key=key,
-                **self._client_kwargs.get('S3.Client.create_multipart_upload', {}),
             )
             self._upload_id = _retry_if_failed(partial)['UploadId']
         except botocore.client.ClientError as error:
@@ -742,8 +771,10 @@ multipart upload may fail")
             self._upload_next_part()
 
         if self._total_bytes and self._upload_id:
-            partial = functools.partial(
-                self._client.complete_multipart_upload,
+            partial = _inject(
+                self._client,
+                'complete_multipart_upload',
+                self._client_kwargs,
                 Bucket=self._bucket,
                 Key=self._key,
                 UploadId=self._upload_id,
@@ -760,12 +791,24 @@ multipart upload may fail")
             # We work around this by creating an empty file explicitly.
             #
             assert self._upload_id, "no multipart upload in progress"
-            self._client.abort_multipart_upload(
+            abort = _inject(
+                self._client,
+                'abort_multipart_upload',
+                self._client_kwargs,
                 Bucket=self._bucket,
                 Key=self._key,
                 UploadId=self._upload_id,
             )
-            self._client.put_object(Bucket=self._bucket, Key=self._key, Body=b'')
+            abort()
+            put = _inject(
+                self._client,
+                'put_object',
+                self._client_kwargs,
+                Bucket=self._bucket,
+                Key=self._key,
+                Body=b'',
+            )
+            put()
             logger.debug('%s: wrote 0 bytes to imitate multipart upload', self)
         self._upload_id = None
 
@@ -807,11 +850,15 @@ multipart upload may fail")
     def terminate(self):
         """Cancel the underlying multipart upload."""
         assert self._upload_id, "no multipart upload in progress"
-        self._client.abort_multipart_upload(
+        abort = _inject(
+            self._client,
+            'abort_multipart_upload',
+            self._client_kwargs,
             Bucket=self._bucket,
             Key=self._key,
             UploadId=self._upload_id,
         )
+        abort()
         self._upload_id = None
 
     def to_boto3(self, resource=None):
@@ -848,8 +895,10 @@ multipart upload may fail")
         # especially robust.
         #
         upload = _retry_if_failed(
-            functools.partial(
-                self._client.upload_part,
+            _inject(
+                self._client,
+                'upload_part',
+                self._client_kwargs,
                 Bucket=self._bucket,
                 Key=self._key,
                 UploadId=self._upload_id,
@@ -904,8 +953,9 @@ class SinglepartWriter(io.BufferedIOBase):
 
         _initialize_boto3(self, client, client_kwargs)
 
+        head = _inject(self._client, 'head_bucket', self._client_kwargs, Bucket=bucket)
         try:
-            self._object = self._client.head_bucket(Bucket=bucket)
+            head()
         except botocore.client.ClientError as e:
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket) from e
 
@@ -929,13 +979,16 @@ class SinglepartWriter(io.BufferedIOBase):
 
         self._buf.seek(0)
 
+        put = _inject(
+            self._client,
+            'put_object',
+            self._client_kwargs,
+            Bucket=self._bucket,
+            Key=self._key,
+            Body=self._buf,
+        )
         try:
-            self._client.put_object(
-                Bucket=self._bucket,
-                Key=self._key,
-                Body=self._buf,
-                **self._client_kwargs.get('S3.Client.put_object', {}),
-            )
+            put()
         except botocore.client.ClientError as e:
             raise ValueError(
                 'the bucket %r does not exist, or is forbidden for access' % self._bucket) from e
