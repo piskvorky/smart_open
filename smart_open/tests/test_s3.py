@@ -958,8 +958,8 @@ def test_client_propagation_singlepart():
         client=client,
         multipart_upload=False,
     ) as writer:
-        assert writer._client == client
-        assert id(writer._client) == id(client)
+        assert writer._client.client == client
+        assert id(writer._client.client) == id(client)
 
 
 @moto.mock_s3()
@@ -979,8 +979,8 @@ def test_client_propagation_multipart():
         client=client,
         multipart_upload=True,
     ) as writer:
-        assert writer._client == client
-        assert id(writer._client) == id(client)
+        assert writer._client.client == client
+        assert id(writer._client.client) == id(client)
 
 
 @moto.mock_s3()
@@ -997,8 +997,8 @@ def test_resource_propagation_reader():
         writer.write(b'hello world')
 
     with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, mode='rb', client=client) as reader:
-        assert reader._client == client
-        assert id(reader._client) == id(client)
+        assert reader._client.client == client
+        assert id(reader._client.client) == id(client)
 
 
 if __name__ == '__main__':

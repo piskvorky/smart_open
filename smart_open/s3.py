@@ -52,24 +52,24 @@ _SLEEP_SECONDS = 10
 _OUT_OF_RANGE = 'InvalidRange'
 
 
-def _inject(client, method_name, client_kwargs, **kwargs):
-    """Inject the appropriate client keyword arguments for the method.
+class _ClientWrapper:
+    """Wraps a client to inject the appropriate keyword args into each method call.
 
-    :param client: The client object to retrieve the method from.
-    :param method_name: The name of the method.
-    :param client_kwargs: A dictionary keyed by fully qualified method names.
-    :param kwargs: Keyword arguments to pass to the method directly.
-
-    The function names are as documented here:
-    https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
-
+    The keyword args are a dictionary keyed by the fully qualified method name.
     For example, S3.Client.create_multipart_upload.
 
-    Returns a callable.
+    See https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
+
+    This wrapper behaves identically to the client otherwise.
     """
-    method = getattr(client, method_name)
-    kwargs.update(client_kwargs.get('S3.Client.%s' % method_name, {}))
-    return functools.partial(method, **kwargs)
+    def __init__(self, client, kwargs):
+        self.client = client
+        self.kwargs = kwargs
+
+    def __getattr__(self, method_name):
+        method = getattr(self.client, method_name)
+        kwargs = self.kwargs.get('S3.Client.%s' % method_name, {})
+        return functools.partial(method, **kwargs)
 
 
 def parse_uri(uri_as_string):
@@ -282,20 +282,12 @@ def open(
     return fileobj
 
 
-def _get(client, client_kwargs, bucket, key, version, range_string):
-    get_object = _inject(
-        client,
-        'get_object',
-        client_kwargs,
-        Bucket=bucket,
-        Key=key,
-        Range=range_string,
-    )
+def _get(client, bucket, key, version, range_string):
     try:
         if version:
-            return get_object(VersionId=version)
+            return client.get_object(Bucket=bucket, Key=key, VersionId=version, Range=range_string)
         else:
-            return get_object()
+            return client.get_object(Bucket=bucket, Key=key, Range=range_string)
     except botocore.client.ClientError as error:
         wrapped_error = IOError(
             'unable to access bucket: %r key: %r version: %r error: %s' % (
@@ -326,7 +318,6 @@ class _SeekableRawReader(object):
         bucket,
         key,
         version_id=None,
-        client_kwargs=None,
     ):
         self._client = client
         self._bucket = bucket
@@ -336,7 +327,6 @@ class _SeekableRawReader(object):
         self._content_length = None
         self._position = 0
         self._body = None
-        self._client_kwargs = client_kwargs if client_kwargs else {}
 
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
@@ -407,7 +397,6 @@ class _SeekableRawReader(object):
             # Optimistically try to fetch the requested content range.
             response = _get(
                 self._client,
-                self._client_kwargs,
                 self._bucket,
                 self._key,
                 self._version_id,
@@ -493,12 +482,13 @@ def _initialize_boto3(rw, client, client_kwargs):
     been already created for us and we can just reuse them."""
     if client_kwargs is None:
         client_kwargs = {}
-    rw._client_kwargs = client_kwargs
 
-    if client:
-        rw._client = client
-    else:
-        rw._client = boto3.client('s3', **client_kwargs.get('S3.Client', {}))
+    if client is None:
+        init_kwargs = client_kwargs.get('S3.Client', {})
+        client = boto3.client('s3', **init_kwargs)
+    assert client
+
+    rw._client = _ClientWrapper(client, client_kwargs)
 
 
 class Reader(io.BufferedIOBase):
@@ -529,7 +519,6 @@ class Reader(io.BufferedIOBase):
             bucket,
             key,
             self._version_id,
-            client_kwargs=self._client_kwargs,
         )
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
@@ -735,10 +724,8 @@ multipart upload may fail")
         _initialize_boto3(self, client, client_kwargs)
 
         try:
-            partial = _inject(
-                self._client,
-                'create_multipart_upload',
-                self._client_kwargs,
+            partial = functools.partial(
+                self._client.create_multipart_upload,
                 Bucket=bucket,
                 Key=key,
             )
@@ -771,10 +758,8 @@ multipart upload may fail")
             self._upload_next_part()
 
         if self._total_bytes and self._upload_id:
-            partial = _inject(
-                self._client,
-                'complete_multipart_upload',
-                self._client_kwargs,
+            partial = functools.partial(
+                self._client.complete_multipart_upload,
                 Bucket=self._bucket,
                 Key=self._key,
                 UploadId=self._upload_id,
@@ -791,24 +776,16 @@ multipart upload may fail")
             # We work around this by creating an empty file explicitly.
             #
             assert self._upload_id, "no multipart upload in progress"
-            abort = _inject(
-                self._client,
-                'abort_multipart_upload',
-                self._client_kwargs,
+            self._client.abort_multipart_upload(
                 Bucket=self._bucket,
                 Key=self._key,
                 UploadId=self._upload_id,
             )
-            abort()
-            put = _inject(
-                self._client,
-                'put_object',
-                self._client_kwargs,
+            self._client.put_object(
                 Bucket=self._bucket,
                 Key=self._key,
                 Body=b'',
             )
-            put()
             logger.debug('%s: wrote 0 bytes to imitate multipart upload', self)
         self._upload_id = None
 
@@ -850,15 +827,11 @@ multipart upload may fail")
     def terminate(self):
         """Cancel the underlying multipart upload."""
         assert self._upload_id, "no multipart upload in progress"
-        abort = _inject(
-            self._client,
-            'abort_multipart_upload',
-            self._client_kwargs,
+        self._client.abort_multipart_upload(
             Bucket=self._bucket,
             Key=self._key,
             UploadId=self._upload_id,
         )
-        abort()
         self._upload_id = None
 
     def to_boto3(self, resource=None):
@@ -895,10 +868,8 @@ multipart upload may fail")
         # especially robust.
         #
         upload = _retry_if_failed(
-            _inject(
-                self._client,
-                'upload_part',
-                self._client_kwargs,
+            functools.partial(
+                self._client.upload_part,
                 Bucket=self._bucket,
                 Key=self._key,
                 UploadId=self._upload_id,
@@ -953,9 +924,8 @@ class SinglepartWriter(io.BufferedIOBase):
 
         _initialize_boto3(self, client, client_kwargs)
 
-        head = _inject(self._client, 'head_bucket', self._client_kwargs, Bucket=bucket)
         try:
-            head()
+            self._client.head_bucket(Bucket=bucket)
         except botocore.client.ClientError as e:
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket) from e
 
@@ -979,16 +949,12 @@ class SinglepartWriter(io.BufferedIOBase):
 
         self._buf.seek(0)
 
-        put = _inject(
-            self._client,
-            'put_object',
-            self._client_kwargs,
-            Bucket=self._bucket,
-            Key=self._key,
-            Body=self._buf,
-        )
         try:
-            put()
+            self._client.put_object(
+                Bucket=self._bucket,
+                Key=self._key,
+                Body=self._buf,
+            )
         except botocore.client.ClientError as e:
             raise ValueError(
                 'the bucket %r does not exist, or is forbidden for access' % self._bucket) from e
