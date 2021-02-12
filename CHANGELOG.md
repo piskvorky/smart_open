@@ -1,5 +1,7 @@
 # Unreleased
 
+- Support tell() for text mode write on s3/gcs/azure (PR [#582](https://github.com/RaRe-Technologies/smart_open/pull/582), [@markopy](https://github.com/markopy))
+
 # 4.1.2, 18 Jan 2021
 
 - Correctly pass boto3 resource to writers (PR [#576](https://github.com/RaRe-Technologies/smart_open/pull/576), [@jackluo923](https://github.com/jackluo923))
