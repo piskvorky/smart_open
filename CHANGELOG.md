@@ -1,5 +1,7 @@
 # Unreleased
 
+# 4.2.0, 15 Feb 2021
+
 - Support tell() for text mode write on s3/gcs/azure (PR [#582](https://github.com/RaRe-Technologies/smart_open/pull/582), [@markopy](https://github.com/markopy))
 - Implement option to use a custom buffer during S3 writes (PR [#547](https://github.com/RaRe-Technologies/smart_open/pull/547), [@mpenkov](https://github.com/mpenkov))
 
