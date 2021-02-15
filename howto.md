@@ -197,6 +197,8 @@ It is possible to save both CPU time and memory by sharing the same resource acr
 
 The above sharing is safe because it is all happening in the same thread and subprocess (see below for details).
 
+## How to Write to S3 Efficiently
+
 By default, `smart_open` buffers the most recent part of a multipart upload in memory.
 The default part size is 50MB.
 If you're concerned about memory usage, then you have two options.
