@@ -30,15 +30,16 @@ jobs:
           python -m pip install --upgrade pip
           python -m venv venv
           . venv/bin/activate
-          pip install twine
+          pip install twine wheel
 
-      - name: Build tarball and wheel
+      - name: Build and upload tarball to PyPI
         run: |
           . venv/bin/activate
-          pip install wheel
-          python setup.py sdist bdist_wheel
-
-      - name: Upload tarball to PyPI
-        run: |
-          . venv/bin/activate
+          python setup.py sdist
           twine upload dist/smart_open-${{ steps.get_version.outputs.V }}.tar.gz -u ${{ env.PYPI_USERNAME }} -p ${{ env.PYPI_PASSWORD }}
+
+      - name: Build and upload wheel to PyPI
+        run: |
+          . venv/bin/activate
+          python setup.py bdist_wheel
+          twine upload dist/smart_open-${{ steps.get_version.outputs.V }}.whl -u ${{ env.PYPI_USERNAME }} -p ${{ env.PYPI_PASSWORD }}

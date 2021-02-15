@@ -15,7 +15,6 @@ with initialize_s3_bucket.py.
 import contextlib
 import gzip
 import io
-import six
 import unittest
 import uuid
 import warnings
@@ -36,12 +35,6 @@ def setUpModule():
 
 
 def ignore_resource_warnings():
-    #
-    # https://github.com/boto/boto3/issues/454
-    # Py2 doesn't have ResourceWarning, so do nothing.
-    #
-    if six.PY2:
-        return
     warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")  # noqa
 
 
