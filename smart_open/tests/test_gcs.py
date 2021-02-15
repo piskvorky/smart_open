@@ -157,9 +157,9 @@ class FakeBlob(object):
         self._bucket.delete_blob(self)
         self._exists = False
 
-    def download_as_string(self, start=0, end=None):
-        # mimics Google's API by returning bytes, despite the method name
-        # https://google-cloud-python.readthedocs.io/en/0.32.0/storage/blobs.html#google.cloud.storage.blob.Blob.download_as_string
+    def download_as_bytes(self, start=0, end=None):
+        # mimics Google's API by returning bytes
+        # https://googleapis.dev/python/storage/latest/blobs.html#google.cloud.storage.blob.Blob.download_as_bytes
         if end is None:
             end = self.__contents.tell()
         self.__contents.seek(start)
@@ -170,7 +170,7 @@ class FakeBlob(object):
 
     def upload_from_string(self, data):
         # mimics Google's API by accepting bytes or str, despite the method name
-        # https://google-cloud-python.readthedocs.io/en/0.32.0/storage/blobs.html#google.cloud.storage.blob.Blob.upload_from_string
+        # https://googleapis.dev/python/storage/latest/blobs.html#google.cloud.storage.blob.Blob.upload_from_string
         if isinstance(data, str):
             data = bytes(data, 'utf8')
         self.__contents = io.BytesIO(data)
@@ -214,10 +214,10 @@ class FakeBlobTest(unittest.TestCase):
         blob = FakeBlob('fake-blob', self.bucket)
         contents = b'test'
         blob.upload_from_string(contents)
-        self.assertEqual(blob.download_as_string(), b'test')
-        self.assertEqual(blob.download_as_string(start=2), b'st')
-        self.assertEqual(blob.download_as_string(end=2), b'te')
-        self.assertEqual(blob.download_as_string(start=2, end=3), b's')
+        self.assertEqual(blob.download_as_bytes(), b'test')
+        self.assertEqual(blob.download_as_bytes(start=2), b'st')
+        self.assertEqual(blob.download_as_bytes(end=2), b'te')
+        self.assertEqual(blob.download_as_bytes(start=2, end=3), b's')
 
     def test_size(self):
         blob = FakeBlob('fake-blob', self.bucket)
@@ -372,7 +372,7 @@ class FakeAuthorizedSessionTest(unittest.TestCase):
         response = self.session.put(self.upload_url, data, headers=headers)
         self.assertIn(response.status_code, smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODES)
         self.session._blob_with_url(self.upload_url, self.client)
-        blob_contents = self.blob.download_as_string()
+        blob_contents = self.blob.download_as_bytes()
         self.assertEqual(blob_contents, b'')
 
     def test_finished_put_writes_to_blob(self):
@@ -384,7 +384,7 @@ class FakeAuthorizedSessionTest(unittest.TestCase):
         response = self.session.put(self.upload_url, data, headers=headers)
         self.assertEqual(response.status_code, 200)
         self.session._blob_with_url(self.upload_url, self.client)
-        blob_contents = self.blob.download_as_string()
+        blob_contents = self.blob.download_as_bytes()
         data.seek(0)
         self.assertEqual(blob_contents, data.read())
 
@@ -900,10 +900,10 @@ class OpenTest(unittest.TestCase):
     def test_round_trip(self):
         test_string = u"ветер по морю гуляет..."
         url = 'gs://%s/%s' % (BUCKET_NAME, BLOB_NAME)
-        with smart_open.open(url, "w") as fout:
+        with smart_open.open(url, "w", encoding='utf-8') as fout:
             fout.write(test_string)
 
-        with smart_open.open(url) as fin:
+        with smart_open.open(url, encoding='utf-8') as fin:
             actual = fin.read()
 
         self.assertEqual(test_string, actual)

@@ -1,5 +1,43 @@
 # Unreleased
 
+- Support tell() for text mode write on s3/gcs/azure (PR [#582](https://github.com/RaRe-Technologies/smart_open/pull/582), [@markopy](https://github.com/markopy))
+
+# 4.1.2, 18 Jan 2021
+
+- Correctly pass boto3 resource to writers (PR [#576](https://github.com/RaRe-Technologies/smart_open/pull/576), [@jackluo923](https://github.com/jackluo923))
+- Improve robustness of S3 reading (PR [#552](https://github.com/RaRe-Technologies/smart_open/pull/552), [@mpenkov](https://github.com/mpenkov))
+- Replace codecs with TextIOWrapper to fix newline issues when reading text files (PR [#578](https://github.com/RaRe-Technologies/smart_open/pull/578), [@markopy](https://github.com/markopy))
+
+# 4.1.0, 30 Dec 2020
+
+- Refactor `s3` submodule to minimize resource usage (PR [#569](https://github.com/RaRe-Technologies/smart_open/pull/569), [@mpenkov](https://github.com/mpenkov))
+- Change `download_as_string` to `download_as_bytes` in `gcs` submodule (PR [#571](https://github.com/RaRe-Technologies/smart_open/pull/571), [@alexandreyc](https://github.com/alexandreyc))
+
+# 4.0.1, 27 Nov 2020
+
+- Exclude `requests` from `install_requires` dependency list.
+  If you need it, use `pip install smart_open[http]` or `pip install smart_open[webhdfs]`.
+
+# 4.0.0, 24 Nov 2020
+
+- Fix reading empty file or seeking past end of file for s3 backend (PR [#549](https://github.com/RaRe-Technologies/smart_open/pull/549), [@jcushman](https://github.com/jcushman))
+- Fix handling of rt/wt mode when working with gzip compression (PR [#559](https://github.com/RaRe-Technologies/smart_open/pull/559), [@mpenkov](https://github.com/mpenkov))
+- Bump minimum Python version to 3.6 (PR [#562](https://github.com/RaRe-Technologies/smart_open/pull/562), [@mpenkov](https://github.com/mpenkov))
+
+# 3.0.0, 8 Oct 2020
+
+This release modifies the behavior of setup.py with respect to dependencies.
+Previously, `boto3` and other AWS-related packages were installed by default.
+Now, in order to install them, you need to run either:
+
+    pip install smart_open[s3]
+
+to install the AWS dependencies only, or
+
+    pip install smart_open[all]
+
+to install all dependencies, including AWS, GCS, etc.
+
 # 2.2.1, 1 Oct 2020
 
 - Include S3 dependencies by default, because removing them in the 2.2.0 minor release was a mistake.

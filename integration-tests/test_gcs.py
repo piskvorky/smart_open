@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import io
 import os
+import urllib.parse
 
 import google.cloud.storage
-from six.moves.urllib import parse as urlparse
 
 import smart_open
 
@@ -13,7 +13,7 @@ assert _GCS_URL is not None, 'please set the SO_GCS_URL environment variable'
 
 def initialize_bucket():
     client = google.cloud.storage.Client()
-    parsed = urlparse.urlparse(_GCS_URL)
+    parsed = urllib.parse.urlparse(_GCS_URL)
     bucket_name = parsed.netloc
     prefix = parsed.path
     bucket = client.get_bucket(bucket_name)

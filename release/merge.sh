@@ -35,9 +35,9 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-version="$SMART_OPEN_RELEASE"
+version="$(python smart_open/version.py)"
 
-read -p "Push version $version to github.com? yes or no: " reply
+read -p "Push version $version to github.com and PyPI? yes or no: " reply
 if [ "$reply" != "yes" ]
 then
     echo "aborted by user"
@@ -54,7 +54,7 @@ set -e
 
 git checkout upstream/master -b master
 git merge --no-ff release-${version}
-git tag -a ${version} -m "${version}"
+git tag -a "v${version}" -m "v${version}"
 
 git checkout upstream/develop -b develop
 git merge --no-ff master
@@ -66,12 +66,9 @@ git checkout master
 git push --tags upstream master
 
 git checkout develop
+dev_version="$version.dev0"
+sed --in-place= -e s/$(python smart_open/version.py)/$dev_version/ smart_open/version.py
+git commit smart_open/version.py -m "bump version to $dev_version"
 git push upstream develop
 
-#
-# TODO: we should be able to automate the release note stuff.  It's just a
-# copypaste of CHANGELOG.md.
-#
-echo "The release is almost done!  Two more steps to go:"
-echo "1) Update release notes at https://github.com/RaRe-Technologies/smart_open/releases/tag/$version"
-echo "2) Push the new release to PyPI: run 'bash push_pypi.sh'"
+python release/update_release_notes.py "$version"
