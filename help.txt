@@ -165,6 +165,13 @@ FUNCTIONS
             If set to `True` on a file opened for reading, GetObject will not be
             called until the first seek() or read().
             Avoids redundant API queries when seeking before reading.
+        writebuffer: IO[bytes], optional
+            By default, this module will buffer data in memory using io.BytesIO
+            when writing. Pass another binary IO instance here to use it instead.
+            For example, you may pass a file object to buffer to local disk instead
+            of in RAM. Use this to keep RAM usage low at the expense of additional
+            disk IO. If you pass in an open file, then you are responsible for
+            cleaning it up after writing completes.
         
         scp (smart_open/ssh.py)
         ~~~~~~~~~~~~~~~~~~~~~~~
@@ -324,9 +331,9 @@ DATA
     __all__ = ['open', 'parse_uri', 'register_compressor', 's3_iter_bucket...
 
 VERSION
-    2.1.1
+    2.2.1
 
 FILE
-    /home/misha/git/smart_open/smart_open/__init__.py
+    /Users/misha/git/smart_open/smart_open/__init__.py
 
 

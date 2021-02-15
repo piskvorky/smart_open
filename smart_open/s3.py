@@ -186,6 +186,7 @@ def open(
     singlepart_upload_kwargs=None,
     object_kwargs=None,
     defer_seek=False,
+    writebuffer=None,
 ):
     """Open an S3 object for reading or writing.
 
@@ -234,6 +235,13 @@ def open(
         If set to `True` on a file opened for reading, GetObject will not be
         called until the first seek() or read().
         Avoids redundant API queries when seeking before reading.
+    writebuffer: IO[bytes], optional
+        By default, this module will buffer data in memory using io.BytesIO
+        when writing. Pass another binary IO instance here to use it instead.
+        For example, you may pass a file object to buffer to local disk instead
+        of in RAM. Use this to keep RAM usage low at the expense of additional
+        disk IO. If you pass in an open file, then you are responsible for
+        cleaning it up after writing completes.
     """
     logger.debug('%r', locals())
     if mode not in constants.BINARY_MODES:
@@ -264,6 +272,7 @@ def open(
                 resource=resource,
                 upload_kwargs=multipart_upload_kwargs,
                 resource_kwargs=resource_kwargs,
+                writebuffer=writebuffer,
             )
         else:
             fileobj = SinglepartWriter(
@@ -273,6 +282,7 @@ def open(
                 resource=resource,
                 upload_kwargs=singlepart_upload_kwargs,
                 resource_kwargs=resource_kwargs,
+                writebuffer=writebuffer,
             )
     else:
         assert False, 'unexpected mode: %r' % mode
@@ -743,6 +753,7 @@ class MultipartWriter(io.BufferedIOBase):
         resource=None,
         resource_kwargs=None,
         upload_kwargs=None,
+        writebuffer=None,
     ):
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
@@ -767,7 +778,11 @@ multipart upload may fail")
                 )
             ) from error
 
-        self._buf = io.BytesIO()
+        if writebuffer is None:
+            self._buf = io.BytesIO()
+        else:
+            self._buf = writebuffer
+
         self._total_bytes = 0
         self._total_parts = 0
         self._parts = []
@@ -898,7 +913,9 @@ multipart upload may fail")
         logger.debug("%s: upload of part_num #%i finished", self, part_num)
 
         self._total_parts += 1
-        self._buf = io.BytesIO()
+
+        self._buf.seek(0)
+        self._buf.truncate(0)
 
     def __enter__(self):
         return self
@@ -937,15 +954,15 @@ class SinglepartWriter(io.BufferedIOBase):
     the data be written to S3 and the buffer is released."""
 
     def __init__(
-            self,
-            bucket,
-            key,
-            session=None,
-            resource=None,
-            resource_kwargs=None,
-            upload_kwargs=None,
-            ):
-
+        self,
+        bucket,
+        key,
+        session=None,
+        resource=None,
+        resource_kwargs=None,
+        upload_kwargs=None,
+        writebuffer=None,
+    ):
         _initialize_boto3(self, session, resource, resource_kwargs)
 
         if upload_kwargs is None:
@@ -959,7 +976,11 @@ class SinglepartWriter(io.BufferedIOBase):
         except botocore.client.ClientError as e:
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket) from e
 
-        self._buf = io.BytesIO()
+        if writebuffer is None:
+            self._buf = io.BytesIO()
+        else:
+            self._buf = writebuffer
+
         self._total_bytes = 0
 
         #
