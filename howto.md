@@ -226,7 +226,7 @@ with tempfile.NamedTemporaryFile() as tmp:
         fout.write(lots_of_data)
 ```
 
-This option reduces memory usage at the expense of additional disk I/O (writing to a reading from a hard disk is slower).
+This option reduces memory usage at the expense of additional disk I/O (writing to and reading from a hard disk is slower).
 
 ## How to Work in a Parallelized Environment
 
