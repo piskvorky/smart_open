@@ -10,6 +10,7 @@ import gzip
 import io
 import logging
 import os
+import tempfile
 import time
 import unittest
 import warnings
@@ -599,6 +600,19 @@ class MultipartWriterTest(unittest.TestCase):
         boto3_body = returned_obj.get()['Body'].read()
         self.assertEqual(contents, boto3_body)
 
+    def test_writebuffer(self):
+        """Does the MultipartWriter support writing to a custom buffer?"""
+        contents = b'get ready for a surprise'
+
+        with tempfile.NamedTemporaryFile(mode='rb+') as f:
+            with smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME, writebuffer=f) as fout:
+                fout.write(contents)
+
+            with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
+                actual = fin.read()
+
+            assert actual == contents
+
 
 @moto.mock_s3
 class SinglepartWriterTest(unittest.TestCase):
@@ -693,6 +707,19 @@ class SinglepartWriterTest(unittest.TestCase):
         fout.write(text)
         fout.flush()
         fout.close()
+
+    def test_writebuffer(self):
+        """Does the SinglepartWriter support writing to a custom buffer?"""
+        contents = b'get ready for a surprise'
+
+        with tempfile.NamedTemporaryFile(mode='rb+') as f:
+            with smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME, writebuffer=f) as fout:
+                fout.write(contents)
+
+            with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
+                actual = fin.read()
+
+            assert actual == contents
 
 
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')

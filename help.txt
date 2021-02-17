@@ -158,6 +158,13 @@ FUNCTIONS
             Additional parameters to pass to the relevant functions of the client.
             The keys are fully qualified method names, e.g. `S3.Client.create_multipart_upload`.
             The values are kwargs to pass to that method each time it is called.
+        writebuffer: IO[bytes], optional
+            By default, this module will buffer data in memory using io.BytesIO
+            when writing. Pass another binary IO instance here to use it instead.
+            For example, you may pass a file object to buffer to local disk instead
+            of in RAM. Use this to keep RAM usage low at the expense of additional
+            disk IO. If you pass in an open file, then you are responsible for
+            cleaning it up after writing completes.
         
         scp (smart_open/ssh.py)
         ~~~~~~~~~~~~~~~~~~~~~~~
@@ -320,6 +327,6 @@ VERSION
     4.1.2.dev0
 
 FILE
-    /home/misha/git/smart_open/smart_open/__init__.py
+    /Users/misha/git/smart_open/smart_open/__init__.py
 
 

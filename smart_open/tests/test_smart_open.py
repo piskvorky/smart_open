@@ -1155,6 +1155,18 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object.seek(0)
         self.assertEqual(content, smart_open_object.read(-1))  # same thing
 
+    @mock_s3
+    def test_s3_tell(self):
+        """Does tell() work when S3 file is opened for text writing? """
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='mybucket')
+
+        with smart_open.open("s3://mybucket/mykey", "w") as fout:
+            fout.write(u"test")
+            # Note that tell() in general returns an opaque number for text files.
+            # See https://docs.python.org/3/library/io.html#io.TextIOBase.tell
+            self.assertEqual(fout.tell(), 4)
+
 
 class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.client')

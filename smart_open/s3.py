@@ -207,6 +207,7 @@ def open(
     defer_seek=False,
     client=None,
     client_kwargs=None,
+    writebuffer=None,
 ):
     """Open an S3 object for reading or writing.
 
@@ -243,6 +244,13 @@ def open(
         Additional parameters to pass to the relevant functions of the client.
         The keys are fully qualified method names, e.g. `S3.Client.create_multipart_upload`.
         The values are kwargs to pass to that method each time it is called.
+    writebuffer: IO[bytes], optional
+        By default, this module will buffer data in memory using io.BytesIO
+        when writing. Pass another binary IO instance here to use it instead.
+        For example, you may pass a file object to buffer to local disk instead
+        of in RAM. Use this to keep RAM usage low at the expense of additional
+        disk IO. If you pass in an open file, then you are responsible for
+        cleaning it up after writing completes.
     """
     logger.debug('%r', locals())
     if mode not in constants.BINARY_MODES:
@@ -269,6 +277,7 @@ def open(
                 min_part_size=min_part_size,
                 client=client,
                 client_kwargs=client_kwargs,
+                writebuffer=writebuffer,
             )
         else:
             fileobj = SinglepartWriter(
@@ -276,6 +285,7 @@ def open(
                 key_id,
                 client=client,
                 client_kwargs=client_kwargs,
+                writebuffer=writebuffer,
             )
     else:
         assert False, 'unexpected mode: %r' % mode
@@ -479,7 +489,7 @@ class _SeekableRawReader(object):
         return 'smart_open.s3._SeekableReader(%r, %r)' % (self._bucket, self._key)
 
 
-def _initialize_boto3(rw, client, client_kwargs):
+def _initialize_boto3(rw, client, client_kwargs, bucket, key):
     """Created the required objects for accessing S3.  Ideally, they have
     been already created for us and we can just reuse them."""
     if client_kwargs is None:
@@ -491,6 +501,8 @@ def _initialize_boto3(rw, client, client_kwargs):
     assert client
 
     rw._client = _ClientWrapper(client, client_kwargs)
+    rw._bucket = bucket
+    rw._key = key
 
 
 class Reader(io.BufferedIOBase):
@@ -509,12 +521,10 @@ class Reader(io.BufferedIOBase):
         client=None,
         client_kwargs=None,
     ):
-        self._bucket = bucket
-        self._key = key
         self._version_id = version_id
         self._buffer_size = buffer_size
 
-        _initialize_boto3(self, client, client_kwargs)
+        _initialize_boto3(self, client, client_kwargs, bucket, key)
 
         self._raw_reader = _SeekableRawReader(
             self._client,
@@ -714,16 +724,14 @@ class MultipartWriter(io.BufferedIOBase):
         min_part_size=DEFAULT_MIN_PART_SIZE,
         client=None,
         client_kwargs=None,
+        writebuffer=None,
     ):
-        self._bucket = bucket
-        self._key = key
-
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning("S3 requires minimum part size >= 5MB; \
 multipart upload may fail")
         self._min_part_size = min_part_size
 
-        _initialize_boto3(self, client, client_kwargs)
+        _initialize_boto3(self, client, client_kwargs, bucket, key)
 
         try:
             partial = functools.partial(
@@ -739,7 +747,11 @@ multipart upload may fail")
                 )
             ) from error
 
-        self._buf = io.BytesIO()
+        if writebuffer is None:
+            self._buf = io.BytesIO()
+        else:
+            self._buf = writebuffer
+
         self._total_bytes = 0
         self._total_parts = 0
         self._parts = []
@@ -798,6 +810,20 @@ multipart upload may fail")
     def writable(self):
         """Return True if the stream supports writing."""
         return True
+
+    def seekable(self):
+        """If False, seek(), tell() and truncate() will raise IOError.
+
+        We offer only tell support, and no seek or truncate support."""
+        return True
+
+    def seek(self, offset, whence=constants.WHENCE_START):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def truncate(self, size=None):
+        """Unsupported."""
+        raise io.UnsupportedOperation
 
     def tell(self):
         """Return the current stream position."""
@@ -884,7 +910,9 @@ multipart upload may fail")
         logger.debug("%s: upload of part_num #%i finished", self, part_num)
 
         self._total_parts += 1
-        self._buf = io.BytesIO()
+
+        self._buf.seek(0)
+        self._buf.truncate(0)
 
     def __enter__(self):
         return self
@@ -920,18 +948,20 @@ class SinglepartWriter(io.BufferedIOBase):
         key,
         client=None,
         client_kwargs=None,
+        writebuffer=None,
     ):
-        self._bucket = bucket
-        self._key = key
-
-        _initialize_boto3(self, client, client_kwargs)
+        _initialize_boto3(self, client, client_kwargs, bucket, key)
 
         try:
             self._client.head_bucket(Bucket=bucket)
         except botocore.client.ClientError as e:
             raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket) from e
 
-        self._buf = io.BytesIO()
+        if writebuffer is None:
+            self._buf = io.BytesIO()
+        else:
+            self._buf = writebuffer
+
         self._total_bytes = 0
 
         #
@@ -971,6 +1001,20 @@ class SinglepartWriter(io.BufferedIOBase):
     def writable(self):
         """Return True if the stream supports writing."""
         return True
+
+    def seekable(self):
+        """If False, seek(), tell() and truncate() will raise IOError.
+
+        We offer only tell support, and no seek or truncate support."""
+        return True
+
+    def seek(self, offset, whence=constants.WHENCE_START):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def truncate(self, size=None):
+        """Unsupported."""
+        raise io.UnsupportedOperation
 
     def tell(self):
         """Return the current stream position."""

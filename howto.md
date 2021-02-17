@@ -198,6 +198,35 @@ It is possible to save both CPU time and memory by sharing the same resource acr
 
 Clients are thread-safe and multiprocess-safe, so you may share them between other threads and subprocesses.
 
+By default, `smart_open` buffers the most recent part of a multipart upload in memory.
+The default part size is 50MB.
+If you're concerned about memory usage, then you have two options.
+The first option is to use smaller part sizes (e.g. 5MB, the lowest value permitted by AWS):
+
+```python
+import boto3
+from smart_open import open
+tp = {'min_part_size': 5 * 1024**2}
+with open('s3://bucket/key', 'w', transport_params=tp) as fout:
+    fout.write(lots_of_data)
+```
+
+This will split your upload into smaller parts.
+Be warned that AWS enforces a [limit](https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html) of a maximum of 10,000 parts per upload.
+
+The second option is to use a temporary file as a buffer instead.
+
+```python
+import boto3
+from smart_open import open
+with tempfile.NamedTemporaryFile() as tmp:
+    tp = {'writebuffer': tmp}
+    with open('s3://bucket/key', 'w', transport_params=tp) as fout:
+        fout.write(lots_of_data)
+```
+
+This option reduces memory usage at the expense of additional disk I/O (writing to a reading from a hard disk is slower).
+
 ## How to Specify the Request Payer (S3 only)
 
 Some public buckets require you to [pay for S3 requests for the data in the bucket](https://docs.aws.amazon.com/AmazonS3/latest/dev/RequesterPaysBuckets.html).
