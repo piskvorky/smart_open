@@ -11,7 +11,6 @@ import io
 import logging
 import os.path
 import urllib.parse
-import base64
 
 try:
     import requests
@@ -50,7 +49,7 @@ def open_uri(uri, mode, transport_params):
     return open(uri, mode, **kwargs)
 
 
-def open(uri, mode, kerberos=False, user=None, password=None, headers=None, git_token=None):
+def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
     """Implement streamed reader from a web site.
 
     Supports Kerberos and Basic HTTP authentication.
@@ -71,10 +70,6 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None, git_
         Any headers to send in the request. If ``None``, the default headers are sent:
         ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
         set this variable to an empty dict, ``{}``.
-    git_token: string, optional  
-        The Git API token that you want to pass as a header. Passing in this
-        arg tells open(...) to read the contents of the file read rather than the
-        response object. See the Git API documentation for formatting and info.
 
     Note
     ----
@@ -82,17 +77,9 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None, git_
     unauthenticated, unless set separately in headers.
 
     """
-    
-    git = False
-    if git_token:
-      if not headers:
-        headers = dict()
-      headers["Authorization"] = "Bearer " + git_token
-      git = True
-      
     if mode == constants.READ_BINARY:
         fobj = SeekableBufferedInputBase(
-            uri, mode, kerberos=kerberos, git=git,
+            uri, mode, kerberos=kerberos,
             user=user, password=password, headers=headers
         )
         fobj.name = os.path.basename(urllib.parse.urlparse(uri).path)
@@ -103,7 +90,7 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None, git_
 
 class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, git=False, user=None, password=None, headers=None):
+                 kerberos=False, user=None, password=None, headers=None):
         if kerberos:
             import requests_kerberos
             auth = requests_kerberos.HTTPKerberosAuth()
@@ -124,9 +111,6 @@ class BufferedInputBase(io.BufferedIOBase):
 
         if not self.response.ok:
             self.response.raise_for_status()
-
-        if git:
-          self.response = GitModifiedResponse(self.response)
 
         self._read_iter = self.response.iter_content(self.buffer_size)
         self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
@@ -216,7 +200,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
     """
 
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, git=False, user=None, password=None, headers=None):
+                 kerberos=False, user=None, password=None, headers=None):
         """
         If Kerberos is True, will attempt to use the local Kerberos credentials.
         Otherwise, will try to use "basic" HTTP authentication via username/password.
@@ -224,7 +208,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         If none of those are set, will connect unauthenticated.
         """
         self.url = url
-        
+
         if kerberos:
             import requests_kerberos
             self.auth = requests_kerberos.HTTPKerberosAuth()
@@ -254,9 +238,6 @@ class SeekableBufferedInputBase(BufferedInputBase):
             self._seekable = False
         if self.response.headers.get("Accept-Ranges", "none").lower() != "bytes":
             self._seekable = False
-
-        if git:
-          self.response = GitModifiedResponse(self.response)
 
         self._read_iter = self.response.iter_content(self.buffer_size)
         self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
@@ -328,34 +309,3 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         response = requests.get(self.url, auth=self.auth, stream=True, headers=self.headers)
         return response
-
-
-class GitModifiedResponse():
-
-    def __init__(self, response):
-        self.raw = io.BytesIO(base64.b64decode(response.json()["content"]))
-        self.response = response
-        self.response.raw = self.raw
-      
-      
-    def __getattribute__(self, name):
-        response = object.__getattribute__(self, "response")
-        
-        # operates as a pass through to response's attributes except for these two
-        if name == "response":
-            return response
-        if name == "iter_content":
-            return object.__getattribute__(self, "iter_content")
-        if name == "raw":
-            return object.__getattribute__(self, "raw")
-          
-        return object.__getattribute__(response, name)
-      
-      
-    def iter_content(self, chunk_size=1, decode_unicode=False):
-        while True:
-            chunk = self.raw.read(chunk_size)
-            if not chunk:
-                break
-            yield chunk
-
