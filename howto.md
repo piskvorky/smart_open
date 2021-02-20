@@ -296,6 +296,34 @@ logging.getLogger('smart_open.s3').setLevel(logging.DEBUG)
 
 and check the log output of your code.
 
+## How to Read from Github API
+
+The Github API allows users access to, among many other things, read files from repositories that you have 
+access to. Below is an example for how users can read a file with smart_open. For more info, see the 
+[Github API documentation](https://docs.github.com/en/rest/reference/repos#contents).
+
+```python
+>>> from smart_open import open
+>>> import base64
+>>> import json
+>>> owner = "RaRe-Technologies"
+>>> repo = "smart_open"
+>>> path = "howto.md"
+>>> git_token = "..."
+>>> url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+>>> transport_params = {
+...     "headers" : {
+...         "Authorization" : "Bearer " + git_token
+...     }
+... }
+>>> with open(url, transport_params=transport_params) as obj:
+...     response_contents = json.loads(obj.read())["contents"]
+...     file_text = base64.b64decode(response_contents).decode()
+```
+
+Note: If you are accessing a file in a Github Enterprise org, you will likely have a different base dns than
+      the `https://api.github.com/` in the example.
+
 ## How to Read/Write from localstack
 
 [localstack](https://github.com/localstack/localstack) is a convenient test framework for developing cloud apps.
