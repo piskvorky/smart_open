@@ -666,7 +666,7 @@ class Reader(io.BufferedIOBase):
         `boto3.s3.Object` may not necessarily affect the current instance.
 
         """
-        if not resource:
+        if resource is None:
             resource = boto3.resource('s3')
         obj = resource.Object(self._bucket, self._key)
         if self._version_id is not None:
