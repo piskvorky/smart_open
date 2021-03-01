@@ -68,12 +68,12 @@ The `client_kwargs` dict can thus contain the following members:
 
 See `README <README.rst>`_ and `HOWTO <howto.md>`_ for more examples.
 
-.. _resource_API: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#service-resource
+.. _resource API: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#service-resource
 .. _s3.Object.initiate_multipart_upload: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Object.initiate_multipart_upload
 .. _s3.Object.get: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.ObjectSummary.get
 .. _s3.Object.put: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.ObjectSummary.put
 
-.. _client_API: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
+.. _client API: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
 .. _s3.Client: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
 .. _s3.Client.create_multipart_upload: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.create_multipart_upload
 .. _s3.Client.get_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.get_object
