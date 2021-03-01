@@ -4,6 +4,7 @@ Migrating to the new client-based S3 API
 Version of smart_open prior to 5.0.0 used the boto3 `resource API`_ for communicating with S3.
 This API was easy to integrate for smart_open developers, but this came at a cost: it was not thread- or multiprocess-safe.
 Furthermore, as smart_open supported more and more options, the transport parameter list grew, making it less maintainable.
+
 Starting with version 5.0.0, smart_open uses the `client API`_ instead of the resource API.
 Functionally, very little changes for the smart_open user. 
 The only difference is in passing transport parameters to the S3 backend.
