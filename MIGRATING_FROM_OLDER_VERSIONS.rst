@@ -5,7 +5,7 @@ Version of smart_open prior to 5.0.0 used the boto3 `resource API`_ for communic
 This API was easy to integrate for smart_open developers, but this came at a cost: it was not thread- or multiprocess-safe.
 Furthermore, as smart_open supported more and more options, the transport parameter list grew, making it less maintainable.
 Starting with version 5.0.0, smart_open uses the `client API`_ instead of the resource API.
-Functionally, the little changes for the smart_open user. 
+Functionally, very little changes for the smart_open user. 
 The only difference is in passing transport parameters to the S3 backend.
 
 More specifically, the following S3 transport parameters are no longer supported:
@@ -25,23 +25,27 @@ If you were previously passing `session`, then construct an S3 client from the s
 For example, before:
 
 .. code-block:: python
+
     smart_open.open('s3://bucket/key', transport_params={'session': session})
 
 After:
 
 .. code-block:: python
+
     smart_open.open('s3://bucket/key', transport_params={'client': session.client('s3')})
 
 If you were passing `resource`, then replace the resource with a client, and pass that instead.
 For example, before:
 
 .. code-block:: python
+
     resource = session.resource('s3', **resource_kwargs)
     smart_open.open('s3://bucket/key', transport_params={'resource': resource})
 
 After:
 
 .. code-block:: python
+
     client = session.client('s3')
     smart_open.open('s3://bucket/key', transport_params={'client': client})
 
