@@ -71,6 +71,24 @@ The `client_kwargs` dict can thus contain the following members:
 - `s3.Client.get_object`
 - `s3.Client.put_object`
 
+Here's a before-and-after example for connecting to a custom endpoint.  Before:
+
+.. code-block:: python
+
+    session = boto3.Session(profile_name='digitalocean')
+    resource_kwargs = {'endpoint_url': 'https://ams3.digitaloceanspaces.com'}
+    with open('s3://bucket/key.txt', 'wb', transport_params={'resource_kwarg': resource_kwargs}) as fout:
+        fout.write(b'here we stand')
+
+After:
+
+.. code-block:: python
+
+    session = boto3.Session(profile_name='digitalocean')
+    client = session.client('s3', endpoint_url='https://ams3.digitaloceanspaces.com')
+    with open('s3://bucket/key.txt', 'wb', transport_params={'client': client}) as fout:
+        fout.write(b'here we stand')
+
 See `README <README.rst>`_ and `HOWTO <howto.md>`_ for more examples.
 
 .. _resource API: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#service-resource
