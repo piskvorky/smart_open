@@ -137,17 +137,6 @@ FUNCTIONS
             The buffer size to use when performing I/O.
         min_part_size: int, optional
             The minimum part size for multipart uploads.  For writing only.
-        session: object, optional
-            The S3 session to use when working with boto3.
-        resource_kwargs: dict, optional
-            Keyword arguments to use when accessing the S3 resource for reading or writing.
-        multipart_upload_kwargs: dict, optional
-            Additional parameters to pass to boto3's initiate_multipart_upload function.
-            For writing only.
-        singlepart_upload_kwargs: dict, optional
-            Additional parameters to pass to boto3's S3.Object.put function when using single
-            part upload.
-            For writing only.
         multipart_upload: bool, optional
             Default: `True`
             If set to `True`, will use multipart upload for writing to S3. If set
@@ -157,14 +146,18 @@ FUNCTIONS
         version_id: str, optional
             Version of the object, used when reading object.
             If None, will fetch the most recent version.
-        object_kwargs: dict, optional
-            Additional parameters to pass to boto3's object.get function.
-            Used during reading only.
         defer_seek: boolean, optional
             Default: `False`
             If set to `True` on a file opened for reading, GetObject will not be
             called until the first seek() or read().
             Avoids redundant API queries when seeking before reading.
+        client: object, optional
+            The S3 client to use when working with boto3.
+            If you don't specify this, then smart_open will create a new client for you.
+        client_kwargs: dict, optional
+            Additional parameters to pass to the relevant functions of the client.
+            The keys are fully qualified method names, e.g. `S3.Client.create_multipart_upload`.
+            The values are kwargs to pass to that method each time it is called.
         writebuffer: IO[bytes], optional
             By default, this module will buffer data in memory using io.BytesIO
             when writing. Pass another binary IO instance here to use it instead.
@@ -325,13 +318,13 @@ FUNCTIONS
     s3_iter_bucket(bucket_name, prefix='', accept_key=None, key_limit=None, workers=16, retries=3, **session_kwargs)
         Deprecated.  Use smart_open.s3.iter_bucket instead.
     
-    smart_open(uri, mode='rb', **kw)
+    smart_open(uri, mode='rb', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, ignore_extension=False, **kwargs)
 
 DATA
     __all__ = ['open', 'parse_uri', 'register_compressor', 's3_iter_bucket...
 
 VERSION
-    2.2.1
+    4.1.2.dev0
 
 FILE
     /Users/misha/git/smart_open/smart_open/__init__.py

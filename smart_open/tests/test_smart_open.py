@@ -21,9 +21,9 @@ import warnings
 import boto3
 import mock
 from moto import mock_s3
-import responses
 import parameterizedtestcase
 import pytest
+import responses
 
 import smart_open
 from smart_open import smart_open_lib
@@ -1169,71 +1169,53 @@ class SmartOpenReadTest(unittest.TestCase):
 
 
 class SmartOpenS3KwargsTest(unittest.TestCase):
-    @mock.patch('boto3.Session')
-    def test_no_kwargs(self, mock_session):
+    @mock.patch('boto3.client')
+    def test_no_kwargs(self, mock_client):
         smart_open.open('s3://mybucket/mykey', transport_params=dict(defer_seek=True))
-        mock_session.return_value.resource.assert_called_with('s3')
+        mock_client.assert_called_with('s3')
 
-    @mock.patch('boto3.Session')
-    def test_credentials(self, mock_session):
+    @mock.patch('boto3.client')
+    def test_credentials(self, mock_client):
         smart_open.open('s3://access_id:access_secret@mybucket/mykey', transport_params=dict(defer_seek=True))
-        mock_session.assert_called_with(aws_access_key_id='access_id', aws_secret_access_key='access_secret')
-        mock_session.return_value.resource.assert_called_with('s3')
-
-    @mock.patch('boto3.Session')
-    def test_host(self, mock_session):
-        transport_params = {'resource_kwargs': {'endpoint_url': 'http://aa.domain.com'}, 'defer_seek': True}
-        smart_open.open("s3://access_id:access_secret@mybucket/mykey", transport_params=transport_params)
-        mock_session.assert_called_with(
+        mock_client.assert_called_with(
+            's3',
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret',
         )
-        mock_session.return_value.resource.assert_called_with(
+
+    @mock.patch('boto3.client')
+    def test_host(self, mock_client):
+        tp = {
+            'client_kwargs': {
+                'S3.Client': {'endpoint_url': 'http://aa.domain.com'},
+            },
+            'defer_seek': True,
+        }
+        smart_open.open("s3://access_id:access_secret@mybucket/mykey", transport_params=tp)
+        mock_client.assert_called_with(
             's3',
+            aws_access_key_id='access_id',
+            aws_secret_access_key='access_secret',
             endpoint_url='http://aa.domain.com',
         )
 
-    @mock.patch('boto3.Session')
-    def test_s3_upload(self, mock_session):
-        smart_open.open(
-            "s3://bucket/key", 'wb', transport_params={
-                'multipart_upload_kwargs': {
+    @mock.patch('boto3.client')
+    def test_s3_upload(self, mock_client):
+        tp = {
+            'client_kwargs': {
+                'S3.Client.create_multipart_upload': {
                     'ServerSideEncryption': 'AES256',
                     'ContentType': 'application/json',
                 }
             }
-        )
-
-        # Locate the s3.Object instance (mock)
-        s3_resource = mock_session.return_value.resource.return_value
-        s3_object = s3_resource.Object.return_value
-
-        # Check that `initiate_multipart_upload` was called
-        # with the desired args
-        s3_object.initiate_multipart_upload.assert_called_with(
+        }
+        smart_open.open("s3://bucket/key", 'wb', transport_params=tp)
+        mock_client.return_value.create_multipart_upload.assert_called_with(
+            Bucket='bucket',
+            Key='key',
             ServerSideEncryption='AES256',
-            ContentType='application/json'
+            ContentType='application/json',
         )
-
-    def test_session_read_mode(self):
-        """
-        Read stream should use a custom boto3.Session
-        """
-        session = boto3.Session()
-        session.resource = mock.MagicMock()
-
-        smart_open.open('s3://bucket/key', transport_params={'session': session, 'defer_seek': True})
-        session.resource.assert_called_with('s3')
-
-    def test_session_write_mode(self):
-        """
-        Write stream should use a custom boto3.Session
-        """
-        session = boto3.Session()
-        session.resource = mock.MagicMock()
-
-        smart_open.open('s3://bucket/key', 'wb', transport_params={'session': session})
-        session.resource.assert_called_with('s3')
 
 
 class SmartOpenTest(unittest.TestCase):
@@ -1336,16 +1318,18 @@ class SmartOpenTest(unittest.TestCase):
 
         assert content == expected
 
-    @mock.patch('boto3.Session')
-    def test_s3_mode_mock(self, mock_session):
+    @mock.patch('boto3.client')
+    def test_s3_mode_mock(self, mock_client):
         """Are s3:// open modes passed correctly?"""
 
         # correct write mode, correct s3 URI
-        transport_params = {'resource_kwargs': {'endpoint_url': 'http://s3.amazonaws.com'}}
+        transport_params = {
+            'client_kwargs': {
+                'S3.Client': {'endpoint_url': 'http://s3.amazonaws.com'},
+            }
+        }
         smart_open.open("s3://mybucket/mykey", "w", transport_params=transport_params)
-        mock_session.return_value.resource.assert_called_with(
-            's3', endpoint_url='http://s3.amazonaws.com'
-        )
+        mock_client.assert_called_with('s3', endpoint_url='http://s3.amazonaws.com')
 
     @mock.patch('smart_open.hdfs.subprocess')
     def test_hdfs(self, mock_subprocess):
@@ -1395,15 +1379,19 @@ class SmartOpenTest(unittest.TestCase):
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='mybucket')
 
-        # Write data, with multipart_upload options
-        write_stream = smart_open.open(
-            's3://mybucket/crime-and-punishment.txt.gz', 'wb',
-            transport_params={
-                'multipart_upload_kwargs': {
+        tp = {
+            'client_kwargs': {
+                'S3.Client.create_multipart_upload': {
                     'ContentType': 'text/plain',
                     'ContentEncoding': 'gzip',
                 }
             }
+        }
+
+        # Write data, with multipart_upload options
+        write_stream = smart_open.open(
+            's3://mybucket/crime-and-punishment.txt.gz', 'wb',
+            transport_params=tp,
         )
         with write_stream as fout:
             fout.write(data)
@@ -1801,31 +1789,43 @@ class S3OpenTest(unittest.TestCase):
     @mock.patch('smart_open.s3.Reader')
     def test_transport_params_is_not_mutable(self, mock_open):
         smart_open.open('s3://access_key:secret_key@host@bucket/key')
-        smart_open.open('s3://bucket/key')
+        actual = mock_open.call_args_list[0][1]['client_kwargs']
+        expected = {
+            'S3.Client': {
+                'aws_access_key_id': 'access_key',
+                'aws_secret_access_key': 'secret_key',
+                'endpoint_url': 'https://host:443',
+            }
+        }
+        assert actual == expected
 
-        #
-        # The first call should have a non-null session, because the session
-        # keys were explicitly specified in the URL.  The second call should
-        # _not_ have a session.
-        #
-        self.assertIsNone(mock_open.call_args_list[1][1]['session'])
-        self.assertIsNotNone(mock_open.call_args_list[0][1]['session'])
+        smart_open.open('s3://bucket/key')
+        actual = mock_open.call_args_list[1][1].get('client_kwargs')
+        assert actual is None
 
     @mock.patch('smart_open.s3.Reader')
     def test_respects_endpoint_url_read(self, mock_open):
         url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
         smart_open.open(url)
 
-        expected = {'endpoint_url': 'https://play.min.io:9000'}
-        self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
+        expected = {
+            'aws_access_key_id': 'key_id',
+            'aws_secret_access_key': 'secret_key',
+            'endpoint_url': 'https://play.min.io:9000',
+        }
+        self.assertEqual(mock_open.call_args[1]['client_kwargs']['S3.Client'], expected)
 
     @mock.patch('smart_open.s3.MultipartWriter')
     def test_respects_endpoint_url_write(self, mock_open):
         url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
         smart_open.open(url, 'wb')
 
-        expected = {'endpoint_url': 'https://play.min.io:9000'}
-        self.assertEqual(mock_open.call_args[1]['resource_kwargs'], expected)
+        expected = {
+            'aws_access_key_id': 'key_id',
+            'aws_secret_access_key': 'secret_key',
+            'endpoint_url': 'https://play.min.io:9000',
+        }
+        self.assertEqual(mock_open.call_args[1]['client_kwargs']['S3.Client'], expected)
 
 
 def function(a, b, c, foo='bar', baz='boz'):
