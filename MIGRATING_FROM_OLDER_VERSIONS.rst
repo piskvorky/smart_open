@@ -56,7 +56,7 @@ Parameter name             Resource API method                    Client API fun
 ========================== ====================================== ==========================
 `multipart_upload_kwargs`  `s3.Object.initiate_multipart_upload`_ `s3.Client.create_multipart_upload`_
 `object_kwargs`            `s3.Object.get`_                       `s3.Client.get_object`_
-`resource_kwargs`          s3.resource                            `s3.Client`
+`resource_kwargs`          s3.resource                            `s3.client`_
 `singlepart_upload_kwargs` `s3.Object.put`_                       `s3.Client.put_object`_
 ========================== ====================================== ==========================
 
