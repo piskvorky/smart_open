@@ -22,23 +22,26 @@ However, if you were using any of the above, then you need to adjust your code.
 Here are some quick recipes below.
 
 If you were previously passing `session`, then construct an S3 client from the session and pass that instead.
-For example, before::
+For example, before:
 
+.. code-block:: python
     smart_open.open('s3://bucket/key', transport_params={'session': session})
 
-After::
+After:
 
+.. code-block:: python
     smart_open.open('s3://bucket/key', transport_params={'client': session.client('s3')})
 
-
 If you were passing `resource`, then replace the resource with a client, and pass that instead.
-For example, before::
+For example, before:
 
+.. code-block:: python
     resource = session.resource('s3', **resource_kwargs)
     smart_open.open('s3://bucket/key', transport_params={'resource': resource})
 
-After::
+After:
 
+.. code-block:: python
     client = session.client('s3')
     smart_open.open('s3://bucket/key', transport_params={'client': client})
 
@@ -47,18 +50,23 @@ If you were passing any of the `*_kwargs` parameters, you will need to include t
 ========================== ====================================== ==========================
 Parameter name             Resource API method                    Client API function
 ========================== ====================================== ==========================
-`multipart_upload_kwargs`  `s3.Object.initiate_multipart_upload`_ `create_multipart_upload`_
-`object_kwargs`            `s3.Object.get`_                       `get_object`_
-`resource_kwargs`          ???                                    ???
-`singlepart_upload_kwargs` `s3.Object.put`_                       `put_object`_
+`multipart_upload_kwargs`  `s3.Object.initiate_multipart_upload`_ `s3.Client.create_multipart_upload`_
+`object_kwargs`            `s3.Object.get`_                       `s3.Client.get_object`_
+`resource_kwargs`          s3.resource                            `s3.Client`
+`singlepart_upload_kwargs` `s3.Object.put`_                       `s3.Client.put_object`_
 ========================== ====================================== ==========================
+
+Most of the above is self-explanatory, with the exception of `resource_kwargs`.
+These were previously used mostly for passing a custom endpoint URL.
 
 The `client_kwargs` dict can thus contain the following members:
 
-- `s3.Client`: initializer parameters, e.g. those to pass directly to the `boto3.client` function
+- `s3.Client`: initializer parameters, e.g. those to pass directly to the `boto3.client` function, such as `endpoint_url`.
 - `s3.Client.create_multipart_upload`
 - `s3.Client.get_object`
 - `s3.Client.put_object`
+
+See `README <README.rst>`_ and `HOWTO <howto.md>`_ for more examples.
 
 .. _resource_API: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#service-resource
 .. _s3.Object.initiate_multipart_upload: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Object.initiate_multipart_upload
@@ -66,9 +74,9 @@ The `client_kwargs` dict can thus contain the following members:
 .. _s3.Object.put: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.ObjectSummary.put
 
 .. _client_API: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
-.. _create_multipart_upload: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.create_multipart_upload
-.. _get_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.get_object
-.. _get_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.put_object
+.. _s3.Client.create_multipart_upload: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.create_multipart_upload
+.. _s3.Client.get_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.get_object
+.. _s3.Client.put_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.put_object
 
 Migrating to the new dependency management subsystem
 ====================================================
