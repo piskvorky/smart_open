@@ -17,7 +17,8 @@ More specifically, the following S3 transport parameters are no longer supported
 - `session`
 - `singlepart_upload_kwargs`
 
-If you weren't using the above parameters, nothing changes for you.
+**If you weren't using the above parameters, nothing changes for you.**
+
 However, if you were using any of the above, then you need to adjust your code.
 Here are some quick recipes below.
 
@@ -196,4 +197,3 @@ or view the help online `here <https://github.com/RaRe-Technologies/smart_open/b
 
 If you pass an invalid parameter name, the ``smart_open.open`` function will warn you about it.
 Keep an eye on your logs for WARNING messages from ``smart_open``.
-
