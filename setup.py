@@ -58,12 +58,7 @@ setup(
     version=__version__,
     description='Utils for streaming large files (S3, HDFS, GCS, Azure Blob Storage, gzip, bz2...)',
     long_description=read('README.rst'),
-
     packages=find_packages(exclude=["smart_open.tests*"]),
-    package_data={
-        "smart_open.tests": ["test_data/*"],
-    },
-
     author='Radim Rehurek',
     author_email='me@radimrehurek.com',
     maintainer='Radim Rehurek',
