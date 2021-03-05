@@ -1,5 +1,11 @@
 # Unreleased
 
+This release modifies the handling of transport parameters for the S3 back-end in a backwards-incompatible way.
+See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.rst) for details.
+
+- Remove `tests` directory from package (PR [#589](https://github.com/RaRe-Technologies/smart_open/pull/589), [@e-nalepa](https://github.com/e-nalepa))
+- Refactor S3, replace high-level resource/session API with low-level client API (PR [#583](https://github.com/RaRe-Technologies/smart_open/pull/583), [@mpenkov](https://github.com/mpenkov))
+
 # 4.2.0, 15 Feb 2021
 
 - Support tell() for text mode write on s3/gcs/azure (PR [#582](https://github.com/RaRe-Technologies/smart_open/pull/582), [@markopy](https://github.com/markopy))
