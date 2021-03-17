@@ -76,7 +76,7 @@ setup(
     extras_require={
         'test': tests_require,
         's3': aws_deps,
-        'gcp': gcp_deps,
+        'gcs': gcp_deps,
         'azure': azure_deps,
         'all': all_deps,
         'http': http_deps,
