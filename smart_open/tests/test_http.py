@@ -8,6 +8,7 @@
 import os
 import unittest
 
+import pytest
 import responses
 
 import smart_open.http
@@ -150,3 +151,11 @@ class HttpTest(unittest.TestCase):
             fin.seek(-10, whence=smart_open.constants.WHENCE_CURRENT)
             read_bytes_2 = fin.read(size=10)
             self.assertEqual(read_bytes_1, read_bytes_2)
+
+    @responses.activate
+    def test_timeout_attribute(self):
+        timeout = 1
+        responses.add_callback(responses.GET, URL, callback=request_callback)
+        reader = smart_open.open(URL, "rb", transport_params={'timeout': timeout})
+        assert hasattr(reader, 'timeout')
+        assert reader.timeout == timeout
