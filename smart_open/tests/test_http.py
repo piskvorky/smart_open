@@ -8,7 +8,6 @@
 import os
 import unittest
 
-import pytest
 import responses
 
 import smart_open.http
