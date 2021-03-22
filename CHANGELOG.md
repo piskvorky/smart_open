@@ -6,6 +6,7 @@ See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.rst) for details.
 - Remove `tests` directory from package (PR [#589](https://github.com/RaRe-Technologies/smart_open/pull/589), [@e-nalepa](https://github.com/e-nalepa))
 - Refactor S3, replace high-level resource/session API with low-level client API (PR [#583](https://github.com/RaRe-Technologies/smart_open/pull/583), [@mpenkov](https://github.com/mpenkov))
 - Add timeout parameter for http/https (PR [#594](https://github.com/RaRe-Technologies/smart_open/pull/594), [@dustymugs](https://github.com/dustymugs))
+- Fix potential infinite loop when reading from webhdfs (PR [#597](https://github.com/RaRe-Technologies/smart_open/pull/597), [@traboukos](https://github.com/traboukos))
 
 # 4.2.0, 15 Feb 2021
 
