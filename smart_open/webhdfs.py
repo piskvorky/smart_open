@@ -147,7 +147,7 @@ class BufferedInputBase(io.BufferedIOBase):
             total_read = 0
             while total_read < size:
                 raw_data = self._response.raw.read(io.DEFAULT_BUFFER_SIZE)
-                # some times read returns 0 length data without throwing a 
+                # some times read returns 0 length data without throwing a
                 # StopIteration exception. We break here if this happens.
                 if len(raw_data) == 0:
                     break
