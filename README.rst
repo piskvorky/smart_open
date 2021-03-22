@@ -115,7 +115,7 @@ By default, ``smart_open`` does not install any dependencies, in order to keep t
 You can install these dependencies explicitly using::
 
     pip install smart_open[azure] # Install Azure deps
-    pip install smart_open[gcp] # Install GCP deps
+    pip install smart_open[gcs] # Install GCS deps
     pip install smart_open[s3] # Install S3 deps
 
 Or, if you don't mind installing a large number of third party libraries, you can install all dependencies using::
