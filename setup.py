@@ -36,11 +36,11 @@ def read(fname):
     return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
 
 aws_deps = ['boto3']
-gcp_deps = ['google-cloud-storage']
+gcs_deps = ['google-cloud-storage']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 http_deps = ['requests']
 
-all_deps = aws_deps + gcp_deps + azure_deps + http_deps
+all_deps = aws_deps + gcs_deps + azure_deps + http_deps
 tests_require = all_deps + [
     'mock',
     'moto[server]==1.3.14',  # Older versions of moto appear broken
@@ -58,12 +58,7 @@ setup(
     version=__version__,
     description='Utils for streaming large files (S3, HDFS, GCS, Azure Blob Storage, gzip, bz2...)',
     long_description=read('README.rst'),
-
-    packages=find_packages(),
-    package_data={
-        "smart_open.tests": ["test_data/*"],
-    },
-
+    packages=find_packages(exclude=["smart_open.tests*"]),
     author='Radim Rehurek',
     author_email='me@radimrehurek.com',
     maintainer='Radim Rehurek',
@@ -81,7 +76,7 @@ setup(
     extras_require={
         'test': tests_require,
         's3': aws_deps,
-        'gcp': gcp_deps,
+        'gcs': gcs_deps,
         'azure': azure_deps,
         'all': all_deps,
         'http': http_deps,

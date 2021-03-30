@@ -115,7 +115,7 @@ By default, ``smart_open`` does not install any dependencies, in order to keep t
 You can install these dependencies explicitly using::
 
     pip install smart_open[azure] # Install Azure deps
-    pip install smart_open[gcp] # Install GCP deps
+    pip install smart_open[gcs] # Install GCS deps
     pip install smart_open[s3] # Install S3 deps
 
 Or, if you don't mind installing a large number of third party libraries, you can install all dependencies using::
@@ -154,7 +154,7 @@ For the sake of simplicity, the examples below assume you have all the dependenc
     ...     aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
     ... )
     >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-    >>> with open(url, 'wb', transport_params={'session': session}) as fout:
+    >>> with open(url, 'wb', transport_params={'client': session.client('s3')}) as fout:
     ...     bytes_written = fout.write(b'hello world!')
     ...     print(bytes_written)
     12
@@ -182,12 +182,9 @@ For the sake of simplicity, the examples below assume you have all the dependenc
         print(line)
 
     # Stream to Digital Ocean Spaces bucket providing credentials from boto3 profile
-    transport_params = {
-        'session': boto3.Session(profile_name='digitalocean'),
-        'resource_kwargs': {
-            'endpoint_url': 'https://ams3.digitaloceanspaces.com',
-        }
-    }
+    session = boto3.Session(profile_name='digitalocean')
+    client = session.client('s3', endpoint_url='https://ams3.digitaloceanspaces.com')
+    transport_params = {'client': client}
     with open('s3://bucket/key.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'here we stand')
 
@@ -202,7 +199,7 @@ For the sake of simplicity, the examples below assume you have all the dependenc
     # stream from Azure Blob Storage
     connect_str = os.environ['AZURE_STORAGE_CONNECTION_STRING']
     transport_params = {
-        client: azure.storage.blob.BlobServiceClient.from_connection_string(connect_str)
+        'client': azure.storage.blob.BlobServiceClient.from_connection_string(connect_str),
     }
     for line in open('azure://mycontainer/myfile.txt', transport_params=transport_params):
         print(line)
@@ -210,7 +207,7 @@ For the sake of simplicity, the examples below assume you have all the dependenc
     # stream content *into* Azure Blob Storage (write mode):
     connect_str = os.environ['AZURE_STORAGE_CONNECTION_STRING']
     transport_params = {
-        client: azure.storage.blob.BlobServiceClient.from_connection_string(connect_str)
+        'client': azure.storage.blob.BlobServiceClient.from_connection_string(connect_str),
     }
     with open('azure://mycontainer/my_file.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'hello world')
@@ -264,7 +261,7 @@ Here are some examples of using this parameter:
 .. code-block:: python
 
   >>> import boto3
-  >>> fin = open('s3://commoncrawl/robots.txt', transport_params=dict(session=boto3.Session()))
+  >>> fin = open('s3://commoncrawl/robots.txt', transport_params=dict(client=boto3.client('s3')))
   >>> fin = open('s3://commoncrawl/robots.txt', transport_params=dict(buffer_size=1024))
 
 For the full list of keyword arguments supported by each transport option, see the documentation:
@@ -281,8 +278,8 @@ S3 Credentials
 By default, ``smart_open`` will defer to ``boto3`` and let the latter take care of the credentials.
 There are several ways to override this behavior.
 
-The first is to pass a ``boto3.Session`` object as a transport parameter to the ``open`` function.
-You can customize the credentials when constructing the session.
+The first is to pass a ``boto3.Client`` object as a transport parameter to the ``open`` function.
+You can customize the credentials when constructing the session for the client.
 ``smart_open`` will then use the session when talking to S3.
 
 .. code-block:: python
@@ -292,7 +289,8 @@ You can customize the credentials when constructing the session.
         aws_secret_access_key=SECRET_KEY,
         aws_session_token=SESSION_TOKEN,
     )
-    fin = open('s3://bucket/key', transport_params=dict(session=session), ...)
+    client = session.client('s3', endpoint_url=..., config=...)
+    fin = open('s3://bucket/key', transport_params=dict(client=client))
 
 Your second option is to specify the credentials within the S3 URL itself:
 
@@ -300,7 +298,7 @@ Your second option is to specify the credentials within the S3 URL itself:
 
     fin = open('s3://aws_access_key_id:aws_secret_access_key@bucket/key', ...)
 
-*Important*: The two methods above are **mutually exclusive**. If you pass an AWS session *and* the URL contains credentials, ``smart_open`` will ignore the latter.
+*Important*: The two methods above are **mutually exclusive**. If you pass an AWS client *and* the URL contains credentials, ``smart_open`` will ignore the latter.
 
 *Important*: ``smart_open`` ignores configuration files from the older ``boto`` library.
 Port your old ``boto`` settings to ``boto3`` in order to use them with ``smart_open``.

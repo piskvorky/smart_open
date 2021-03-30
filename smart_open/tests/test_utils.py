@@ -20,3 +20,11 @@ class ClampTest(unittest.TestCase):
 
     def test_out_of_range(self):
         self.assertEqual(smart_open.utils.clamp(-1, 0, 10), 0)
+
+
+def test_check_kwargs():
+    import smart_open.s3
+    kallable = smart_open.s3.open
+    kwargs = {'client': 'foo', 'unsupported': 'bar', 'client_kwargs': 'boaz'}
+    supported = smart_open.utils.check_kwargs(kallable, kwargs)
+    assert supported == {'client': 'foo', 'client_kwargs': 'boaz'}

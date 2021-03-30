@@ -2,7 +2,3 @@ include LICENSE
 include README.rst
 include MIGRATING_FROM_OLDER_VERSIONS.rst
 include CHANGELOG.md
-recursive-include sampledata *.zip
-recursive-include smart_open/tests/test_data *.txt *.xz *.gz
-include integration-tests/README.md integration-tests/*.txt
-recursive-include integration-tests *.py

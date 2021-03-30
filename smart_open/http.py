@@ -49,7 +49,7 @@ def open_uri(uri, mode, transport_params):
     return open(uri, mode, **kwargs)
 
 
-def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
+def open(uri, mode, kerberos=False, user=None, password=None, headers=None, timeout=None):
     """Implement streamed reader from a web site.
 
     Supports Kerberos and Basic HTTP authentication.
@@ -80,7 +80,7 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
     if mode == constants.READ_BINARY:
         fobj = SeekableBufferedInputBase(
             uri, mode, kerberos=kerberos,
-            user=user, password=password, headers=headers
+            user=user, password=password, headers=headers, timeout=timeout,
         )
         fobj.name = os.path.basename(urllib.parse.urlparse(uri).path)
         return fobj
@@ -90,7 +90,7 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None):
 
 class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, user=None, password=None, headers=None):
+                 kerberos=False, user=None, password=None, headers=None, timeout=None):
         if kerberos:
             import requests_kerberos
             auth = requests_kerberos.HTTPKerberosAuth()
@@ -107,7 +107,15 @@ class BufferedInputBase(io.BufferedIOBase):
         else:
             self.headers = headers
 
-        self.response = requests.get(url, auth=auth, stream=True, headers=self.headers)
+        self.timeout = timeout
+
+        self.response = requests.get(
+            url,
+            auth=auth,
+            stream=True,
+            headers=self.headers,
+            timeout=self.timeout,
+        )
 
         if not self.response.ok:
             self.response.raise_for_status()
@@ -200,7 +208,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
     """
 
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, user=None, password=None, headers=None):
+                 kerberos=False, user=None, password=None, headers=None, timeout=None):
         """
         If Kerberos is True, will attempt to use the local Kerberos credentials.
         Otherwise, will try to use "basic" HTTP authentication via username/password.
@@ -221,6 +229,8 @@ class SeekableBufferedInputBase(BufferedInputBase):
             self.headers = _HEADERS.copy()
         else:
             self.headers = headers
+
+        self.timeout = timeout
 
         self.buffer_size = buffer_size
         self.mode = mode
@@ -307,5 +317,11 @@ class SeekableBufferedInputBase(BufferedInputBase):
         if start_pos is not None:
             self.headers.update({"range": smart_open.utils.make_range_string(start_pos)})
 
-        response = requests.get(self.url, auth=self.auth, stream=True, headers=self.headers)
+        response = requests.get(
+            self.url,
+            auth=self.auth,
+            stream=True,
+            headers=self.headers,
+            timeout=self.timeout,
+        )
         return response

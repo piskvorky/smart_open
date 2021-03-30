@@ -1,3 +1,108 @@
+Migrating to the new client-based S3 API
+========================================
+
+Version of smart_open prior to 5.0.0 used the boto3 `resource API`_ for communicating with S3.
+This API was easy to integrate for smart_open developers, but this came at a cost: it was not thread- or multiprocess-safe.
+Furthermore, as smart_open supported more and more options, the transport parameter list grew, making it less maintainable.
+
+Starting with version 5.0.0, smart_open uses the `client API`_ instead of the resource API.
+Functionally, very little changes for the smart_open user. 
+The only difference is in passing transport parameters to the S3 backend.
+
+More specifically, the following S3 transport parameters are no longer supported:
+
+- `multipart_upload_kwargs`
+- `object_kwargs`
+- `resource`
+- `resource_kwargs`
+- `session`
+- `singlepart_upload_kwargs`
+
+**If you weren't using the above parameters, nothing changes for you.**
+
+However, if you were using any of the above, then you need to adjust your code.
+Here are some quick recipes below.
+
+If you were previously passing `session`, then construct an S3 client from the session and pass that instead.
+For example, before:
+
+.. code-block:: python
+
+    smart_open.open('s3://bucket/key', transport_params={'session': session})
+
+After:
+
+.. code-block:: python
+
+    smart_open.open('s3://bucket/key', transport_params={'client': session.client('s3')})
+
+If you were passing `resource`, then replace the resource with a client, and pass that instead.
+For example, before:
+
+.. code-block:: python
+
+    resource = session.resource('s3', **resource_kwargs)
+    smart_open.open('s3://bucket/key', transport_params={'resource': resource})
+
+After:
+
+.. code-block:: python
+
+    client = session.client('s3')
+    smart_open.open('s3://bucket/key', transport_params={'client': client})
+
+If you were passing any of the `*_kwargs` parameters, you will need to include them in `client_kwargs`, keeping in mind the following transformations.
+
+========================== ====================================== ==========================
+Parameter name             Resource API method                    Client API function
+========================== ====================================== ==========================
+`multipart_upload_kwargs`  `s3.Object.initiate_multipart_upload`_ `s3.Client.create_multipart_upload`_
+`object_kwargs`            `s3.Object.get`_                       `s3.Client.get_object`_
+`resource_kwargs`          s3.resource                            `s3.client`_
+`singlepart_upload_kwargs` `s3.Object.put`_                       `s3.Client.put_object`_
+========================== ====================================== ==========================
+
+Most of the above is self-explanatory, with the exception of `resource_kwargs`.
+These were previously used mostly for passing a custom endpoint URL.
+
+The `client_kwargs` dict can thus contain the following members:
+
+- `s3.Client`: initializer parameters, e.g. those to pass directly to the `boto3.client` function, such as `endpoint_url`.
+- `s3.Client.create_multipart_upload`
+- `s3.Client.get_object`
+- `s3.Client.put_object`
+
+Here's a before-and-after example for connecting to a custom endpoint.  Before:
+
+.. code-block:: python
+
+    session = boto3.Session(profile_name='digitalocean')
+    resource_kwargs = {'endpoint_url': 'https://ams3.digitaloceanspaces.com'}
+    with open('s3://bucket/key.txt', 'wb', transport_params={'resource_kwarg': resource_kwargs}) as fout:
+        fout.write(b'here we stand')
+
+After:
+
+.. code-block:: python
+
+    session = boto3.Session(profile_name='digitalocean')
+    client = session.client('s3', endpoint_url='https://ams3.digitaloceanspaces.com')
+    with open('s3://bucket/key.txt', 'wb', transport_params={'client': client}) as fout:
+        fout.write(b'here we stand')
+
+See `README <README.rst>`_ and `HOWTO <howto.md>`_ for more examples.
+
+.. _resource API: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#service-resource
+.. _s3.Object.initiate_multipart_upload: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Object.initiate_multipart_upload
+.. _s3.Object.get: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.ObjectSummary.get
+.. _s3.Object.put: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.ObjectSummary.put
+
+.. _client API: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
+.. _s3.Client: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
+.. _s3.Client.create_multipart_upload: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.create_multipart_upload
+.. _s3.Client.get_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.get_object
+.. _s3.Client.put_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.put_object
+
 Migrating to the new dependency management subsystem
 ====================================================
 
@@ -111,4 +216,3 @@ or view the help online `here <https://github.com/RaRe-Technologies/smart_open/b
 
 If you pass an invalid parameter name, the ``smart_open.open`` function will warn you about it.
 Keep an eye on your logs for WARNING messages from ``smart_open``.
-
