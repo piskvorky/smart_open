@@ -1,12 +1,14 @@
 # Unreleased
 
+# 5.0.0, 30 Mar 2021
+
 This release modifies the handling of transport parameters for the S3 back-end in a backwards-incompatible way.
 See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.rst) for details.
 
-- Remove `tests` directory from package (PR [#589](https://github.com/RaRe-Technologies/smart_open/pull/589), [@e-nalepa](https://github.com/e-nalepa))
 - Refactor S3, replace high-level resource/session API with low-level client API (PR [#583](https://github.com/RaRe-Technologies/smart_open/pull/583), [@mpenkov](https://github.com/mpenkov))
-- Add timeout parameter for http/https (PR [#594](https://github.com/RaRe-Technologies/smart_open/pull/594), [@dustymugs](https://github.com/dustymugs))
 - Fix potential infinite loop when reading from webhdfs (PR [#597](https://github.com/RaRe-Technologies/smart_open/pull/597), [@traboukos](https://github.com/traboukos))
+- Add timeout parameter for http/https (PR [#594](https://github.com/RaRe-Technologies/smart_open/pull/594), [@dustymugs](https://github.com/dustymugs))
+- Remove `tests` directory from package (PR [#589](https://github.com/RaRe-Technologies/smart_open/pull/589), [@e-nalepa](https://github.com/e-nalepa))
 
 # 4.2.0, 15 Feb 2021
 
