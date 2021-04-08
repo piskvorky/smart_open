@@ -101,3 +101,4 @@ def compression_wrapper(file_obj, mode, filename=None):
 #
 register_compressor('.bz2', _handle_bz2)
 register_compressor('.gz', _handle_gzip)
+register_compressor('.gzip', _handle_gzip)
