@@ -107,6 +107,7 @@ def open(
         closefd=True,
         opener=None,
         ignore_ext=False,
+        override_ext=None,
         transport_params=None,
         ):
     r"""Open the URI object, returning a file-like object.
@@ -139,6 +140,8 @@ def open(
         Mimicks built-in open parameter of the same name.  Ignored.
     ignore_ext: boolean, optional
         Disable transparent compression/decompression based on the file extension.
+    override_ext: str, optional
+        Force transparent compression/decompression on files based on supplied extension.
     transport_params: dict, optional
         Additional parameters for the transport layer (see notes below).
 
@@ -221,6 +224,8 @@ def open(
     binary = _open_binary_stream(uri, binary_mode, transport_params)
     if ignore_ext:
         decompressed = binary
+    elif override_ext:
+        decompressed = compression.compression_wrapper(binary, binary_mode, filename=binary.name + override_ext)
     else:
         decompressed = compression.compression_wrapper(binary, binary_mode)
 

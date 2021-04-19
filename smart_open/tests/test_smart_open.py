@@ -1679,6 +1679,30 @@ class S3OpenTest(unittest.TestCase):
             self.assertEqual(fin.read().decode("utf-8"), text)
 
     @mock_s3
+    def test_rw_gzip_override(self):
+        """Should read/write gzip files on extension override, implicitly and explicitly."""
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
+        key = "s3://bucket/key"
+
+        text = u"не слышны в саду даже шорохи"
+        with smart_open.open(key, "wb", override_ext=".gz") as fout:
+            fout.write(text.encode("utf-8"))
+
+        #
+        # Check that what we've created is a gzip.
+        #
+        with smart_open.open(key, "rb", ignore_ext=True) as fin:
+            gz = gzip.GzipFile(fileobj=fin)
+            self.assertEqual(gz.read().decode("utf-8"), text)
+
+        #
+        # We should be able to read it back as well.
+        #
+        with smart_open.open(key, "rb", override_ext=".gz") as fin:
+            self.assertEqual(fin.read().decode("utf-8"), text)
+
+    @mock_s3
     @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_write_mode(self):
         """Should always open in binary mode when writing through a codec."""
