@@ -175,7 +175,11 @@ def open(
         raise ValueError('can not simultaneously define and disable compression')
 
     if not compression:
-        compression = so_compression.NO_COMPRESSION if ignore_ext else so_compression.INFER_FROM_EXTENSION
+        if ignore_ext:
+            compression = so_compression.NO_COMPRESSION
+            warnings.warn("'ignore_ext' will be deprecated in a future release", PendingDeprecationWarning)
+        else:
+            compression = so_compression.INFER_FROM_EXTENSION
 
     if compression not in so_compression.get_supported_compression_types():
         raise ValueError(f'invalid compression type: {compression}')
