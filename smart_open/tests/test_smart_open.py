@@ -14,6 +14,7 @@ import gzip
 import hashlib
 import logging
 import os
+from smart_open.compression import INFER_FROM_EXTENSION, NO_COMPRESSION
 import tempfile
 import unittest
 import warnings
@@ -1678,6 +1679,7 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.open(key, "rb") as fin:
             self.assertEqual(fin.read().decode("utf-8"), text)
 
+
     @mock_s3
     @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_write_mode(self):
@@ -1838,6 +1840,115 @@ class CheckKwargsTest(unittest.TestCase):
         expected = {'foo': 123}
         actual = smart_open.smart_open_lib._check_kwargs(function, kwargs)
         self.assertEqual(expected, actual)
+
+
+class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
+    # compression | ignore_ext | behavior |
+    # ----------- | ---------- | -------- |
+    # 'gz'        | False      | Override |
+    # 'bz2'       | False      | Override |
+    @parameterizedtestcase.ParameterizedTestCase.parameterize(
+        ('_compression', 'decompressor'),
+        [
+            ('gz', lambda fileobj: gzip.GzipFile(fileobj=fileobj)),
+            ('bz2', lambda fileobj: bz2.BZ2File(fileobj))
+        ]
+    )
+    @mock_s3
+    def test_rw_compression_prescribed(self, _compression, decompressor):
+        """Should read/write files with `_compression`, as prescribed."""
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
+        key = "s3://bucket/key.txt"
+
+        text = u"не слышны в саду даже шорохи"
+        with smart_open.open(key, "wb", compression=_compression) as fout:
+            fout.write(text.encode("utf-8"))
+
+        #
+        # Check that what we've created is of type `_compression`.
+        #
+        with smart_open.open(key, "rb", compression=NO_COMPRESSION) as fin:
+            dfin = decompressor(fin)
+            self.assertEqual(dfin.read().decode("utf-8"), text)
+
+        #
+        # We should be able to read it back as well.
+        #
+        with smart_open.open(key, "rb", compression=_compression) as fin:
+            self.assertEqual(fin.read().decode("utf-8"), text)
+
+    # compression | ignore_ext | behavior |
+    # ----------- | ---------- | -------- |
+    # 'extension' | False      | Enable   |
+    # 'none'      | False      | Disable  |
+    # None        | False      | Enable   |
+    # None        | True       | Disable  |
+    @parameterizedtestcase.ParameterizedTestCase.parameterize(
+        ('_compression', 'decompressor', 'compression_kwargs', 'no_compression_kwargs'),
+        [
+            ('gz', lambda fileobj: gzip.GzipFile(fileobj=fileobj), dict(compression=INFER_FROM_EXTENSION), dict(compression=NO_COMPRESSION)),
+            ('bz2', lambda fileobj: bz2.BZ2File(fileobj), dict(compression=INFER_FROM_EXTENSION), dict(compression=NO_COMPRESSION)),
+            ('gz', lambda fileobj: gzip.GzipFile(fileobj=fileobj), dict(), dict(ignore_ext=True)),
+            ('bz2', lambda fileobj: bz2.BZ2File(fileobj), dict(), dict(ignore_ext=True))
+        ]
+    )
+    @mock_s3
+    def test_rw_compression_by_extension(self, _compression, decompressor, compression_kwargs, no_compression_kwargs):
+        """Should read/write files with `_compression`, explicitily or implicitly inferred by file extension."""
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
+        key = f"s3://bucket/key.{_compression}"
+
+        text = u"не слышны в саду даже шорохи"
+        with smart_open.open(key, "wb", **compression_kwargs) as fout:
+            fout.write(text.encode("utf-8"))
+
+        #
+        # Check that what we've created is of type `_compression`.
+        #
+        with smart_open.open(key, "rb", **no_compression_kwargs) as fin:
+            dfin = decompressor(fin)
+            self.assertEqual(dfin.read().decode("utf-8"), text)
+
+        #
+        # We should be able to read it back as well.
+        #
+        with smart_open.open(key, "rb", **compression_kwargs) as fin:
+            self.assertEqual(fin.read().decode("utf-8"), text)
+
+    # extension | compression | ignore_ext | behavior |
+    # ----------| ----------- | ---------- | -------- |
+    # <any>     | <invalid>   | <any>      | Error    |
+    # <any>     | 'none'      | True       | Error    |
+    # 'gz'      | 'extension' | True       | Error    |
+    # 'bz2'     | 'extension' | True       | Error    |
+    # <any>     | 'gz'        | True       | Error    |
+    # <any>     | 'bz2'       | True       | Error    |
+    @parameterizedtestcase.ParameterizedTestCase.parameterize(
+        ('extension', 'kwargs', 'error'),
+        [
+            ('', dict(compression="foo"), ValueError),
+            ('', dict(compression="foo", ignore_ext=True), ValueError),
+            ('', dict(compression=NO_COMPRESSION, ignore_ext=True), ValueError),
+            ('.gz', dict(compression=INFER_FROM_EXTENSION, ignore_ext=True), ValueError),
+            ('.bz2', dict(compression=INFER_FROM_EXTENSION, ignore_ext=True), ValueError),
+            ('', dict(compression='gz', ignore_ext=True), ValueError),
+            ('', dict(compression='bz2', ignore_ext=True), ValueError),
+        ]
+    )
+    @mock_s3
+    def test_compression_invalid(self, extension, kwargs, error):
+        """Should detect and error on these invalid inputs"""
+        s3 = boto3.resource('s3')
+        s3.create_bucket(Bucket='bucket')
+        key = f"s3://bucket/key{extension}"
+
+        with pytest.raises(error):
+            smart_open.open(key, "wb", **kwargs)
+
+        with pytest.raises(error):
+            smart_open.open(key, "rb", **kwargs)
 
 
 class GetBinaryModeTest(parameterizedtestcase.ParameterizedTestCase):

@@ -15,6 +15,14 @@ logger = logging.getLogger(__name__)
 _COMPRESSOR_REGISTRY = {}
 
 
+NO_COMPRESSION = 'none'
+INFER_FROM_EXTENSION = 'extension'
+
+
+def get_supported_compression_types():
+    return [NO_COMPRESSION, INFER_FROM_EXTENSION] + [ext[1:] for ext in get_supported_extensions()]
+
+
 def get_supported_extensions():
     """Return the list of file extensions for which we have registered compressors."""
     return sorted(_COMPRESSOR_REGISTRY.keys())
