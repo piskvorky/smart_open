@@ -1679,7 +1679,6 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.open(key, "rb") as fin:
             self.assertEqual(fin.read().decode("utf-8"), text)
 
-
     @mock_s3
     @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_write_mode(self):
@@ -1848,20 +1847,20 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     # 'gz'        | False      | Override |
     # 'bz2'       | False      | Override |
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ('_compression', 'decompressor'),
+        ("_compression", "decompressor"),
         [
-            ('gz', lambda fileobj: gzip.GzipFile(fileobj=fileobj)),
-            ('bz2', lambda fileobj: bz2.BZ2File(fileobj))
-        ]
+            ("gz", lambda fileobj: gzip.GzipFile(fileobj=fileobj)),
+            ("bz2", lambda fileobj: bz2.BZ2File(fileobj)),
+        ],
     )
     @mock_s3
     def test_rw_compression_prescribed(self, _compression, decompressor):
         """Should read/write files with `_compression`, as prescribed."""
-        s3 = boto3.resource('s3')
-        s3.create_bucket(Bucket='bucket')
+        s3 = boto3.resource("s3")
+        s3.create_bucket(Bucket="bucket")
         key = "s3://bucket/key.txt"
 
-        text = u"не слышны в саду даже шорохи"
+        text = "не слышны в саду даже шорохи"
         with smart_open.open(key, "wb", compression=_compression) as fout:
             fout.write(text.encode("utf-8"))
 
@@ -1885,22 +1884,45 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     # None        | False      | Enable   |
     # None        | True       | Disable  |
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ('_compression', 'decompressor', 'compression_kwargs', 'no_compression_kwargs'),
+        ("_compression", "decompressor", "compression_kwargs", "no_compression_kwargs"),
         [
-            ('gz', lambda fileobj: gzip.GzipFile(fileobj=fileobj), dict(compression=INFER_FROM_EXTENSION), dict(compression=NO_COMPRESSION)),
-            ('bz2', lambda fileobj: bz2.BZ2File(fileobj), dict(compression=INFER_FROM_EXTENSION), dict(compression=NO_COMPRESSION)),
-            ('gz', lambda fileobj: gzip.GzipFile(fileobj=fileobj), dict(), dict(ignore_ext=True)),
-            ('bz2', lambda fileobj: bz2.BZ2File(fileobj), dict(), dict(ignore_ext=True))
-        ]
+            (
+                "gz",
+                lambda fileobj: gzip.GzipFile(fileobj=fileobj),
+                dict(compression=INFER_FROM_EXTENSION),
+                dict(compression=NO_COMPRESSION),
+            ),
+            (
+                "bz2",
+                lambda fileobj: bz2.BZ2File(fileobj),
+                dict(compression=INFER_FROM_EXTENSION),
+                dict(compression=NO_COMPRESSION),
+            ),
+            (
+                "gz",
+                lambda fileobj: gzip.GzipFile(fileobj=fileobj),
+                dict(),
+                dict(ignore_ext=True),
+            ),
+            (
+                "bz2",
+                lambda fileobj: bz2.BZ2File(fileobj),
+                dict(),
+                dict(ignore_ext=True),
+            ),
+        ],
     )
     @mock_s3
-    def test_rw_compression_by_extension(self, _compression, decompressor, compression_kwargs, no_compression_kwargs):
-        """Should read/write files with `_compression`, explicitily or implicitly inferred by file extension."""
-        s3 = boto3.resource('s3')
-        s3.create_bucket(Bucket='bucket')
+    def test_rw_compression_by_extension(
+        self, _compression, decompressor, compression_kwargs, no_compression_kwargs
+    ):
+        """Should read/write files with `_compression`, explicitily or implicitly
+        inferred by file extension."""
+        s3 = boto3.resource("s3")
+        s3.create_bucket(Bucket="bucket")
         key = f"s3://bucket/key.{_compression}"
 
-        text = u"не слышны в саду даже шорохи"
+        text = "не слышны в саду даже шорохи"
         with smart_open.open(key, "wb", **compression_kwargs) as fout:
             fout.write(text.encode("utf-8"))
 
@@ -1926,22 +1948,30 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     # <any>     | 'gz'        | True       | Error    |
     # <any>     | 'bz2'       | True       | Error    |
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ('extension', 'kwargs', 'error'),
+        ("extension", "kwargs", "error"),
         [
-            ('', dict(compression="foo"), ValueError),
-            ('', dict(compression="foo", ignore_ext=True), ValueError),
-            ('', dict(compression=NO_COMPRESSION, ignore_ext=True), ValueError),
-            ('.gz', dict(compression=INFER_FROM_EXTENSION, ignore_ext=True), ValueError),
-            ('.bz2', dict(compression=INFER_FROM_EXTENSION, ignore_ext=True), ValueError),
-            ('', dict(compression='gz', ignore_ext=True), ValueError),
-            ('', dict(compression='bz2', ignore_ext=True), ValueError),
-        ]
+            ("", dict(compression="foo"), ValueError),
+            ("", dict(compression="foo", ignore_ext=True), ValueError),
+            ("", dict(compression=NO_COMPRESSION, ignore_ext=True), ValueError),
+            (
+                ".gz",
+                dict(compression=INFER_FROM_EXTENSION, ignore_ext=True),
+                ValueError,
+            ),
+            (
+                ".bz2",
+                dict(compression=INFER_FROM_EXTENSION, ignore_ext=True),
+                ValueError,
+            ),
+            ("", dict(compression="gz", ignore_ext=True), ValueError),
+            ("", dict(compression="bz2", ignore_ext=True), ValueError),
+        ],
     )
     @mock_s3
     def test_compression_invalid(self, extension, kwargs, error):
         """Should detect and error on these invalid inputs"""
-        s3 = boto3.resource('s3')
-        s3.create_bucket(Bucket='bucket')
+        s3 = boto3.resource("s3")
+        s3.create_bucket(Bucket="bucket")
         key = f"s3://bucket/key{extension}"
 
         with pytest.raises(error):
