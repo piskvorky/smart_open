@@ -154,7 +154,7 @@ For the sake of simplicity, the examples below assume you have all the dependenc
     ...     aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
     ... )
     >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-    >>> with open(url, 'wb', transport_params={'client': session.client('s3')}) as fout:
+    >>> with open(url, 'wb', transport_params={'session': session}) as fout:
     ...     bytes_written = fout.write(b'hello world!')
     ...     print(bytes_written)
     12
