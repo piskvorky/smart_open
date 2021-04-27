@@ -56,10 +56,10 @@ If you were passing any of the `*_kwargs` parameters, you will need to include t
 ========================== ====================================== ==========================
 Parameter name             Resource API method                    Client API function
 ========================== ====================================== ==========================
-`multipart_upload_kwargs`  `s3.Object.initiate_multipart_upload`_ `s3.Client.create_multipart_upload`_
-`object_kwargs`            `s3.Object.get`_                       `s3.Client.get_object`_
-`resource_kwargs`          s3.resource                            `s3.client`_
-`singlepart_upload_kwargs` `s3.Object.put`_                       `s3.Client.put_object`_
+`multipart_upload_kwargs`  `S3.Object.initiate_multipart_upload`_ `S3.Client.create_multipart_upload`_
+`object_kwargs`            `S3.Object.get`_                       `S3.Client.get_object`_
+`resource_kwargs`          S3.resource                            `S3.client`_
+`singlepart_upload_kwargs` `S3.Object.put`_                       `S3.Client.put_object`_
 ========================== ====================================== ==========================
 
 Most of the above is self-explanatory, with the exception of `resource_kwargs`.
@@ -67,10 +67,10 @@ These were previously used mostly for passing a custom endpoint URL.
 
 The `client_kwargs` dict can thus contain the following members:
 
-- `s3.Client`: initializer parameters, e.g. those to pass directly to the `boto3.client` function, such as `endpoint_url`.
-- `s3.Client.create_multipart_upload`
-- `s3.Client.get_object`
-- `s3.Client.put_object`
+- `S3.Client`: initializer parameters, e.g. those to pass directly to the `boto3.client` function, such as `endpoint_url`.
+- `S3.Client.create_multipart_upload`
+- `S3.Client.get_object`
+- `S3.Client.put_object`
 
 Here's a before-and-after example for connecting to a custom endpoint.  Before:
 
@@ -93,15 +93,15 @@ After:
 See `README <README.rst>`_ and `HOWTO <howto.md>`_ for more examples.
 
 .. _resource API: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#service-resource
-.. _s3.Object.initiate_multipart_upload: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Object.initiate_multipart_upload
-.. _s3.Object.get: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.ObjectSummary.get
-.. _s3.Object.put: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.ObjectSummary.put
+.. _S3.Object.initiate_multipart_upload: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Object.initiate_multipart_upload
+.. _S3.Object.get: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.ObjectSummary.get
+.. _S3.Object.put: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.ObjectSummary.put
 
 .. _client API: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
-.. _s3.Client: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
-.. _s3.Client.create_multipart_upload: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.create_multipart_upload
-.. _s3.Client.get_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.get_object
-.. _s3.Client.put_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.put_object
+.. _S3.Client: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#client
+.. _S3.Client.create_multipart_upload: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.create_multipart_upload
+.. _S3.Client.get_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.get_object
+.. _S3.Client.put_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.put_object
 
 Migrating to the new dependency management subsystem
 ====================================================
