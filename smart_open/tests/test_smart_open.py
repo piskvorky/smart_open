@@ -1841,6 +1841,7 @@ class CheckKwargsTest(unittest.TestCase):
         self.assertEqual(expected, actual)
 
 
+_RAW_DATA = "не слышны в саду даже шорохи".encode("utf-8")
 class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     # compression | ignore_ext | behavior |
     # ----------- | ---------- | -------- |
@@ -1849,8 +1850,8 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
         ("_compression", "decompressor"),
         [
-            ("gz", lambda fileobj: gzip.GzipFile(fileobj=fileobj)),
-            ("bz2", lambda fileobj: bz2.BZ2File(fileobj)),
+            ("gz", gzip.decompress),
+            ("bz2", bz2.decompress),
         ],
     )
     @mock_s3
@@ -1860,22 +1861,21 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         s3.create_bucket(Bucket="bucket").wait_until_exists()
         key = "s3://bucket/key.txt"
 
-        data = "не слышны в саду даже шорохи".encode("utf-8")
         with smart_open.open(key, "wb", compression=_compression) as fout:
-            fout.write(data)
+            fout.write(_RAW_DATA)
 
         #
-        # Check that what we've created is of type `_compression`.
+        # Check that what we've created is compressed as expected.
         #
         with smart_open.open(key, "rb", compression=NO_COMPRESSION) as fin:
-            dfin = decompressor(fin)
-            self.assertEqual(dfin.read(), data)
+            data = decompressor(fin.read())
+            self.assertEqual(data, _RAW_DATA)
 
         #
         # We should be able to read it back as well.
         #
         with smart_open.open(key, "rb", compression=_compression) as fin:
-            self.assertEqual(fin.read(), data)
+            self.assertEqual(fin.read(), _RAW_DATA)
 
     # compression | ignore_ext | behavior |
     # ----------- | ---------- | -------- |
@@ -1888,25 +1888,25 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         [
             (
                 "gz",
-                lambda fileobj: gzip.GzipFile(fileobj=fileobj),
+                gzip.decompress,
                 dict(compression=INFER_FROM_EXTENSION),
                 dict(compression=NO_COMPRESSION),
             ),
             (
                 "bz2",
-                lambda fileobj: bz2.BZ2File(fileobj),
+                bz2.decompress,
                 dict(compression=INFER_FROM_EXTENSION),
                 dict(compression=NO_COMPRESSION),
             ),
             (
                 "gz",
-                lambda fileobj: gzip.GzipFile(fileobj=fileobj),
+                gzip.decompress,
                 dict(),
                 dict(ignore_ext=True),
             ),
             (
                 "bz2",
-                lambda fileobj: bz2.BZ2File(fileobj),
+                bz2.decompress,
                 dict(),
                 dict(ignore_ext=True),
             ),
@@ -1922,22 +1922,21 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         s3.create_bucket(Bucket="bucket")
         key = f"s3://bucket/key.{_compression}"
 
-        data = "не слышны в саду даже шорохи".encode("utf-8")
         with smart_open.open(key, "wb", **compression_kwargs) as fout:
-            fout.write(data)
+            fout.write(_RAW_DATA)
 
         #
-        # Check that what we've created is of type `_compression`.
+        # Check that what we've created is compressed as expected.
         #
         with smart_open.open(key, "rb", **no_compression_kwargs) as fin:
-            dfin = decompressor(fin)
-            self.assertEqual(dfin.read(), data)
+            data = decompressor(fin.read())
+            self.assertEqual(data, _RAW_DATA)
 
         #
         # We should be able to read it back as well.
         #
         with smart_open.open(key, "rb", **compression_kwargs) as fin:
-            self.assertEqual(fin.read(), data)
+            self.assertEqual(fin.read(), _RAW_DATA)
 
     # extension | compression | ignore_ext | behavior |
     # ----------| ----------- | ---------- | -------- |
