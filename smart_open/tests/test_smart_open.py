@@ -1860,22 +1860,22 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         s3.create_bucket(Bucket="bucket").wait_until_exists()
         key = "s3://bucket/key.txt"
 
-        text = "не слышны в саду даже шорохи"
+        data = "не слышны в саду даже шорохи".encode("utf-8")
         with smart_open.open(key, "wb", compression=_compression) as fout:
-            fout.write(text.encode("utf-8"))
+            fout.write(data)
 
         #
         # Check that what we've created is of type `_compression`.
         #
         with smart_open.open(key, "rb", compression=NO_COMPRESSION) as fin:
             dfin = decompressor(fin)
-            self.assertEqual(dfin.read().decode("utf-8"), text)
+            self.assertEqual(dfin.read(), data)
 
         #
         # We should be able to read it back as well.
         #
         with smart_open.open(key, "rb", compression=_compression) as fin:
-            self.assertEqual(fin.read().decode("utf-8"), text)
+            self.assertEqual(fin.read(), data)
 
     # compression | ignore_ext | behavior |
     # ----------- | ---------- | -------- |
@@ -1922,22 +1922,22 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         s3.create_bucket(Bucket="bucket")
         key = f"s3://bucket/key.{_compression}"
 
-        text = "не слышны в саду даже шорохи"
+        data = "не слышны в саду даже шорохи".encode("utf-8")
         with smart_open.open(key, "wb", **compression_kwargs) as fout:
-            fout.write(text.encode("utf-8"))
+            fout.write(data)
 
         #
         # Check that what we've created is of type `_compression`.
         #
         with smart_open.open(key, "rb", **no_compression_kwargs) as fin:
             dfin = decompressor(fin)
-            self.assertEqual(dfin.read().decode("utf-8"), text)
+            self.assertEqual(dfin.read(), data)
 
         #
         # We should be able to read it back as well.
         #
         with smart_open.open(key, "rb", **compression_kwargs) as fin:
-            self.assertEqual(fin.read().decode("utf-8"), text)
+            self.assertEqual(fin.read(), data)
 
     # extension | compression | ignore_ext | behavior |
     # ----------| ----------- | ---------- | -------- |
