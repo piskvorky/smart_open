@@ -1883,8 +1883,6 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     # ----------- | ---------- | -------- |
     # 'extension' | False      | Enable   |
     # 'none'      | False      | Disable  |
-    # None        | False      | Enable   |
-    # None        | True       | Disable  |
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
         ("_compression", "decompressor", "compression_kwargs", "no_compression_kwargs"),
         [
@@ -1899,27 +1897,14 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
                 bz2.decompress,
                 dict(compression=INFER_FROM_EXTENSION),
                 dict(compression=NO_COMPRESSION),
-            ),
-            (
-                "gz",
-                gzip.decompress,
-                dict(),
-                dict(ignore_ext=True),
-            ),
-            (
-                "bz2",
-                bz2.decompress,
-                dict(),
-                dict(ignore_ext=True),
-            ),
+            )
         ],
     )
     @mock_s3
     def test_rw_compression_by_extension(
         self, _compression, decompressor, compression_kwargs, no_compression_kwargs
     ):
-        """Should read/write files with `_compression`, explicitily or implicitly
-        inferred by file extension."""
+        """Should read/write files with `_compression`, explicitily inferred by file extension."""
         s3 = boto3.resource("s3")
         s3.create_bucket(Bucket="bucket")
         key = f"s3://bucket/key.{_compression}"
@@ -1940,6 +1925,51 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         with smart_open.open(key, "rb", **compression_kwargs) as fin:
             self.assertEqual(fin.read(), _RAW_DATA)
 
+    # compression | ignore_ext | behavior |
+    # ----------- | ---------- | -------- |
+    # None        | False      | Enable   |
+    # None        | True       | Disable  |
+
+    @parameterizedtestcase.ParameterizedTestCase.parameterize(
+        ("_compression", "decompressor", "kwargs"),
+        [
+            (
+                "gz",
+                gzip.decompress,
+                dict(ignore_ext=True),
+            ),
+            (
+                "bz2",
+                bz2.decompress,
+                dict(ignore_ext=True),
+            ),
+        ],
+    )
+    @mock_s3
+    def test_rw_compression_by_extension_deprecated(
+        self, _compression, decompressor, kwargs
+    ):
+        """Should read/write files with `_compression`, implicitly inferred by file extension."""
+        s3 = boto3.resource("s3")
+        s3.create_bucket(Bucket="bucket")
+        key = f"s3://bucket/key.{_compression}"
+
+        with smart_open.open(key, "wb") as fout:
+            fout.write(_RAW_DATA)
+
+        #
+        # Check that what we've created is compressed as expected.
+        #
+        with smart_open.open(key, "rb", **kwargs) as fin:
+            data = decompressor(fin.read())
+            self.assertEqual(data, _RAW_DATA)
+
+        #
+        # We should be able to read it back as well.
+        #
+        with smart_open.open(key, "rb") as fin:
+            self.assertEqual(fin.read(), _RAW_DATA)
+
     # extension | compression | ignore_ext | behavior |
     # ----------| ----------- | ---------- | -------- |
     # <any>     | <invalid>   | <any>      | Error    |
@@ -1948,6 +1978,7 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     # 'bz2'     | 'extension' | True       | Error    |
     # <any>     | 'gz'        | True       | Error    |
     # <any>     | 'bz2'       | True       | Error    |
+
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
         ("extension", "kwargs", "error"),
         [
