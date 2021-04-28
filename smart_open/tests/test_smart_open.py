@@ -1857,7 +1857,7 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     def test_rw_compression_prescribed(self, _compression, decompressor):
         """Should read/write files with `_compression`, as prescribed."""
         s3 = boto3.resource("s3")
-        s3.create_bucket(Bucket="bucket")
+        s3.create_bucket(Bucket="bucket").wait_until_exists()
         key = "s3://bucket/key.txt"
 
         text = "не слышны в саду даже шорохи"
