@@ -1871,13 +1871,13 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         #
         with smart_open.open(key, "rb", compression=NO_COMPRESSION) as fin:
             data = decompressor(fin.read())
-            self.assertEqual(data, _RAW_DATA)
+            assert data == _RAW_DATA
 
         #
         # We should be able to read it back as well.
         #
         with smart_open.open(key, "rb", compression=_compression) as fin:
-            self.assertEqual(fin.read(), _RAW_DATA)
+            assert fin.read() == _RAW_DATA
 
     # compression | ignore_ext | behavior |
     # ----------- | ---------- | -------- |
@@ -1916,14 +1916,13 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         # Check that what we've created is compressed as expected.
         #
         with smart_open.open(key, "rb", **no_compression_kwargs) as fin:
-            data = decompressor(fin.read())
-            self.assertEqual(data, _RAW_DATA)
+            assert decompressor(fin.read()) == _RAW_DATA
 
         #
         # We should be able to read it back as well.
         #
         with smart_open.open(key, "rb", **compression_kwargs) as fin:
-            self.assertEqual(fin.read(), _RAW_DATA)
+            assert fin.read() == _RAW_DATA
 
     # compression | ignore_ext | behavior |
     # ----------- | ---------- | -------- |
@@ -1961,14 +1960,13 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         # Check that what we've created is compressed as expected.
         #
         with smart_open.open(key, "rb", **kwargs) as fin:
-            data = decompressor(fin.read())
-            self.assertEqual(data, _RAW_DATA)
+            assert decompressor(fin.read()) == _RAW_DATA
 
         #
         # We should be able to read it back as well.
         #
         with smart_open.open(key, "rb") as fin:
-            self.assertEqual(fin.read(), _RAW_DATA)
+            assert fin.read() == _RAW_DATA
 
     # extension | compression | ignore_ext | behavior |
     # ----------| ----------- | ---------- | -------- |
