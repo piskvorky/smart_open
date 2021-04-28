@@ -25,6 +25,10 @@ See get_supported_extensions().
 
 
 def get_supported_compression_types():
+    """Return the list of supported compression types available to open.
+    
+    See compression paratemeter to smart_open.open().
+    """
     return [NO_COMPRESSION, INFER_FROM_EXTENSION] + [ext[1:] for ext in get_supported_extensions()]
 
 
