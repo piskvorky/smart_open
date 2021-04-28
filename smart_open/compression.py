@@ -18,6 +18,10 @@ _COMPRESSOR_REGISTRY = {}
 NO_COMPRESSION = 'none'
 """Use no compression. Read/write the data as-is."""
 INFER_FROM_EXTENSION = 'extension'
+"""Determine the compression to use from the file extension.
+
+See get_supported_extensions().
+"""
 
 
 def get_supported_compression_types():
