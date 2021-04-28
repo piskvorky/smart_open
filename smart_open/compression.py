@@ -16,6 +16,7 @@ _COMPRESSOR_REGISTRY = {}
 
 
 NO_COMPRESSION = 'none'
+"""Use no compression. Read/write the data as-is."""
 INFER_FROM_EXTENSION = 'extension'
 
 
