@@ -172,7 +172,7 @@ def open(
         raise TypeError('mode should be a string')
 
     if compression and ignore_ext:
-        raise ValueError('can not simultaneously define and disable compression')
+        raise ValueError('ignore_ext and compression parameters are mutually exclusive')
 
     if not compression:
         if ignore_ext:
