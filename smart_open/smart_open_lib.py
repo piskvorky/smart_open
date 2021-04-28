@@ -174,16 +174,13 @@ def open(
 
     if compression and ignore_ext:
         raise ValueError('ignore_ext and compression parameters are mutually exclusive')
-
-    if not compression:
-        if ignore_ext:
-            compression = so_compression.NO_COMPRESSION
-            warnings.warn("'ignore_ext' will be deprecated in a future release", PendingDeprecationWarning)
-        else:
-            compression = so_compression.INFER_FROM_EXTENSION
-
-    if compression not in so_compression.get_supported_compression_types():
+    elif compression and compression not in so_compression.get_supported_compression_types():
         raise ValueError(f'invalid compression type: {compression}')
+    elif ignore_ext:
+        compression = so_compression.NO_COMPRESSION
+        warnings.warn("'ignore_ext' will be deprecated in a future release", PendingDeprecationWarning)
+    elif compression is None:
+        compression = so_compression.INFER_FROM_EXTENSION
 
     if transport_params is None:
         transport_params = {}
