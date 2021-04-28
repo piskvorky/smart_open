@@ -1842,6 +1842,8 @@ class CheckKwargsTest(unittest.TestCase):
 
 
 _RAW_DATA = "не слышны в саду даже шорохи".encode("utf-8")
+
+
 class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     # compression | ignore_ext | behavior |
     # ----------- | ---------- | -------- |
