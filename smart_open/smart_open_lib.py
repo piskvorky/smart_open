@@ -140,7 +140,7 @@ def open(
         Mimicks built-in open parameter of the same name.  Ignored.
     ignore_ext: boolean, optional
         Disable transparent compression/decompression based on the file extension.
-    compression: str, optional (SEE smart_open.compression.get_supported_compression_types)
+    compression: str, optional (see smart_open.compression.get_supported_compression_types)
         Explicitly specify the compression/decompression behavior.
         If you specify this parameter, then ignore_ext must not be specified.
     transport_params: dict, optional
