@@ -1876,12 +1876,6 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
             data = decompressor(fin.read())
             assert data == _RAW_DATA
 
-        #
-        # We should be able to read it back as well.
-        #
-        with smart_open.open(key, "rb", compression=_compression) as fin:
-            assert fin.read() == _RAW_DATA
-
     # compression | ignore_ext | behavior |
     # ----------- | ---------- | -------- |
     # 'extension' | False      | Enable   |
@@ -1914,17 +1908,10 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         with smart_open.open(key, "rb", compression=NO_COMPRESSION) as fin:
             assert decompressor(fin.read()) == _RAW_DATA
 
-        #
-        # We should be able to read it back as well.
-        #
-        with smart_open.open(key, "rb", compression=INFER_FROM_EXTENSION) as fin:
-            assert fin.read() == _RAW_DATA
-
     # compression | ignore_ext | behavior |
     # ----------- | ---------- | -------- |
     # None        | False      | Enable   |
     # None        | True       | Disable  |
-
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
         ("_compression", "decompressor"),
         [
@@ -1953,12 +1940,6 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         with smart_open.open(key, "rb", ignore_ext=True) as fin:
             assert decompressor(fin.read()) == _RAW_DATA
 
-        #
-        # We should be able to read it back as well.
-        #
-        with smart_open.open(key, "rb") as fin:
-            assert fin.read() == _RAW_DATA
-
     # extension | compression | ignore_ext | behavior |
     # ----------| ----------- | ---------- | -------- |
     # <any>     | <invalid>   | <any>      | Error    |
@@ -1967,7 +1948,6 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     # 'bz2'     | 'extension' | True       | Error    |
     # <any>     | 'gz'        | True       | Error    |
     # <any>     | 'bz2'       | True       | Error    |
-
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
         ("extension", "kwargs", "error"),
         [
