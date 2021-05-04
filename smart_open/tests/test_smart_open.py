@@ -1844,7 +1844,13 @@ class CheckKwargsTest(unittest.TestCase):
 _RAW_DATA = "не слышны в саду даже шорохи".encode("utf-8")
 
 
+@mock_s3
 class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
+
+    def setUp(self):
+        s3 = boto3.resource("s3")
+        s3.create_bucket(Bucket="bucket").wait_until_exists()
+
     # compression | ignore_ext | behavior |
     # ----------- | ---------- | -------- |
     # 'gz'        | False      | Override |
@@ -1856,11 +1862,8 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
             ("bz2", bz2.decompress),
         ],
     )
-    @mock_s3
     def test_rw_compression_prescribed(self, _compression, decompressor):
         """Should read/write files with `_compression`, as prescribed."""
-        s3 = boto3.resource("s3")
-        s3.create_bucket(Bucket="bucket").wait_until_exists()
         key = "s3://bucket/key.txt"
 
         with smart_open.open(key, "wb", compression=_compression) as fout:
@@ -1896,13 +1899,10 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
             )
         ],
     )
-    @mock_s3
     def test_rw_compression_by_extension(
         self, _compression, decompressor
     ):
         """Should read/write files with `_compression`, explicitily inferred by file extension."""
-        s3 = boto3.resource("s3")
-        s3.create_bucket(Bucket="bucket")
         key = f"s3://bucket/key.{_compression}"
 
         with smart_open.open(key, "wb", compression=INFER_FROM_EXTENSION) as fout:
@@ -1938,13 +1938,10 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
             ),
         ],
     )
-    @mock_s3
     def test_rw_compression_by_extension_deprecated(
         self, _compression, decompressor
     ):
         """Should read/write files with `_compression`, implicitly inferred by file extension."""
-        s3 = boto3.resource("s3")
-        s3.create_bucket(Bucket="bucket")
         key = f"s3://bucket/key.{_compression}"
 
         with smart_open.open(key, "wb") as fout:
@@ -1991,11 +1988,8 @@ class HandleS3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
             ("", dict(compression="bz2", ignore_ext=True), ValueError),
         ],
     )
-    @mock_s3
     def test_compression_invalid(self, extension, kwargs, error):
         """Should detect and error on these invalid inputs"""
-        s3 = boto3.resource("s3")
-        s3.create_bucket(Bucket="bucket")
         key = f"s3://bucket/key{extension}"
 
         with pytest.raises(error):
