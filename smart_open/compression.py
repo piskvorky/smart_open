@@ -15,6 +15,23 @@ logger = logging.getLogger(__name__)
 _COMPRESSOR_REGISTRY = {}
 
 
+NO_COMPRESSION = 'none'
+"""Use no compression. Read/write the data as-is."""
+INFER_FROM_EXTENSION = 'extension'
+"""Determine the compression to use from the file extension.
+
+See get_supported_extensions().
+"""
+
+
+def get_supported_compression_types():
+    """Return the list of supported compression types available to open.
+
+    See compression paratemeter to smart_open.open().
+    """
+    return [NO_COMPRESSION, INFER_FROM_EXTENSION] + [ext[1:] for ext in get_supported_extensions()]
+
+
 def get_supported_extensions():
     """Return the list of file extensions for which we have registered compressors."""
     return sorted(_COMPRESSOR_REGISTRY.keys())
