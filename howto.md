@@ -404,16 +404,15 @@ emulate them using object name patterns (see
 [here](https://stackoverflow.com/questions/38416598/how-to-create-an-empty-folder-on-google-storage-with-google-api/38417397#38417397)
 for an explanation). To download all files in a directory you can do this:
 
-    >>> from google.cloud import storage
-    >>> from smart_open import open
-    >>> client = storage.Client()
-    >>> bucket_name = "gcp-public-data-landsat"
-    >>> bucket = client.get_bucket(bucket_name)
-    >>> prefix = "LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/"
-    >>> blobs = list(client.list_blobs(bucket, prefix=prefix))
-    >>>
-    >>> for blob in blobs:
-    ...      with open(f"gs://{bucket_name}/{blob.name}") as f:
-    ...          print(f.name)
-    ...          break # just show the first iteration for the test
-    LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/LC08_L1GT_044034_20130330_20170310_01_T2_ANG.txt
+```python
+>>> from google.cloud import storage
+>>> from smart_open import open
+>>> client = storage.Client()
+>>> bucket_name = "gcp-public-data-landsat"
+>>> prefix = "LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/"
+>>> for blob in client.list_blobs(client.get_bucket(bucket_name), prefix=prefix):
+...      with open(f"gs://{bucket_name}/{blob.name}") as f:
+...          print(f.name)
+...          break # just show the first iteration for the test
+LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/LC08_L1GT_044034_20130330_20170310_01_T2_ANG.txt
+```
