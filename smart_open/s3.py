@@ -11,6 +11,7 @@ import io
 import functools
 import logging
 import time
+import warnings
 
 try:
     import boto3
@@ -190,6 +191,33 @@ def _consolidate_params(uri, transport_params):
 
 
 def open_uri(uri, mode, transport_params):
+    deprecated = (
+        'multipart_upload_kwargs',
+        'object_kwargs',
+        'resource',
+        'resource_kwargs',
+        'session',
+        'singlepart_upload_kwargs',
+    )
+    detected = [k for k in deprecated if k in transport_params]
+    if detected:
+        doc_url = (
+            'https://github.com/RaRe-Technologies/smart_open/blob/develop/'
+            'MIGRATING_FROM_OLDER_VERSIONS.rst'
+        )
+        #
+        # We use warnings.warn /w UserWarning instead of logger.warn here because
+        #
+        # 1) Not everyone has logging enabled; and
+        # 2) check_kwargs (below) already uses logger.warn with a similar message
+        #
+        # https://github.com/RaRe-Technologies/smart_open/issues/614
+        #
+        message = (
+            'ignoring the following deprecated transport parameters: %r. '
+            'See <%s> for details' % (detected, doc_url)
+        )
+        warnings.warn(message, UserWarning)
     parsed_uri = parse_uri(uri)
     parsed_uri, transport_params = _consolidate_params(parsed_uri, transport_params)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
