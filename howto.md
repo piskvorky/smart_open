@@ -397,7 +397,7 @@ You can also access it using the CLI:
     $ aws --endpoint-url http://localhost:4566 s3 ls s3://mybucket/
     2020-12-09 15:56:22         12 hello.txt
 
-## How to Download a Whole Directory
+## How to Download a Whole Directory From Google Cloud
 
 Object storage providers generally don't provide real directories, and instead
 emulate them using object name patterns (see
