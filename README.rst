@@ -80,18 +80,6 @@ How?
   ...     break
   '<!doctype html>\n'
 
-  >>> # to download a whole "directory". Note that object storage doesn't have
-  >>> # real directories, see here for details:
-  >>> # https://stackoverflow.com/questions/38416598/how-to-create-an-empty-folder-on-google-storage-with-google-api/38417397#38417397
-  >>> client = storage.Client()
-  ... bucket = client.get_bucket("my-bucket")
-  ... prefix = "my_prefix"
-  ... blobs = list(client.list_blobs(bucket, prefix=prefix))
-  ...
-  ... for blob in blobs:
-  ...      with open(f"gs://{bucket}/{blob.name}") as f:
-  ...          do_something(f)
-
 .. _doctools_after_examples:
 
 Other examples of URLs that ``smart_open`` accepts::
