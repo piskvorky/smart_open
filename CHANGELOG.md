@@ -1,5 +1,8 @@
 # Unreleased
 
+- Add warning for recently deprecated s3 parameters (PR [#618](https://github.com/RaRe-Technologies/smart_open/pull/618), [@mpenkov](https://github.com/mpenkov))
+- Add new top-level compression parameter (PR [#609](https://github.com/RaRe-Technologies/smart_open/pull/609), [@dmcguire81](https://github.com/dmcguire81))
+
 # 5.0.0, 30 Mar 2021
 
 This release modifies the handling of transport parameters for the S3 back-end in a backwards-incompatible way.
@@ -9,7 +12,6 @@ See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.rst) for details.
 - Fix potential infinite loop when reading from webhdfs (PR [#597](https://github.com/RaRe-Technologies/smart_open/pull/597), [@traboukos](https://github.com/traboukos))
 - Add timeout parameter for http/https (PR [#594](https://github.com/RaRe-Technologies/smart_open/pull/594), [@dustymugs](https://github.com/dustymugs))
 - Remove `tests` directory from package (PR [#589](https://github.com/RaRe-Technologies/smart_open/pull/589), [@e-nalepa](https://github.com/e-nalepa))
-- Add new top-level compression parameter (PR [#609](https://github.com/RaRe-Technologies/smart_open/pull/609), [@dmcguire81](https://github.com/dmcguire81))
 
 # 4.2.0, 15 Feb 2021
 
