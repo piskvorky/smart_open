@@ -103,10 +103,12 @@ This returns a `boto3.s3.Object` that you can work with directly.
 For example, let's get the content type of a publicly available file:
 
 ```python
+>>> import boto3
 >>> from smart_open import open
+>>> resource = boto3.resource('s3')  # Pass additional resource parameters here
 >>> with open('s3://commoncrawl/robots.txt') as fin:
 ...    print(fin.readline().rstrip())
-...    boto3_s3_object = fin.to_boto3()
+...    boto3_s3_object = fin.to_boto3(resource)
 ...    print(repr(boto3_s3_object))
 ...    print(boto3_s3_object.content_type)  # Using the boto3 API here
 User-Agent: *
@@ -153,8 +155,10 @@ You can then interact with the object using the `boto3` API:
 
 
 ```python
+>>> import boto3
+>>> resource = boto3.resource('s3')  # Pass additional resource parameters here
 >>> with open('s3://commoncrawl/robots.txt') as fin:
-...     boto3_object = fin.to_boto3()
+...     boto3_object = fin.to_boto3(resource)
 ...     print(boto3_object)
 ...     print(boto3_object.get()['LastModified'])
 s3.Object(bucket_name='commoncrawl', key='robots.txt')

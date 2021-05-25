@@ -685,17 +685,12 @@ class Reader(io.BufferedIOBase):
         """Do nothing."""
         pass
 
-    def to_boto3(self, resource=None):
+    def to_boto3(self, resource):
         """Create an **independent** `boto3.s3.Object` instance that points to
-        the same resource as this instance.
-
-        The created instance will re-use the session and resource parameters of
-        the current instance, but it will be independent: changes to the
-        `boto3.s3.Object` may not necessarily affect the current instance.
-
+        the same S3 object as this instance.
+        Changes to the returned object will not affect the current instance.
         """
-        if resource is None:
-            resource = boto3.resource('s3')
+        assert resource, 'resource must be a boto3.resource instance'
         obj = resource.Object(self._bucket, self._key)
         if self._version_id is not None:
             return obj.Version(self._version_id)
@@ -890,17 +885,12 @@ multipart upload may fail")
         )
         self._upload_id = None
 
-    def to_boto3(self, resource=None):
+    def to_boto3(self, resource):
         """Create an **independent** `boto3.s3.Object` instance that points to
-        the same resource as this instance.
-
-        The created instance will re-use the session and resource parameters of
-        the current instance, but it will be independent: changes to the
-        `boto3.s3.Object` may not necessary affect the current instance.
-
+        the same S3 object as this instance.
+        Changes to the returned object will not affect the current instance.
         """
-        if not resource:
-            resource = boto3.resource('s3')
+        assert resource, 'resource must be a boto3.resource instance'
         return resource.Object(self._bucket, self._key)
 
     #
