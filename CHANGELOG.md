@@ -10,6 +10,7 @@ See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.rst) for details.
 - Add timeout parameter for http/https (PR [#594](https://github.com/RaRe-Technologies/smart_open/pull/594), [@dustymugs](https://github.com/dustymugs))
 - Remove `tests` directory from package (PR [#589](https://github.com/RaRe-Technologies/smart_open/pull/589), [@e-nalepa](https://github.com/e-nalepa))
 - Add new top-level compression parameter (PR [#609](https://github.com/RaRe-Technologies/smart_open/pull/609), [@dmcguire81](https://github.com/dmcguire81))
+- Fix to_boto3 method (PR [#619](https://github.com/RaRe-Technologies/smart_open/pull/619), [@mpenkov](https://github.com/mpenkov))
 
 # 4.2.0, 15 Feb 2021
 
