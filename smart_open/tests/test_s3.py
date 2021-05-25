@@ -15,13 +15,12 @@ import time
 import unittest
 import warnings
 from contextlib import contextmanager
-from unittest.mock import patch
+from unittest import mock
 import sys
 
 import boto3
 import botocore.client
 import botocore.endpoint
-import mock
 import moto
 
 import smart_open
@@ -108,7 +107,7 @@ def patch_invalid_range_response(actual_size):
                 error_response['Message'] = 'The requested range is not satisfiable'
             raise
 
-    with patch('smart_open.s3._get', new=mock_get):
+    with mock.patch('smart_open.s3._get', new=mock_get):
         yield
 
 
@@ -123,7 +122,7 @@ class BaseTest(unittest.TestCase):
             api_calls[operation_model.name] += 1
             return _real_make_request(self, operation_model, *args, **kwargs)
 
-        patcher = patch('botocore.endpoint.Endpoint.make_request', new=mock_make_request)
+        patcher = mock.patch('botocore.endpoint.Endpoint.make_request', new=mock_make_request)
         patcher.start()
         try:
             yield api_calls
