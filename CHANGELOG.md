@@ -2,6 +2,7 @@
 
 - Add warning for recently deprecated s3 parameters (PR [#618](https://github.com/RaRe-Technologies/smart_open/pull/618), [@mpenkov](https://github.com/mpenkov))
 - Add new top-level compression parameter (PR [#609](https://github.com/RaRe-Technologies/smart_open/pull/609), [@dmcguire81](https://github.com/dmcguire81))
+- Drop mock dependency; standardize on unittest.mock (PR [#621](https://github.com/RaRe-Technologies/smart_open/pull/621), [@musicinmybrain](https://github.com/musicinmybrain))
 
 # 5.0.0, 30 Mar 2021
 

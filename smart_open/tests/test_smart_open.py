@@ -17,10 +17,10 @@ import os
 from smart_open.compression import INFER_FROM_EXTENSION, NO_COMPRESSION
 import tempfile
 import unittest
+from unittest import mock
 import warnings
 
 import boto3
-import mock
 from moto import mock_s3
 import parameterizedtestcase
 import pytest
