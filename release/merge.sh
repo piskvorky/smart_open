@@ -67,7 +67,7 @@ git push --tags upstream master
 
 git checkout develop
 dev_version="$version.dev0"
-sed --in-place= -e s/$(python smart_open/version.py)/$dev_version/ smart_open/version.py
+sed --in-place="" -e s/$(python smart_open/version.py)/$dev_version/ smart_open/version.py
 git commit smart_open/version.py -m "bump version to $dev_version"
 git push upstream develop
 
