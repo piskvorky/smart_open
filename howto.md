@@ -103,10 +103,12 @@ This returns a `boto3.s3.Object` that you can work with directly.
 For example, let's get the content type of a publicly available file:
 
 ```python
+>>> import boto3
 >>> from smart_open import open
+>>> resource = boto3.resource('s3')  # Pass additional resource parameters here
 >>> with open('s3://commoncrawl/robots.txt') as fin:
 ...    print(fin.readline().rstrip())
-...    boto3_s3_object = fin.to_boto3()
+...    boto3_s3_object = fin.to_boto3(resource)
 ...    print(repr(boto3_s3_object))
 ...    print(boto3_s3_object.content_type)  # Using the boto3 API here
 User-Agent: *
@@ -153,8 +155,10 @@ You can then interact with the object using the `boto3` API:
 
 
 ```python
+>>> import boto3
+>>> resource = boto3.resource('s3')  # Pass additional resource parameters here
 >>> with open('s3://commoncrawl/robots.txt') as fin:
-...     boto3_object = fin.to_boto3()
+...     boto3_object = fin.to_boto3(resource)
 ...     print(boto3_object)
 ...     print(boto3_object.get()['LastModified'])
 s3.Object(bucket_name='commoncrawl', key='robots.txt')
@@ -396,3 +400,23 @@ You can also access it using the CLI:
 
     $ aws --endpoint-url http://localhost:4566 s3 ls s3://mybucket/
     2020-12-09 15:56:22         12 hello.txt
+
+## How to Download a Whole Directory From Google Cloud
+
+Object storage providers generally don't provide real directories, and instead
+emulate them using object name patterns (see
+[here](https://stackoverflow.com/questions/38416598/how-to-create-an-empty-folder-on-google-storage-with-google-api/38417397#38417397)
+for an explanation). To download all files in a directory you can do this:
+
+```python
+>>> from google.cloud import storage
+>>> from smart_open import open
+>>> client = storage.Client()
+>>> bucket_name = "gcp-public-data-landsat"
+>>> prefix = "LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/"
+>>> for blob in client.list_blobs(client.get_bucket(bucket_name), prefix=prefix):
+...      with open(f"gs://{bucket_name}/{blob.name}") as f:
+...          print(f.name)
+...          break # just show the first iteration for the test
+LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/LC08_L1GT_044034_20130330_20170310_01_T2_ANG.txt
+```

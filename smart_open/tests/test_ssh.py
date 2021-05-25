@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import logging
-import mock
 import unittest
+from unittest import mock
 
 import smart_open.ssh
 

@@ -30,8 +30,8 @@ import warnings
 # smart_open.submodule to reference to the submodules.
 #
 import smart_open.local_file as so_file
+import smart_open.compression as so_compression
 
-from smart_open import compression
 from smart_open import doctools
 from smart_open import transport
 
@@ -107,6 +107,7 @@ def open(
         closefd=True,
         opener=None,
         ignore_ext=False,
+        compression=None,
         transport_params=None,
         ):
     r"""Open the URI object, returning a file-like object.
@@ -139,6 +140,9 @@ def open(
         Mimicks built-in open parameter of the same name.  Ignored.
     ignore_ext: boolean, optional
         Disable transparent compression/decompression based on the file extension.
+    compression: str, optional (see smart_open.compression.get_supported_compression_types)
+        Explicitly specify the compression/decompression behavior.
+        If you specify this parameter, then ignore_ext must not be specified.
     transport_params: dict, optional
         Additional parameters for the transport layer (see notes below).
 
@@ -168,13 +172,23 @@ def open(
     if not isinstance(mode, str):
         raise TypeError('mode should be a string')
 
+    if compression and ignore_ext:
+        raise ValueError('ignore_ext and compression parameters are mutually exclusive')
+    elif compression and compression not in so_compression.get_supported_compression_types():
+        raise ValueError(f'invalid compression type: {compression}')
+    elif ignore_ext:
+        compression = so_compression.NO_COMPRESSION
+        warnings.warn("'ignore_ext' will be deprecated in a future release", PendingDeprecationWarning)
+    elif compression is None:
+        compression = so_compression.INFER_FROM_EXTENSION
+
     if transport_params is None:
         transport_params = {}
 
     fobj = _shortcut_open(
         uri,
         mode,
-        ignore_ext=ignore_ext,
+        compression=compression,
         buffering=buffering,
         encoding=encoding,
         errors=errors,
@@ -219,10 +233,7 @@ def open(
         raise NotImplementedError(ve.args[0])
 
     binary = _open_binary_stream(uri, binary_mode, transport_params)
-    if ignore_ext:
-        decompressed = binary
-    else:
-        decompressed = compression.compression_wrapper(binary, binary_mode)
+    decompressed = so_compression.compression_wrapper(binary, binary_mode, compression)
 
     if 'b' not in mode or explicit_encoding is not None:
         decoded = _encoding_wrapper(
@@ -295,7 +306,7 @@ def _get_binary_mode(mode_str):
 def _shortcut_open(
         uri,
         mode,
-        ignore_ext=False,
+        compression,
         buffering=-1,
         encoding=None,
         errors=None,
@@ -309,12 +320,13 @@ def _shortcut_open(
     This is only possible under the following conditions:
 
         1. Opening a local file; and
-        2. Ignore extension is set to True
+        2. Compression is disabled
 
     If it is not possible to use the built-in open for the specified URI, returns None.
 
     :param str uri: A string indicating what to open.
     :param str mode: The mode to pass to the open function.
+    :param str compression: The compression type selected.
     :returns: The opened file
     :rtype: file
     """
@@ -326,8 +338,11 @@ def _shortcut_open(
         return None
 
     local_path = so_file.extract_local_path(uri)
-    _, extension = P.splitext(local_path)
-    if extension in compression.get_supported_extensions() and not ignore_ext:
+    if compression == so_compression.INFER_FROM_EXTENSION:
+        _, extension = P.splitext(local_path)
+        if extension in so_compression.get_supported_extensions():
+            return None
+    elif compression != so_compression.NO_COMPRESSION:
         return None
 
     open_kwargs = {}

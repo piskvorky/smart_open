@@ -15,13 +15,12 @@ import time
 import unittest
 import warnings
 from contextlib import contextmanager
-from unittest.mock import patch
+from unittest import mock
 import sys
 
 import boto3
 import botocore.client
 import botocore.endpoint
-import mock
 import moto
 
 import smart_open
@@ -108,7 +107,7 @@ def patch_invalid_range_response(actual_size):
                 error_response['Message'] = 'The requested range is not satisfiable'
             raise
 
-    with patch('smart_open.s3._get', new=mock_get):
+    with mock.patch('smart_open.s3._get', new=mock_get):
         yield
 
 
@@ -123,7 +122,7 @@ class BaseTest(unittest.TestCase):
             api_calls[operation_model.name] += 1
             return _real_make_request(self, operation_model, *args, **kwargs)
 
-        patcher = patch('botocore.endpoint.Endpoint.make_request', new=mock_make_request)
+        patcher = mock.patch('botocore.endpoint.Endpoint.make_request', new=mock_make_request)
         patcher.start()
         try:
             yield api_calls
@@ -420,7 +419,7 @@ class ReaderTest(BaseTest):
         with self.assertApiCalls():
             # set defer_seek to verify that to_boto3() doesn't trigger an unnecessary API call
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
-                returned_obj = fin.to_boto3()
+                returned_obj = fin.to_boto3(boto3.resource('s3'))
 
         boto3_body = returned_obj.get()['Body'].read()
         self.assertEqual(contents, boto3_body)
@@ -595,7 +594,7 @@ class MultipartWriterTest(unittest.TestCase):
 
         with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'wb') as fout:
             fout.write(contents)
-            returned_obj = fout.to_boto3()
+            returned_obj = fout.to_boto3(boto3.resource('s3'))
 
         boto3_body = returned_obj.get()['Body'].read()
         self.assertEqual(contents, boto3_body)

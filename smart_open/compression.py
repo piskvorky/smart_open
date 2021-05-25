@@ -11,8 +11,23 @@ import os.path
 
 logger = logging.getLogger(__name__)
 
-
 _COMPRESSOR_REGISTRY = {}
+
+NO_COMPRESSION = 'disable'
+"""Use no compression. Read/write the data as-is."""
+INFER_FROM_EXTENSION = 'infer_from_extension'
+"""Determine the compression to use from the file extension.
+
+See get_supported_extensions().
+"""
+
+
+def get_supported_compression_types():
+    """Return the list of supported compression types available to open.
+
+    See compression paratemeter to smart_open.open().
+    """
+    return [NO_COMPRESSION, INFER_FROM_EXTENSION] + get_supported_extensions()
 
 
 def get_supported_extensions():
@@ -62,34 +77,36 @@ def _handle_gzip(file_obj, mode):
     return gzip.GzipFile(fileobj=file_obj, mode=mode)
 
 
-def compression_wrapper(file_obj, mode, filename=None):
+def compression_wrapper(file_obj, mode, compression):
     """
     This function will wrap the file_obj with an appropriate
-    [de]compression mechanism based on the extension of the filename.
+    [de]compression mechanism based on the specified extension.
 
     file_obj must either be a filehandle object, or a class which behaves
-    like one. It must have a .name attribute unless ``filename`` is given.
+    like one. It must have a .name attribute.
 
     If the filename extension isn't recognized, will simply return the original
     file_obj.
 
     """
-    try:
-        if filename is None:
-            filename = file_obj.name
-        _, ext = os.path.splitext(filename)
-    except (AttributeError, TypeError):
-        logger.warning(
-            'unable to transparently decompress %r because it '
-            'seems to lack a string-like .name', file_obj
-        )
+    if compression == NO_COMPRESSION:
         return file_obj
+    elif compression == INFER_FROM_EXTENSION:
+        try:
+            filename = file_obj.name
+        except (AttributeError, TypeError):
+            logger.warning(
+                'unable to transparently decompress %r because it '
+                'seems to lack a string-like .name', file_obj
+            )
+            return file_obj
+        _, compression = os.path.splitext(filename)
 
-    if ext in _COMPRESSOR_REGISTRY and mode.endswith('+'):
+    if compression in _COMPRESSOR_REGISTRY and mode.endswith('+'):
         raise ValueError('transparent (de)compression unsupported for mode %r' % mode)
 
     try:
-        callback = _COMPRESSOR_REGISTRY[ext]
+        callback = _COMPRESSOR_REGISTRY[compression]
     except KeyError:
         return file_obj
     else:

@@ -1,5 +1,17 @@
 # Unreleased
 
+# 5.1.0, 25 May 2021
+
+This release introduces a new top-level parameter: `compression`.
+It controls compression behavior and partially overlaps with the old `ignore_ext` parameter.
+For details, see the README.rst file.
+You may continue to use `ignore_ext` parameter for now, but it will be deprecated in the next major release.
+
+- Add warning for recently deprecated s3 parameters (PR [#618](https://github.com/RaRe-Technologies/smart_open/pull/618), [@mpenkov](https://github.com/mpenkov))
+- Add new top-level compression parameter (PR [#609](https://github.com/RaRe-Technologies/smart_open/pull/609), [@dmcguire81](https://github.com/dmcguire81))
+- Drop mock dependency; standardize on unittest.mock (PR [#621](https://github.com/RaRe-Technologies/smart_open/pull/621), [@musicinmybrain](https://github.com/musicinmybrain))
+- Fix to_boto3 method (PR [#619](https://github.com/RaRe-Technologies/smart_open/pull/619), [@mpenkov](https://github.com/mpenkov))
+
 # 5.0.0, 30 Mar 2021
 
 This release modifies the handling of transport parameters for the S3 back-end in a backwards-incompatible way.

@@ -124,7 +124,7 @@ class TestVersionId(unittest.TestCase):
         self.versions = get_versions(BUCKET_NAME, self.key)
         params = {'version_id': self.versions[0]}
         with open(self.url, mode='rb', transport_params=params) as fin:
-            returned_obj = fin.to_boto3()
+            returned_obj = fin.to_boto3(boto3.resource('s3'))
 
         boto3_body = boto3_body = returned_obj.get()['Body'].read()
         self.assertEqual(boto3_body, self.test_ver1)

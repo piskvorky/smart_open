@@ -10,9 +10,8 @@ import os
 import os.path as P
 import subprocess
 import unittest
+from unittest import mock
 import sys
-
-import mock
 
 import smart_open.hdfs
 
