@@ -233,13 +233,7 @@ def open(
         raise NotImplementedError(ve.args[0])
 
     binary = _open_binary_stream(uri, binary_mode, transport_params)
-    if compression == so_compression.NO_COMPRESSION:
-        decompressed = binary
-    elif compression == so_compression.INFER_FROM_EXTENSION:
-        decompressed = so_compression.compression_wrapper(binary, binary_mode)
-    else:
-        faked_extension = f"{binary.name}.{compression.lower()}"
-        decompressed = so_compression.compression_wrapper(binary, binary_mode, filename=faked_extension)
+    decompressed = so_compression.compression_wrapper(binary, binary_mode, compression)
 
     if 'b' not in mode or explicit_encoding is not None:
         decoded = _encoding_wrapper(

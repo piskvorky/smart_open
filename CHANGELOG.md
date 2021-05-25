@@ -1,5 +1,10 @@
 # Unreleased
 
+This release introduces a new top-level parameter: `compression`.
+It controls compression behavior and partially overlaps with the old `ignore_ext` parameter.
+For details, see the README.md file.
+You may continue to use `ignore_ext` parameter for now, but it will be deprecated in the next major release.
+
 - Add warning for recently deprecated s3 parameters (PR [#618](https://github.com/RaRe-Technologies/smart_open/pull/618), [@mpenkov](https://github.com/mpenkov))
 - Add new top-level compression parameter (PR [#609](https://github.com/RaRe-Technologies/smart_open/pull/609), [@dmcguire81](https://github.com/dmcguire81))
 - Drop mock dependency; standardize on unittest.mock (PR [#621](https://github.com/RaRe-Technologies/smart_open/pull/621), [@musicinmybrain](https://github.com/musicinmybrain))

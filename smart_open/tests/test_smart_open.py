@@ -1876,8 +1876,8 @@ class S3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
         ("url", "_compression"),
         [
-            ("s3://bucket/gzipped", "gz"),
-            ("s3://bucket/bzipped", "bz2"),
+            ("s3://bucket/gzipped", ".gz"),
+            ("s3://bucket/bzipped", ".bz2"),
         ]
     )
     def test_read_explicit(self, url, _compression):
@@ -1888,8 +1888,8 @@ class S3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
         ("_compression", "expected"),
         [
-            ("gz", gzip_compress(_DECOMPRESSED_DATA, 'key')),
-            ("bz2", bz2.compress(_DECOMPRESSED_DATA)),
+            (".gz", gzip_compress(_DECOMPRESSED_DATA, 'key')),
+            (".bz2", bz2.compress(_DECOMPRESSED_DATA)),
         ],
     )
     def test_write_explicit(self, _compression, expected):
@@ -1903,8 +1903,8 @@ class S3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
         ("url", "_compression", "expected"),
         [
-            ("s3://bucket/key.gz", "gz", gzip_compress(_DECOMPRESSED_DATA, 'key.gz')),
-            ("s3://bucket/key.bz2", "bz2", bz2.compress(_DECOMPRESSED_DATA)),
+            ("s3://bucket/key.gz", ".gz", gzip_compress(_DECOMPRESSED_DATA, 'key.gz')),
+            ("s3://bucket/key.bz2", ".bz2", bz2.compress(_DECOMPRESSED_DATA)),
         ],
     )
     def test_write_implicit(self, url, _compression, expected):
@@ -1918,8 +1918,8 @@ class S3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
     @parameterizedtestcase.ParameterizedTestCase.parameterize(
         ("url", "_compression", "expected"),
         [
-            ("s3://bucket/key.gz", "gz", gzip_compress(_DECOMPRESSED_DATA, 'key.gz')),
-            ("s3://bucket/key.bz2", "bz2", bz2.compress(_DECOMPRESSED_DATA)),
+            ("s3://bucket/key.gz", ".gz", gzip_compress(_DECOMPRESSED_DATA, 'key.gz')),
+            ("s3://bucket/key.bz2", ".bz2", bz2.compress(_DECOMPRESSED_DATA)),
         ],
     )
     def test_ignore_ext(self, url, _compression, expected):
@@ -1946,8 +1946,8 @@ class S3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
                 dict(compression=INFER_FROM_EXTENSION, ignore_ext=True),
                 ValueError,
             ),
-            ("", dict(compression="gz", ignore_ext=True), ValueError),
-            ("", dict(compression="bz2", ignore_ext=True), ValueError),
+            ("", dict(compression=".gz", ignore_ext=True), ValueError),
+            ("", dict(compression=".bz2", ignore_ext=True), ValueError),
         ],
     )
     def test_compression_invalid(self, extension, kwargs, error):

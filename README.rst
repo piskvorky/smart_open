@@ -63,6 +63,10 @@ How?
   ...    with open('smart_open/tests/test_data/1984.txt.bz2', 'w') as fout:
   ...        for line in fin:
   ...           fout.write(line)
+  74
+  80
+  78
+  79
 
   >>> # can use any IOBase operations, like seek
   >>> with open('s3://commoncrawl/robots.txt', 'rb') as fin:
@@ -212,12 +216,46 @@ For the sake of simplicity, the examples below assume you have all the dependenc
     with open('azure://mycontainer/my_file.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'hello world')
 
-Supported Compression Formats
------------------------------
+Compression Handling
+--------------------
 
-``smart_open`` allows reading and writing gzip and bzip2 files.
-They are transparently handled over HTTP, S3, and other protocols, too, based on the extension of the file being opened.
-You can easily add support for other file extensions and compression formats.
+The top-level `compression` parameter controls compression/decompression behavior when reading and writing.
+The supported values for this parameter are:
+
+- ``infer_from_extension`` (default behavior)
+- ``disable``
+- ``.gz``
+- ``.bz2``
+
+By default, ``smart_open`` determines the compression algorithm to use based on the file extension.
+
+.. code-block:: python
+
+    >>> from smart_open import open, register_compressor
+    >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
+    ...     print(fin.read(32))
+    It was a bright cold day in Apri
+
+You can override this behavior to either disable compression, or explicitly specify the algorithm to use.
+To disable compression:
+
+.. code-block:: python
+
+    >>> from smart_open import open, register_compressor
+    >>> with open('smart_open/tests/test_data/1984.txt.gz', 'rb', compression='disable') as fin:
+    ...     print(fin.read(32))
+    b'1234'
+
+To specify the algorithm explicitly (e.g. for non-standard file extensions):
+
+.. code-block:: python
+
+    >>> from smart_open import open, register_compressor
+    >>> with open('smart_open/tests/test_data/1984.txt.gzip', compression='.gz') as fin:
+    ...     print(fin.read(32))
+    It was a bright cold day in Apri
+
+You can also easily add support for other file extensions and compression formats.
 For example, to open xz-compressed files:
 
 .. code-block:: python
@@ -230,16 +268,14 @@ For example, to open xz-compressed files:
 
     >>> register_compressor('.xz', _handle_xz)
 
-    >>> with open('smart_open/tests/test_data/crime-and-punishment.txt.xz') as fin:
-    ...     text = fin.read()
-    >>> print(len(text))
-    1696
+    >>> with open('smart_open/tests/test_data/1984.txt.xz') as fin:
+    ...     print(fin.read(32))
+    It was a bright cold day in Apri
 
 ``lzma`` is in the standard library in Python 3.3 and greater.
 For 2.7, use `backports.lzma`_.
 
 .. _backports.lzma: https://pypi.org/project/backports.lzma/
-
 
 Transport-specific Options
 --------------------------
