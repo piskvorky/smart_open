@@ -397,7 +397,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     Test reading from HTTP connections in various ways.
 
     """
-    @mock.patch('smart_open.ssh.open')
+    @mock.patch('smart_open.ssh.open', return_value=open(__file__))
     def test_read_ssh(self, mock_open):
         """Is SSH line iterator called correctly?"""
         obj = smart_open.open(
@@ -1686,7 +1686,7 @@ class S3OpenTest(unittest.TestCase):
         s3 = boto3.resource('s3')
         s3.create_bucket(Bucket='bucket')
 
-        with mock.patch('smart_open.s3.open') as mock_open:
+        with mock.patch('smart_open.s3.open', return_value=open(__file__, 'rb')) as mock_open:
             smart_open.open("s3://bucket/key.gz", "wb")
             mock_open.assert_called_with('bucket', 'key.gz', 'wb')
 
@@ -1702,7 +1702,7 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.open(key, "wb") as fout:
             fout.write(text.encode("utf-8"))
 
-        with mock.patch('smart_open.s3.open') as mock_open:
+        with mock.patch('smart_open.s3.open', return_value=open(__file__)) as mock_open:
             smart_open.open(key, "r")
             mock_open.assert_called_with('bucket', 'key.gz', 'rb')
 
