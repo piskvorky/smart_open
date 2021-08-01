@@ -81,7 +81,7 @@ setup(
         'http': http_deps,
         'webhdfs': http_deps,
     },
-    python_requires=">=3.6.0",
+    python_requires=">=3.6",
 
     test_suite="smart_open.tests",
 
