@@ -21,6 +21,9 @@ jobs:
           - python-version: '3.8'
             toxenv: "py38-doctest"
 
+          - python-version: '3.9'
+            toxenv: "py38-doctest"
+
           - python-version: '3.8'
             toxenv: "py38-test"
 
