@@ -150,16 +150,16 @@ def safe_urlsplit(url):
     querystring separately.  Unfortunately, question marks can also appear
     _inside_ the actual URL for some schemas like S3, GS.
 
-    Replaces question marks with newlines prior to splitting.  This is safe because:
-
-    1. The standard library's urlsplit completely ignores newlines
-    2. Raw newlines will never occur in innocuous URLs.  They are always URL-encoded.
+    Replaces question marks with null characters prior to splitting.  This is not guarenteed
+    to be safe because any UTF-8 encoded Unicode character is possible but the null character
+    should not, realistically be used in a blob name.
 
     See Also
     --------
+    https://bugs.python.org/issue43882
     https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
     https://github.com/RaRe-Technologies/smart_open/issues/285
     https://github.com/RaRe-Technologies/smart_open/issues/458
     """
-    sr = urllib.parse.urlsplit(url.replace('?', '\n'), allow_fragments=False)
-    return urllib.parse.SplitResult(sr.scheme, sr.netloc, sr.path.replace('\n', '?'), '', '')
+    sr = urllib.parse.urlsplit(url.replace('?', '�'), allow_fragments=False)
+    return urllib.parse.SplitResult(sr.scheme, sr.netloc, sr.path.replace('�', '?'), '', '')
