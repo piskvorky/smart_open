@@ -21,11 +21,14 @@ jobs:
           - python-version: '3.8'
             toxenv: "py38-doctest"
 
-          - python-version: '3.9'
-            toxenv: "py38-doctest"
-
           - python-version: '3.8'
             toxenv: "py38-test"
+
+          - python-version: '3.9'
+            toxenv: "py39-doctest"
+
+          - python-version: '3.9'
+            toxenv: "py39-test"
 
     steps:
       - uses: actions/checkout@v2
