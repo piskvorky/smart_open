@@ -67,14 +67,30 @@ def register_compressor(ext, callback):
     _COMPRESSOR_REGISTRY[ext] = callback
 
 
+def adapted_closer(adapter, adapted):
+    orig_close = adapter.close
+
+    def close_both(*args):
+        nonlocal adapted
+        try:
+            orig_close()
+        finally:
+            if adapted:
+                adapted, fp = None, adapted
+                fp.close()
+
+    adapter.close = close_both
+    return adapter
+
+
 def _handle_bz2(file_obj, mode):
     from bz2 import BZ2File
-    return BZ2File(file_obj, mode)
+    return adapted_closer(BZ2File(file_obj, mode), file_obj)
 
 
 def _handle_gzip(file_obj, mode):
     import gzip
-    return gzip.GzipFile(fileobj=file_obj, mode=mode)
+    return adapted_closer(gzip.GzipFile(fileobj=file_obj, mode=mode), file_obj)
 
 
 def compression_wrapper(file_obj, mode, compression):

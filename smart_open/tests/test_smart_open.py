@@ -453,7 +453,7 @@ class SmartOpenHttpTest(unittest.TestCase):
         buf = make_buffer(name='data' + suffix)
         with smart_open.open(buf, 'wb') as outfile:
             outfile.write(raw_data)
-        compressed_data = buf.getvalue()
+        compressed_data = buf._value_when_closed
         # check that the string was actually compressed
         self.assertNotEqual(compressed_data, raw_data)
 
@@ -494,8 +494,19 @@ def make_buffer(cls=io.BytesIO, initial_value=None, name=None, noclose=False):
     buf = cls(initial_value) if initial_value else cls()
     if name is not None:
         buf.name = name
-    if noclose:
-        buf.close = lambda: None
+
+    buf._value_when_closed = None
+    buf._close_calls = 0
+    orig_close = buf.close
+
+    def close(self):
+        if not self._close_calls:
+            self._value_when_closed = self.getvalue()
+        self._close_calls += 1
+        if not noclose:
+            orig_close()
+
+    buf.close = close.__get__(buf, buf.__class__)
     return buf
 
 
@@ -652,7 +663,7 @@ class SmartOpenFileObjTest(unittest.TestCase):
         buf = make_buffer(name='data.bz2')
         with smart_open.open(buf, 'wb') as sf:
             sf.write(data)
-        self.assertEqual(bz2.decompress(buf.getvalue()), data)
+        self.assertEqual(bz2.decompress(buf._value_when_closed), data)
 
     def test_open_side_effect(self):
         """
@@ -1496,16 +1507,32 @@ class WebHdfsWriteTest(unittest.TestCase):
         assert responses.calls[3].request.url == "http://127.0.0.1:8440/file"
 
 
-class CompressionFormatTest(unittest.TestCase):
+_DECOMPRESSED_DATA = "не слышны в саду даже шорохи".encode("utf-8")
+_MOCK_TIME = mock.Mock(return_value=1620256567)
+
+
+def gzip_compress(data, filename=None):
+    #
+    # gzip.compress is sensitive to the current time and the destination filename.
+    # This function fixes those variables for consistent compression results.
+    #
+    buf = io.BytesIO()
+    buf.name = filename
+    with mock.patch('time.time', _MOCK_TIME):
+        gzip.GzipFile(fileobj=buf, mode='w').write(data)
+    return buf.getvalue()
+
+
+class CompressionFormatTest(parameterizedtestcase.ParameterizedTestCase):
     """Test transparent (de)compression."""
 
     def write_read_assertion(self, suffix):
         test_file = make_buffer(name='file' + suffix)
         with smart_open.open(test_file, 'wb') as fout:
             fout.write(SAMPLE_BYTES)
-        self.assertNotEqual(SAMPLE_BYTES, test_file.getvalue())
+        self.assertNotEqual(SAMPLE_BYTES, test_file._value_when_closed)
         # we have to recreate the buffer because it is closed
-        test_file = make_buffer(initial_value=test_file.getvalue(), name=test_file.name)
+        test_file = make_buffer(initial_value=test_file._value_when_closed, name=test_file.name)
         with smart_open.open(test_file, 'rb') as fin:
             self.assertEqual(fin.read(), SAMPLE_BYTES)
 
@@ -1516,6 +1543,20 @@ class CompressionFormatTest(unittest.TestCase):
             data = infile.read()
         m = hashlib.md5(data)
         assert m.hexdigest() == '18473e60f8c7c98d29d65bf805736a0d', 'Failed to read gzip'
+
+    @parameterizedtestcase.ParameterizedTestCase.parameterize(
+        ("extension", "compressed"),
+        [
+            (".gz", gzip_compress(_DECOMPRESSED_DATA, 'key')),
+            (".bz2", bz2.compress(_DECOMPRESSED_DATA)),
+        ],
+    )
+    def test_closes_compressed_stream(self, extension, compressed):
+        """Transparent compression closes the compressed stream?"""
+        compressed_stream = make_buffer(initial_value=compressed, name=f"file{extension}")
+        with smart_open.open(compressed_stream, encoding="utf-8"):
+            pass
+        assert compressed_stream._close_calls == 1
 
     def test_write_read_gz(self):
         """Can write and read gzip?"""
@@ -1839,22 +1880,6 @@ class CheckKwargsTest(unittest.TestCase):
         expected = {'foo': 123}
         actual = smart_open.smart_open_lib._check_kwargs(function, kwargs)
         self.assertEqual(expected, actual)
-
-
-_DECOMPRESSED_DATA = "не слышны в саду даже шорохи".encode("utf-8")
-_MOCK_TIME = mock.Mock(return_value=1620256567)
-
-
-def gzip_compress(data, filename=None):
-    #
-    # gzip.compress is sensitive to the current time and the destination filename.
-    # This function fixes those variables for consistent compression results.
-    #
-    buf = io.BytesIO()
-    buf.name = filename
-    with mock.patch('time.time', _MOCK_TIME):
-        gzip.GzipFile(fileobj=buf, mode='w').write(data)
-    return buf.getvalue()
 
 
 @mock_s3
