@@ -496,17 +496,15 @@ def make_buffer(cls=io.BytesIO, initial_value=None, name=None, noclose=False):
         buf.name = name
 
     buf._value_when_closed = None
-    buf._close_calls = 0
     orig_close = buf.close
 
-    def close(self):
-        if not self._close_calls:
-            self._value_when_closed = self.getvalue()
-        self._close_calls += 1
+    def close():
+        if buf.close.call_count == 1:
+            buf._value_when_closed = buf.getvalue()
         if not noclose:
             orig_close()
 
-    buf.close = close.__get__(buf, buf.__class__)
+    buf.close = mock.Mock(side_effect=close)
     return buf
 
 
@@ -1556,7 +1554,7 @@ class CompressionFormatTest(parameterizedtestcase.ParameterizedTestCase):
         compressed_stream = make_buffer(initial_value=compressed, name=f"file{extension}")
         with smart_open.open(compressed_stream, encoding="utf-8"):
             pass
-        assert compressed_stream._close_calls == 1
+        assert compressed_stream.close.call_count == 1
 
     def test_write_read_gz(self):
         """Can write and read gzip?"""
