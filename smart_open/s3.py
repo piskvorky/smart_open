@@ -87,6 +87,8 @@ def parse_uri(uri_as_string):
     # let boto3 take care of that for us.
     #
     split_uri = smart_open.utils.safe_urlsplit(uri_as_string)
+    logger.critical('split_uri: %r', split_uri)
+
     assert split_uri.scheme in SCHEMES
 
     port = DEFAULT_PORT

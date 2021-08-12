@@ -1026,6 +1026,15 @@ def test_resource_propagation_reader():
         assert id(reader._client.client) == id(client)
 
 
+def test_s3_uri_contains_question_mark():
+    parsed_uri = smart_open.s3.parse_uri("s3://mybucket/mydir/mykey?param")
+    print(parsed_uri)
+
+    parsed_uri.scheme == "s3"
+    parsed_uri.bucket_id == "mybucket"
+    parsed_uri.key_id == "mydir/mykey?param"
+
+
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
     unittest.main()
