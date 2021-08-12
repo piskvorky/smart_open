@@ -81,7 +81,7 @@ def parse_uri(uri_as_string):
     submodule = transport.get_transport(scheme)
     as_dict = submodule.parse_uri(uri_as_string)
 
-    logger.critical('scheme: %r submodule: %r as_dict: %r', scheme, submodule, as_dict())
+    logger.critical('scheme: %r submodule: %r as_dict: %r', scheme, submodule, as_dict)
 
     #
     # The conversion to a namedtuple is just to keep the old tests happy while
