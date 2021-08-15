@@ -10,9 +10,13 @@
 
 import inspect
 import logging
+import string
 import urllib.parse
 
 logger = logging.getLogger(__name__)
+
+WORKAROUND_SCHEMES = ['s3', 's3n', 's3u', 's3a', 'gs']
+QUESTION_MARK_PLACEHOLDER = '///smart_open.utils._QUESTION_MARK_PLACEHOLDER///'
 
 
 def inspect_kwargs(kallable):
@@ -150,9 +154,10 @@ def safe_urlsplit(url):
     querystring separately.  Unfortunately, question marks can also appear
     _inside_ the actual URL for some schemas like S3, GS.
 
-    Replaces question marks with null characters prior to splitting.  This is not guarenteed
-    to be safe because any UTF-8 encoded Unicode character is possible but the null character
-    should not, realistically be used in a blob name.
+    Replaces question marks with a special placeholder substring prior to
+    splitting.  This work-around behavior is disabled in the unlikely event the
+    placeholder is already part of the URL.  If this affects you, consider
+    changing the value of QUESTION_MARK_PLACEHOLDER to something more suitable.
 
     See Also
     --------
@@ -160,6 +165,23 @@ def safe_urlsplit(url):
     https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
     https://github.com/RaRe-Technologies/smart_open/issues/285
     https://github.com/RaRe-Technologies/smart_open/issues/458
+    smart_open/utils.py:QUESTION_MARK_PLACEHOLDER
     """
-    sr = urllib.parse.urlsplit(url.replace('?', '�'), allow_fragments=False)
-    return urllib.parse.SplitResult(sr.scheme, sr.netloc, sr.path.replace('�', '?'), '', '')
+    sr = urllib.parse.urlsplit(url, allow_fragments=False)
+
+    placeholder = None
+    if sr.scheme in WORKAROUND_SCHEMES and '?' in url and QUESTION_MARK_PLACEHOLDER not in url:
+        #
+        # This is safe because people will _almost never_ use the below
+        # substring in a URL.  If they do, then they're asking for trouble,
+        # and this special handling will simply not happen for them.
+        #
+        placeholder = QUESTION_MARK_PLACEHOLDER
+        url = url.replace('?', placeholder)
+        sr = urllib.parse.urlsplit(url, allow_fragments=False)
+
+    if placeholder is None:
+        return sr
+
+    path = sr.path.replace(placeholder, '?')
+    return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, '', '')
