@@ -10,7 +10,6 @@
 
 import inspect
 import logging
-import string
 import urllib.parse
 
 logger = logging.getLogger(__name__)
