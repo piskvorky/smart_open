@@ -37,6 +37,9 @@ DEFAULT_BUFFER_SIZE = 4 * 1024**2
 https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs
 """
 
+DEFAULT_MAX_CONCURRENCY = 1
+"""Default number of parallel connections with which to download."""
+
 
 def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
@@ -67,7 +70,8 @@ def open(
         mode,
         client=None,  # type: azure.storage.blob.BlobServiceClient
         buffer_size=DEFAULT_BUFFER_SIZE,
-        min_part_size=_DEFAULT_MIN_PART_SIZE
+        min_part_size=_DEFAULT_MIN_PART_SIZE,
+        max_concurrency=DEFAULT_MAX_CONCURRENCY,
         ):
     """Open an Azure Blob Storage blob for reading or writing.
 
@@ -85,6 +89,8 @@ def open(
         The buffer size to use when performing I/O. For reading only.
     min_part_size: int, optional
         The minimum part size for multipart uploads.  For writing only.
+    max_concurrency: int, optional
+        The number of parallel connections with which to download. For reading only.
 
     """
     if not client:
@@ -97,6 +103,7 @@ def open(
             client,
             buffer_size=buffer_size,
             line_terminator=smart_open.constants.BINARY_NEWLINE,
+            max_concurrency=max_concurrency,
         )
     elif mode == smart_open.constants.WRITE_BINARY:
         return Writer(
@@ -112,11 +119,12 @@ def open(
 class _RawReader(object):
     """Read an Azure Blob Storage file."""
 
-    def __init__(self, blob, size):
-        # type: (azure.storage.blob.BlobClient, int) -> None
+    def __init__(self, blob, size, concurrency):
+        # type: (azure.storage.blob.BlobClient, int, int) -> None
         self._blob = blob
         self._size = size
         self._position = 0
+        self._concurrency = concurrency
 
     def seek(self, position):
         """Seek to the specified position (byte offset) in the Azure Blob Storage blob.
@@ -143,9 +151,10 @@ class _RawReader(object):
             #
             return b''
         elif size == -1:
-            stream = self._blob.download_blob(offset=self._position)
+            stream = self._blob.download_blob(offset=self._position, max_concurrency=self._concurrency)
         else:
-            stream = self._blob.download_blob(offset=self._position, length=size)
+            stream = self._blob.download_blob(offset=self._position, max_concurrency=self._concurrency, length=size)
+        logging.debug('reading with a max concurrency of %d', self._concurrency)
         if isinstance(stream, azure.storage.blob.StorageStreamDownloader):
             binary = stream.readall()
         else:
@@ -168,6 +177,7 @@ class Reader(io.BufferedIOBase):
             client,  # type: azure.storage.blob.BlobServiceClient
             buffer_size=DEFAULT_BUFFER_SIZE,
             line_terminator=smart_open.constants.BINARY_NEWLINE,
+            max_concurrency=DEFAULT_MAX_CONCURRENCY,
     ):
         self._container_client = client.get_container_client(container)
         # type: azure.storage.blob.ContainerClient
@@ -182,7 +192,7 @@ class Reader(io.BufferedIOBase):
         except KeyError:
             self._size = 0
 
-        self._raw_reader = _RawReader(self._blob, self._size)
+        self._raw_reader = _RawReader(self._blob, self._size, max_concurrency)
         self._position = 0
         self._current_part = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._line_terminator = line_terminator
