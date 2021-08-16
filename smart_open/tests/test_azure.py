@@ -369,7 +369,7 @@ class ReaderTest(unittest.TestCase):
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
         self.assertEqual(content[14:], fin.read())  # read the rest
-    
+
     def test_read_max_concurrency(self):
         """Are Azure Blob Storage files read correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')

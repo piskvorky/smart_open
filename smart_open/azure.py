@@ -153,7 +153,8 @@ class _RawReader(object):
         elif size == -1:
             stream = self._blob.download_blob(offset=self._position, max_concurrency=self._concurrency)
         else:
-            stream = self._blob.download_blob(offset=self._position, max_concurrency=self._concurrency, length=size)
+            stream = self._blob.download_blob(
+                offset=self._position, max_concurrency=self._concurrency, length=size)
         logging.debug('reading with a max concurrency of %d', self._concurrency)
         if isinstance(stream, azure.storage.blob.StorageStreamDownloader):
             binary = stream.readall()
