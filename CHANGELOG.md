@@ -4,6 +4,7 @@
 - Change python_requires version to fix PEP 440 issue (PR [#639](https://github.com/RaRe-Technologies/smart_open/pull/639), [@lucasvieirasilva](https://github.com/lucasvieirasilva))
 - New blob_properties transport parameter for GCS (PR [#632](https://github.com/RaRe-Technologies/smart_open/pull/632), [@FHTheron](https://github.com/FHTheron))
 - Don't leak compressed stream (PR [#636](https://github.com/RaRe-Technologies/smart_open/pull/636), [@ampanasiuk](https://github.com/ampanasiuk))
+- New max_concurrency transport parameter for azure (PR [#642](https://github.com/RaRe-Technologies/smart_open/pull/642), [@omBratteng](https://github.com/omBratteng))
 
 # 5.1.0, 25 May 2021
 
