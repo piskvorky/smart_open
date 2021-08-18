@@ -1,5 +1,8 @@
 # Unreleased
 
+- Work around changes to `urllib.parse.urlsplit` (PR [#633](https://github.com/RaRe-Technologies/smart_open/pull/633), [@judahrand](https://github.com/judahrand)
+- Change python_requires version to fix PEP 440 issue (PR [#639](https://github.com/RaRe-Technologies/smart_open/pull/639), [@lucasvieirasilva](https://github.com/lucasvieirasilva))
+
 # 5.1.0, 25 May 2021
 
 This release introduces a new top-level parameter: `compression`.
