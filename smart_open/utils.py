@@ -15,7 +15,7 @@ import urllib.parse
 logger = logging.getLogger(__name__)
 
 WORKAROUND_SCHEMES = ['s3', 's3n', 's3u', 's3a', 'gs']
-QUESTION_MARK_PLACEHOLDER = '///smart_open.utils._QUESTION_MARK_PLACEHOLDER///'
+QUESTION_MARK_PLACEHOLDER = '///smart_open.utils.QUESTION_MARK_PLACEHOLDER///'
 
 
 def inspect_kwargs(kallable):
