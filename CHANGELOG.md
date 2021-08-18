@@ -1,5 +1,13 @@
 # Unreleased
 
+# 5.2.0, 18 August 2021
+
+- Work around changes to `urllib.parse.urlsplit` (PR [#633](https://github.com/RaRe-Technologies/smart_open/pull/633), [@judahrand](https://github.com/judahrand))
+- New blob_properties transport parameter for GCS (PR [#632](https://github.com/RaRe-Technologies/smart_open/pull/632), [@FHTheron](https://github.com/FHTheron))
+- Don't leak compressed stream (PR [#636](https://github.com/RaRe-Technologies/smart_open/pull/636), [@ampanasiuk](https://github.com/ampanasiuk))
+- Change python_requires version to fix PEP 440 issue (PR [#639](https://github.com/RaRe-Technologies/smart_open/pull/639), [@lucasvieirasilva](https://github.com/lucasvieirasilva))
+- New max_concurrency transport parameter for azure (PR [#642](https://github.com/RaRe-Technologies/smart_open/pull/642), [@omBratteng](https://github.com/omBratteng))
+
 # 5.1.0, 25 May 2021
 
 This release introduces a new top-level parameter: `compression`.

@@ -244,7 +244,8 @@ To disable compression:
     >>> from smart_open import open, register_compressor
     >>> with open('smart_open/tests/test_data/1984.txt.gz', 'rb', compression='disable') as fin:
     ...     print(fin.read(32))
-    b'1234'
+    b'\x1f\x8b\x08\x08\x85F\x94\\\x00\x031984.txt\x005\x8f=r\xc3@\x08\x85{\x9d\xe2\x1d@'
+
 
 To specify the algorithm explicitly (e.g. for non-standard file extensions):
 
