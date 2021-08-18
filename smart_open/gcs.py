@@ -112,6 +112,7 @@ def open(
         buffer_size=DEFAULT_BUFFER_SIZE,
         min_part_size=_MIN_MIN_PART_SIZE,
         client=None,  # type: google.cloud.storage.Client
+        blob_properties=None
         ):
     """Open an GCS blob for reading or writing.
 
@@ -129,6 +130,8 @@ def open(
         The minimum part size for multipart uploads.  For writing only.
     client: google.cloud.storage.Client, optional
         The GCS client to use when working with google-cloud-storage.
+    blob_properties: dict, optional
+        Set properties on blob before writing.  For writing only.
 
     """
     if mode == constants.READ_BINARY:
@@ -145,6 +148,7 @@ def open(
             blob_id,
             min_part_size=min_part_size,
             client=client,
+            blob_properties=blob_properties,
         )
     else:
         raise NotImplementedError('GCS support for mode %r not implemented' % mode)
@@ -396,6 +400,7 @@ class Writer(io.BufferedIOBase):
             blob,
             min_part_size=_DEFAULT_MIN_PART_SIZE,
             client=None,  # type: google.cloud.storage.Client
+            blob_properties=None,
     ):
         if client is None:
             client = google.cloud.storage.Client()
@@ -411,6 +416,10 @@ class Writer(io.BufferedIOBase):
         self._current_part = io.BytesIO()
 
         self._session = google.auth.transport.requests.AuthorizedSession(client._credentials)
+
+        if blob_properties:
+            for k, v in blob_properties.items():
+                setattr(self._blob, k, v)
 
         #
         # https://cloud.google.com/storage/docs/json_api/v1/how-tos/resumable-upload#start-resumable

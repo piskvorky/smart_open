@@ -801,6 +801,18 @@ class WriterTest(unittest.TestCase):
 
         self.assertEqual(output, [])
 
+    def test_write_05(self):
+        """Do blob_properties get applied?"""
+        smart_open_write = smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME,
+            blob_properties={
+                "content_type": "random/x-test",
+                "content_encoding": "coded"
+            }
+        )
+        with smart_open_write as fout:  # noqa
+            assert fout._blob.content_type == "random/x-test"
+            assert fout._blob.content_encoding == "coded"
+
     def test_gzip(self):
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
         with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fout:

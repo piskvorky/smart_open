@@ -2,6 +2,7 @@
 
 - Work around changes to `urllib.parse.urlsplit` (PR [#633](https://github.com/RaRe-Technologies/smart_open/pull/633), [@judahrand](https://github.com/judahrand)
 - Change python_requires version to fix PEP 440 issue (PR [#639](https://github.com/RaRe-Technologies/smart_open/pull/639), [@lucasvieirasilva](https://github.com/lucasvieirasilva))
+- New blob_properties transport parameter for GCS (PR [#632](https://github.com/RaRe-Technologies/smart_open/pull/632), [@FHTheron](https://github.com/FHTheron))
 
 # 5.1.0, 25 May 2021
 
