@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Helper script for including change log entries in an open PR.
 
 Automatically constructs the change log entry from the PR title.
