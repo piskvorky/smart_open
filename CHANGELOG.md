@@ -12,6 +12,7 @@ You may continue to use `ignore_ext` parameter for now, but it will be deprecate
 - Drop mock dependency; standardize on unittest.mock (PR [#621](https://github.com/RaRe-Technologies/smart_open/pull/621), [@musicinmybrain](https://github.com/musicinmybrain))
 - Fix to_boto3 method (PR [#619](https://github.com/RaRe-Technologies/smart_open/pull/619), [@mpenkov](https://github.com/mpenkov))
 - Work around changes to `urllib.parse.urlsplit` (PR [#633](https://github.com/RaRe-Technologies/smart_open/pull/633), [@judahrand](https://github.com/judahrand)
+- New blob_properties transport parameter for GCS (PR [#632](https://github.com/RaRe-Technologies/smart_open/pull/632), [@FHTheron](https://github.com/FHTheron))
 
 # 5.0.0, 30 Mar 2021
 
