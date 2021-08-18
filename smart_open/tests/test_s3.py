@@ -22,6 +22,7 @@ import boto3
 import botocore.client
 import botocore.endpoint
 import moto
+import pytest
 
 import smart_open
 import smart_open.s3
@@ -732,7 +733,11 @@ class IterBucketTest(unittest.TestCase):
     def tearDown(self):
         cleanup_bucket()
 
-    @unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
+    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
+    @pytest.mark.xfail(
+        condition=sys.platform == 'darwin',
+        reason="MacOS uses spawn rather than fork for multiprocessing",
+    )
     def test_iter_bucket(self):
         populate_bucket()
         results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
@@ -750,7 +755,11 @@ class IterBucketTest(unittest.TestCase):
             # verify the suggested new import is in the warning
             assert "from smart_open.s3 import iter_bucket as s3_iter_bucket" in cm.output[0]
 
-    @unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
+    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
+    @pytest.mark.xfail(
+        condition=sys.platform == 'darwin',
+        reason="MacOS uses spawn rather than fork for multiprocessing",
+    )
     def test_accepts_boto3_bucket(self):
         populate_bucket()
         bucket = boto3.resource('s3').Bucket(BUCKET_NAME)
@@ -777,8 +786,15 @@ class IterBucketTest(unittest.TestCase):
 
 
 @moto.mock_s3
-@unittest.skipIf(not smart_open.concurrency._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
-@unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
+@pytest.mark.skipif(
+    condition=not smart_open.concurrency._CONCURRENT_FUTURES,
+    reason='concurrent.futures unavailable',
+)
+@pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
+@pytest.mark.xfail(
+    condition=sys.platform == 'darwin',
+    reason="MacOS uses spawn rather than fork for multiprocessing",
+)
 class IterBucketConcurrentFuturesTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
@@ -800,8 +816,15 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
 
 
 @moto.mock_s3
-@unittest.skipIf(not smart_open.concurrency._MULTIPROCESSING, 'multiprocessing unavailable')
-@unittest.skipIf(sys.platform == 'win32', reason="does not run on windows")
+@pytest.mark.skipif(
+    condition=not smart_open.concurrency._MULTIPROCESSING,
+    reason='multiprocessing unavailable',
+)
+@pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
+@pytest.mark.xfail(
+    condition=sys.platform == 'darwin',
+    reason="MacOS uses spawn rather than fork for multiprocessing",
+)
 class IterBucketMultiprocessingTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_concurrent = smart_open.concurrency._CONCURRENT_FUTURES
