@@ -1,5 +1,8 @@
 # Unreleased
 
+- Work around changes to `urllib.parse.urlsplit` (PR [#633](https://github.com/RaRe-Technologies/smart_open/pull/633), [@judahrand](https://github.com/judahrand)
+- Change python_requires version to fix PEP 440 issue (PR [#639](https://github.com/RaRe-Technologies/smart_open/pull/639), [@lucasvieirasilva](https://github.com/lucasvieirasilva))
+
 # 5.1.0, 25 May 2021
 
 This release introduces a new top-level parameter: `compression`.
@@ -11,8 +14,6 @@ You may continue to use `ignore_ext` parameter for now, but it will be deprecate
 - Add new top-level compression parameter (PR [#609](https://github.com/RaRe-Technologies/smart_open/pull/609), [@dmcguire81](https://github.com/dmcguire81))
 - Drop mock dependency; standardize on unittest.mock (PR [#621](https://github.com/RaRe-Technologies/smart_open/pull/621), [@musicinmybrain](https://github.com/musicinmybrain))
 - Fix to_boto3 method (PR [#619](https://github.com/RaRe-Technologies/smart_open/pull/619), [@mpenkov](https://github.com/mpenkov))
-- Work around changes to `urllib.parse.urlsplit` (PR [#633](https://github.com/RaRe-Technologies/smart_open/pull/633), [@judahrand](https://github.com/judahrand)
-- Change python_requires version to fix PEP 440 issue (PR [#639](https://github.com/RaRe-Technologies/smart_open/pull/639), [@lucasvieirasilva](https://github.com/lucasvieirasilva))
 
 # 5.0.0, 30 Mar 2021
 
