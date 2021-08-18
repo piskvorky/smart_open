@@ -22,6 +22,10 @@ jobs:
             toxenv: "check_keys,py38-doctest,test_coverage,py38-integration"
             coveralls: true
 
+          - python-version: '3.9'
+            toxenv: "check_keys,py39-doctest,test_coverage,py39-integration"
+            coveralls: true
+
           - python-version: '3.8'
             toxenv: "flake8"
 
