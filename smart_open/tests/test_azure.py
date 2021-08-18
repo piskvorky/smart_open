@@ -60,7 +60,7 @@ class FakeBlobClient(object):
     def delete_blob(self):
         self._container_client.delete_blob(self)
 
-    def download_blob(self, offset=None, length=None):
+    def download_blob(self, offset=None, length=None, max_concurrency=1):
         if offset is None:
             return self.__contents
         self.__contents.seek(offset)
@@ -366,6 +366,18 @@ class ReaderTest(unittest.TestCase):
         logger.debug('content: %r len: %r', content, len(content))
 
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
+        self.assertEqual(content[:6], fin.read(6))
+        self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
+        self.assertEqual(content[14:], fin.read())  # read the rest
+
+    def test_read_max_concurrency(self):
+        """Are Azure Blob Storage files read correctly?"""
+        content = u"hello wořld\nhow are you?".encode('utf8')
+        blob_name = "test_read_%s" % BLOB_NAME
+        put_to_container(blob_name, contents=content)
+        logger.debug('content: %r len: %r', content, len(content))
+
+        fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT, max_concurrency=4)
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
         self.assertEqual(content[14:], fin.read())  # read the rest
