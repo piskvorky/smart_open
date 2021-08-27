@@ -280,8 +280,10 @@ class SeekableBufferedInputBase(BufferedInputBase):
         elif whence == constants.WHENCE_END:
             new_pos = self.content_length + offset
 
-        if self.content_length != -1:
-            new_pos = smart_open.utils.clamp(new_pos, 0, self.content_length)
+        if self.content_length == -1:
+            new_pos = smart_open.utils.clamp(new_pos, maxval=None)
+        else:
+            new_pos = smart_open.utils.clamp(new_pos, maxval=self.content_length)
 
         if self._current_pos == new_pos:
             return self._current_pos

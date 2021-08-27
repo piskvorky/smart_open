@@ -74,7 +74,7 @@ def check_kwargs(kallable, kwargs):
     return supported_kwargs
 
 
-def clamp(value, minval, maxval):
+def clamp(value, minval=0, maxval=None):
     """Clamp a numeric value to a specific range.
 
     Parameters
@@ -94,7 +94,10 @@ def clamp(value, minval, maxval):
         The clamped value.  It will be in the range ``[minval, maxval]``.
 
     """
-    return max(min(value, maxval), minval)
+    if maxval is not None:
+        value = min(value, maxval)
+    value = max(value, minval)
+    return value
 
 
 def make_range_string(start=None, stop=None):

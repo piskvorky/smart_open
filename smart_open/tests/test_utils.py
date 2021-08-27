@@ -5,7 +5,6 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-import unittest
 import urllib.parse
 
 import pytest
@@ -13,15 +12,31 @@ import pytest
 import smart_open.utils
 
 
-class ClampTest(unittest.TestCase):
-    def test_low(self):
-        self.assertEqual(smart_open.utils.clamp(5, 0, 10), 5)
+@pytest.mark.parametrize(
+    'value,minval,maxval,expected',
+    [
+        (5, 0, 10, 5),
+        (11, 0, 10, 10),
+        (-1, 0, 10, 0),
+        (10, 0, None, 10),
+        (-10, 0, None, 0),
+    ]
+)
+def test_clamp(value, minval, maxval, expected):
+    assert smart_open.utils.clamp(value, minval=minval, maxval=maxval) == expected
 
-    def test_high(self):
-        self.assertEqual(smart_open.utils.clamp(11, 0, 10), 10)
 
-    def test_out_of_range(self):
-        self.assertEqual(smart_open.utils.clamp(-1, 0, 10), 0)
+@pytest.mark.parametrize(
+    'value,params,expected',
+    [
+        (10, {}, 10),
+        (-10, {}, 0),
+        (-10, {'minval': -5}, -5),
+        (10, {'maxval': 5}, 5),
+    ]
+)
+def test_clamp_defaults(value, params, expected):
+    assert smart_open.utils.clamp(value, **params) == expected
 
 
 def test_check_kwargs():
