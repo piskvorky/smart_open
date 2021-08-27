@@ -119,7 +119,9 @@ def make_range_string(start=None, stop=None):
     #
     if start is None and stop is None:
         raise ValueError("make_range_string requires either a stop or start value")
-    return 'bytes=%s-%s' % ('' if start is None else start, '' if stop is None else stop)
+    start_str = '' if start is None else str(start)
+    stop_str = '' if stop is None else str(stop)
+    return 'bytes=%s-%s' % (start_str, stop_str)
 
 
 def parse_content_range(content_range):
