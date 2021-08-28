@@ -5,9 +5,11 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
+import functools
 import os
 import unittest
 
+import pytest
 import responses
 
 import smart_open.http
@@ -24,19 +26,19 @@ HEADERS = {
 }
 
 
-def request_callback(request):
+def request_callback(request, headers=HEADERS, data=BYTES):
     try:
         range_string = request.headers['range']
     except KeyError:
-        return (200, HEADERS, BYTES)
+        return (200, headers, data)
 
     start, end = range_string.replace('bytes=', '').split('-', 1)
     start = int(start)
     if end:
         end = int(end)
     else:
-        end = len(BYTES)
-    return (200, HEADERS, BYTES[start:end])
+        end = len(data)
+    return (200, headers, data[start:end])
 
 
 @unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
@@ -158,3 +160,28 @@ class HttpTest(unittest.TestCase):
         reader = smart_open.open(URL, "rb", transport_params={'timeout': timeout})
         assert hasattr(reader, 'timeout')
         assert reader.timeout == timeout
+
+
+@responses.activate
+def test_seek_implicitly_enabled(numbytes=10):
+    """Can we seek even if the server hasn't explicitly allowed it?"""
+    callback = functools.partial(request_callback, headers={})
+    responses.add_callback(responses.GET, HTTPS_URL, callback=callback)
+    with smart_open.open(HTTPS_URL, 'rb') as fin:
+        assert fin.seekable()
+        first = fin.read(size=numbytes)
+        fin.seek(-numbytes, whence=smart_open.constants.WHENCE_CURRENT)
+        second = fin.read(size=numbytes)
+        assert first == second
+
+
+@responses.activate
+def test_seek_implicitly_disabled():
+    """Does seeking fail when the server has explicitly disabled it?"""
+    callback = functools.partial(request_callback, headers={'Accept-Ranges': 'none'})
+    responses.add_callback(responses.GET, HTTPS_URL, callback=callback)
+    with smart_open.open(HTTPS_URL, 'rb') as fin:
+        assert not fin.seekable()
+        fin.read()
+        with pytest.raises(OSError):
+            fin.seek(0)

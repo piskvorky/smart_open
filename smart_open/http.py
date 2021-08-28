@@ -241,13 +241,14 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         logger.debug('self.response: %r, raw: %r', self.response, self.response.raw)
 
-        self._seekable = True
-
         self.content_length = int(self.response.headers.get("Content-Length", -1))
-        if self.content_length < 0:
-            self._seekable = False
-        if self.response.headers.get("Accept-Ranges", "none").lower() != "bytes":
-            self._seekable = False
+        #
+        # We assume the HTTP stream is seekable unless the server explicitly
+        # tells us it isn't.  It's better to err on the side of "seekable"
+        # because we don't want to prevent users from seeking a stream that
+        # does not appear to be seekable but really is.
+        #
+        self._seekable = self.response.headers.get("Accept-Ranges", "").lower() != "none"
 
         self._read_iter = self.response.iter_content(self.buffer_size)
         self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
@@ -270,7 +271,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             raise ValueError('invalid whence, expected one of %r' % constants.WHENCE_CHOICES)
 
         if not self.seekable():
-            raise OSError
+            raise OSError('stream is not seekable')
 
         if whence == constants.WHENCE_START:
             new_pos = offset
@@ -279,7 +280,10 @@ class SeekableBufferedInputBase(BufferedInputBase):
         elif whence == constants.WHENCE_END:
             new_pos = self.content_length + offset
 
-        new_pos = smart_open.utils.clamp(new_pos, 0, self.content_length)
+        if self.content_length == -1:
+            new_pos = smart_open.utils.clamp(new_pos, maxval=None)
+        else:
+            new_pos = smart_open.utils.clamp(new_pos, maxval=self.content_length)
 
         if self._current_pos == new_pos:
             return self._current_pos
