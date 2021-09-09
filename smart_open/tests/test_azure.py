@@ -526,6 +526,31 @@ class ReaderTest(unittest.TestCase):
 
         self.assertEqual(data, content)
 
+    def test_read_container_client(self):
+        content = "spirits in the material world".encode("utf-8")
+        blob_name = "test_read_container_client_%s" % BLOB_NAME
+        put_to_container(blob_name, contents=content)
+
+        container_client = CLIENT.get_container_client(CONTAINER_NAME)
+
+        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, container_client) as fin:
+            data = fin.read(100)
+
+        self.assertEqual(data, content)
+
+    def test_read_blob_client(self):
+        content = "walking on the moon".encode("utf-8")
+        blob_name = "test_read_blob_client_%s" % BLOB_NAME
+        put_to_container(blob_name, contents=content)
+
+        container_client = CLIENT.get_container_client(CONTAINER_NAME)
+        blob_client = container_client.get_blob_client(blob_name)
+
+        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, blob_client) as fin:
+            data = fin.read(100)
+
+        self.assertEqual(data, content)
+
 
 class WriterTest(unittest.TestCase):
     """Test writing into Azure Blob files."""
@@ -545,6 +570,23 @@ class WriterTest(unittest.TestCase):
             "azure://%s/%s" % (CONTAINER_NAME, blob_name),
             "rb",
             transport_params=dict(client=CLIENT),
+        ))
+        self.assertEqual(output, [test_string])
+
+    def test_write_container_client(self):
+        """Does writing into Azure Blob Storage work correctly?"""
+        test_string = u"Hiszékeny Öngyilkos Vasárnap".encode('utf8')
+        blob_name = "test_write_container_client_%s" % BLOB_NAME
+
+        container_client = CLIENT.get_container_client(CONTAINER_NAME)
+
+        with smart_open.azure.Writer(CONTAINER_NAME, blob_name, container_client) as fout:
+            fout.write(test_string)
+
+        output = list(smart_open.open(
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+            "rb",
+            transport_params=dict(client=container_client),
         ))
         self.assertEqual(output, [test_string])
 
