@@ -41,13 +41,6 @@ https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-bl
 DEFAULT_MAX_CONCURRENCY = 1
 """Default number of parallel connections with which to download."""
 
-# type alias the accepts any of three types of Azure storage client
-AzureClientType = Union[
-    azure.storage.blob.BlobServiceClient,
-    azure.storage.blob.ContainerClient,
-    azure.storage.blob.BlobClient,
-]
-
 
 def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
@@ -76,7 +69,7 @@ def open(
         container_id,
         blob_id,
         mode,
-        client=None,  # type: AzureClientType
+        client=None,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient] # noqa
         buffer_size=DEFAULT_BUFFER_SIZE,
         min_part_size=_DEFAULT_MIN_PART_SIZE,
         max_concurrency=DEFAULT_MAX_CONCURRENCY,
@@ -91,7 +84,7 @@ def open(
         The name of the blob within the bucket.
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
-    client: azure.storage.blob.BlobServiceClient
+    client: azure.storage.blob.BlobServiceClient, ContainerClient, or BlobClient
         The Azure Blob Storage client to use when working with azure-storage-blob.
     buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
@@ -125,7 +118,7 @@ def open(
 
 
 def _get_blob_client(client, container, blob):
-    # type: (AzureClientType, str, str) -> azure.storage.blob.BlobClient
+    # type: (Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient], str, str) -> azure.storage.blob.BlobClient  # noqa
     """
     Return an Azure BlobClient starting with any of BlobServiceClient,
     ContainerClient, or BlobClient plus container name and blob name.
@@ -202,7 +195,7 @@ class Reader(io.BufferedIOBase):
             self,
             container,
             blob,
-            client,  # type: AzureClientType
+            client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
             buffer_size=DEFAULT_BUFFER_SIZE,
             line_terminator=smart_open.constants.BINARY_NEWLINE,
             max_concurrency=DEFAULT_MAX_CONCURRENCY,
@@ -391,7 +384,7 @@ class Writer(io.BufferedIOBase):
             self,
             container,
             blob,
-            client,  # type: AzureClientType
+            client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
             min_part_size=_DEFAULT_MIN_PART_SIZE,
     ):
         self._is_closed = False
