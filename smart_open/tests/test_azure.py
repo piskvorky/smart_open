@@ -536,7 +536,7 @@ class ReaderTest(unittest.TestCase):
         with smart_open.azure.Reader(CONTAINER_NAME, blob_name, container_client) as fin:
             data = fin.read(100)
 
-        self.assertEqual(data, content)
+        assert data == content
 
     def test_read_blob_client(self):
         content = "walking on the moon".encode("utf-8")
@@ -549,7 +549,7 @@ class ReaderTest(unittest.TestCase):
         with smart_open.azure.Reader(CONTAINER_NAME, blob_name, blob_client) as fin:
             data = fin.read(100)
 
-        self.assertEqual(data, content)
+        assert data == content
 
 
 class WriterTest(unittest.TestCase):
@@ -588,7 +588,7 @@ class WriterTest(unittest.TestCase):
             "rb",
             transport_params=dict(client=container_client),
         ))
-        self.assertEqual(output, [test_string])
+        assert output == [test_string]
 
     def test_incorrect_input(self):
         """Does azure write fail on incorrect input?"""
