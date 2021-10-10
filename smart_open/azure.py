@@ -127,8 +127,10 @@ def _get_blob_client(client, container, blob):
         client = client.get_container_client(container)
 
     if hasattr(client, "container_name") and client.container_name != container:
-        raise ValueError("""Container client for "{}" doesn't match container "{}".""".format(
-            client.container_name, container))
+        raise ValueError(
+            "Client for %r doesn't match "
+            "container %r" % (client.container_name, container)
+        )
 
     if hasattr(client, "get_blob_client"):
         client = client.get_blob_client(blob)
