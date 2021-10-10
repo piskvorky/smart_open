@@ -20,7 +20,7 @@ import uuid
 import warnings
 
 import boto3
-from parameterizedtestcase import ParameterizedTestCase as PTestCase
+import pytest
 
 import smart_open
 import smart_open.concurrency
@@ -277,7 +277,7 @@ def force(multiprocessing=False, concurrent_futures=False):
     smart_open.concurrency._CONCURRENT_FUTURES = old_concurrent_futures
 
 
-class IterBucketTest(PTestCase):
+class IterBucketTest(unittest.TestCase):
     def setUp(self):
         self.expected = [
             (key, value)
@@ -321,11 +321,17 @@ class IterBucketTest(PTestCase):
         self.assertEqual(len(expected), len(actual))
         self.assertEqual(expected, sorted(actual))
 
-    @PTestCase.parameterize(('workers',), [(x,) for x in (1, 4, 8, 16, 64)])
-    def test_workers(self, workers):
-        actual = list(smart_open.s3.iter_bucket(BUCKET_NAME, prefix='iter_bucket', workers=workers))
-        self.assertEqual(len(self.expected), len(actual))
-        self.assertEqual(self.expected, sorted(actual))
+
+@pytest.mark.parametrize('workers', [(x,) for x in (1, 4, 8, 16, 64)])
+def test_workers(self, workers):
+    expected = sorted([
+        (key, value)
+        for (key, value) in CONTENTS.items()
+        if key.startswith('iter_bucket/')
+    ])
+    actual = sorted(smart_open.s3.iter_bucket(BUCKET_NAME, prefix='iter_bucket', workers=workers))
+    assert len(self.expected) == len(actual)
+    assert expected == actual
 
 
 class DownloadKeyTest(unittest.TestCase):
