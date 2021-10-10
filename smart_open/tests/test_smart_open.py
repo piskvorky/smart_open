@@ -2060,6 +2060,7 @@ def test_backwards_compatibility_wrapper():
         smart_open.smart_open(fpath, unsupported_keyword_param=123)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="this test does not work on Windows")
 def test_read_file_descriptor():
     with smart_open.open(__file__) as fin:
         expected = fin.read()
@@ -2071,6 +2072,7 @@ def test_read_file_descriptor():
     assert actual == expected
 
 
+@pytest.mark.skipif(os.name == "nt", reason="this test does not work on Windows")
 def test_write_file_descriptor():
     with tempfile.NamedTemporaryFile() as tmp:
         with smart_open.open(os.open(tmp.name, os.O_WRONLY), 'wt') as fout:
