@@ -35,6 +35,7 @@ __version__ = _get_version()
 def read(fname):
     return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
 
+
 aws_deps = ['boto3']
 gcs_deps = ['google-cloud-storage']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
@@ -47,7 +48,6 @@ tests_require = all_deps + [
     'responses',
     'boto3',
     'paramiko',
-    'parameterizedtestcase',
     'pytest',
     'pytest-rerunfailures'
 ]
