@@ -1375,7 +1375,7 @@ class CompressionFormatTest(unittest.TestCase):
     """Test transparent (de)compression."""
 
     def write_read_assertion(self, suffix):
-        with tempfile.NamedTemporaryFile(suffix=suffix) as tmp:
+        with named_temporary_file(suffix=suffix) as tmp:
             with smart_open.open(tmp.name, 'wb') as fout:
                 fout.write(SAMPLE_BYTES)
 
