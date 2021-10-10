@@ -2078,7 +2078,7 @@ def test_write_file_descriptor():
         with smart_open.open(os.open(tmp.name, os.O_WRONLY), 'wt') as fout:
             fout.write("hello world")
 
-        with smart_open.open(tmp, 'rt') as fin:
+        with smart_open.open(tmp.name, 'rt') as fin:
             assert fin.read() == "hello world"
 
 
