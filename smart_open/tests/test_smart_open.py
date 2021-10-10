@@ -1911,7 +1911,7 @@ def test_read_file_descriptor():
 
 @pytest.mark.skipif(os.name == "nt", reason="this test does not work on Windows")
 def test_write_file_descriptor():
-    with tempfile.NamedTemporaryFile() as tmp:
+    with named_temporary_file() as tmp:
         with smart_open.open(os.open(tmp.name, os.O_WRONLY), 'wt') as fout:
             fout.write("hello world")
 
