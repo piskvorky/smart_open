@@ -387,7 +387,11 @@ def _open_binary_stream(uri, mode, transport_params):
         # if there is no such an attribute, we return "unknown" - this
         # effectively disables any compression
         if not hasattr(uri, 'name'):
-            uri.name = getattr(uri, 'name', 'unknown')
+            name = getattr(uri, 'name', 'unknown')
+            try:
+                uri.name = name
+            except AttributeError:
+                pass
         return uri
 
     if not isinstance(uri, str):
