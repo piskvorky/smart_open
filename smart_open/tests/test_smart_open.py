@@ -2060,6 +2060,26 @@ def test_backwards_compatibility_wrapper():
         smart_open.smart_open(fpath, unsupported_keyword_param=123)
 
 
+def test_read_file_descriptor():
+    with smart_open.open(__file__) as fin:
+        expected = fin.read()
+
+    fd = os.open(__file__, os.O_RDONLY)
+    with smart_open.open(fd) as fin:
+        actual = fin.read()
+
+    assert actual == expected
+
+
+def test_write_file_descriptor():
+    with tempfile.NamedTemporaryFile() as tmp:
+        with smart_open.open(os.open(tmp.name, os.O_WRONLY), 'wt') as fout:
+            fout.write("hello world")
+
+        with smart_open.open(tmp, 'rt') as fin:
+            assert fin.read() == "hello world"
+
+
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
     unittest.main()
