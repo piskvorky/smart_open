@@ -120,6 +120,7 @@ def compression_wrapper(file_obj, mode, compression):
     elif compression == INFER_FROM_EXTENSION:
         try:
             filename = file_obj.name
+            filename.upper()  # make sure this thing is a string
         except (AttributeError, TypeError):
             logger.warning(
                 'unable to transparently decompress %r because it '

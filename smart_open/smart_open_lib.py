@@ -394,6 +394,17 @@ def _open_binary_stream(uri, mode, transport_params):
                 pass
         return uri
 
+    if isinstance(uri, int):
+        #
+        # We're working with a file descriptor.  If we open it, its name is
+        # just the integer value, which isn't helpful.  Unfortunately, there's
+        # no easy cross-platform way to go from a file descriptor to the filename,
+        # so we just give up here.  The user will have to handle their own
+        # compression, etc. explicitly.
+        #
+        fobj = _builtin_open(uri, mode, closefd=False)
+        return fobj
+
     if not isinstance(uri, str):
         raise TypeError("don't know how to handle uri %s" % repr(uri))
 
