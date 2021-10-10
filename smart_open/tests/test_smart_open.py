@@ -22,7 +22,6 @@ import warnings
 
 import boto3
 from moto import mock_s3
-import parameterizedtestcase
 import pytest
 import responses
 
@@ -1521,7 +1520,7 @@ def gzip_compress(data, filename=None):
     return buf.getvalue()
 
 
-class CompressionFormatTest(parameterizedtestcase.ParameterizedTestCase):
+class CompressionFormatTest(unittest.TestCase):
     """Test transparent (de)compression."""
 
     def write_read_assertion(self, suffix):
@@ -1542,20 +1541,6 @@ class CompressionFormatTest(parameterizedtestcase.ParameterizedTestCase):
         m = hashlib.md5(data)
         assert m.hexdigest() == '18473e60f8c7c98d29d65bf805736a0d', 'Failed to read gzip'
 
-    @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ("extension", "compressed"),
-        [
-            (".gz", gzip_compress(_DECOMPRESSED_DATA, 'key')),
-            (".bz2", bz2.compress(_DECOMPRESSED_DATA)),
-        ],
-    )
-    def test_closes_compressed_stream(self, extension, compressed):
-        """Transparent compression closes the compressed stream?"""
-        compressed_stream = make_buffer(initial_value=compressed, name=f"file{extension}")
-        with smart_open.open(compressed_stream, encoding="utf-8"):
-            pass
-        assert compressed_stream.close.call_count == 1
-
     def test_write_read_gz(self):
         """Can write and read gzip?"""
         self.write_read_assertion('.gz')
@@ -1571,6 +1556,21 @@ class CompressionFormatTest(parameterizedtestcase.ParameterizedTestCase):
 
             with smart_open.open(f.name, 'rt') as fin:
                 assert fin.read() == 'hello world'
+
+
+@pytest.mark.parametrize(
+    "extension,compressed",
+    [
+        (".gz", gzip_compress(_DECOMPRESSED_DATA, 'key')),
+        (".bz2", bz2.compress(_DECOMPRESSED_DATA)),
+    ],
+)
+def test_closes_compressed_stream(extension, compressed):
+    """Transparent compression closes the compressed stream?"""
+    compressed_stream = make_buffer(initial_value=compressed, name=f"file{extension}")
+    with smart_open.open(compressed_stream, encoding="utf-8"):
+        pass
+    assert compressed_stream.close.call_count == 1
 
 
 class MultistreamsBZ2Test(unittest.TestCase):
@@ -1882,7 +1882,7 @@ class CheckKwargsTest(unittest.TestCase):
 
 @mock_s3
 @mock.patch('time.time', _MOCK_TIME)
-class S3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
+class S3CompressionTestCase(unittest.TestCase):
 
     def setUp(self):
         s3 = boto3.resource("s3")
@@ -1896,130 +1896,136 @@ class S3CompressionTestCase(parameterizedtestcase.ParameterizedTestCase):
         """Does our gzip_compress function actually produce gzipped data?"""
         assert gzip.decompress(gzip_compress(_DECOMPRESSED_DATA)) == _DECOMPRESSED_DATA
 
-    @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ("url", "_compression"),
-        [
-            ("s3://bucket/gzipped", ".gz"),
-            ("s3://bucket/bzipped", ".bz2"),
-        ]
-    )
-    def test_read_explicit(self, url, _compression):
-        """Can we read using the explicitly specified compression?"""
-        with smart_open.open(url, 'rb', compression=_compression) as fin:
-            assert fin.read() == _DECOMPRESSED_DATA
 
-    @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ("_compression", "expected"),
-        [
-            (".gz", gzip_compress(_DECOMPRESSED_DATA, 'key')),
-            (".bz2", bz2.compress(_DECOMPRESSED_DATA)),
-        ],
-    )
-    def test_write_explicit(self, _compression, expected):
-        """Can we write using the explicitly specified compression?"""
-        with smart_open.open("s3://bucket/key", "wb", compression=_compression) as fout:
-            fout.write(_DECOMPRESSED_DATA)
-
-        with smart_open.open("s3://bucket/key", "rb", compression=NO_COMPRESSION) as fin:
-            assert fin.read() == expected
-
-    @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ("url", "_compression", "expected"),
-        [
-            ("s3://bucket/key.gz", ".gz", gzip_compress(_DECOMPRESSED_DATA, 'key.gz')),
-            ("s3://bucket/key.bz2", ".bz2", bz2.compress(_DECOMPRESSED_DATA)),
-        ],
-    )
-    def test_write_implicit(self, url, _compression, expected):
-        """Can we determine the compression from the file extension?"""
-        with smart_open.open(url, "wb", compression=INFER_FROM_EXTENSION) as fout:
-            fout.write(_DECOMPRESSED_DATA)
-
-        with smart_open.open(url, "rb", compression=NO_COMPRESSION) as fin:
-            assert fin.read() == expected
-
-    @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ("url", "_compression", "expected"),
-        [
-            ("s3://bucket/key.gz", ".gz", gzip_compress(_DECOMPRESSED_DATA, 'key.gz')),
-            ("s3://bucket/key.bz2", ".bz2", bz2.compress(_DECOMPRESSED_DATA)),
-        ],
-    )
-    def test_ignore_ext(self, url, _compression, expected):
-        """Can we handle the deprecated ignore_ext parameter when reading/writing?"""
-        with smart_open.open(url, "wb") as fout:
-            fout.write(_DECOMPRESSED_DATA)
-
-        with smart_open.open(url, "rb", ignore_ext=True) as fin:
-            assert fin.read() == expected
-
-    @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ("extension", "kwargs", "error"),
-        [
-            ("", dict(compression="foo"), ValueError),
-            ("", dict(compression="foo", ignore_ext=True), ValueError),
-            ("", dict(compression=NO_COMPRESSION, ignore_ext=True), ValueError),
-            (
-                ".gz",
-                dict(compression=INFER_FROM_EXTENSION, ignore_ext=True),
-                ValueError,
-            ),
-            (
-                ".bz2",
-                dict(compression=INFER_FROM_EXTENSION, ignore_ext=True),
-                ValueError,
-            ),
-            ("", dict(compression=".gz", ignore_ext=True), ValueError),
-            ("", dict(compression=".bz2", ignore_ext=True), ValueError),
-        ],
-    )
-    def test_compression_invalid(self, extension, kwargs, error):
-        """Should detect and error on these invalid inputs"""
-        with pytest.raises(error):
-            smart_open.open(f"s3://bucket/key{extension}", "wb", **kwargs)
-
-        with pytest.raises(error):
-            smart_open.open(f"s3://bucket/key{extension}", "rb", **kwargs)
+@pytest.mark.parametrize(
+    "url,_compression",
+    [
+        ("s3://bucket/gzipped", ".gz"),
+        ("s3://bucket/bzipped", ".bz2"),
+    ]
+)
+def test_s3_read_explicit(url, _compression):
+    """Can we read using the explicitly specified compression?"""
+    with smart_open.open(url, 'rb', compression=_compression) as fin:
+        assert fin.read() == _DECOMPRESSED_DATA
 
 
-class GetBinaryModeTest(parameterizedtestcase.ParameterizedTestCase):
-    @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ('mode', 'expected'),
-        [
-            ('r', 'rb'),
-            ('r+', 'rb+'),
-            ('rt', 'rb'),
-            ('rt+', 'rb+'),
-            ('r+t', 'rb+'),
-            ('w', 'wb'),
-            ('w+', 'wb+'),
-            ('wt', 'wb'),
-            ('wt+', 'wb+'),
-            ('w+t', 'wb+'),
-            ('a', 'ab'),
-            ('a+', 'ab+'),
-            ('at', 'ab'),
-            ('at+', 'ab+'),
-            ('a+t', 'ab+'),
-        ]
-    )
-    def test(self, mode, expected):
-        actual = smart_open.smart_open_lib._get_binary_mode(mode)
-        assert actual == expected
+@pytest.mark.parametrize(
+    "_compression,expected",
+    [
+        (".gz", gzip_compress(_DECOMPRESSED_DATA, 'key')),
+        (".bz2", bz2.compress(_DECOMPRESSED_DATA)),
+    ],
+)
+def test_s3_write_explicit(_compression, expected):
+    """Can we write using the explicitly specified compression?"""
+    with smart_open.open("s3://bucket/key", "wb", compression=_compression) as fout:
+        fout.write(_DECOMPRESSED_DATA)
 
-    @parameterizedtestcase.ParameterizedTestCase.parameterize(
-        ('mode', ),
-        [
-            ('rw', ),
-            ('rwa', ),
-            ('rbt', ),
-            ('r++', ),
-            ('+', ),
-            ('x', ),
-        ]
-    )
-    def test_bad(self, mode):
-        self.assertRaises(ValueError, smart_open.smart_open_lib._get_binary_mode, mode)
+    with smart_open.open("s3://bucket/key", "rb", compression=NO_COMPRESSION) as fin:
+        assert fin.read() == expected
+
+
+@pytest.mark.parametrize(
+    "url,_compression,expected",
+    [
+        ("s3://bucket/key.gz", ".gz", gzip_compress(_DECOMPRESSED_DATA, 'key.gz')),
+        ("s3://bucket/key.bz2", ".bz2", bz2.compress(_DECOMPRESSED_DATA)),
+    ],
+)
+def test_s3_write_implicit(url, _compression, expected):
+    """Can we determine the compression from the file extension?"""
+    with smart_open.open(url, "wb", compression=INFER_FROM_EXTENSION) as fout:
+        fout.write(_DECOMPRESSED_DATA)
+
+    with smart_open.open(url, "rb", compression=NO_COMPRESSION) as fin:
+        assert fin.read() == expected
+
+
+@pytest.mark.parametrize(
+    "url,_compression,expected",
+    [
+        ("s3://bucket/key.gz", ".gz", gzip_compress(_DECOMPRESSED_DATA, 'key.gz')),
+        ("s3://bucket/key.bz2", ".bz2", bz2.compress(_DECOMPRESSED_DATA)),
+    ],
+)
+def test_s3_ignore_ext(url, _compression, expected):
+    """Can we handle the deprecated ignore_ext parameter when reading/writing?"""
+    with smart_open.open(url, "wb") as fout:
+        fout.write(_DECOMPRESSED_DATA)
+
+    with smart_open.open(url, "rb", ignore_ext=True) as fin:
+        assert fin.read() == expected
+
+
+@pytest.mark.parametrize(
+    "extension,kwargs,error",
+    [
+        ("", dict(compression="foo"), ValueError),
+        ("", dict(compression="foo", ignore_ext=True), ValueError),
+        ("", dict(compression=NO_COMPRESSION, ignore_ext=True), ValueError),
+        (
+            ".gz",
+            dict(compression=INFER_FROM_EXTENSION, ignore_ext=True),
+            ValueError,
+        ),
+        (
+            ".bz2",
+            dict(compression=INFER_FROM_EXTENSION, ignore_ext=True),
+            ValueError,
+        ),
+        ("", dict(compression=".gz", ignore_ext=True), ValueError),
+        ("", dict(compression=".bz2", ignore_ext=True), ValueError),
+    ],
+)
+def test_compression_invalid(extension, kwargs, error):
+    """Should detect and error on these invalid inputs"""
+    with pytest.raises(error):
+        smart_open.open(f"s3://bucket/key{extension}", "wb", **kwargs)
+
+    with pytest.raises(error):
+        smart_open.open(f"s3://bucket/key{extension}", "rb", **kwargs)
+
+
+@pytest.mark.parametrize(
+    'mode,expected',
+    [
+        ('r', 'rb'),
+        ('r+', 'rb+'),
+        ('rt', 'rb'),
+        ('rt+', 'rb+'),
+        ('r+t', 'rb+'),
+        ('w', 'wb'),
+        ('w+', 'wb+'),
+        ('wt', 'wb'),
+        ('wt+', 'wb+'),
+        ('w+t', 'wb+'),
+        ('a', 'ab'),
+        ('a+', 'ab+'),
+        ('at', 'ab'),
+        ('at+', 'ab+'),
+        ('a+t', 'ab+'),
+    ]
+)
+def test_get_binary_mode(mode, expected):
+    actual = smart_open.smart_open_lib._get_binary_mode(mode)
+    assert actual == expected
+
+
+@pytest.mark.parametrize(
+    'mode',
+    [
+        ('rw', ),
+        ('rwa', ),
+        ('rbt', ),
+        ('r++', ),
+        ('+', ),
+        ('x', ),
+    ]
+)
+def test_get_binary_mode_bad(self, mode):
+    with pytest.assertRaise(ValueError):
+        smart_open.smart_open_lib._get_binary_mode(mode)
 
 
 def test_backwards_compatibility_wrapper():
