@@ -1880,23 +1880,25 @@ class CheckKwargsTest(unittest.TestCase):
         self.assertEqual(expected, actual)
 
 
+def initialize_bucket():
+    s3 = boto3.resource("s3")
+    bucket = s3.create_bucket(Bucket="bucket")
+    bucket.wait_until_exists()
+
+    bucket.Object('gzipped').put(Body=gzip_compress(_DECOMPRESSED_DATA))
+    bucket.Object('bzipped').put(Body=bz2.compress(_DECOMPRESSED_DATA))
+
+
 @mock_s3
 @mock.patch('time.time', _MOCK_TIME)
-class S3CompressionTestCase(unittest.TestCase):
-
-    def setUp(self):
-        s3 = boto3.resource("s3")
-        bucket = s3.create_bucket(Bucket="bucket")
-        bucket.wait_until_exists()
-
-        bucket.Object('gzipped').put(Body=gzip_compress(_DECOMPRESSED_DATA))
-        bucket.Object('bzipped').put(Body=bz2.compress(_DECOMPRESSED_DATA))
-
-    def test_gzip_compress_sanity(self):
-        """Does our gzip_compress function actually produce gzipped data?"""
-        assert gzip.decompress(gzip_compress(_DECOMPRESSED_DATA)) == _DECOMPRESSED_DATA
+def test_s3_gzip_compress_sanity():
+    """Does our gzip_compress function actually produce gzipped data?"""
+    initialize_bucket()
+    assert gzip.decompress(gzip_compress(_DECOMPRESSED_DATA)) == _DECOMPRESSED_DATA
 
 
+@mock_s3
+@mock.patch('time.time', _MOCK_TIME)
 @pytest.mark.parametrize(
     "url,_compression",
     [
@@ -1906,10 +1908,13 @@ class S3CompressionTestCase(unittest.TestCase):
 )
 def test_s3_read_explicit(url, _compression):
     """Can we read using the explicitly specified compression?"""
+    initialize_bucket()
     with smart_open.open(url, 'rb', compression=_compression) as fin:
         assert fin.read() == _DECOMPRESSED_DATA
 
 
+@mock_s3
+@mock.patch('time.time', _MOCK_TIME)
 @pytest.mark.parametrize(
     "_compression,expected",
     [
@@ -1919,6 +1924,8 @@ def test_s3_read_explicit(url, _compression):
 )
 def test_s3_write_explicit(_compression, expected):
     """Can we write using the explicitly specified compression?"""
+    initialize_bucket()
+
     with smart_open.open("s3://bucket/key", "wb", compression=_compression) as fout:
         fout.write(_DECOMPRESSED_DATA)
 
@@ -1926,6 +1933,8 @@ def test_s3_write_explicit(_compression, expected):
         assert fin.read() == expected
 
 
+@mock_s3
+@mock.patch('time.time', _MOCK_TIME)
 @pytest.mark.parametrize(
     "url,_compression,expected",
     [
@@ -1935,6 +1944,8 @@ def test_s3_write_explicit(_compression, expected):
 )
 def test_s3_write_implicit(url, _compression, expected):
     """Can we determine the compression from the file extension?"""
+    initialize_bucket()
+
     with smart_open.open(url, "wb", compression=INFER_FROM_EXTENSION) as fout:
         fout.write(_DECOMPRESSED_DATA)
 
@@ -1942,6 +1953,8 @@ def test_s3_write_implicit(url, _compression, expected):
         assert fin.read() == expected
 
 
+@mock_s3
+@mock.patch('time.time', _MOCK_TIME)
 @pytest.mark.parametrize(
     "url,_compression,expected",
     [
@@ -1951,6 +1964,8 @@ def test_s3_write_implicit(url, _compression, expected):
 )
 def test_s3_ignore_ext(url, _compression, expected):
     """Can we handle the deprecated ignore_ext parameter when reading/writing?"""
+    initialize_bucket()
+
     with smart_open.open(url, "wb") as fout:
         fout.write(_DECOMPRESSED_DATA)
 
@@ -2023,8 +2038,8 @@ def test_get_binary_mode(mode, expected):
         ('x', ),
     ]
 )
-def test_get_binary_mode_bad(self, mode):
-    with pytest.assertRaise(ValueError):
+def test_get_binary_mode_bad(mode):
+    with pytest.raises(ValueError):
         smart_open.smart_open_lib._get_binary_mode(mode)
 
 
