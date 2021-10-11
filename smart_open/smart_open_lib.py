@@ -106,8 +106,7 @@ def open(
         newline=None,
         closefd=True,
         opener=None,
-        ignore_ext=False,
-        compression=None,
+        compression=so_compression.INFER_FROM_EXTENSION,
         transport_params=None,
         ):
     r"""Open the URI object, returning a file-like object.
@@ -138,11 +137,8 @@ def open(
         Mimicks built-in open parameter of the same name.  Ignored.
     opener: object, optional
         Mimicks built-in open parameter of the same name.  Ignored.
-    ignore_ext: boolean, optional
-        Disable transparent compression/decompression based on the file extension.
     compression: str, optional (see smart_open.compression.get_supported_compression_types)
         Explicitly specify the compression/decompression behavior.
-        If you specify this parameter, then ignore_ext must not be specified.
     transport_params: dict, optional
         Additional parameters for the transport layer (see notes below).
 
@@ -172,15 +168,8 @@ def open(
     if not isinstance(mode, str):
         raise TypeError('mode should be a string')
 
-    if compression and ignore_ext:
-        raise ValueError('ignore_ext and compression parameters are mutually exclusive')
-    elif compression and compression not in so_compression.get_supported_compression_types():
+    if compression not in so_compression.get_supported_compression_types():
         raise ValueError(f'invalid compression type: {compression}')
-    elif ignore_ext:
-        compression = so_compression.NO_COMPRESSION
-        warnings.warn("'ignore_ext' will be deprecated in a future release", PendingDeprecationWarning)
-    elif compression is None:
-        compression = so_compression.INFER_FROM_EXTENSION
 
     if transport_params is None:
         transport_params = {}
@@ -496,7 +485,7 @@ def smart_open(
     # For completeness, the main differences of the old smart_open function:
     #
     # 1. Default mode was read binary (mode='rb')
-    # 2. ignore_ext parameter was called ignore_extension
+    # 2. compression parameter was called ignore_extension
     # 3. Transport parameters were passed directly as kwargs
     #
     url = 'https://github.com/RaRe-Technologies/smart_open/blob/develop/MIGRATING_FROM_OLDER_VERSIONS.rst'
@@ -508,7 +497,10 @@ def smart_open(
     message = 'This function is deprecated.  See %s for more information' % url
     warnings.warn(message, category=DeprecationWarning)
 
-    ignore_ext = ignore_extension
+    if ignore_extension:
+        compression = so_compression.NO_COMPRESSION
+    else:
+        compression = so_compression.INFER_FROM_EXTENSION
     del kwargs, url, message, ignore_extension
     return open(**locals())
 
