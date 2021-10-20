@@ -247,7 +247,7 @@ def open(
         decoded = decompressed
 
     #
-    # There some useful methods in the binary readers, e.g. to_boto3, that get
+    # There are some useful methods in the binary readers, e.g. to_boto3, that get
     # hidden by the multiple layers of wrapping we just performed.  Promote
     # them so they are visible to the user.
     #
