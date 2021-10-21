@@ -23,24 +23,26 @@ from smart_open import utils
 
 logger = logging.getLogger(__name__)
 
-SCHEME = 'hdfs'
+SCHEMES = ('hdfs', 'viewfs')
 
 URI_EXAMPLES = (
     'hdfs:///path/file',
     'hdfs://path/file',
+    'viewfs:///path/file',
+    'viewfs://path/file',
 )
 
 
 def parse_uri(uri_as_string):
     split_uri = urllib.parse.urlsplit(uri_as_string)
-    assert split_uri.scheme == SCHEME
+    assert split_uri.scheme in SCHEMES
 
     uri_path = split_uri.netloc + split_uri.path
     uri_path = "/" + uri_path.lstrip("/")
     if not uri_path:
         raise RuntimeError("invalid HDFS URI: %r" % uri_as_string)
 
-    return dict(scheme=SCHEME, uri_path=uri_path)
+    return dict(scheme="hdfs", uri_path=uri_path)
 
 
 def open_uri(uri, mode, transport_params):
