@@ -42,7 +42,7 @@ def parse_uri(uri_as_string):
     if not uri_path:
         raise RuntimeError("invalid HDFS URI: %r" % uri_as_string)
 
-    return dict(scheme="hdfs", uri_path=uri_path)
+    return dict(scheme=split_uri.scheme, uri_path=uri_path)
 
 
 def open_uri(uri, mode, transport_params):
