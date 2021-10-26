@@ -1380,7 +1380,7 @@ class CompressionFormatTest(unittest.TestCase):
                 fout.write(SAMPLE_BYTES)
 
             with open(tmp.name, 'rb') as fin:
-                assert fin.read() != SAMPLE_BYTES
+                assert fin.read() != SAMPLE_BYTES  # is the content really compressed? (built-in fails)
 
             with smart_open.open(tmp.name, 'rb') as fin:
                 assert fin.read() == SAMPLE_BYTES
