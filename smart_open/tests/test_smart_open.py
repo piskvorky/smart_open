@@ -1383,7 +1383,7 @@ class CompressionFormatTest(unittest.TestCase):
                 assert fin.read() != SAMPLE_BYTES  # is the content really compressed? (built-in fails)
 
             with smart_open.open(tmp.name, 'rb') as fin:
-                assert fin.read() == SAMPLE_BYTES
+                assert fin.read() == SAMPLE_BYTES  # ... smart_open correctly opens and decompresses
 
     def test_open_gz(self):
         """Can open gzip?"""
