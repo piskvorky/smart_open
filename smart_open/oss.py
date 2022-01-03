@@ -222,18 +222,18 @@ def open(
         The line terminator to use to split the line, by default linux using '/n', windows using '/r/n'
     """
     logger.debug('%r', locals())
-    if not client:
-        default_access_key_id = os.getenv('OSS_ACCESS_KEY_ID', '')
-        default_access_key_secret = os.getenv('OSS_ACCESS_KEY_SECRET', '')
-        default_endpoint = os.getenv('OSS_ENDPOINT', '')
-
-        client_kwargs = client_kwargs or {}
-        oss_client_args = client_kwargs.get('oss.Client', {})
-        access_key_id = oss_client_args.get('access_key_id', default_access_key_id)
-        access_key_secret = oss_client_args.get('access_key_secret', default_access_key_secret)
-        endpoint = oss_client_args.get('endpoint', default_endpoint)
-
-        client = oss2.Bucket(oss2.Auth(access_key_id, access_key_secret), endpoint, bucket_id)
+    # if not client:
+    #     default_access_key_id = os.getenv('OSS_ACCESS_KEY_ID', '')
+    #     default_access_key_secret = os.getenv('OSS_ACCESS_KEY_SECRET', '')
+    #     default_endpoint = os.getenv('OSS_ENDPOINT', '')
+    #
+    #     client_kwargs = client_kwargs or {}
+    #     oss_client_args = client_kwargs.get('oss.Client', {})
+    #     access_key_id = oss_client_args.get('access_key_id', default_access_key_id)
+    #     access_key_secret = oss_client_args.get('access_key_secret', default_access_key_secret)
+    #     endpoint = oss_client_args.get('endpoint', default_endpoint)
+    #
+    #     client = oss2.Bucket(oss2.Auth(access_key_id, access_key_secret), endpoint, bucket_id)
 
     if mode not in constants.BINARY_MODES:
         raise NotImplementedError('bad mode: %r expected one of %r' % (mode, constants.BINARY_MODES))
@@ -293,8 +293,12 @@ class Reader(io.BufferedIOBase):
             client=None,
             client_kwargs=None,
     ):
+
+        self._client = client
         self._bucket = bucket_id
         self._key = key_id
+        _initialize_oss(self, client, client_kwargs, bucket_id, key_id)
+
         self._version_id = version_id
         self._buffer_size = buffer_size
 
