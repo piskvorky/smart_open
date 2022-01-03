@@ -500,7 +500,6 @@ def _get(ali_bucket, key, version, byte_range):
 _OUT_OF_RANGE = 'InvalidRange'
 
 
-
 class _RawReader(object):
     """Read an ALICLOUD OSS Storage file."""
 
@@ -945,7 +944,7 @@ class MultipartWriter(io.BufferedIOBase):
             part_num,
             size_to_upload,
             self._total_bytes / 1024.0 ** 3,
-            )
+        )
         self._buf.seek(0)
 
         #
