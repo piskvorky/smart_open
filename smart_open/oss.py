@@ -81,12 +81,11 @@ def parse_uri(uri_as_string):
         auth, uri = uri.split('@', 1)
         access_id, access_secret = auth.split(':')
 
-    head, key_id = uri.split('/', 1)
-    if '@' in head:
+    if '@' in uri:
         ordinary_calling_format = True
-        endpoint, bucket_id = head.split('@')
-    else:
-        bucket_id = head
+        endpoint, uri = uri.split('@', -1)
+
+    bucket_id, key_id = uri.split('/', 1)
 
     return dict(
         scheme=split_uri.scheme,
@@ -138,7 +137,7 @@ def _consolidate_params(uri, transport_params):
     elif uri['access_id'] and uri['access_secret']:
         inject(
             access_key_id=uri['access_id'],
-            secret_access_key=uri['access_secret'],
+            access_key_secret=uri['access_secret'],
         )
         uri.update(access_id=None, access_secret=None)
 
@@ -303,7 +302,7 @@ class Reader(io.BufferedIOBase):
         self._buffer_size = buffer_size
 
         self._raw_reader = _RawReader(
-            ali_bucket=client,
+            ali_bucket=self._client,
             bucket=bucket_id,
             key=key_id,
             version_id=None,
@@ -501,13 +500,6 @@ def _get(ali_bucket, key, version, byte_range):
 _OUT_OF_RANGE = 'InvalidRange'
 
 
-# def _unwrap_ioerror(ioe):
-#     """Given an IOError from _get, return the 'Error' dictionary from oss"""
-#     try:
-#         return ioe.backend_error.response['Error']
-#     except (AttributeError, KeyError):
-#         return None
-
 
 class _RawReader(object):
     """Read an ALICLOUD OSS Storage file."""
@@ -524,7 +516,7 @@ class _RawReader(object):
         self._key = key
         self._version_id = version_id
 
-        self.content_length = None
+        self._content_length = None
         self._position = 0
         self._body = None
 
@@ -598,7 +590,7 @@ class _RawReader(object):
                 self._ali_bucket,
                 self._key,
                 self._version_id,
-                (start, stop),
+                byte_range=(start, stop),
             )
         except IOError as ioe:
             raise ioe
@@ -613,7 +605,7 @@ class _RawReader(object):
                 self._body = response
             else:
                 ans = re.search('bytes (?P<start>[0-9]*)-(?P<end>[0-9]*)/(?P<length>[0-9]*)',
-                                response.content_length,
+                                response.content_range,
                                 re.IGNORECASE)
                 self._content_length = int(ans.group('length'))
                 self._position = int(ans.group('start'))
@@ -793,10 +785,10 @@ def _initialize_oss(rw, client, client_kwargs, bucket_id, key_id):
         client_kwargs = {}
 
     if client is None:
-        init_kwargs = client_kwargs.get('OSS.Client', {})
-        access_key_id = init_kwargs.get('access_key_id')
-        access_key_secret = init_kwargs.get('access_key_secret')
-        endpoint = init_kwargs.get('endpoint')
+        init_kwargs = client_kwargs.get('oss.Client', {})
+        access_key_id = init_kwargs.pop('access_key_id')
+        access_key_secret = init_kwargs.pop('access_key_secret')
+        endpoint = init_kwargs.pop('endpoint')
         client = oss2.Bucket(oss2.Auth(access_key_id, access_key_secret), endpoint, bucket_id, **init_kwargs)
     assert client
 
@@ -823,16 +815,16 @@ class MultipartWriter(io.BufferedIOBase):
         self._bucket = bucket_id
         self._key = key_id
 
-        _initialize_oss(self, client, client_kwargs, bucket_id, key_id)
-
         if min_part_size < MIN_PART_SIZE:
             logger.warning("OSS requires minimum part size >= 100KB; multipart upload may fail")
             self._min_part_size = MIN_PART_SIZE
         else:
             self._min_part_size = min_part_size
 
+        _initialize_oss(self, client, client_kwargs, bucket_id, key_id)
+
         try:
-            client.get_bucket_info()
+            self._client.get_bucket_info()
         except oss2.exceptions.InvalidArgument as e:
             raise ValueError('oss config error, ak, sk, not correct' % bucket_id) from e
         except oss2.exceptions.NoSuchBucket as e:

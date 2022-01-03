@@ -39,8 +39,7 @@ def _get_obj_iter(oss_bucket, prefix):
                                     delimiter='/',
                                     max_keys=100):
         try:
-            oss_obj = oss_bucket.head_object(info.key)
-            yield oss_obj
+            yield info.key
         except (oss2.exceptions.NoSuchKey, oss2.exceptions.NotFound) as e:
             continue
         except Exception as e:
@@ -48,8 +47,8 @@ def _get_obj_iter(oss_bucket, prefix):
 
 
 def _delete_obj_by_prefix(oss_bucket, prefix):
-    for obj in _get_obj_iter(oss_bucket, prefix):
-        oss_bucket.delete_object(obj.name)
+    for obj_key in _get_obj_iter(oss_bucket, prefix):
+        oss_bucket.delete_object(obj_key)
 
 
 #
@@ -86,16 +85,18 @@ def _test_case(function):
 
 
 def write_read(uri, content, write_mode, read_mode, encoding=None, oss_bucket=None, **kwargs):
-    write_params = dict(kwargs)
-    write_params.update(client=oss_bucket)
-    with smart_open.open(uri, write_mode, encoding=encoding, transport_params=write_params) as fout:
+    transport_params = dict(kwargs)
+    transport_params.update(client=oss_bucket)
+
+    # with open(url, 'wb', transport_params={'client': oss_client}) as fout:
+    with smart_open.open(uri, write_mode, encoding=encoding, transport_params=transport_params) as fout:
         fout.write(content)
-    with smart_open.open(uri, read_mode, encoding=encoding, transport_params=kwargs) as fin:
+    with smart_open.open(uri, read_mode, encoding=encoding, transport_params=transport_params) as fin:
         actual = fin.read()
     return actual
 
 @_test_case
 def test_oss_readwrite_text(benchmark, oss_bucket, uri):
     text = 'с гранатою в кармане, с чекою в руке'
-    actual = benchmark(write_read, uri, text, 'w', 'r', 'utf-8')
+    actual = benchmark(write_read, uri, text, 'w', 'r', 'utf-8', oss_bucket)
     assert actual == text
