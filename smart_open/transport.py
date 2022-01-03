@@ -101,6 +101,7 @@ register_transport('smart_open.http')
 register_transport('smart_open.s3')
 register_transport('smart_open.ssh')
 register_transport('smart_open.webhdfs')
+register_transport('smart_open.oss')
 
 SUPPORTED_SCHEMES = tuple(sorted(_REGISTRY.keys()))
 """The transport schemes that the local installation of ``smart_open`` supports."""
