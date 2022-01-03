@@ -81,6 +81,7 @@ def _test_case(function):
     def inner(benchmark, oss_bucket):
         with temporary(oss_bucket) as uri:
             return function(benchmark, oss_bucket, uri)
+
     return inner
 
 
@@ -94,6 +95,7 @@ def write_read(uri, content, write_mode, read_mode, encoding=None, oss_bucket=No
     with smart_open.open(uri, read_mode, encoding=encoding, transport_params=transport_params) as fin:
         actual = fin.read()
     return actual
+
 
 @_test_case
 def test_oss_readwrite_text(benchmark, oss_bucket, uri):
