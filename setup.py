@@ -37,7 +37,7 @@ def read(fname):
 
 
 aws_deps = ['boto3']
-gcs_deps = ['google-cloud-storage']
+gcs_deps = ['google-cloud-storage>=1.31.0']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 http_deps = ['requests']
 
