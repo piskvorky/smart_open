@@ -1,5 +1,19 @@
 # Unreleased
 
+This release deprecates the old `ignore_ext` parameter.
+Use the `compression` parameter instead.
+
+```python
+fin = smart_open.open("/path/file.gz", ignore_ext=True)  # No
+fin = smart_open.open("/path/file.gz", compression="disable")  # Yes
+
+fin = smart_open.open("/path/file.gz", ignore_ext=False)  # No
+fin = smart_open.open("/path/file.gz")  # Yes
+fin = smart_open.open("/path/file.gz", compression="infer_from_extension")  # Yes, if you want to be explicit
+
+fin = smart_open.open("/path/file", compression=".gz")  # Yes
+```
+
 - Use pytest instead of parameterizedtestcase (PR [#657](https://github.com/RaRe-Technologies/smart_open/pull/657), [@mpenkov](https://github.com/mpenkov))
 - Support container client and blob client for azure blob storage (PR [#652](https://github.com/RaRe-Technologies/smart_open/pull/652), [@cbare](https://github.com/cbare))
 - Support working directly with file descriptors (PR [#659](https://github.com/RaRe-Technologies/smart_open/pull/659), [@mpenkov](https://github.com/mpenkov))
