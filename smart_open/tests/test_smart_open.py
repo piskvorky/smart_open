@@ -448,20 +448,16 @@ class SmartOpenHttpTest(unittest.TestCase):
     @responses.activate
     def _test_compressed_http(self, suffix, query):
         """Can open <suffix> via http?"""
+        assert suffix in ('.gz', '.bz2')
+
         raw_data = b'Hello World Compressed.' * 10000
-        buf = make_buffer(name='data' + suffix)
-        with smart_open.open(buf, 'wb') as outfile:
-            outfile.write(raw_data)
-        compressed_data = buf._value_when_closed
-        # check that the string was actually compressed
-        self.assertNotEqual(compressed_data, raw_data)
+        compressed_data = gzip_compress(raw_data) if suffix == '.gz' else bz2.compress(raw_data)
 
         responses.add(responses.GET, 'http://127.0.0.1/data' + suffix, body=compressed_data, stream=True)
         url = 'http://127.0.0.1/data%s%s' % (suffix, '?some_param=some_val' if query else '')
         smart_open_object = smart_open.open(url, 'rb')
 
-        # decompress the file and get the same md5 hash
-        self.assertEqual(smart_open_object.read(), raw_data)
+        assert smart_open_object.read() == raw_data
 
     def test_http_gz(self):
         """Can open gzip via http?"""
@@ -478,33 +474,6 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_http_bz2_query(self):
         """Can open bzip2 via http with a query appended to URI?"""
         self._test_compressed_http(".bz2", True)
-
-
-def make_buffer(cls=io.BytesIO, initial_value=None, name=None, noclose=False):
-    """
-    Construct a new in-memory file object aka "buf".
-
-    :param cls: Class of the file object. Meaningful values are BytesIO and StringIO.
-    :param initial_value: Passed directly to the constructor, this is the content of the returned buffer.
-    :param name: Associated file path. Not assigned if is None (default).
-    :param noclose: If True, disables the .close function.
-    :return: Instance of `cls`.
-    """
-    buf = cls(initial_value) if initial_value else cls()
-    if name is not None:
-        buf.name = name
-
-    buf._value_when_closed = None
-    orig_close = buf.close
-
-    def close():
-        if buf.close.call_count == 1:
-            buf._value_when_closed = buf.getvalue()
-        if not noclose:
-            orig_close()
-
-    buf.close = mock.Mock(side_effect=close)
-    return buf
 
 
 class RealFileSystemTests(unittest.TestCase):
@@ -562,124 +531,6 @@ class RealFileSystemTests(unittest.TestCase):
         with smart_open.open(self.temp_file, 'rt') as fin:
             text = fin.read()
         self.assertEqual(text, SAMPLE_TEXT * 2)
-
-
-class SmartOpenFileObjTest(unittest.TestCase):
-    """
-    Test passing raw file objects.
-    """
-
-    def test_read_bytes(self):
-        """Can we read bytes from a byte stream?"""
-        buf = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.open(buf, 'rb') as sf:
-            data = sf.read()
-        self.assertEqual(data, SAMPLE_BYTES)
-
-    def test_write_bytes(self):
-        """Can we write bytes to a byte stream?"""
-        buf = make_buffer()
-        with smart_open.open(buf, 'wb') as sf:
-            sf.write(SAMPLE_BYTES)
-            self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
-
-    def test_read_text_stream_fails(self):
-        """Attempts to read directly from a text stream should fail.
-
-        This is because smart_open.open expects a byte stream as input.
-        If you have a text stream, there's no point passing it to smart_open:
-        you can read from it directly.
-        """
-        buf = make_buffer(io.StringIO, initial_value=SAMPLE_TEXT)
-        with smart_open.open(buf, 'r') as sf:
-            self.assertRaises(TypeError, sf.read)  # we expect binary mode
-
-    def test_write_text_stream_fails(self):
-        """Attempts to write directly to a text stream should fail."""
-        buf = make_buffer(io.StringIO)
-        with smart_open.open(buf, 'w') as sf:
-            with self.assertRaises(TypeError):
-                sf.write(SAMPLE_TEXT)  # we expect binary mode
-                # Need to flush because TextIOWrapper may buffer and we need
-                # to write to the underlying StringIO to get the TypeError.
-                sf.flush()
-
-    def test_read_text_from_bytestream(self):
-        buf = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.open(buf, 'r') as sf:
-            data = sf.read()
-        self.assertEqual(data, SAMPLE_TEXT)
-
-    def test_read_text_from_bytestream_rt(self):
-        buf = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.open(buf, 'rt') as sf:
-            data = sf.read()
-        self.assertEqual(data, SAMPLE_TEXT)
-
-    def test_read_text_from_bytestream_rtplus(self):
-        buf = make_buffer(initial_value=SAMPLE_BYTES)
-        with smart_open.open(buf, 'rt+') as sf:
-            data = sf.read()
-        self.assertEqual(data, SAMPLE_TEXT)
-
-    def test_write_text_to_bytestream(self):
-        """Can we write strings to a byte stream?"""
-        buf = make_buffer(noclose=True)
-        with smart_open.open(buf, 'w') as sf:
-            sf.write(SAMPLE_TEXT)
-
-        self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
-
-    def test_write_text_to_bytestream_wt(self):
-        """Can we write strings to a byte stream?"""
-        buf = make_buffer(noclose=True)
-        with smart_open.open(buf, 'wt') as sf:
-            sf.write(SAMPLE_TEXT)
-
-        self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
-
-    def test_write_text_to_bytestream_wtplus(self):
-        """Can we write strings to a byte stream?"""
-        buf = make_buffer(noclose=True)
-        with smart_open.open(buf, 'wt+') as sf:
-            sf.write(SAMPLE_TEXT)
-
-        self.assertEqual(buf.getvalue(), SAMPLE_BYTES)
-
-    def test_name_read(self):
-        """Can we use the "name" attribute to decompress on the fly?"""
-        data = SAMPLE_BYTES * 1000
-        buf = make_buffer(initial_value=bz2.compress(data), name='data.bz2')
-        with smart_open.open(buf, 'rb') as sf:
-            data = sf.read()
-        self.assertEqual(data, data)
-
-    def test_name_write(self):
-        """Can we use the "name" attribute to compress on the fly?"""
-        data = SAMPLE_BYTES * 1000
-        buf = make_buffer(name='data.bz2')
-        with smart_open.open(buf, 'wb') as sf:
-            sf.write(data)
-        self.assertEqual(bz2.decompress(buf._value_when_closed), data)
-
-    def test_open_side_effect(self):
-        """
-        Does our detection of the `name` attribute work with wrapped open()-ed streams?
-
-        We `open()` a file with ".bz2" extension, pass the file object to `smart_open()` and check that
-        we read decompressed data. This behavior is driven by detecting the `name` attribute in
-        `_open_binary_stream()`.
-        """
-        data = SAMPLE_BYTES * 1000
-        with named_temporary_file(prefix='smart_open_tests_', suffix=".bz2", delete=False) as tmpf:
-            tmpf.write(bz2.compress(data))
-        try:
-            with open(tmpf.name, 'rb') as openf:
-                with smart_open.open(openf, 'rb') as smartf:
-                    smart_data = smartf.read()
-            self.assertEqual(data, smart_data)
-        finally:
-            os.unlink(tmpf.name)
 
 
 #
@@ -1524,14 +1375,15 @@ class CompressionFormatTest(unittest.TestCase):
     """Test transparent (de)compression."""
 
     def write_read_assertion(self, suffix):
-        test_file = make_buffer(name='file' + suffix)
-        with smart_open.open(test_file, 'wb') as fout:
-            fout.write(SAMPLE_BYTES)
-        self.assertNotEqual(SAMPLE_BYTES, test_file._value_when_closed)
-        # we have to recreate the buffer because it is closed
-        test_file = make_buffer(initial_value=test_file._value_when_closed, name=test_file.name)
-        with smart_open.open(test_file, 'rb') as fin:
-            self.assertEqual(fin.read(), SAMPLE_BYTES)
+        with named_temporary_file(suffix=suffix) as tmp:
+            with smart_open.open(tmp.name, 'wb') as fout:
+                fout.write(SAMPLE_BYTES)
+
+            with open(tmp.name, 'rb') as fin:
+                assert fin.read() != SAMPLE_BYTES  # is the content really compressed? (built-in fails)
+
+            with smart_open.open(tmp.name, 'rb') as fin:
+                assert fin.read() == SAMPLE_BYTES  # ... smart_open correctly opens and decompresses
 
     def test_open_gz(self):
         """Can open gzip?"""
@@ -1556,21 +1408,6 @@ class CompressionFormatTest(unittest.TestCase):
 
             with smart_open.open(f.name, 'rt') as fin:
                 assert fin.read() == 'hello world'
-
-
-@pytest.mark.parametrize(
-    "extension,compressed",
-    [
-        (".gz", gzip_compress(_DECOMPRESSED_DATA, 'key')),
-        (".bz2", bz2.compress(_DECOMPRESSED_DATA)),
-    ],
-)
-def test_closes_compressed_stream(extension, compressed):
-    """Transparent compression closes the compressed stream?"""
-    compressed_stream = make_buffer(initial_value=compressed, name=f"file{extension}")
-    with smart_open.open(compressed_stream, encoding="utf-8"):
-        pass
-    assert compressed_stream.close.call_count == 1
 
 
 class MultistreamsBZ2Test(unittest.TestCase):
@@ -2074,7 +1911,7 @@ def test_read_file_descriptor():
 
 @pytest.mark.skipif(os.name == "nt", reason="this test does not work on Windows")
 def test_write_file_descriptor():
-    with tempfile.NamedTemporaryFile() as tmp:
+    with named_temporary_file() as tmp:
         with smart_open.open(os.open(tmp.name, os.O_WRONLY), 'wt') as fout:
             fout.write("hello world")
 
