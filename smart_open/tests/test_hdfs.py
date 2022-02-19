@@ -18,6 +18,8 @@ import smart_open.hdfs
 
 CURR_DIR = P.dirname(P.abspath(__file__))
 
+if sys.platform.startswith("win"):
+    pytest.skip("these tests don't work under Windows", allow_module_level=True)
 
 #
 # We want our mocks to emulate the real implementation as close as possible,
