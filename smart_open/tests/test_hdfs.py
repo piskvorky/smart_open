@@ -13,6 +13,8 @@ import unittest
 from unittest import mock
 import sys
 
+import pytest
+
 import smart_open.hdfs
 
 #
@@ -43,100 +45,91 @@ def cat(path=None):
     return subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
 
-class CliRawInputBaseTest(unittest.TestCase):
-    def setUp(self):
-        self.path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
-
-        #
-        # We have to specify the encoding explicitly, because different
-        # platforms like Windows may be using something other than unicode
-        # by default.
-        #
-        with open(self.path, encoding='utf-8') as fin:
-            self.expected = fin.read()
-        self.cat = cat(self.path)
-
-    def test_read(self):
-        with mock.patch('subprocess.Popen', return_value=self.cat):
-            reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
-            as_bytes = reader.read()
-
-        #
-        # Not 100% sure why this is necessary on Windows platforms, but the
-        # tests fail without it.  It may be a bug, but I don't have time to
-        # investigate right now.
-        #
-        as_text = as_bytes.decode('utf-8').replace(os.linesep, '\n')
-        assert as_text == self.expected
-
-    def test_read_75(self):
-        with mock.patch('subprocess.Popen', return_value=self.cat):
-            reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
-            as_bytes = reader.read(75)
-
-        as_text = as_bytes.decode('utf-8').replace(os.linesep, '\n')
-        assert as_text == self.expected[:len(as_text)]
-
-    def test_unzip(self):
-        path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt.gz')
-
-        with mock.patch('subprocess.Popen', return_value=cat(path)):
-            with gzip.GzipFile(fileobj=smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')) as fin:
-                as_bytes = fin.read()
-
-        as_text = as_bytes.decode('utf-8')
-        assert as_text == self.expected
-
-    def test_context_manager(self):
-        with mock.patch('subprocess.Popen', return_value=self.cat):
-            with smart_open.hdfs.CliRawInputBase('hdfs://dummy/url') as fin:
-                as_bytes = fin.read()
-
-        as_text = as_bytes.decode('utf-8').replace('\r\n', '\n')
-        assert as_text == self.expected
+CAP_PATH = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
+with open(CAP_PATH, encoding='utf-8') as fin:
+    CRIME_AND_PUNISHMENT = fin.read()
 
 
-class SanityTest(unittest.TestCase):
-    def test_read_bytes(self):
-        path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
-        with open(path, 'rb') as fin:
-            lines = [line for line in fin]
-        assert len(lines) == 3
+def test_read():
+    with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH)):
+        reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
+        as_bytes = reader.read()
 
-    def test_read_text(self):
-        path = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
-        with open(path, 'r', encoding='utf-8') as fin:
-            text = fin.read()
-
-        expected = 'В начале июля, в чрезвычайно жаркое время'
-        assert text[:len(expected)] == expected
+    #
+    # Not 100% sure why this is necessary on Windows platforms, but the
+    # tests fail without it.  It may be a bug, but I don't have time to
+    # investigate right now.
+    #
+    as_text = as_bytes.decode('utf-8').replace(os.linesep, '\n')
+    assert as_text == CRIME_AND_PUNISHMENT
 
 
-class CliRawOutputBaseTest(unittest.TestCase):
-    def test_write(self):
-        expected = 'мы в ответе за тех, кого приручили'
-        mocked_cat = cat()
+def test_read_75():
+    with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH)):
+        reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
+        as_bytes = reader.read(75)
 
-        with mock.patch('subprocess.Popen', return_value=mocked_cat):
-            with smart_open.hdfs.CliRawOutputBase('hdfs://dummy/url') as fout:
-                fout.write(expected.encode('utf-8'))
+    as_text = as_bytes.decode('utf-8').replace(os.linesep, '\n')
+    assert as_text == CRIME_AND_PUNISHMENT[:len(as_text)]
 
-        actual = mocked_cat.stdout.read().decode('utf-8')
-        assert actual == expected
 
-    def test_zip(self):
-        expected = 'мы в ответе за тех, кого приручили'
-        mocked_cat = cat()
+def test_unzip():
+    with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH + '.gz')):
+        with gzip.GzipFile(fileobj=smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')) as fin:
+            as_bytes = fin.read()
 
-        with mock.patch('subprocess.Popen', return_value=mocked_cat):
-            with smart_open.hdfs.CliRawOutputBase('hdfs://dummy/url') as fout:
-                with gzip.GzipFile(fileobj=fout, mode='wb') as gz_fout:
-                    gz_fout.write(expected.encode('utf-8'))
+    as_text = as_bytes.decode('utf-8')
+    assert as_text == CRIME_AND_PUNISHMENT
 
-        with gzip.GzipFile(fileobj=mocked_cat.stdout) as fin:
-            actual = fin.read().decode('utf-8')
 
-        assert actual == expected
+def test_context_manager():
+    with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH)):
+        with smart_open.hdfs.CliRawInputBase('hdfs://dummy/url') as fin:
+            as_bytes = fin.read()
+
+    as_text = as_bytes.decode('utf-8').replace('\r\n', '\n')
+    assert as_text == CRIME_AND_PUNISHMENT
+
+
+def test_read_bytes():
+    with open(CAP_PATH, 'rb') as fin:
+        lines = [line for line in fin]
+    assert len(lines) == 3
+
+
+def test_read_text():
+    with open(CAP_PATH, 'r', encoding='utf-8') as fin:
+        text = fin.read()
+
+    expected = 'В начале июля, в чрезвычайно жаркое время'
+    assert text[:len(expected)] == expected
+
+
+def test_write():
+    expected = 'мы в ответе за тех, кого приручили'
+    mocked_cat = cat()
+
+    with mock.patch('subprocess.Popen', return_value=mocked_cat):
+        with smart_open.hdfs.CliRawOutputBase('hdfs://dummy/url') as fout:
+            fout.write(expected.encode('utf-8'))
+
+    actual = mocked_cat.stdout.read().decode('utf-8')
+    assert actual == expected
+
+
+def test_write_zip():
+    expected = 'мы в ответе за тех, кого приручили'
+    mocked_cat = cat()
+
+    with mock.patch('subprocess.Popen', return_value=mocked_cat):
+        with smart_open.hdfs.CliRawOutputBase('hdfs://dummy/url') as fout:
+            with gzip.GzipFile(fileobj=fout, mode='wb') as gz_fout:
+                gz_fout.write(expected.encode('utf-8'))
+
+    with gzip.GzipFile(fileobj=mocked_cat.stdout) as fin:
+        actual = fin.read().decode('utf-8')
+
+    assert actual == expected
 
 
 def main():
