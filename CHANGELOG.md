@@ -4,6 +4,7 @@
 - Support container client and blob client for azure blob storage (PR [#652](https://github.com/RaRe-Technologies/smart_open/pull/652), [@cbare](https://github.com/cbare))
 - Support working directly with file descriptors (PR [#659](https://github.com/RaRe-Technologies/smart_open/pull/659), [@mpenkov](https://github.com/mpenkov))
 - Fix AttributeError when reading passthrough zstandard (PR [#658](https://github.com/RaRe-Technologies/smart_open/pull/658), [@mpenkov](https://github.com/mpenkov))
+- Added support for viewfs:// URLs (PR [#665](https://github.com/RaRe-Technologies/smart_open/pull/665), [@ChandanChainani](https://github.com/ChandanChainani))
 
 # 5.2.1, 28 August 2021
 
