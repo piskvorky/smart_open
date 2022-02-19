@@ -24,11 +24,11 @@ jobs:
           - python-version: '3.9'
             toxenv: "py39-test"
 
-          - python-version: '3.10'
-            toxenv: "py310-doctest"
+        # - python-version: '3.10'
+        #   toxenv: "py310-doctest"
 
-          # - python-version: '3.10'
-          # toxenv: "py310-test"
+        # - python-version: '3.10'
+        #   toxenv: "py310-test"
 
     steps:
       - uses: actions/checkout@v2
@@ -45,3 +45,5 @@ jobs:
 
       - name: Test using Tox
         run: tox
+        env:
+          TOXENV: ${{ matrix.toxenv }}
