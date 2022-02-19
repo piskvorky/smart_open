@@ -9,19 +9,12 @@ import gzip
 import os
 import os.path as P
 import subprocess
-import unittest
 from unittest import mock
 import sys
 
 import pytest
 
 import smart_open.hdfs
-
-#
-# Workaround for https://bugs.python.org/issue37380
-#
-if sys.version_info[:2] == (3, 6):
-    subprocess._cleanup = lambda: None
 
 CURR_DIR = P.dirname(P.abspath(__file__))
 
@@ -50,9 +43,24 @@ with open(CAP_PATH, encoding='utf-8') as fin:
     CRIME_AND_PUNISHMENT = fin.read()
 
 
-def test_read():
+def test_sanity_read_bytes():
+    with open(CAP_PATH, 'rb') as fin:
+        lines = [line for line in fin]
+    assert len(lines) == 3
+
+
+def test_sanity_read_text():
+    with open(CAP_PATH, 'r', encoding='utf-8') as fin:
+        text = fin.read()
+
+    expected = 'В начале июля, в чрезвычайно жаркое время'
+    assert text[:len(expected)] == expected
+
+
+@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+def test_read(schema):
     with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH)):
-        reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
+        reader = smart_open.hdfs.CliRawInputBase(f'{schema}://dummy/url')
         as_bytes = reader.read()
 
     #
@@ -64,65 +72,56 @@ def test_read():
     assert as_text == CRIME_AND_PUNISHMENT
 
 
-def test_read_75():
+@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+def test_read_75(schema):
     with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH)):
-        reader = smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')
+        reader = smart_open.hdfs.CliRawInputBase(f'{schema}://dummy/url')
         as_bytes = reader.read(75)
 
     as_text = as_bytes.decode('utf-8').replace(os.linesep, '\n')
     assert as_text == CRIME_AND_PUNISHMENT[:len(as_text)]
 
 
-def test_unzip():
+@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+def test_unzip(schema):
     with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH + '.gz')):
-        with gzip.GzipFile(fileobj=smart_open.hdfs.CliRawInputBase('hdfs://dummy/url')) as fin:
+        with gzip.GzipFile(fileobj=smart_open.hdfs.CliRawInputBase(f'{schema}://dummy/url')) as fin:
             as_bytes = fin.read()
 
     as_text = as_bytes.decode('utf-8')
     assert as_text == CRIME_AND_PUNISHMENT
 
 
-def test_context_manager():
+@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+def test_context_manager(schema):
     with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH)):
-        with smart_open.hdfs.CliRawInputBase('hdfs://dummy/url') as fin:
+        with smart_open.hdfs.CliRawInputBase(f'{schema}://dummy/url') as fin:
             as_bytes = fin.read()
 
     as_text = as_bytes.decode('utf-8').replace('\r\n', '\n')
     assert as_text == CRIME_AND_PUNISHMENT
 
 
-def test_read_bytes():
-    with open(CAP_PATH, 'rb') as fin:
-        lines = [line for line in fin]
-    assert len(lines) == 3
-
-
-def test_read_text():
-    with open(CAP_PATH, 'r', encoding='utf-8') as fin:
-        text = fin.read()
-
-    expected = 'В начале июля, в чрезвычайно жаркое время'
-    assert text[:len(expected)] == expected
-
-
-def test_write():
+@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+def test_write(schema):
     expected = 'мы в ответе за тех, кого приручили'
     mocked_cat = cat()
 
     with mock.patch('subprocess.Popen', return_value=mocked_cat):
-        with smart_open.hdfs.CliRawOutputBase('hdfs://dummy/url') as fout:
+        with smart_open.hdfs.CliRawOutputBase(f'{schema}://dummy/url') as fout:
             fout.write(expected.encode('utf-8'))
 
     actual = mocked_cat.stdout.read().decode('utf-8')
     assert actual == expected
 
 
-def test_write_zip():
+@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+def test_write_zip(schema):
     expected = 'мы в ответе за тех, кого приручили'
     mocked_cat = cat()
 
     with mock.patch('subprocess.Popen', return_value=mocked_cat):
-        with smart_open.hdfs.CliRawOutputBase('hdfs://dummy/url') as fout:
+        with smart_open.hdfs.CliRawOutputBase(f'{schema}://dummy/url') as fout:
             with gzip.GzipFile(fileobj=fout, mode='wb') as gz_fout:
                 gz_fout.write(expected.encode('utf-8'))
 
