@@ -22,9 +22,9 @@ jobs:
             toxenv: "check_keys,py39-doctest,test_coverage,py39-integration"
             coveralls: true
 
-          - python-version: '3.10'
-            toxenv: "check_keys,py310-doctest,py310-test,py310-benchmark,py310-integration"
-            result_key: benchmark-results-py310
+          # - python-version: '3.10'
+          # toxenv: "check_keys,py310-doctest,py310-test,py310-benchmark,py310-integration"
+          # result_key: benchmark-results-py310
 
           - python-version: '3.8'
             toxenv: "flake8"
