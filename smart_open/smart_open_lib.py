@@ -392,21 +392,6 @@ def _open_binary_stream(uri, mode, transport_params):
         #
         raise NotImplementedError('unsupported mode: %r' % mode)
 
-    if hasattr(uri, 'read'):
-        # simply pass-through if already a file-like
-        # we need to return something as the file name, but we don't know what
-        # so we probe for uri.name (e.g., this works with open() or tempfile.NamedTemporaryFile)
-        # if the value ends with COMPRESSED_EXT, we will note it in compression_wrapper()
-        # if there is no such an attribute, we return "unknown" - this
-        # effectively disables any compression
-        if not hasattr(uri, 'name'):
-            name = getattr(uri, 'name', 'unknown')
-            try:
-                uri.name = name
-            except AttributeError:
-                pass
-        return uri
-
     if isinstance(uri, int):
         #
         # We're working with a file descriptor.  If we open it, its name is
