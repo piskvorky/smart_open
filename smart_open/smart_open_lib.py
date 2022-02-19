@@ -246,6 +246,19 @@ def open(
     else:
         decoded = decompressed
 
+    #
+    # There are some useful methods in the binary readers, e.g. to_boto3, that get
+    # hidden by the multiple layers of wrapping we just performed.  Promote
+    # them so they are visible to the user.
+    #
+    if decoded != binary:
+        promoted_attrs = ['to_boto3']
+        for attr in promoted_attrs:
+            try:
+                setattr(decoded, attr, getattr(binary, attr))
+            except AttributeError:
+                pass
+
     return decoded
 
 
