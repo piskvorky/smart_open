@@ -10,10 +10,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - python-version: '3.6'
-            toxenv: "check_keys,py36-doctest,py36-test,py36-benchmark,py36-integration"
-            result_key: benchmark-results-py36
-
           - python-version: '3.7'
             toxenv: "check_keys,py37-doctest,enable_moto_server,py37-test,py37-benchmark,py37-integration,disable_moto_server"
             enable_moto_server: "1"
@@ -25,6 +21,10 @@ jobs:
           - python-version: '3.9'
             toxenv: "check_keys,py39-doctest,test_coverage,py39-integration"
             coveralls: true
+
+          - python-version: '3.10'
+            toxenv: "check_keys,py310-doctest,py310-test,py310-benchmark,py310-integration"
+            result_key: benchmark-results-py310
 
           - python-version: '3.8'
             toxenv: "flake8"
