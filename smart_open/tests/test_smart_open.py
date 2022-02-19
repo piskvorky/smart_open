@@ -1923,7 +1923,12 @@ def test_write_file_descriptor():
 def test_to_boto3():
     resource = boto3.resource('s3')
     resource.create_bucket(Bucket='mybucket')
-    with smart_open.open('s3://mybucket/key.txt', 'wt') as fout:
+    #
+    # If we don't specify encoding explicitly, the platform-dependent encoding
+    # will be used, and it may not necessarily support Unicode, breaking this
+    # test under Windows on github actions.
+    #
+    with smart_open.open('s3://mybucket/key.txt', 'wt', encoding='utf-8') as fout:
         fout.write('я бегу по вызженной земле, гермошлем захлопнув на ходу')
         obj = fout.to_boto3(resource)
     assert obj.bucket_name == 'mybucket'
