@@ -8,6 +8,7 @@
 - Drop support for passing buffers to smart_open.open (PR [#660](https://github.com/RaRe-Technologies/smart_open/pull/660), [@mpenkov](https://github.com/mpenkov))
 - Pin google-cloud-storage to >=1.31.1 in extras (PR [#687](https://github.com/RaRe-Technologies/smart_open/pull/687), [@PLPeeters](https://github.com/PLPeeters))
 - Expose certain transport-specific methods e.g. to_boto3 in top layer (PR [#664](https://github.com/RaRe-Technologies/smart_open/pull/664), [@mpenkov](https://github.com/mpenkov))
+- Make Python 3.7 the required minimum (PR [#688](https://github.com/RaRe-Technologies/smart_open/pull/688), [@mpenkov](https://github.com/mpenkov))
 
 # 5.2.1, 28 August 2021
 
