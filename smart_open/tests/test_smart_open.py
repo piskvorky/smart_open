@@ -1545,7 +1545,7 @@ class S3OpenTest(unittest.TestCase):
         #
         # Check that what we've created is a gzip.
         #
-        with smart_open.open(key, "rb", ignore_ext=True) as fin:
+        with smart_open.open(key, "rb", compression='disable') as fin:
             gz = gzip.GzipFile(fileobj=fin)
             self.assertEqual(gz.read().decode("utf-8"), text)
 
@@ -1799,44 +1799,15 @@ def test_s3_write_implicit(url, _compression, expected):
         ("s3://bucket/key.bz2", ".bz2", bz2.compress(_DECOMPRESSED_DATA)),
     ],
 )
-def test_s3_ignore_ext(url, _compression, expected):
-    """Can we handle the deprecated ignore_ext parameter when reading/writing?"""
+def test_s3_disable_compression(url, _compression, expected):
+    """Can we handle the compression parameter when reading/writing?"""
     initialize_bucket()
 
     with smart_open.open(url, "wb") as fout:
         fout.write(_DECOMPRESSED_DATA)
 
-    with smart_open.open(url, "rb", ignore_ext=True) as fin:
+    with smart_open.open(url, "rb", compression='disable') as fin:
         assert fin.read() == expected
-
-
-@pytest.mark.parametrize(
-    "extension,kwargs,error",
-    [
-        ("", dict(compression="foo"), ValueError),
-        ("", dict(compression="foo", ignore_ext=True), ValueError),
-        ("", dict(compression=NO_COMPRESSION, ignore_ext=True), ValueError),
-        (
-            ".gz",
-            dict(compression=INFER_FROM_EXTENSION, ignore_ext=True),
-            ValueError,
-        ),
-        (
-            ".bz2",
-            dict(compression=INFER_FROM_EXTENSION, ignore_ext=True),
-            ValueError,
-        ),
-        ("", dict(compression=".gz", ignore_ext=True), ValueError),
-        ("", dict(compression=".bz2", ignore_ext=True), ValueError),
-    ],
-)
-def test_compression_invalid(extension, kwargs, error):
-    """Should detect and error on these invalid inputs"""
-    with pytest.raises(error):
-        smart_open.open(f"s3://bucket/key{extension}", "wb", **kwargs)
-
-    with pytest.raises(error):
-        smart_open.open(f"s3://bucket/key{extension}", "rb", **kwargs)
 
 
 @pytest.mark.parametrize(
