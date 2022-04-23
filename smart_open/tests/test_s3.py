@@ -12,7 +12,6 @@ import io
 import logging
 import os
 import tempfile
-import time
 import unittest
 import warnings
 from contextlib import contextmanager
