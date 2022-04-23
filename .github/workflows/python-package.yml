@@ -169,7 +169,7 @@ jobs:
       - name: Run benchmarks
         run: python tox_helpers/run_benchmarks.py
         env:
-          SO_BUCKET: smart_open
+          SO_BUCKET: smart-open
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
