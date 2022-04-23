@@ -599,3 +599,5 @@ class Writer(io.BufferedIOBase):
         return "%s(bucket=%r, blob=%r, min_part_size=%r)" % (
             self.__class__.__name__, self._blob.bucket.name, self._blob.name, self._min_part_size,
         )
+
+    
