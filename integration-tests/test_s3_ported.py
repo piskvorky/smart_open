@@ -330,7 +330,7 @@ def test_workers(workers):
         if key.startswith('iter_bucket/')
     ])
     actual = sorted(smart_open.s3.iter_bucket(BUCKET_NAME, prefix='iter_bucket', workers=workers))
-    assert len(self.expected) == len(actual)
+    assert len(expected) == len(actual)
     assert expected == actual
 
 
