@@ -10,6 +10,7 @@ import inspect
 import io
 import logging
 import os
+import pickle
 import time
 import uuid
 import unittest
@@ -926,6 +927,16 @@ class MakeRangeStringTest(unittest.TestCase):
     def test_stop(self):
         start, stop = 1, 2
         self.assertEqual(smart_open.gcs._make_range_string(start, stop), 'bytes 1-2/*')
+
+
+class PickleUploadFailedTest(unittest.TestCase):
+    def test_pickle_upload_failed(self):
+        original = smart_open.gcs.UploadFailedError("foo", 123, "bar")
+        recovered: smart_open.gcs.UploadFailedError = pickle.loads(pickle.dumps(original))
+
+        self.assertEqual(original.args, recovered.args)
+        self.assertEqual(original.text, recovered.text)
+        self.assertEqual(original.status_code, recovered.status_code)
 
 
 if __name__ == '__main__':

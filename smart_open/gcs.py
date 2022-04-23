@@ -78,6 +78,9 @@ class UploadFailedError(Exception):
         self.status_code = status_code
         self.text = text
 
+    def __reduce__(self):
+        return UploadFailedError, (self.args[0], self.status_code, self.text)
+
 
 def _fail(response, part_num, content_length, total_size, headers):
     status_code = response.status_code
