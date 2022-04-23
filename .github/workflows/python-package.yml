@@ -85,7 +85,7 @@ jobs:
         run: pip install -e .[test]
 
       - name: Run doctests
-        run: python tox_helpers/doctest.py
+        run: python ci_helpers/doctest.py
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -123,16 +123,16 @@ jobs:
       - name: Install smart_open and its dependencies
         run: pip install -e .[test]
 
-      - run: bash tox_helpers/helpers.sh enable_moto_server
+      - run: bash ci_helpers/helpers.sh enable_moto_server
         if: ${{ matrix.moto_server }}
 
       - name: Run integration tests
-        run: python tox_helpers/run_integration_tests.py
+        run: python ci_helpers/run_integration_tests.py
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - run: bash tox_helpers/helpers.sh disable_moto_server
+      - run: bash ci_helpers/helpers.sh disable_moto_server
         if: ${{ matrix.moto_server }}
 
   benchmarks:
@@ -167,7 +167,7 @@ jobs:
       - run: pip install awscli pytest_benchmark
 
       - name: Run benchmarks
-        run: python tox_helpers/run_benchmarks.py
+        run: python ci_helpers/run_benchmarks.py
         env:
           SO_BUCKET: smart-open
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
