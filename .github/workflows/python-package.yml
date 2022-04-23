@@ -23,10 +23,6 @@ jobs:
   unit_tests:
     needs: [linters]
     runs-on: ${{ matrix.os }}
-    env:
-      BOTO_CONFIG: "/dev/null"
-      SO_BUCKET: smart-open
-
     strategy:
       matrix:
         include:
@@ -88,6 +84,9 @@ jobs:
 
       - name: Run doctests
         run: python tox_helpers/doctest.py
+        env:
+          AWS_ACCESS_KEY_ID: ${{ github.secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ github.secrets.AWS_SECRET_ACCESS_KEY }}
 
   integration:
     needs: [linters,unit_tests]
