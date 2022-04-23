@@ -123,13 +123,13 @@ jobs:
       - run: python tox_helpers/check_keys.py
 
       - run: bash tox_helpers/helpers.sh enable_moto_server
-        if: {{ matrix.moto_server }}
+        if: ${{ matrix.moto_server }}
 
       - name: Run integration tests
         run: python tox_helpers/run_integration_tests.py
 
       - run: bash tox_helpers/helpers.sh disable_moto_server
-        if: {{ matrix.moto_server }}
+        if: ${{ matrix.moto_server }}
 
   benchmarks:
     needs: [linters,build]
