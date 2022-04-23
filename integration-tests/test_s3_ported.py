@@ -170,7 +170,7 @@ class ReaderTest(unittest.TestCase):
         expected = CONTENTS[key_name]
 
         with smart_open.s3.Reader(BUCKET_NAME, key_name) as fin:
-            returned_obj = fin.to_boto3()
+            returned_obj = fin.to_boto3(boto3.resource('s3'))
 
         boto3_body = returned_obj.get()['Body'].read()
         self.assertEqual(expected, boto3_body)
@@ -323,7 +323,7 @@ class IterBucketTest(unittest.TestCase):
 
 
 @pytest.mark.parametrize('workers', [(x,) for x in (1, 4, 8, 16, 64)])
-def test_workers(self, workers):
+def test_workers(workers):
     expected = sorted([
         (key, value)
         for (key, value) in CONTENTS.items()
