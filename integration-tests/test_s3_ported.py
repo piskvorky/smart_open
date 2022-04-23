@@ -322,7 +322,7 @@ class IterBucketTest(unittest.TestCase):
         self.assertEqual(expected, sorted(actual))
 
 
-@pytest.mark.parametrize('workers', [(x,) for x in (1, 4, 8, 16, 64)])
+@pytest.mark.parametrize('workers', [1, 4, 8, 16, 64])
 def test_workers(workers):
     expected = sorted([
         (key, value)
