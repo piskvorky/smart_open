@@ -80,8 +80,6 @@ jobs:
       - name: Install smart_open and its dependencies
         run: pip install -e .[test]
 
-      - run: python tox_helpers/check_keys.py
-
       - name: Run doctests
         run: python tox_helpers/doctest.py
         env:
@@ -121,13 +119,14 @@ jobs:
       - name: Install smart_open and its dependencies
         run: pip install -e .[test]
 
-      - run: python tox_helpers/check_keys.py
-
       - run: bash tox_helpers/helpers.sh enable_moto_server
         if: ${{ matrix.moto_server }}
 
       - name: Run integration tests
         run: python tox_helpers/run_integration_tests.py
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - run: bash tox_helpers/helpers.sh disable_moto_server
         if: ${{ matrix.moto_server }}
@@ -163,10 +162,11 @@ jobs:
 
       - run: pip install awscli pytest_benchmark
 
-      - run: python tox_helpers/check_keys.py
-
       - name: Run benchmarks
         run: python tox_helpers/run_benchmarks.py
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       #
       # The test_coverage environment in tox.ini generates coverage data and
