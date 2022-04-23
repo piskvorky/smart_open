@@ -6,6 +6,7 @@
 # from the MIT License (MIT).
 #
 from collections import defaultdict
+import functools
 import gzip
 import io
 import logging
@@ -45,42 +46,9 @@ ENABLE_MOTO_SERVER = os.environ.get("SO_ENABLE_MOTO_SERVER") == "1"
 os.environ["AWS_ACCESS_KEY_ID"] = "test"
 os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
 
-
 logger = logging.getLogger(__name__)
 
-
-@moto.mock_s3
-def setUpModule():
-    '''Called once by unittest when initializing this module.  Sets up the
-    test S3 bucket.
-
-    '''
-    bucket = boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
-    bucket.wait_until_exists()
-
-
-def cleanup_bucket():
-    for key in boto3.resource('s3').Bucket(BUCKET_NAME).objects.all():
-        key.delete()
-
-
-def put_to_bucket(contents, num_attempts=12, sleep_time=5):
-    logger.debug('%r', locals())
-
-    #
-    # In real life, it can take a few seconds for the bucket to become ready.
-    # If we try to write to the key while the bucket while it isn't ready, we
-    # will get a ClientError: NoSuchBucket.
-    #
-    for attempt in range(num_attempts):
-        try:
-            boto3.resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=contents)
-            return
-        except botocore.exceptions.ClientError as err:
-            logger.error('caught %r, retrying', err)
-            time.sleep(sleep_time)
-
-    assert False, 'failed to write to bucket %s after %d attempts' % (BUCKET_NAME, num_attempts)
+_resource = functools.partial(boto3.resource, region_name='us-east-1')
 
 
 def ignore_resource_warnings():
@@ -231,66 +199,57 @@ class ReaderTest(BaseTest):
 
         super().setUp()
 
+        s3 = _resource('s3')
+        s3.create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
+
+        self.body = u"hello wořld\nhow are you?".encode('utf8')
+        s3.Object(BUCKET_NAME, KEY_NAME).put(Body=self.body)
+
     def tearDown(self):
         smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
-        cleanup_bucket()
 
     def test_iter(self):
         """Are S3 files iterated over correctly?"""
-        # a list of strings to test with
-        expected = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=expected)
-
         # connect to fake s3 and read from the fake key we filled above
         with self.assertApiCalls(GetObject=1):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
             output = [line.rstrip(b'\n') for line in fin]
-        self.assertEqual(output, expected.split(b'\n'))
+        self.assertEqual(output, self.body.split(b'\n'))
 
     def test_iter_context_manager(self):
         # same thing but using a context manager
-        expected = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=expected)
+        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
+        
         with self.assertApiCalls(GetObject=1):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
                 output = [line.rstrip(b'\n') for line in fin]
-        self.assertEqual(output, expected.split(b'\n'))
+        self.assertEqual(output, self.body.split(b'\n'))
 
     def test_read(self):
         """Are S3 files read correctly?"""
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-        logger.debug('content: %r len: %r', content, len(content))
-
         with self.assertApiCalls(GetObject=1):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
-            self.assertEqual(content[:6], fin.read(6))
-            self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
-            self.assertEqual(content[14:], fin.read())  # read the rest
+            self.assertEqual(self.body[:6], fin.read(6))
+            self.assertEqual(self.body[6:14], fin.read(8))  # ř is 2 bytes
+            self.assertEqual(self.body[14:], fin.read())  # read the rest
 
     def test_seek_beginning(self):
         """Does seeking to the beginning of S3 files work correctly?"""
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-
         with self.assertApiCalls(GetObject=1):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
-            self.assertEqual(content[:6], fin.read(6))
-            self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
+            self.assertEqual(self.body[:6], fin.read(6))
+            self.assertEqual(self.body[6:14], fin.read(8))  # ř is 2 bytes
 
         with self.assertApiCalls(GetObject=1):
             fin.seek(0)
-            self.assertEqual(content, fin.read())  # no size given => read whole file
+            self.assertEqual(self.body, fin.read())  # no size given => read whole file
 
         with self.assertApiCalls(GetObject=1):
             fin.seek(0)
-            self.assertEqual(content, fin.read(-1))  # same thing
+            self.assertEqual(self.body, fin.read(-1))  # same thing
 
     def test_seek_start(self):
         """Does seeking from the start of S3 files work correctly?"""
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-
         with self.assertApiCalls(GetObject=1):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
             seek = fin.seek(6)
@@ -300,9 +259,6 @@ class ReaderTest(BaseTest):
 
     def test_seek_current(self):
         """Does seeking from the middle of S3 files work correctly?"""
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-
         with self.assertApiCalls(GetObject=1):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
             self.assertEqual(fin.read(5), b'hello')
@@ -314,33 +270,24 @@ class ReaderTest(BaseTest):
 
     def test_seek_end(self):
         """Does seeking from the end of S3 files work correctly?"""
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-
         with self.assertApiCalls(GetObject=1):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
             seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
-            self.assertEqual(seek, len(content) - 4)
+            self.assertEqual(seek, len(self.body) - 4)
             self.assertEqual(fin.read(), b'you?')
 
     def test_seek_past_end(self):
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-
-        with self.assertApiCalls(GetObject=1), patch_invalid_range_response(str(len(content))):
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response(str(len(self.body))):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
             seek = fin.seek(60)
-            self.assertEqual(seek, len(content))
+            self.assertEqual(seek, len(self.body))
 
     def test_detect_eof(self):
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-
         with self.assertApiCalls(GetObject=1):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
             fin.read()
             eof = fin.tell()
-            self.assertEqual(eof, len(content))
+            self.assertEqual(eof, len(self.body))
             fin.seek(0, whence=smart_open.constants.WHENCE_END)
             self.assertEqual(eof, fin.tell())
             fin.seek(eof)
@@ -352,7 +299,8 @@ class ReaderTest(BaseTest):
         buf.close = lambda: None  # keep buffer open so that we can .getvalue()
         with gzip.GzipFile(fileobj=buf, mode='w') as zipfile:
             zipfile.write(expected)
-        put_to_bucket(contents=buf.getvalue())
+
+        _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=buf.getvalue())
 
         #
         # Make sure we're reading things correctly.
@@ -377,7 +325,7 @@ class ReaderTest(BaseTest):
 
     def test_readline(self):
         content = b'englishman\nin\nnew\nyork\n'
-        put_to_bucket(contents=content)
+        _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=content)
 
         with self.assertApiCalls(GetObject=2):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
@@ -393,7 +341,7 @@ class ReaderTest(BaseTest):
 
     def test_readline_tiny_buffer(self):
         content = b'englishman\nin\nnew\nyork\n'
-        put_to_bucket(contents=content)
+        _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=content)
 
         with self.assertApiCalls(GetObject=1):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, buffer_size=8) as fin:
@@ -403,9 +351,6 @@ class ReaderTest(BaseTest):
         self.assertEqual(expected, actual)
 
     def test_read0_does_not_return_data(self):
-        content = b'englishman\nin\nnew\nyork\n'
-        put_to_bucket(contents=content)
-
         with self.assertApiCalls():
             # set defer_seek to verify that read(0) doesn't trigger an unnecessary API call
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
@@ -414,20 +359,18 @@ class ReaderTest(BaseTest):
         self.assertEqual(data, b'')
 
     def test_to_boto3(self):
-        contents = b'the spice melange\n'
-        put_to_bucket(contents=contents)
-
         with self.assertApiCalls():
             # set defer_seek to verify that to_boto3() doesn't trigger an unnecessary API call
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
-                returned_obj = fin.to_boto3(boto3.resource('s3'))
+                returned_obj = fin.to_boto3(_resource('s3'))
 
         boto3_body = returned_obj.get()['Body'].read()
-        self.assertEqual(contents, boto3_body)
+        self.assertEqual(self.body, boto3_body)
 
     def test_binary_iterator(self):
         expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
-        put_to_bucket(contents=b"\n".join(expected))
+        _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'\n'.join(expected))
+
         with self.assertApiCalls(GetObject=1):
             with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'rb') as fin:
                 actual = [line.rstrip() for line in fin]
@@ -435,7 +378,7 @@ class ReaderTest(BaseTest):
 
     def test_defer_seek(self):
         content = b'englishman\nin\nnew\nyork\n'
-        put_to_bucket(contents=content)
+        _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=content)
 
         with self.assertApiCalls():
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
@@ -449,7 +392,7 @@ class ReaderTest(BaseTest):
             self.assertEqual(fin.read(), content[10:])
 
     def test_read_empty_file(self):
-        put_to_bucket(contents=b'')
+        _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'')
 
         with self.assertApiCalls(GetObject=1), patch_invalid_range_response('0'):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
@@ -467,8 +410,7 @@ class MultipartWriterTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
 
-    def tearDown(self):
-        cleanup_bucket()
+        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
 
     def test_write_01(self):
         """Does writing into s3 work correctly?"""
@@ -595,7 +537,7 @@ class MultipartWriterTest(unittest.TestCase):
 
         with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'wb') as fout:
             fout.write(contents)
-            returned_obj = fout.to_boto3(boto3.resource('s3'))
+            returned_obj = fout.to_boto3(_resource('s3'))
 
         boto3_body = returned_obj.get()['Body'].read()
         self.assertEqual(contents, boto3_body)
@@ -623,8 +565,7 @@ class SinglepartWriterTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
 
-    def tearDown(self):
-        cleanup_bucket()
+        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
 
     def test_write_01(self):
         """Does writing into s3 work correctly?"""
@@ -729,9 +670,7 @@ ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operatio
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
-
-    def tearDown(self):
-        cleanup_bucket()
+        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
 
     @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
     @pytest.mark.xfail(
@@ -762,7 +701,7 @@ class IterBucketTest(unittest.TestCase):
     )
     def test_accepts_boto3_bucket(self):
         populate_bucket()
-        bucket = boto3.resource('s3').Bucket(BUCKET_NAME)
+        bucket = _resource('s3').Bucket(BUCKET_NAME)
         results = list(smart_open.s3.iter_bucket(bucket))
         self.assertEqual(len(results), 10)
 
@@ -801,9 +740,10 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
         smart_open.concurrency._MULTIPROCESSING = False
         ignore_resource_warnings()
 
+        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
+
     def tearDown(self):
         smart_open.concurrency._MULTIPROCESSING = self.old_flag_multi
-        cleanup_bucket()
 
     def test(self):
         num_keys = 101
@@ -831,9 +771,10 @@ class IterBucketMultiprocessingTest(unittest.TestCase):
         smart_open.concurrency._CONCURRENT_FUTURES = False
         ignore_resource_warnings()
 
+        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
+
     def tearDown(self):
         smart_open.concurrency._CONCURRENT_FUTURES = self.old_flag_concurrent
-        cleanup_bucket()
 
     def test(self):
         num_keys = 101
@@ -855,10 +796,11 @@ class IterBucketSingleProcessTest(unittest.TestCase):
 
         ignore_resource_warnings()
 
+        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
+
     def tearDown(self):
         smart_open.concurrency._MULTIPROCESSING = self.old_flag_multi
         smart_open.concurrency._CONCURRENT_FUTURES = self.old_flag_concurrent
-        cleanup_bucket()
 
     def test(self):
         num_keys = 101
@@ -877,6 +819,7 @@ class IterBucketSingleProcessTest(unittest.TestCase):
 @moto.mock_s3
 class IterBucketCredentialsTest(unittest.TestCase):
     def test(self):
+        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
         num_keys = 10
         populate_bucket(num_keys=num_keys)
         result = list(
@@ -895,28 +838,26 @@ class DownloadKeyTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
 
-    def tearDown(self):
-        cleanup_bucket()
+        s3 = _resource('s3')
+        bucket = s3.create_bucket(Bucket=BUCKET_NAME)
+        bucket.wait_until_exists()
+
+        self.body = b'hello'
+        s3.Object(BUCKET_NAME, KEY_NAME).put(Body=self.body)
 
     def test_happy(self):
-        contents = b'hello'
-        put_to_bucket(contents=contents)
-        expected = (KEY_NAME, contents)
+        expected = (KEY_NAME, self.body)
         actual = smart_open.s3._download_key(KEY_NAME, bucket_name=BUCKET_NAME)
         self.assertEqual(expected, actual)
 
     def test_intermittent_error(self):
-        contents = b'hello'
-        put_to_bucket(contents=contents)
-        expected = (KEY_NAME, contents)
-        side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, contents]
+        expected = (KEY_NAME, self.body)
+        side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, self.body]
         with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
             actual = smart_open.s3._download_key(KEY_NAME, bucket_name=BUCKET_NAME)
         self.assertEqual(expected, actual)
 
     def test_persistent_error(self):
-        contents = b'hello'
-        put_to_bucket(contents=contents)
         side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR,
                        ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR]
         with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
@@ -924,18 +865,14 @@ class DownloadKeyTest(unittest.TestCase):
                               KEY_NAME, bucket_name=BUCKET_NAME)
 
     def test_intermittent_error_retries(self):
-        contents = b'hello'
-        put_to_bucket(contents=contents)
-        expected = (KEY_NAME, contents)
+        expected = (KEY_NAME, self.body)
         side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR,
-                       ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, contents]
+                       ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, self.body]
         with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
             actual = smart_open.s3._download_key(KEY_NAME, bucket_name=BUCKET_NAME, retries=4)
         self.assertEqual(expected, actual)
 
     def test_propagates_other_exception(self):
-        contents = b'hello'
-        put_to_bucket(contents=contents)
         with mock.patch('smart_open.s3._download_fileobj', side_effect=ValueError):
             self.assertRaises(ValueError, smart_open.s3._download_key,
                               KEY_NAME, bucket_name=BUCKET_NAME)
@@ -945,9 +882,7 @@ class DownloadKeyTest(unittest.TestCase):
 class OpenTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
-
-    def tearDown(self):
-        cleanup_bucket()
+        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
 
     def test_read_never_returns_none(self):
         """read should never return None."""
@@ -962,7 +897,7 @@ class OpenTest(unittest.TestCase):
 
 
 def populate_bucket(num_keys=10):
-    s3 = boto3.resource('s3')
+    s3 = _resource('s3')
     for key_number in range(num_keys):
         key_name = 'key_%d' % key_number
         s3.Object(BUCKET_NAME, key_name).put(Body=str(key_number))
@@ -993,9 +928,7 @@ def test_client_propagation_singlepart():
     # have done that for us by now.
     #
     session = boto3.Session()
-    resource = session.resource('s3')
-    bucket = resource.create_bucket(Bucket=BUCKET_NAME)
-    bucket.wait_until_exists()
+    _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
 
     client = session.client('s3')
 
@@ -1014,9 +947,7 @@ def test_client_propagation_singlepart():
 def test_client_propagation_multipart():
     """Does the resource parameter make it from the caller to Boto3?"""
     session = boto3.Session()
-    resource = session.resource('s3')
-    bucket = resource.create_bucket(Bucket=BUCKET_NAME)
-    bucket.wait_until_exists()
+    _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
 
     client = session.client('s3')
 
@@ -1035,7 +966,7 @@ def test_client_propagation_multipart():
 def test_resource_propagation_reader():
     """Does the resource parameter make it from the caller to Boto3?"""
     session = boto3.Session()
-    resource = session.resource('s3')
+    resource = session.resource('s3', region_name='us-east-1')
     bucket = resource.create_bucket(Bucket=BUCKET_NAME)
     bucket.wait_until_exists()
 

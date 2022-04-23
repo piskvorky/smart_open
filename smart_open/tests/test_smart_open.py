@@ -9,6 +9,7 @@
 import bz2
 import csv
 import contextlib
+import functools
 import io
 import gzip
 import hashlib
@@ -36,6 +37,8 @@ logger = logging.getLogger(__name__)
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 SAMPLE_TEXT = 'Hello, world!'
 SAMPLE_BYTES = SAMPLE_TEXT.encode('utf-8')
+
+_resource = functools.partial(boto3.resource, region_name='us-east-1')
 
 
 #
@@ -592,7 +595,7 @@ class SmartOpenReadTest(unittest.TestCase):
     @moto.mock_s3
     def test_read_never_returns_none(self):
         """read should never return None."""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
 
         test_string = u"ветер по морю гуляет..."
@@ -609,7 +612,7 @@ class SmartOpenReadTest(unittest.TestCase):
         """Does newline open() parameter for reading work according to
            https://docs.python.org/3/library/functions.html#open-newline-parameter
         """
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         # Unicode line separator and various others must never split lines
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
@@ -626,7 +629,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @moto.mock_s3
     def test_read_newline_empty(self):
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_file.encode("utf-8"))
@@ -641,7 +644,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @moto.mock_s3
     def test_read_newline_cr(self):
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_file.encode("utf-8"))
@@ -655,7 +658,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @moto.mock_s3
     def test_read_newline_lf(self):
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_file.encode("utf-8"))
@@ -669,7 +672,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @moto.mock_s3
     def test_read_newline_crlf(self):
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_file.encode("utf-8"))
@@ -682,7 +685,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @moto.mock_s3
     def test_read_newline_slurp(self):
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_file.encode("utf-8"))
@@ -695,7 +698,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @moto.mock_s3
     def test_read_newline_binary(self):
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write(test_file.encode("utf-8"))
@@ -712,7 +715,7 @@ class SmartOpenReadTest(unittest.TestCase):
         """Does newline open() parameter for writing work according to
            https://docs.python.org/3/library/functions.html#open-newline-parameter
         """
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         # Unicode line separator and various others must never split lines
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # No newline parameter means newline=None, all LF are translatest to os.linesep
@@ -728,7 +731,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @moto.mock_s3
     def test_write_newline_empty(self):
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='' nothing is changed
         with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='') as fout:
@@ -741,7 +744,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @moto.mock_s3
     def test_write_newline_lf(self):
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='\n' nothing is changed
         with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\n') as fout:
@@ -754,7 +757,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @moto.mock_s3
     def test_write_newline_cr(self):
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='\r' all LF are replaced by CR
         with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\r') as fout:
@@ -767,7 +770,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @moto.mock_s3
     def test_write_newline_crlf(self):
-        boto3.resource('s3').create_bucket(Bucket='mybucket')
+        _resource('s3').create_bucket(Bucket='mybucket')
         test_file = u"line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='\r\n' all LF are replaced by CRLF
         with smart_open.open("s3://mybucket/mykey", "w", encoding='utf-8', newline='\r\n') as fout:
@@ -781,7 +784,7 @@ class SmartOpenReadTest(unittest.TestCase):
     @moto.mock_s3
     def test_readline(self):
         """Does readline() return the correct file content?"""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
         test_string = u"hello žluťoučký\u2028world!\nhow are you?".encode('utf8')
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
@@ -793,7 +796,7 @@ class SmartOpenReadTest(unittest.TestCase):
     @moto.mock_s3
     def test_readline_iter(self):
         """Does __iter__ return the correct file content?"""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
         lines = [u"всем\u2028привет!\n", u"что нового?"]
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
@@ -809,7 +812,7 @@ class SmartOpenReadTest(unittest.TestCase):
     @moto.mock_s3
     def test_readline_eof(self):
         """Does readline() return empty string on EOF?"""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
         with smart_open.open("s3://mybucket/mykey", "wb"):
             pass
@@ -825,7 +828,7 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_s3_iter_lines(self):
         """Does s3_iter_lines give correct content?"""
         # create fake bucket and fake key
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
         test_string = u"hello žluťoučký\u2028world!\nhow are you?".encode('utf8')
         with smart_open.open("s3://mybucket/mykey", "wb") as fin:
@@ -952,7 +955,7 @@ class SmartOpenReadTest(unittest.TestCase):
         expected = [b"*" * 5 * 1024**2] + [b'0123456789'] * 1024 + [b"test"]
 
         # create fake bucket and fake key
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
 
         tp = dict(s3_min_part_size=5 * 1024**2)
@@ -980,7 +983,7 @@ class SmartOpenReadTest(unittest.TestCase):
     @moto.mock_s3
     def test_s3_read_moto(self):
         """Are S3 files read correctly?"""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
 
         # write some bogus key so we can check it below
@@ -997,7 +1000,7 @@ class SmartOpenReadTest(unittest.TestCase):
     @moto.mock_s3
     def test_s3_seek_moto(self):
         """Does seeking in S3 files work correctly?"""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
 
         # write some bogus key so we can check it below
@@ -1018,7 +1021,7 @@ class SmartOpenReadTest(unittest.TestCase):
     @moto.mock_s3
     def test_s3_tell(self):
         """Does tell() work when S3 file is opened for text writing? """
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
 
         with smart_open.open("s3://mybucket/mykey", "w") as fout:
@@ -1212,7 +1215,7 @@ class SmartOpenTest(unittest.TestCase):
     def test_s3_modes_moto(self):
         """Do s3:// open modes work correctly?"""
         # fake bucket and key
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
         raw_data = b"second test"
 
@@ -1236,7 +1239,7 @@ class SmartOpenTest(unittest.TestCase):
             data = fd.read()
 
         # Create a test bucket
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
 
         tp = {
@@ -1491,7 +1494,7 @@ class S3OpenTest(unittest.TestCase):
         """Reading a UTF string should work."""
         text = u"физкульт-привет!"
 
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='bucket')
         key = s3.Object('bucket', 'key')
         key.put(Body=text.encode('utf-8'))
@@ -1510,7 +1513,7 @@ class S3OpenTest(unittest.TestCase):
     @moto.mock_s3
     def test_rw_encoding(self):
         """Should read and write text, respecting encodings, etc."""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='bucket')
 
         key = "s3://bucket/key"
@@ -1534,7 +1537,7 @@ class S3OpenTest(unittest.TestCase):
     @moto.mock_s3
     def test_rw_gzip(self):
         """Should read/write gzip files, implicitly and explicitly."""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.gz"
 
@@ -1559,7 +1562,7 @@ class S3OpenTest(unittest.TestCase):
     @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_write_mode(self):
         """Should always open in binary mode when writing through a codec."""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='bucket')
 
         with mock.patch('smart_open.s3.open', return_value=open(__file__, 'rb')) as mock_open:
@@ -1570,7 +1573,7 @@ class S3OpenTest(unittest.TestCase):
     @mock.patch('smart_open.smart_open_lib._inspect_kwargs', mock.Mock(return_value={}))
     def test_gzip_read_mode(self):
         """Should always open in binary mode when reading through a codec."""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.gz"
 
@@ -1585,7 +1588,7 @@ class S3OpenTest(unittest.TestCase):
     @moto.mock_s3
     def test_read_encoding(self):
         """Should open the file with the correct encoding, explicit text read."""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
@@ -1598,7 +1601,7 @@ class S3OpenTest(unittest.TestCase):
     @moto.mock_s3
     def test_read_encoding_implicit_text(self):
         """Should open the file with the correct encoding, implicit text read."""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'это знала ева, это знал адам, колеса любви едут прямо по нам'
@@ -1611,7 +1614,7 @@ class S3OpenTest(unittest.TestCase):
     @moto.mock_s3
     def test_write_encoding(self):
         """Should open the file for writing with the correct encoding."""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
@@ -1625,7 +1628,7 @@ class S3OpenTest(unittest.TestCase):
     @moto.mock_s3
     def test_write_bad_encoding_strict(self):
         """Should open the file for writing with the correct encoding."""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'欲しい気持ちが成長しすぎて'
@@ -1637,7 +1640,7 @@ class S3OpenTest(unittest.TestCase):
     @moto.mock_s3
     def test_write_bad_encoding_replace(self):
         """Should open the file for writing with the correct encoding."""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt"
         text = u'欲しい気持ちが成長しすぎて'
@@ -1652,7 +1655,7 @@ class S3OpenTest(unittest.TestCase):
     @moto.mock_s3
     def test_write_text_gzip(self):
         """Should open the file for writing with the correct encoding."""
-        s3 = boto3.resource('s3')
+        s3 = _resource('s3')
         s3.create_bucket(Bucket='bucket')
         key = "s3://bucket/key.txt.gz"
         text = u'какая боль, какая боль, аргентина - ямайка, 5-0'
@@ -1718,7 +1721,7 @@ class CheckKwargsTest(unittest.TestCase):
 
 
 def initialize_bucket():
-    s3 = boto3.resource("s3")
+    s3 = _resource("s3")
     bucket = s3.create_bucket(Bucket="bucket")
     bucket.wait_until_exists()
 
@@ -1892,7 +1895,7 @@ def test_write_file_descriptor():
 
 @moto.mock_s3()
 def test_to_boto3():
-    resource = boto3.resource('s3')
+    resource = _resource('s3')
     resource.create_bucket(Bucket='mybucket')
     #
     # If we don't specify encoding explicitly, the platform-dependent encoding
