@@ -22,6 +22,7 @@ jobs:
 
   build:
     needs: [linters]
+    runs-on: ${{ matrix.os }}
     env:
       BOTO_CONFIG: "/dev/null"
       SO_BUCKET: smart-open
@@ -56,6 +57,7 @@ jobs:
 
   doctest:
     needs: [linters,build]
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
@@ -89,6 +91,7 @@ jobs:
 
   integration:
     needs: [linters,build]
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
@@ -130,6 +133,7 @@ jobs:
 
   benchmarks:
     needs: [linters,build]
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
