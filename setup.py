@@ -43,7 +43,7 @@ http_deps = ['requests']
 
 all_deps = aws_deps + gcs_deps + azure_deps + http_deps
 tests_require = all_deps + [
-    'moto[server]==1.3.14',  # Older versions of moto appear broken
+    'moto[server]',
     'pathlib2',
     'responses',
     'boto3',

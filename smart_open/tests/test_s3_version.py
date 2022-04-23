@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
+import functools
 import logging
 import unittest
 import uuid
+import time
 
 import boto3
 import moto
@@ -16,32 +18,7 @@ KEY_NAME = 'test-key'
 logger = logging.getLogger(__name__)
 
 
-@moto.mock_s3
-def setUpModule():
-    '''Called once by unittest when initializing this module.  Sets up the
-    test S3 bucket.
-
-    '''
-    bucket = boto3.resource('s3').create_bucket(Bucket=BUCKET_NAME)
-    bucket.wait_until_exists()
-    boto3.resource('s3').BucketVersioning(BUCKET_NAME).enable()
-
-
-@moto.mock_s3
-def tearDownModule():
-    '''Called once by unittest when tearing down this module.  Empties and
-    removes the test S3 bucket.
-
-    '''
-    s3 = boto3.resource('s3')
-    bucket = s3.Bucket(BUCKET_NAME)
-    try:
-        bucket.object_versions.delete()
-        bucket.delete()
-    except s3.meta.client.exceptions.NoSuchBucket:
-        pass
-
-    bucket.wait_until_not_exists()
+_resource = functools.partial(boto3.resource, region_name='us-east-1')
 
 
 def get_versions(bucket, key):
@@ -49,7 +26,7 @@ def get_versions(bucket, key):
     return [
         v.id
         for v in sorted(
-            boto3.resource('s3').Bucket(bucket).object_versions.filter(Prefix=key),
+            _resource('s3').Bucket(bucket).object_versions.filter(Prefix=key),
             key=lambda version: version.last_modified,
         )
     ]
@@ -57,24 +34,27 @@ def get_versions(bucket, key):
 
 @moto.mock_s3
 class TestVersionId(unittest.TestCase):
-
     def setUp(self):
         #
         # Each run of this test reuses the BUCKET_NAME, but works with a
         # different key for isolation.
         #
+        resource = _resource('s3')
+        resource.create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
+        resource.BucketVersioning(BUCKET_NAME).enable()
+
         self.key = 'test-write-key-{}'.format(uuid.uuid4().hex)
         self.url = "s3://%s/%s" % (BUCKET_NAME, self.key)
         self.test_ver1 = u"String version 1.0".encode('utf8')
         self.test_ver2 = u"String version 2.0".encode('utf8')
 
-        bucket = boto3.resource('s3').Bucket(BUCKET_NAME)
+        bucket = resource.Bucket(BUCKET_NAME)
         bucket.put_object(Key=self.key, Body=self.test_ver1)
-
         logging.critical('versions after first write: %r', get_versions(BUCKET_NAME, self.key))
 
-        bucket.put_object(Key=self.key, Body=self.test_ver2)
+        time.sleep(3)
 
+        bucket.put_object(Key=self.key, Body=self.test_ver2)
         self.versions = get_versions(BUCKET_NAME, self.key)
         logging.critical('versions after second write: %r', get_versions(BUCKET_NAME, self.key))
 
@@ -112,7 +92,7 @@ class TestVersionId(unittest.TestCase):
             actual = fin.read()
         self.assertEqual(actual, self.test_ver2)
 
-    def test_oldset_version(self):
+    def test_oldest_version(self):
         """Passing in the oldest version gives the oldest content?"""
         params = {'version_id': self.versions[0]}
         with open(self.url, mode='rb', transport_params=params) as fin:
@@ -124,7 +104,7 @@ class TestVersionId(unittest.TestCase):
         self.versions = get_versions(BUCKET_NAME, self.key)
         params = {'version_id': self.versions[0]}
         with open(self.url, mode='rb', transport_params=params) as fin:
-            returned_obj = fin.to_boto3(boto3.resource('s3'))
+            returned_obj = fin.to_boto3(_resource('s3'))
 
         boto3_body = boto3_body = returned_obj.get()['Body'].read()
         self.assertEqual(boto3_body, self.test_ver1)
