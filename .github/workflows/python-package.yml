@@ -20,7 +20,7 @@ jobs:
       - name: Run flake8 linter (source)
         run: flake8 --ignore E12,E226,W503 --max-line-length 110 --show-source smart_open
 
-  build:
+  unit_tests:
     needs: [linters]
     runs-on: ${{ matrix.os }}
     env:
@@ -56,7 +56,7 @@ jobs:
         run: pytest smart_open -v -rfxECs --durations=20
 
   doctest:
-    needs: [linters,build]
+    needs: [linters,unit_tests]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -90,7 +90,7 @@ jobs:
         run: python tox_helpers/doctest.py
 
   integration:
-    needs: [linters,build]
+    needs: [linters,unit_tests]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -132,7 +132,7 @@ jobs:
         if: ${{ matrix.moto_server }}
 
   benchmarks:
-    needs: [linters,build]
+    needs: [linters,unit_tests]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

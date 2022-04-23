@@ -218,7 +218,7 @@ class ReaderTest(BaseTest):
     def test_iter_context_manager(self):
         # same thing but using a context manager
         _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
-        
+
         with self.assertApiCalls(GetObject=1):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
                 output = [line.rstrip(b'\n') for line in fin]
