@@ -1,5 +1,7 @@
 # Unreleased
 
+# 6.0.0, 24 April 2022
+
 This release deprecates the old `ignore_ext` parameter.
 Use the `compression` parameter instead.
 
