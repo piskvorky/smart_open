@@ -25,7 +25,11 @@ Finally, ensure all the guides still work by running:
 
     python -m doctest howto.md
 
-The above command shouldn't print anything to standard output/error and return zero.
+The above command shouldn't print anything to standard output/error and return zero, provided your local environment is set up correctly:
+
+- you have a working Internet connection
+- localstack is running, and the `mybucket` S3 bucket has been created
+- the GITHUB_TOKEN environment variable is set to a valid [access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)
 
 ## How to Read/Write Zip Files
 
@@ -156,6 +160,7 @@ You can then interact with the object using the `boto3` API:
 
 ```python
 >>> import boto3
+>>> from smart_open import open
 >>> resource = boto3.resource('s3')  # Pass additional resource parameters here
 >>> with open('s3://commoncrawl/robots.txt') as fin:
 ...     boto3_object = fin.to_boto3(resource)
@@ -171,9 +176,11 @@ This works only when reading and writing via S3.
 For versioned objects, the returned object will be slightly different:
 
 ```python
+>>> from smart_open import open
+>>> resource = boto3.resource('s3')
 >>> params = {'version_id': 'KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg'}
 >>> with open('s3://smart-open-versioned/demo.txt', transport_params=params) as fin:
-...     print(fin.to_boto3())
+...     print(fin.to_boto3(resource))
 s3.ObjectVersion(bucket_name='smart-open-versioned', object_key='demo.txt', id='KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg')
 
 ```
@@ -242,7 +249,7 @@ To access such buckets, you need to pass some special transport parameters:
 
 ```python
 >>> from smart_open import open
->>> params = {'client_kwargs': {'S3.Client.get_object': {RequestPayer': 'requester'}}}
+>>> params = {'client_kwargs': {'S3.Client.get_object': {'RequestPayer': 'requester'}}}
 >>> with open('s3://arxiv/pdf/arXiv_pdf_manifest.xml', transport_params=params) as fin:
 ...    print(fin.readline())
 <?xml version='1.0' standalone='yes'?>
@@ -266,9 +273,11 @@ You can fine-tune it using several ways:
 >>> config = botocore.config.Config(retries={'mode': 'standard'})
 >>> client = boto3.client('s3', config=config)
 >>> tp = {'client': client}
->>> with smart_open.open('s3://commoncrawl/robots.txt', transport_params=tp) as fin:
+>>> with open('s3://commoncrawl/robots.txt', transport_params=tp) as fin:
 ...     print(fin.readline())
 User-Agent: *
+<BLANKLINE>
+
 ```
 
 To verify your settings have effect:
@@ -288,9 +297,13 @@ Instead, `smart_open` offers the caller of the function to pass additional param
 
 ```python
 >>> import boto3
->>> client_kwargs = {'S3.Client.get_object': {RequestPayer': 'requester'}}}
+>>> from smart_open import open
+>>> transport_params = {'client_kwargs': {'S3.Client.get_object': {'RequestPayer': 'requester'}}}
 >>> with open('s3://arxiv/pdf/arXiv_pdf_manifest.xml', transport_params=params) as fin:
-...     pass
+...    print(fin.readline())
+<?xml version='1.0' standalone='yes'?>
+<BLANKLINE>
+
 ```
 
 The above example influences how the [S3.Client.get_object function](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.get_object) gets called by `smart_open` when reading the specified URL.
@@ -318,7 +331,7 @@ More specifically, here's the direct method:
 ```python
 import boto3
 import smart_open
-with smart_open.open('s3://bucket/key', 'wb') as fout:
+with open('s3://bucket/key', 'wb') as fout:
     fout.write(b'hello world!')
 client = boto3.client('s3')
 client.put_object_acl(ACL=acl_as_string)
@@ -329,7 +342,7 @@ Here's the same code that passes the above parameter via `smart_open`:
 ```python
 import smart_open
 tp = {'client_kwargs': {'S3.Client.create_multipart_upload': {'ACL': acl_as_string}}}
-with smart_open.open('s3://bucket/key', 'wb', transport_params=tp) as fout:
+with open('s3://bucket/key', 'wb', transport_params=tp) as fout:
     fout.write(b'hello world!')
 ```
 
@@ -342,22 +355,20 @@ access to. Below is an example for how users can read a file with smart_open. Fo
 [Github API documentation](https://docs.github.com/en/rest/reference/repos#contents).
 
 ```python
->>> from smart_open import open
 >>> import base64
+>>> import gzip
 >>> import json
->>> owner = "RaRe-Technologies"
->>> repo = "smart_open"
->>> path = "howto.md"
->>> git_token = "..."
+>>> import os
+>>> from smart_open import open
+>>> owner, repo, path = "RaRe-Technologies", "smart_open", "howto.md"
+>>> github_token = os.environ['GITHUB_TOKEN']
 >>> url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
->>> transport_params = {
-...     "headers" : {
-...         "Authorization" : "Bearer " + git_token
-...     }
-... }
->>> with open(url, transport_params=transport_params) as obj:
-...     response_contents = json.loads(obj.read())["contents"]
-...     file_text = base64.b64decode(response_contents).decode()
+>>> params = {"headers" : {"Authorization" : "Bearer " + github_token}}
+>>> with open(url, 'rb', transport_params=params) as fin:
+...     response = json.loads(gzip.decompress(fin.read()))
+>>> response["path"]
+'howto.md'
+
 ```
 
 Note: If you are accessing a file in a Github Enterprise org, you will likely have a different base dns than
@@ -389,7 +400,7 @@ You can now read/write to the bucket the same way you would to a real S3 bucket:
 >>> client = boto3.client('s3', endpoint_url='http://localhost:4566')
 >>> tparams = {'client': client}
 >>> with open('s3://mybucket/hello.txt', 'wt', transport_params=tparams) as fout:
-...     fout.write('hello world!')
+...     _ = fout.write('hello world!')
 >>> with open('s3://mybucket/hello.txt', 'rt', transport_params=tparams) as fin:
 ...     fin.read()
 'hello world!'
@@ -419,4 +430,5 @@ for an explanation). To download all files in a directory you can do this:
 ...          print(f.name)
 ...          break # just show the first iteration for the test
 LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/LC08_L1GT_044034_20130330_20170310_01_T2_ANG.txt
+
 ```

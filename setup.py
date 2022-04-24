@@ -35,19 +35,19 @@ __version__ = _get_version()
 def read(fname):
     return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
 
+
 aws_deps = ['boto3']
-gcs_deps = ['google-cloud-storage']
+gcs_deps = ['google-cloud-storage>=1.31.0']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 http_deps = ['requests']
 
 all_deps = aws_deps + gcs_deps + azure_deps + http_deps
 tests_require = all_deps + [
-    'moto[server]==1.3.14',  # Older versions of moto appear broken
+    'moto[server]',
     'pathlib2',
     'responses',
     'boto3',
     'paramiko',
-    'parameterizedtestcase',
     'pytest',
     'pytest-rerunfailures'
 ]
@@ -91,9 +91,10 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Topic :: System :: Distributed Computing',
         'Topic :: Database :: Front-Ends',
     ],

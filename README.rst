@@ -418,36 +418,6 @@ to setting up authentication.
 If you need more credential options, refer to the
 `Azure Storage authentication guide <https://docs.microsoft.com/en-us/azure/storage/common/storage-samples-python#authentication>`__.
 
-File-like Binary Streams
-------------------------
-
-The ``open`` function also accepts file-like objects.
-This is useful when you already have a `binary file <https://docs.python.org/3/glossary.html#term-binary-file>`_ open, and would like to wrap it with transparent decompression:
-
-
-.. code-block:: python
-
-    >>> import io, gzip
-    >>>
-    >>> # Prepare some gzipped binary data in memory, as an example.
-    >>> # Any binary file will do; we're using BytesIO here for simplicity.
-    >>> buf = io.BytesIO()
-    >>> with gzip.GzipFile(fileobj=buf, mode='w') as fout:
-    ...     _ = fout.write(b'this is a bytestring')
-    >>> _ = buf.seek(0)
-    >>>
-    >>> # Use case starts here.
-    >>> buf.name = 'file.gz'  # add a .name attribute so smart_open knows what compressor to use
-    >>> import smart_open
-    >>> smart_open.open(buf, 'rb').read()  # will gzip-decompress transparently!
-    b'this is a bytestring'
-
-
-In this case, ``smart_open`` relied on the ``.name`` attribute of our `binary I/O stream <https://docs.python.org/3/library/io.html#binary-i-o>`_ ``buf`` object to determine which decompressor to use.
-If your file object doesn't have one, set the ``.name`` attribute to an appropriate value.
-Furthermore, that value has to end with a **known** file extension (see the ``register_compressor`` function).
-Otherwise, the transparent decompression will not occur.
-
 Drop-in replacement of ``pathlib.Path.open``
 --------------------------------------------
 
@@ -502,3 +472,4 @@ issues or pull requests there. Suggestions, pull requests and improvements welco
 
 ``smart_open`` is open source software released under the `MIT license <https://github.com/piskvorky/smart_open/blob/master/LICENSE>`_.
 Copyright (c) 2015-now `Radim Řehůřek <https://radimrehurek.com>`_.
+

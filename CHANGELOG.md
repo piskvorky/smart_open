@@ -1,5 +1,33 @@
 # Unreleased
 
+# 6.0.0, 24 April 2022
+
+This release deprecates the old `ignore_ext` parameter.
+Use the `compression` parameter instead.
+
+```python
+fin = smart_open.open("/path/file.gz", ignore_ext=True)  # No
+fin = smart_open.open("/path/file.gz", compression="disable")  # Yes
+
+fin = smart_open.open("/path/file.gz", ignore_ext=False)  # No
+fin = smart_open.open("/path/file.gz")  # Yes
+fin = smart_open.open("/path/file.gz", compression="infer_from_extension")  # Yes, if you want to be explicit
+
+fin = smart_open.open("/path/file", compression=".gz")  # Yes
+```
+
+- Make Python 3.7 the required minimum (PR [#688](https://github.com/RaRe-Technologies/smart_open/pull/688), [@mpenkov](https://github.com/mpenkov))
+- Drop deprecated ignore_ext parameter (PR [#661](https://github.com/RaRe-Technologies/smart_open/pull/661), [@mpenkov](https://github.com/mpenkov)) 
+- Drop support for passing buffers to smart_open.open (PR [#660](https://github.com/RaRe-Technologies/smart_open/pull/660), [@mpenkov](https://github.com/mpenkov))
+- Support working directly with file descriptors (PR [#659](https://github.com/RaRe-Technologies/smart_open/pull/659), [@mpenkov](https://github.com/mpenkov))
+- Added support for viewfs:// URLs (PR [#665](https://github.com/RaRe-Technologies/smart_open/pull/665), [@ChandanChainani](https://github.com/ChandanChainani))
+- Fix AttributeError when reading passthrough zstandard (PR [#658](https://github.com/RaRe-Technologies/smart_open/pull/658), [@mpenkov](https://github.com/mpenkov))
+- Make UploadFailedError picklable (PR [#689](https://github.com/RaRe-Technologies/smart_open/pull/689), [@birgerbr](https://github.com/birgerbr))
+- Support container client and blob client for azure blob storage (PR [#652](https://github.com/RaRe-Technologies/smart_open/pull/652), [@cbare](https://github.com/cbare))
+- Pin google-cloud-storage to >=1.31.1 in extras (PR [#687](https://github.com/RaRe-Technologies/smart_open/pull/687), [@PLPeeters](https://github.com/PLPeeters))
+- Expose certain transport-specific methods e.g. to_boto3 in top layer (PR [#664](https://github.com/RaRe-Technologies/smart_open/pull/664), [@mpenkov](https://github.com/mpenkov))
+- Use pytest instead of parameterizedtestcase (PR [#657](https://github.com/RaRe-Technologies/smart_open/pull/657), [@mpenkov](https://github.com/mpenkov))
+
 # 5.2.1, 28 August 2021
 
 - make HTTP/S seeking less strict (PR [#646](https://github.com/RaRe-Technologies/smart_open/pull/646), [@mpenkov](https://github.com/mpenkov))

@@ -106,8 +106,7 @@ def open(
         newline=None,
         closefd=True,
         opener=None,
-        ignore_ext=False,
-        compression=None,
+        compression=so_compression.INFER_FROM_EXTENSION,
         transport_params=None,
         ):
     r"""Open the URI object, returning a file-like object.
@@ -138,11 +137,8 @@ def open(
         Mimicks built-in open parameter of the same name.  Ignored.
     opener: object, optional
         Mimicks built-in open parameter of the same name.  Ignored.
-    ignore_ext: boolean, optional
-        Disable transparent compression/decompression based on the file extension.
     compression: str, optional (see smart_open.compression.get_supported_compression_types)
         Explicitly specify the compression/decompression behavior.
-        If you specify this parameter, then ignore_ext must not be specified.
     transport_params: dict, optional
         Additional parameters for the transport layer (see notes below).
 
@@ -172,15 +168,8 @@ def open(
     if not isinstance(mode, str):
         raise TypeError('mode should be a string')
 
-    if compression and ignore_ext:
-        raise ValueError('ignore_ext and compression parameters are mutually exclusive')
-    elif compression and compression not in so_compression.get_supported_compression_types():
+    if compression not in so_compression.get_supported_compression_types():
         raise ValueError(f'invalid compression type: {compression}')
-    elif ignore_ext:
-        compression = so_compression.NO_COMPRESSION
-        warnings.warn("'ignore_ext' will be deprecated in a future release", PendingDeprecationWarning)
-    elif compression is None:
-        compression = so_compression.INFER_FROM_EXTENSION
 
     if transport_params is None:
         transport_params = {}
@@ -245,6 +234,19 @@ def open(
         )
     else:
         decoded = decompressed
+
+    #
+    # There are some useful methods in the binary readers, e.g. to_boto3, that get
+    # hidden by the multiple layers of wrapping we just performed.  Promote
+    # them so they are visible to the user.
+    #
+    if decoded != binary:
+        promoted_attrs = ['to_boto3']
+        for attr in promoted_attrs:
+            try:
+                setattr(decoded, attr, getattr(binary, attr))
+            except AttributeError:
+                pass
 
     return decoded
 
@@ -379,16 +381,16 @@ def _open_binary_stream(uri, mode, transport_params):
         #
         raise NotImplementedError('unsupported mode: %r' % mode)
 
-    if hasattr(uri, 'read'):
-        # simply pass-through if already a file-like
-        # we need to return something as the file name, but we don't know what
-        # so we probe for uri.name (e.g., this works with open() or tempfile.NamedTemporaryFile)
-        # if the value ends with COMPRESSED_EXT, we will note it in compression_wrapper()
-        # if there is no such an attribute, we return "unknown" - this
-        # effectively disables any compression
-        if not hasattr(uri, 'name'):
-            uri.name = getattr(uri, 'name', 'unknown')
-        return uri
+    if isinstance(uri, int):
+        #
+        # We're working with a file descriptor.  If we open it, its name is
+        # just the integer value, which isn't helpful.  Unfortunately, there's
+        # no easy cross-platform way to go from a file descriptor to the filename,
+        # so we just give up here.  The user will have to handle their own
+        # compression, etc. explicitly.
+        #
+        fobj = _builtin_open(uri, mode, closefd=False)
+        return fobj
 
     if not isinstance(uri, str):
         raise TypeError("don't know how to handle uri %s" % repr(uri))
@@ -481,7 +483,7 @@ def smart_open(
     # For completeness, the main differences of the old smart_open function:
     #
     # 1. Default mode was read binary (mode='rb')
-    # 2. ignore_ext parameter was called ignore_extension
+    # 2. compression parameter was called ignore_extension
     # 3. Transport parameters were passed directly as kwargs
     #
     url = 'https://github.com/RaRe-Technologies/smart_open/blob/develop/MIGRATING_FROM_OLDER_VERSIONS.rst'
@@ -493,7 +495,10 @@ def smart_open(
     message = 'This function is deprecated.  See %s for more information' % url
     warnings.warn(message, category=DeprecationWarning)
 
-    ignore_ext = ignore_extension
+    if ignore_extension:
+        compression = so_compression.NO_COMPRESSION
+    else:
+        compression = so_compression.INFER_FROM_EXTENSION
     del kwargs, url, message, ignore_extension
     return open(**locals())
 

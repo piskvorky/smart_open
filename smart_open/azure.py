@@ -11,6 +11,7 @@
 import base64
 import io
 import logging
+from typing import Union
 
 import smart_open.bytebuffer
 import smart_open.constants
@@ -68,7 +69,7 @@ def open(
         container_id,
         blob_id,
         mode,
-        client=None,  # type: azure.storage.blob.BlobServiceClient
+        client=None,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient] # noqa
         buffer_size=DEFAULT_BUFFER_SIZE,
         min_part_size=_DEFAULT_MIN_PART_SIZE,
         max_concurrency=DEFAULT_MAX_CONCURRENCY,
@@ -83,7 +84,7 @@ def open(
         The name of the blob within the bucket.
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
-    client: azure.storage.blob.BlobServiceClient
+    client: azure.storage.blob.BlobServiceClient, ContainerClient, or BlobClient
         The Azure Blob Storage client to use when working with azure-storage-blob.
     buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
@@ -114,6 +115,27 @@ def open(
         )
     else:
         raise NotImplementedError('Azure Blob Storage support for mode %r not implemented' % mode)
+
+
+def _get_blob_client(client, container, blob):
+    # type: (Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient], str, str) -> azure.storage.blob.BlobClient  # noqa
+    """
+    Return an Azure BlobClient starting with any of BlobServiceClient,
+    ContainerClient, or BlobClient plus container name and blob name.
+    """
+    if hasattr(client, "get_container_client"):
+        client = client.get_container_client(container)
+
+    if hasattr(client, "container_name") and client.container_name != container:
+        raise ValueError(
+            "Client for %r doesn't match "
+            "container %r" % (client.container_name, container)
+        )
+
+    if hasattr(client, "get_blob_client"):
+        client = client.get_blob_client(blob)
+
+    return client
 
 
 class _RawReader(object):
@@ -175,15 +197,16 @@ class Reader(io.BufferedIOBase):
             self,
             container,
             blob,
-            client,  # type: azure.storage.blob.BlobServiceClient
+            client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
             buffer_size=DEFAULT_BUFFER_SIZE,
             line_terminator=smart_open.constants.BINARY_NEWLINE,
             max_concurrency=DEFAULT_MAX_CONCURRENCY,
     ):
-        self._container_client = client.get_container_client(container)
-        # type: azure.storage.blob.ContainerClient
+        self._container_name = container
 
-        self._blob = self._container_client.get_blob_client(blob)
+        self._blob = _get_blob_client(client, container, blob)
+        # type: azure.storage.blob.BlobClient
+
         if self._blob is None:
             raise azure.core.exceptions.ResourceNotFoundError(
                 'blob %s not found in %s' % (blob, container)
@@ -345,12 +368,12 @@ class Reader(io.BufferedIOBase):
 
     def __str__(self):
         return "(%s, %r, %r)" % (self.__class__.__name__,
-                                 self._container.container_name,
+                                 self._container_name,
                                  self._blob.blob_name)
 
     def __repr__(self):
         return "%s(container=%r, blob=%r)" % (
-            self.__class__.__name__, self._container_client.container_name, self._blob.blob_name,
+            self.__class__.__name__, self._container_name, self._blob.blob_name,
         )
 
 
@@ -363,13 +386,15 @@ class Writer(io.BufferedIOBase):
             self,
             container,
             blob,
-            client,  # type: azure.storage.blob.BlobServiceClient
+            client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
             min_part_size=_DEFAULT_MIN_PART_SIZE,
     ):
-        self._client = client
-        self._container_client = self._client.get_container_client(container)
-        # type: azure.storage.blob.ContainerClient
-        self._blob = self._container_client.get_blob_client(blob)  # type: azure.storage.blob.BlobClient
+        self._is_closed = False
+        self._container_name = container
+
+        self._blob = _get_blob_client(client, container, blob)
+        # type: azure.storage.blob.BlobClient
+
         self._min_part_size = min_part_size
 
         self._total_size = 0
@@ -396,12 +421,12 @@ class Writer(io.BufferedIOBase):
                 self._upload_part()
             self._blob.commit_block_list(self._block_list)
             self._block_list = []
-            self._client = None
+            self._is_closed = True
         logger.debug("successfully closed")
 
     @property
     def closed(self):
-        return self._client is None
+        return self._is_closed
 
     def writable(self):
         """Return True if the stream supports writing."""
@@ -483,14 +508,14 @@ class Writer(io.BufferedIOBase):
     def __str__(self):
         return "(%s, %r, %r)" % (
             self.__class__.__name__,
-            self._container_client.container_name,
+            self._container_name,
             self._blob.blob_name
         )
 
     def __repr__(self):
         return "%s(container=%r, blob=%r, min_part_size=%r)" % (
             self.__class__.__name__,
-            self._container_client.container_name,
+            self._container_name,
             self._blob.blob_name,
             self._min_part_size
         )
