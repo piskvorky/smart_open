@@ -7,6 +7,8 @@
 #
 """Implements the compression layer of the ``smart_open`` library."""
 import logging
+import importlib
+import importlib.metadata
 import os.path
 
 logger = logging.getLogger(__name__)
@@ -145,3 +147,16 @@ def compression_wrapper(file_obj, mode, compression):
 #
 register_compressor('.bz2', _handle_bz2)
 register_compressor('.gz', _handle_gzip)
+
+
+def _register_compressor_entry_point(ep):
+    try:
+        assert len(ep.name) > 0, "At least one char is required for ep.name"
+        extension = ".{}".format(ep.name)
+        register_compressor(extension, ep.load())
+    except Exception:
+        logger.warning("Fail to load smart_open compressor extension: %s (target: %s)", ep.name, ep.value)
+
+
+for ep in importlib.metadata.entry_points().select(group='smart_open_compressor'):
+    _register_compressor_entry_point(ep)
