@@ -11,10 +11,10 @@ The main entrypoint is :func:`get_transport`.  See also :file:`extending.md`.
 
 """
 import importlib
-import importlib.metadata
 import logging
 
 import smart_open.local_file
+from smart_open.utils import find_entry_points
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ def _register_transport_entry_point(ep):
         logger.warning("Fail to load smart_open transport extension: %s (target: %s)", ep.name, ep.value)
 
 
-for ep in importlib.metadata.entry_points().select(group='smart_open_transport'):
+for ep in find_entry_points(group='smart_open_transport'):
     _register_transport_entry_point(ep)
 
 SUPPORTED_SCHEMES = tuple(sorted(_REGISTRY.keys()))

@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from importlib.metadata import EntryPoint
 import pytest
 
+from smart_open.utils import importlib_metadata
 from smart_open.compression import _COMPRESSOR_REGISTRY, _register_compressor_entry_point
+
+EntryPoint = importlib_metadata.EntryPoint
 
 
 def unregister_compressor(ext):

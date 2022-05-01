@@ -80,6 +80,7 @@ setup(
         'all': all_deps,
         'http': http_deps,
         'webhdfs': http_deps,
+        ':python_version<"3.8"': ['importlib-metadata'],
     },
     python_requires=">=3.6,<4.0",
 

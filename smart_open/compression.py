@@ -7,9 +7,9 @@
 #
 """Implements the compression layer of the ``smart_open`` library."""
 import logging
-import importlib
-import importlib.metadata
 import os.path
+
+from smart_open.utils import find_entry_points
 
 logger = logging.getLogger(__name__)
 
@@ -158,5 +158,5 @@ def _register_compressor_entry_point(ep):
         logger.warning("Fail to load smart_open compressor extension: %s (target: %s)", ep.name, ep.value)
 
 
-for ep in importlib.metadata.entry_points().select(group='smart_open_compressor'):
+for ep in find_entry_points('smart_open_compressor'):
     _register_compressor_entry_point(ep)

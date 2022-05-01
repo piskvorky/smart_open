@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-from importlib.metadata import EntryPoint
 import pytest
 import unittest
 
 from smart_open.transport import (
     register_transport, get_transport, _REGISTRY, _ERRORS, _register_transport_entry_point
 )
+from smart_open.utils import importlib_metadata
+
+EntryPoint = importlib_metadata.EntryPoint
 
 
 def unregister_transport(x):

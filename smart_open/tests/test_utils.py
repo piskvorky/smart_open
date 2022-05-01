@@ -59,3 +59,14 @@ def test_check_kwargs():
 def test_safe_urlsplit(url, expected):
     actual = smart_open.utils.safe_urlsplit(url)
     assert actual == urllib.parse.SplitResult(*expected)
+
+
+def test_find_entry_points():
+    # Installed through setup.py tests requirements
+    eps = smart_open.utils.find_entry_points("pytest11")
+    eps_names = {ep.name for ep in eps}
+    assert "rerunfailures" in eps_names
+
+    # Part of setuptools
+    eps = smart_open.utils.find_entry_points("distutils.commands")
+    assert len(eps) > 0
