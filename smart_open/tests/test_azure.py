@@ -600,8 +600,12 @@ class WriterTest(unittest.TestCase):
         container_client = CLIENT.get_container_client(CONTAINER_NAME)
         blob_client = container_client.get_blob_client(blob_name)
 
-        with smart_open.azure.Writer(
-            CONTAINER_NAME, blob_name, blob_client, metadata={"name": blob_name}
+        with smart_open.open(
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+            "wb",
+            transport_params={
+                "client": blob_client, "blob_kwargs": {"metadata": {"name": blob_name}}
+            },
         ) as fout:
             fout.write(test_string)
 
