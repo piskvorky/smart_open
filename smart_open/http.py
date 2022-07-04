@@ -49,7 +49,7 @@ def open_uri(uri, mode, transport_params):
     return open(uri, mode, **kwargs)
 
 
-def open(uri, mode, kerberos=False, user=None, password=None, cert= None,
+def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
          headers=None, timeout=None):
     """Implement streamed reader from a web site.
 
