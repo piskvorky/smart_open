@@ -49,7 +49,8 @@ def open_uri(uri, mode, transport_params):
     return open(uri, mode, **kwargs)
 
 
-def open(uri, mode, kerberos=False, user=None, password=None, cert= None, headers=None, timeout=None):
+def open(uri, mode, kerberos=False, user=None, password=None, cert= None,
+         headers=None, timeout=None):
     """Implement streamed reader from a web site.
 
     Supports Kerberos and Basic HTTP authentication.
@@ -82,7 +83,7 @@ def open(uri, mode, kerberos=False, user=None, password=None, cert= None, header
     if mode == constants.READ_BINARY:
         fobj = SeekableBufferedInputBase(
             uri, mode, kerberos=kerberos,
-            user=user, password=password, cert=cert, 
+            user=user, password=password, cert=cert,
             headers=headers, timeout=timeout,
         )
         fobj.name = os.path.basename(urllib.parse.urlparse(uri).path)
@@ -93,7 +94,7 @@ def open(uri, mode, kerberos=False, user=None, password=None, cert= None, header
 
 class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, user=None, password=None, cert=None, 
+                 kerberos=False, user=None, password=None, cert=None,
                  headers=None, timeout=None):
         if kerberos:
             import requests_kerberos
@@ -213,7 +214,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
     """
 
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, user=None, password=None, cert=None, 
+                 kerberos=False, user=None, password=None, cert=None,
                  headers=None, timeout=None):
         """
         If Kerberos is True, will attempt to use the local Kerberos credentials.
