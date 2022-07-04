@@ -450,7 +450,7 @@ class SmartOpenHttpTest(unittest.TestCase):
 
     @responses.activate
     def test_http_cert(self):
-        """Does http authentication work correctly"""
+        """Does cert parameter get passed to requests"""
         responses.add(responses.GET, "http://127.0.0.1/index.html",
                       body='line1\nline2', stream=True)
         cert_path = '/path/to/my/cert.pem'
