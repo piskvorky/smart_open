@@ -49,7 +49,8 @@ def open_uri(uri, mode, transport_params):
     return open(uri, mode, **kwargs)
 
 
-def open(uri, mode, kerberos=False, user=None, password=None, headers=None, timeout=None):
+def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
+         headers=None, timeout=None):
     """Implement streamed reader from a web site.
 
     Supports Kerberos and Basic HTTP authentication.
@@ -66,6 +67,8 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None, time
         The username for authenticating over HTTP
     password: str, optional
         The password for authenticating over HTTP
+    cert: str/tuple, optional
+        if String, path to ssl client cert file (.pem). If Tuple, (‘cert’, ‘key’)
     headers: dict, optional
         Any headers to send in the request. If ``None``, the default headers are sent:
         ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
@@ -80,7 +83,8 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None, time
     if mode == constants.READ_BINARY:
         fobj = SeekableBufferedInputBase(
             uri, mode, kerberos=kerberos,
-            user=user, password=password, headers=headers, timeout=timeout,
+            user=user, password=password, cert=cert,
+            headers=headers, timeout=timeout,
         )
         fobj.name = os.path.basename(urllib.parse.urlparse(uri).path)
         return fobj
@@ -90,7 +94,8 @@ def open(uri, mode, kerberos=False, user=None, password=None, headers=None, time
 
 class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, user=None, password=None, headers=None, timeout=None):
+                 kerberos=False, user=None, password=None, cert=None,
+                 headers=None, timeout=None):
         if kerberos:
             import requests_kerberos
             auth = requests_kerberos.HTTPKerberosAuth()
@@ -112,6 +117,7 @@ class BufferedInputBase(io.BufferedIOBase):
         self.response = requests.get(
             url,
             auth=auth,
+            cert=cert,
             stream=True,
             headers=self.headers,
             timeout=self.timeout,
@@ -204,13 +210,15 @@ class BufferedInputBase(io.BufferedIOBase):
 class SeekableBufferedInputBase(BufferedInputBase):
     """
     Implement seekable streamed reader from a web site.
-    Supports Kerberos and Basic HTTP authentication.
+    Supports Kerberos, client certificate and Basic HTTP authentication.
     """
 
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, user=None, password=None, headers=None, timeout=None):
+                 kerberos=False, user=None, password=None, cert=None,
+                 headers=None, timeout=None):
         """
         If Kerberos is True, will attempt to use the local Kerberos credentials.
+        If cert is set, will try to use a client certificate
         Otherwise, will try to use "basic" HTTP authentication via username/password.
 
         If none of those are set, will connect unauthenticated.
@@ -230,6 +238,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         else:
             self.headers = headers
 
+        self.cert = cert
         self.timeout = timeout
 
         self.buffer_size = buffer_size
@@ -325,6 +334,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             self.url,
             auth=self.auth,
             stream=True,
+            cert=self.cert,
             headers=self.headers,
             timeout=self.timeout,
         )

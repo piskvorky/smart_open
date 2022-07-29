@@ -449,6 +449,18 @@ class SmartOpenHttpTest(unittest.TestCase):
         self.assertTrue(actual_request.headers['Authorization'].startswith('Basic '))
 
     @responses.activate
+    def test_http_cert(self):
+        """Does cert parameter get passed to requests"""
+        responses.add(responses.GET, "http://127.0.0.1/index.html",
+                      body='line1\nline2', stream=True)
+        cert_path = '/path/to/my/cert.pem'
+        tp = dict(cert=cert_path)
+        smart_open.open("http://127.0.0.1/index.html", transport_params=tp)
+        self.assertEqual(len(responses.calls), 1)
+        actual_request = responses.calls[0].request
+        self.assertEqual(cert_path, actual_request.req_kwargs['cert'])
+
+    @responses.activate
     def _test_compressed_http(self, suffix, query):
         """Can open <suffix> via http?"""
         assert suffix in ('.gz', '.bz2')

@@ -124,6 +124,8 @@ FUNCTIONS
             The username for authenticating over HTTP
         password: str, optional
             The password for authenticating over HTTP
+        cert: str/tuple, optional
+            If String, path to ssl client cert file (.pem). If Tuple, (‘cert’, ‘key’)
         headers: dict, optional
             Any headers to send in the request. If ``None``, the default headers are sent:
             ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
