@@ -70,6 +70,7 @@ def open(
         blob_id,
         mode,
         client=None,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient] # noqa
+        blob_kwargs=None,
         buffer_size=DEFAULT_BUFFER_SIZE,
         min_part_size=_DEFAULT_MIN_PART_SIZE,
         max_concurrency=DEFAULT_MAX_CONCURRENCY,
@@ -86,10 +87,13 @@ def open(
         The mode for opening the object.  Must be either "rb" or "wb".
     client: azure.storage.blob.BlobServiceClient, ContainerClient, or BlobClient
         The Azure Blob Storage client to use when working with azure-storage-blob.
+    blob_kwargs: dict, optional
+        Additional parameters to pass to `BlobClient.commit_block_list`.
+        For writing only.
     buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
     min_part_size: int, optional
-        The minimum part size for multipart uploads.  For writing only.
+        The minimum part size for multipart uploads. For writing only.
     max_concurrency: int, optional
         The number of parallel connections with which to download. For reading only.
 
@@ -111,6 +115,7 @@ def open(
             container_id,
             blob_id,
             client,
+            blob_kwargs=blob_kwargs,
             min_part_size=min_part_size
         )
     else:
@@ -387,12 +392,14 @@ class Writer(io.BufferedIOBase):
             container,
             blob,
             client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
+            blob_kwargs=None,
             min_part_size=_DEFAULT_MIN_PART_SIZE,
     ):
         self._is_closed = False
         self._container_name = container
 
         self._blob = _get_blob_client(client, container, blob)
+        self._blob_kwargs = blob_kwargs or {}
         # type: azure.storage.blob.BlobClient
 
         self._min_part_size = min_part_size
@@ -419,7 +426,7 @@ class Writer(io.BufferedIOBase):
         if not self.closed:
             if self._current_part.tell() > 0:
                 self._upload_part()
-            self._blob.commit_block_list(self._block_list)
+            self._blob.commit_block_list(self._block_list, **self._blob_kwargs)
             self._block_list = []
             self._is_closed = True
         logger.debug("successfully closed")

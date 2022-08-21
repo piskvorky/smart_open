@@ -1,5 +1,10 @@
 # Unreleased
 
+# 6.1.0, 21 August 2022
+
+- Add cert parameter to http transport params (PR [#703](https://github.com/RaRe-Technologies/smart_open/pull/703), [@stev-0](https://github.com/stev-0))
+- Allow passing additional kwargs for Azure writes (PR [#702](https://github.com/RaRe-Technologies/smart_open/pull/702), [@ddelange](https://github.com/ddelange))
+
 # 6.0.0, 24 April 2022
 
 This release deprecates the old `ignore_ext` parameter.

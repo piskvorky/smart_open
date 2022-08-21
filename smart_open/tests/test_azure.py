@@ -51,10 +51,12 @@ class FakeBlobClient(object):
         self.__contents = io.BytesIO()
         self._staged_contents = {}
 
-    def commit_block_list(self, block_list):
+    def commit_block_list(self, block_list, metadata=None):
         data = b''.join([self._staged_contents[block_blob['id']] for block_blob in block_list])
         self.__contents = io.BytesIO(data)
-        self.set_blob_metadata(dict(size=len(data)))
+        metadata = metadata or {}
+        metadata.update({"size": len(data)})
+        self.set_blob_metadata(metadata)
         self._container_client.register_blob_client(self)
 
     def delete_blob(self):
@@ -589,6 +591,32 @@ class WriterTest(unittest.TestCase):
             transport_params=dict(client=container_client),
         ))
         assert output == [test_string]
+
+    def test_write_blob_client(self):
+        """Does writing into Azure Blob Storage work correctly?"""
+        test_string = u"žluťoučký koníček".encode('utf8')
+        blob_name = "test_write_blob_client_%s" % BLOB_NAME
+
+        container_client = CLIENT.get_container_client(CONTAINER_NAME)
+        blob_client = container_client.get_blob_client(blob_name)
+
+        with smart_open.open(
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+            "wb",
+            transport_params={
+                "client": blob_client, "blob_kwargs": {"metadata": {"name": blob_name}}
+            },
+        ) as fout:
+            fout.write(test_string)
+
+        self.assertEqual(blob_client.get_blob_properties()["name"], blob_name)
+
+        output = list(smart_open.open(
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+            "rb",
+            transport_params=dict(client=CLIENT),
+        ))
+        self.assertEqual(output, [test_string])
 
     def test_incorrect_input(self):
         """Does azure write fail on incorrect input?"""
