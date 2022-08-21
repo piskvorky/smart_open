@@ -348,15 +348,14 @@ Since going over all (or select) keys in an S3 bucket is a very common operation
 .. code-block:: python
 
   >>> from smart_open import s3
-  >>> # get data corresponding to 2010 and later under "silo-open-data/annual/monthly_rain"
   >>> # we use workers=1 for reproducibility; you should use as many workers as you have cores
   >>> bucket = 'silo-open-data'
-  >>> prefix = 'annual/monthly_rain/'
+  >>> prefix = 'Official/annual/monthly_rain/'
   >>> for key, content in s3.iter_bucket(bucket, prefix=prefix, accept_key=lambda key: '/201' in key, workers=1, key_limit=3):
   ...     print(key, round(len(content) / 2**20))
-  annual/monthly_rain/2010.monthly_rain.nc 13
-  annual/monthly_rain/2011.monthly_rain.nc 13
-  annual/monthly_rain/2012.monthly_rain.nc 13
+  Official/annual/monthly_rain/2010.monthly_rain.nc 13
+  Official/annual/monthly_rain/2011.monthly_rain.nc 13
+  Official/annual/monthly_rain/2012.monthly_rain.nc 13
 
 GCS Credentials
 ---------------
