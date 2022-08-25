@@ -27,6 +27,8 @@ import logging
 import urllib.parse
 import warnings
 
+from paramiko import SSHException
+
 import smart_open.utils
 
 logger = logging.getLogger(__name__)
@@ -74,7 +76,7 @@ def open_uri(uri, mode, transport_params):
     return open(uri_path, mode, transport_params=transport_params, **parsed_uri)
 
 
-def _connect(hostname, username, port, password, transport_params):
+def _connect_sftp(hostname, username, port, password, transport_params):
     try:
         import paramiko
     except ImportError:
@@ -84,10 +86,8 @@ def _connect(hostname, username, port, password, transport_params):
         )
         raise
 
-    key = (hostname, username)
-    ssh = _SSH.get(key)
-    if ssh is None:
-        ssh = _SSH[key] = paramiko.client.SSHClient()
+    def connect_ssh():
+        ssh = paramiko.SSHClient()
         ssh.load_system_host_keys()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         kwargs = transport_params.get('connect_kwargs', {}).copy()
@@ -97,7 +97,23 @@ def _connect(hostname, username, port, password, transport_params):
             kwargs.setdefault('password', password)
         kwargs.setdefault('username', username)
         ssh.connect(hostname, port, **kwargs)
-    return ssh
+        return ssh
+
+    def init_sftp(ssh: paramiko.SSHClient):
+        tport = ssh.get_transport()
+        return tport and tport.open_sftp_client()
+
+    key = (hostname, username)
+    ssh = _SSH[key] = _SSH.get(key) or connect_ssh()
+
+    try:
+        return init_sftp(ssh)
+    except SSHException as ex:
+        connection_timed_out = ex.args and ex.args[0] == 'SSH session not active'
+        if connection_timed_out:
+            ssh = _SSH[key] = connect_ssh()  # one reconnect attempt
+            return init_sftp(ssh)
+        raise
 
 
 def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT, transport_params=None):
@@ -142,8 +158,7 @@ def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT,
     if not transport_params:
         transport_params = {}
 
-    conn = _connect(host, user, port, password, transport_params)
-    sftp_client = conn.get_transport().open_sftp_client()
+    sftp_client = _connect_sftp(host, user, port, password, transport_params)
     fobj = sftp_client.open(path, mode)
     fobj.name = path
     return fobj
