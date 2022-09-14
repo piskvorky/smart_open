@@ -105,12 +105,12 @@ class ByteBuffer(object):
         if size < 0 or size > len(self):
             size = len(self)
 
-        part = self._bytes[self._pos:self._pos+size]
+        part = bytes(self._bytes[self._pos:self._pos+size])
         return part
 
     def empty(self):
         """Remove all bytes from the buffer"""
-        self._bytes = b''
+        self._bytes = bytearray()
         self._pos = 0
 
     def fill(self, source, size=-1):
@@ -151,7 +151,7 @@ class ByteBuffer(object):
         if hasattr(source, 'read'):
             new_bytes = source.read(size)
         else:
-            new_bytes = b''
+            new_bytes = bytearray()
             for more_bytes in source:
                 new_bytes += more_bytes
                 if len(new_bytes) >= size:
