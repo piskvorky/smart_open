@@ -87,6 +87,9 @@ jobs:
       - name: Update pip
         run: python -m pip install -U pip
 
+      - name: Upgrade PyOpenSSL
+        run: python -m pip install pyOpenSSL --upgrade
+
       - name: Install smart_open and its dependencies
         run: pip install -e .[test]
 
@@ -123,6 +126,9 @@ jobs:
 
       - name: Update pip
         run: python -m pip install -U pip
+
+      - name: Upgrade PyOpenSSL
+        run: python -m pip install pyOpenSSL --upgrade
 
       - run: python -m pip install numpy
 
