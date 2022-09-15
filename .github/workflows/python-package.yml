@@ -45,6 +45,12 @@ jobs:
       - name: Update pip
         run: python -m pip install -U pip
 
+      #
+      # https://askubuntu.com/questions/1428181/module-lib-has-no-attribute-x509-v-flag-cb-issuer-check
+      #
+      - name: Upgrade PyOpenSSL
+        run: python -m pip install pyOpenSSL --upgrade
+
       - name: Install smart_open and its dependencies
         run: pip install -e .[test]
 
