@@ -46,11 +46,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_ENCODING = locale.getpreferredencoding(do_setlocale=False)
 
-#
-# Attempt to avoid circular import in transport submodule
-#
-transport._REGISTRY[transport.NO_SCHEME] = so_file
-
 
 def _sniff_scheme(uri_as_string):
     """Returns the scheme of the URL only, as a string."""

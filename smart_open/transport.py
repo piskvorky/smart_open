@@ -13,11 +13,13 @@ The main entrypoint is :func:`get_transport`.  See also :file:`extending.md`.
 import importlib
 import logging
 
+import smart_open.local_file
+
 logger = logging.getLogger(__name__)
 
 NO_SCHEME = ''
 
-_REGISTRY = {}
+_REGISTRY = {NO_SCHEME: smart_open.local_file}
 _ERRORS = {}
 _MISSING_DEPS_ERROR = """You are trying to use the %(module)s functionality of smart_open
 but you do not have the correct %(module)s dependencies installed. Try:
@@ -91,7 +93,7 @@ def get_transport(scheme):
     raise NotImplementedError(message)
 
 
-register_transport('smart_open.local_file')
+register_transport(smart_open.local_file)
 register_transport('smart_open.azure')
 register_transport('smart_open.gcs')
 register_transport('smart_open.hdfs')
