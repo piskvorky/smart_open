@@ -54,15 +54,15 @@ def register_transport(submodule):
     # Save only the last module name piece
     module_name = module_name.rsplit(".")[-1]
 
-    if hasattr(submodule, 'SCHEME'):
+    if hasattr(submodule, "SCHEME"):
         schemes = [submodule.SCHEME]
-    elif hasattr(submodule, 'SCHEMES'):
+    elif hasattr(submodule, "SCHEMES"):
         schemes = submodule.SCHEMES
     else:
-        raise ValueError('%r does not have a .SCHEME or .SCHEMES attribute' % submodule)
+        raise ValueError("%r does not have a .SCHEME or .SCHEMES attribute" % submodule)
 
-    for f in ('open', 'open_uri', 'parse_uri'):
-        assert hasattr(submodule, f), '%r is missing %r' % (submodule, f)
+    for f in ("open", "open_uri", "parse_uri"):
+        assert hasattr(submodule, f), "%r is missing %r" % (submodule, f)
 
     for scheme in schemes:
         assert scheme not in _REGISTRY
@@ -80,7 +80,9 @@ def get_transport(scheme):
     """
     global _ERRORS, _MISSING_DEPS_ERROR, _REGISTRY, SUPPORTED_SCHEMES
     expected = SUPPORTED_SCHEMES
-    readme_url = 'https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst'
+    readme_url = (
+        "https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst"
+    )
     message = (
         "Unable to handle scheme %(scheme)r, expected one of %(expected)r. "
         "Extra dependencies required by %(scheme)r may be missing. "
@@ -94,13 +96,14 @@ def get_transport(scheme):
 
 
 register_transport(smart_open.local_file)
-register_transport('smart_open.azure')
-register_transport('smart_open.gcs')
-register_transport('smart_open.hdfs')
-register_transport('smart_open.http')
-register_transport('smart_open.s3')
-register_transport('smart_open.ssh')
-register_transport('smart_open.webhdfs')
+register_transport("smart_open.azure")
+register_transport("smart_open.ftp")
+register_transport("smart_open.gcs")
+register_transport("smart_open.hdfs")
+register_transport("smart_open.http")
+register_transport("smart_open.s3")
+register_transport("smart_open.ssh")
+register_transport("smart_open.webhdfs")
 
 SUPPORTED_SCHEMES = tuple(sorted(_REGISTRY.keys()))
 """The transport schemes that the local installation of ``smart_open`` supports."""
