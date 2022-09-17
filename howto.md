@@ -432,3 +432,18 @@ for an explanation). To download all files in a directory you can do this:
 LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/LC08_L1GT_044034_20130330_20170310_01_T2_ANG.txt
 
 ```
+
+## How to Access Google Cloud Anonymously
+
+The `google-cloud-storage` library that `smart_open` uses expects credentials and authenticated access by default.
+If you would like to access GCS without using an account you need to explicitly use an anonymous client.
+
+```python
+>>> from google.cloud import storage
+>>> from smart_open import open
+>>> client = storage.Client.create_anonymous_client()
+>>> f = open("gs://gcp-public-data-landsat/index.csv.gz", transport_params=dict(client=client))
+>>> f.readline()
+'SCENE_ID,PRODUCT_ID,SPACECRAFT_ID,SENSOR_ID,DATE_ACQUIRED,COLLECTION_NUMBER,COLLECTION_CATEGORY,SENSING_TIME,DATA_TYPE,WRS_PATH,WRS_ROW,CLOUD_COVER,NORTH_LAT,SOUTH_LAT,WEST_LON,EAST_LON,TOTAL_SIZE,BASE_URL\n'
+
+```
