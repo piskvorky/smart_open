@@ -139,7 +139,8 @@ class FakeBlob(object):
         self._bucket = bucket  # type: FakeBucket
         self._exists = False
         self.__contents = io.BytesIO()
-
+        self.__contents.close = lambda: None
+        self._size = 0
         self._create_if_not_exists()
 
     def create_resumable_upload_session(self):
@@ -171,11 +172,27 @@ class FakeBlob(object):
         # https://googleapis.dev/python/storage/latest/blobs.html#google.cloud.storage.blob.Blob.upload_from_string
         if isinstance(data, str):
             data = bytes(data, 'utf8')
-        self.__contents = io.BytesIO(data)
-        self.__contents.seek(0, io.SEEK_END)
+        self.__contents.truncate(0) 
+        self.__contents.seek(0)
+        self.__contents.write(data)
+        self._size = self.__contents.tell()
 
     def write(self, data):
         self.upload_from_string(data)
+
+    def open(
+        self,
+        mode,
+        chunk_size=None,
+        ignore_flush=None,
+        encoding=None,
+        errors=None,
+        newline=None,
+        **kwargs,
+        ):
+        if mode.startswith('r'):
+            self.__contents.seek(0)
+        return self.__contents
 
     @property
     def bucket(self):
@@ -183,9 +200,7 @@ class FakeBlob(object):
 
     @property
     def size(self):
-        if self.__contents.tell() == 0:
-            return None
-        return self.__contents.tell()
+        return self._size if self._size > 0 else None
 
     def _create_if_not_exists(self):
         self._bucket.register_blob(self)
@@ -336,7 +351,7 @@ class FakeAuthorizedSession(object):
                 upload.write(data.read())
             else:
                 upload.write(data)
-        if not headers.get('Content-Range', '').endswith(smart_open.gcs._UNKNOWN):
+        if not headers.get('Content-Range', '').endswith('*'):
             upload.finish()
             return FakeResponse(200)
         return FakeResponse(smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODES[0])
@@ -361,17 +376,8 @@ class FakeAuthorizedSessionTest(unittest.TestCase):
         self.assertFalse(self.blob.exists())
         self.assertDictEqual(self.client.uploads, {})
 
-    def test_unfinished_put_does_not_write_to_blob(self):
-        data = io.BytesIO(b'test')
-        headers = {
-            'Content-Range': 'bytes 0-3/*',
-            'Content-Length': str(4),
-        }
-        response = self.session.put(self.upload_url, data, headers=headers)
-        self.assertIn(response.status_code, smart_open.gcs._UPLOAD_INCOMPLETE_STATUS_CODES)
-        self.session._blob_with_url(self.upload_url, self.client)
-        blob_contents = self.blob.download_as_bytes()
-        self.assertEqual(blob_contents, b'')
+    #def test_unfinished_put_does_not_write_to_blob(self):
+    # Removed as google client handles this for us
 
     def test_finished_put_writes_to_blob(self):
         data = io.BytesIO(b'test')
@@ -711,85 +717,8 @@ class WriterTest(unittest.TestCase):
             fout.write(u"testžížáč".encode("utf-8"))
             self.assertEqual(fout.tell(), 14)
 
-    def test_write_03(self):
-        """Do multiple writes less than the min_part_size work correctly?"""
-        # write
-        min_part_size = 256 * 1024
-        smart_open_write = smart_open.gcs.Writer(
-            BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
-        )
-        local_write = io.BytesIO()
-
-        with smart_open_write as fout:
-            first_part = b"t" * 262141
-            fout.write(first_part)
-            local_write.write(first_part)
-            self.assertEqual(fout._current_part.tell(), 262141)
-
-            second_part = b"t\n"
-            fout.write(second_part)
-            local_write.write(second_part)
-            self.assertEqual(fout._current_part.tell(), 262143)
-            self.assertEqual(fout._total_parts, 0)
-
-            third_part = b"t"
-            fout.write(third_part)
-            local_write.write(third_part)
-            self.assertEqual(fout._current_part.tell(), 262144)
-            self.assertEqual(fout._total_parts, 0)
-
-            fourth_part = b"t" * 1
-            fout.write(fourth_part)
-            local_write.write(fourth_part)
-            self.assertEqual(fout._current_part.tell(), 1)
-            self.assertEqual(fout._total_parts, 1)
-
-        # read back the same key and check its content
-        output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
-        local_write.seek(0)
-        actual = [line.decode("utf-8") for line in list(local_write)]
-        self.assertEqual(output, actual)
-
-    def test_write_03a(self):
-        """Do multiple writes greater than the min_part_size work correctly?"""
-        min_part_size = 256 * 1024
-        smart_open_write = smart_open.gcs.Writer(
-            BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
-        )
-        local_write = io.BytesIO()
-
-        with smart_open_write as fout:
-            for i in range(1, 4):
-                part = b"t" * (min_part_size + 1)
-                fout.write(part)
-                local_write.write(part)
-                self.assertEqual(fout._current_part.tell(), i)
-                self.assertEqual(fout._total_parts, i)
-
-        # read back the same key and check its content
-        output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
-        local_write.seek(0)
-        actual = [line.decode("utf-8") for line in list(local_write)]
-        self.assertEqual(output, actual)
-
-    def test_write_03b(self):
-        """Does writing a last chunk size equal to a multiple of the min_part_size work?"""
-        min_part_size = 256 * 1024
-        smart_open_write = smart_open.gcs.Writer(
-            BUCKET_NAME, WRITE_BLOB_NAME, min_part_size=min_part_size
-        )
-        expected = b"t" * min_part_size * 2
-
-        with smart_open_write as fout:
-            fout.write(expected)
-            self.assertEqual(fout._current_part.tell(), 262144)
-            self.assertEqual(fout._total_parts, 1)
-
-        # read back the same key and check its content
-        with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)) as fin:
-            output = fin.read().encode('utf-8')
-
-        self.assertEqual(output, expected)
+    # def test_write_03(self):
+    # we no longer need to test if part writes work correctly as thats covered by the google cloud storage functionality
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
@@ -875,16 +804,6 @@ class WriterTest(unittest.TestCase):
         fout.flush()
         fout.close()
 
-    def test_terminate(self):
-        text = u'там за туманами, вечными, пьяными'.encode('utf-8')
-        fout = smart_open.gcs.open(BUCKET_NAME, 'key', 'wb')
-        fout.write(text)
-        fout.terminate()
-
-        with self.assertRaises(google.api_core.exceptions.NotFound):
-            with smart_open.gcs.open(BUCKET_NAME, 'key', 'rb') as fin:
-                fin.read()
-
 
 @maybe_mock_gcs
 class OpenTest(unittest.TestCase):
@@ -917,27 +836,6 @@ class OpenTest(unittest.TestCase):
             actual = fin.read()
 
         self.assertEqual(test_string, actual)
-
-
-class MakeRangeStringTest(unittest.TestCase):
-    def test_no_stop(self):
-        start, stop = 1, None
-        self.assertEqual(smart_open.gcs._make_range_string(start, stop), 'bytes 1-/*')
-
-    def test_stop(self):
-        start, stop = 1, 2
-        self.assertEqual(smart_open.gcs._make_range_string(start, stop), 'bytes 1-2/*')
-
-
-class PickleUploadFailedTest(unittest.TestCase):
-    def test_pickle_upload_failed(self):
-        original = smart_open.gcs.UploadFailedError("foo", 123, "bar")
-        recovered: smart_open.gcs.UploadFailedError = pickle.loads(pickle.dumps(original))
-
-        self.assertEqual(original.args, recovered.args)
-        self.assertEqual(original.text, recovered.text)
-        self.assertEqual(original.status_code, recovered.status_code)
-
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
