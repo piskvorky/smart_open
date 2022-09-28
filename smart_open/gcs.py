@@ -408,7 +408,10 @@ class Writer(io.BufferedIOBase):
         if client is None:
             client = google.cloud.storage.Client()
         self._client = client
-        self._blob = self._client.bucket(bucket).blob(blob)  # type: google.cloud.storage.Blob
+        _bucket = self._client.bucket(bucket)
+        if blob_properties and 'storage_class' in blob_properties:
+            _bucket.storage_class = blob_properties.pop('storage_class')
+        self._blob = _bucket.blob(blob)  # type: google.cloud.storage.Blob
         assert min_part_size % _REQUIRED_CHUNK_MULTIPLE == 0, 'min part size must be a multiple of 256KB'
         assert min_part_size >= _MIN_MIN_PART_SIZE, 'min part size must be greater than 256KB'
         self._min_part_size = min_part_size

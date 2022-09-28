@@ -139,6 +139,7 @@ class FakeBlob(object):
         self._bucket = bucket  # type: FakeBucket
         self._exists = False
         self.__contents = io.BytesIO()
+        self.storage_class = getattr(bucket, 'storage_class', None)
 
         self._create_if_not_exists()
 
@@ -807,12 +808,14 @@ class WriterTest(unittest.TestCase):
         smart_open_write = smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME,
             blob_properties={
                 "content_type": "random/x-test",
-                "content_encoding": "coded"
+                "content_encoding": "coded",
+                "storage_class": "STANDARD_STORAGE_CLASS"
             }
         )
         with smart_open_write as fout:  # noqa
             assert fout._blob.content_type == "random/x-test"
             assert fout._blob.content_encoding == "coded"
+            assert fout._blob.storage_class == "STANDARD_STORAGE_CLASS"
 
     def test_gzip(self):
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
