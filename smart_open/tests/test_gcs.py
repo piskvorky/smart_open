@@ -142,12 +142,13 @@ class FakeBlob(object):
 
         self._create_if_not_exists()
 
-    def create_resumable_upload_session(self):
+    def create_resumable_upload_session(self, predefined_acl=None):
         resumeable_upload_url = RESUMABLE_SESSION_URI_TEMPLATE % dict(
             bucket=self._bucket.name,
             upload_id=str(uuid.uuid4()),
         )
         upload = FakeBlobUpload(resumeable_upload_url, self)
+        self.acl = predefined_acl
         self._bucket.register_upload(upload)
         return resumeable_upload_url
 
@@ -807,12 +808,14 @@ class WriterTest(unittest.TestCase):
         smart_open_write = smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME,
             blob_properties={
                 "content_type": "random/x-test",
-                "content_encoding": "coded"
+                "content_encoding": "coded",
+                "predefined_acl": "publicRead"
             }
         )
         with smart_open_write as fout:  # noqa
             assert fout._blob.content_type == "random/x-test"
             assert fout._blob.content_encoding == "coded"
+            assert fout._blob.acl == "publicRead"
 
     def test_gzip(self):
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')

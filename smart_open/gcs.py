@@ -15,6 +15,7 @@ try:
     import google.cloud.exceptions
     import google.cloud.storage
     import google.auth.transport.requests
+    _PREDEFINED_ACL_SUPPORTED = google.cloud.storage.__version__.split('.') >= ['2', '6']
 except ImportError:
     MISSING_DEPS = True
 
@@ -420,14 +421,20 @@ class Writer(io.BufferedIOBase):
 
         self._session = google.auth.transport.requests.AuthorizedSession(client._credentials)
 
+        upload_kwargs = {}
+
         if blob_properties:
+            if 'predefined_acl' in blob_properties:
+                upload_kwargs['predefined_acl'] = blob_properties.pop('predefined_acl')
             for k, v in blob_properties.items():
                 setattr(self._blob, k, v)
 
+        if 'predefined_acl' in upload_kwargs and not _PREDEFINED_ACL_SUPPORTED:
+            raise NotImplementedError('GCS "predefined_acl" requires google-cloud-storage>=2.6.0')
         #
         # https://cloud.google.com/storage/docs/json_api/v1/how-tos/resumable-upload#start-resumable
         #
-        self._resumable_upload_url = self._blob.create_resumable_upload_session()
+        self._resumable_upload_url = self._blob.create_resumable_upload_session(**upload_kwargs)
 
         #
         # This member is part of the io.BufferedIOBase interface.
