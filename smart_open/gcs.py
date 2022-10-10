@@ -5,7 +5,6 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-
 """Implements file-like objects for reading and writing to/from GCS."""
 
 import logging
@@ -73,7 +72,8 @@ def open(
     blob_properties: dict, optional
         Set properties on blob before writing.  For writing only.
     blob_open_kwargs: dict, optional
-        Set properties on the blob 
+        Set properties for opening the blob, passed through directly to
+        the google-cloud-storage library
     """
     if blob_open_kwargs is None:
         blob_open_kwargs = {}

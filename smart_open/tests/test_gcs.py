@@ -10,7 +10,6 @@ import inspect
 import io
 import logging
 import os
-import pickle
 import time
 import uuid
 import unittest
@@ -172,7 +171,7 @@ class FakeBlob(object):
         # https://googleapis.dev/python/storage/latest/blobs.html#google.cloud.storage.blob.Blob.upload_from_string
         if isinstance(data, str):
             data = bytes(data, 'utf8')
-        self.__contents.truncate(0) 
+        self.__contents.truncate(0)
         self.__contents.seek(0)
         self.__contents.write(data)
         self._size = self.__contents.tell()
@@ -181,15 +180,15 @@ class FakeBlob(object):
         self.upload_from_string(data)
 
     def open(
-        self,
-        mode,
-        chunk_size=None,
-        ignore_flush=None,
-        encoding=None,
-        errors=None,
-        newline=None,
-        **kwargs,
-        ):
+            self,
+            mode,
+            chunk_size=None,
+            ignore_flush=None,
+            encoding=None,
+            errors=None,
+            newline=None,
+            **kwargs,
+            ):
         if mode.startswith('r'):
             self.__contents.seek(0)
         return self.__contents
@@ -360,6 +359,7 @@ class FakeAuthorizedSession(object):
     def _blob_with_url(url, client):
         # type: (str, FakeClient) -> FakeBlobUpload
         return client.uploads.get(url)
+
 
 if DISABLE_MOCKS:
     storage_client = google.cloud.storage.Client()
@@ -787,6 +787,7 @@ class OpenTest(unittest.TestCase):
             actual = fin.read()
 
         self.assertEqual(test_string, actual)
+
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
