@@ -38,7 +38,8 @@ SCHEMES = ("s3", "s3n", 's3u', "s3a")
 DEFAULT_PORT = 443
 DEFAULT_HOST = 's3.amazonaws.com'
 
-DEFAULT_BUFFER_SIZE = 128 * 1024
+DEFAULT_BUFFER_SIZE = 1500
+DEFAULT_STREAM_RANGE = 10485760
 
 URI_EXAMPLES = (
     's3://my_bucket/my_key',
@@ -232,7 +233,7 @@ def open(
     buffer_size=DEFAULT_BUFFER_SIZE,
     min_part_size=DEFAULT_MIN_PART_SIZE,
     multipart_upload=True,
-    defer_seek=False,
+    stream_range=10485760,
     client=None,
     client_kwargs=None,
     writebuffer=None,
@@ -260,11 +261,16 @@ def open(
     version_id: str, optional
         Version of the object, used when reading object.
         If None, will fetch the most recent version.
-    defer_seek: boolean, optional
-        Default: `False`
-        If set to `True` on a file opened for reading, GetObject will not be
-        called until the first seek() or read().
-        Avoids redundant API queries when seeking before reading.
+    stream_range: str, optional
+        Default: 10485760 bytes (10 MB)
+        The stream_range setting limits the size of data that may be streamed through a
+        single HTTP request across multiple read calls, this is an important protection
+        for the S3 server, ensuring the S3 server doesn't get an open-ended byte-range request
+        which can cause it to internally queue up a massive file when only a small bit of it may ultimately be
+        read by the user. Note that the first read call (after opening or seeking) will always set the
+        byte range header to exactly the read size, an optimization for use cases in which a single
+        small read is performed against a large file (example: random reading of small data samples
+        from large files in machine learning contexts).
     client: object, optional
         The S3 client to use when working with boto3.
         If you don't specify this, then smart_open will create a new client for you.
@@ -280,6 +286,7 @@ def open(
         disk IO. If you pass in an open file, then you are responsible for
         cleaning it up after writing completes.
     """
+
     logger.debug('%r', locals())
     if mode not in constants.BINARY_MODES:
         raise NotImplementedError('bad mode: %r expected one of %r' % (mode, constants.BINARY_MODES))
@@ -293,7 +300,7 @@ def open(
             key_id,
             version_id=version_id,
             buffer_size=buffer_size,
-            defer_seek=defer_seek,
+            stream_range=stream_range,
             client=client,
             client_kwargs=client_kwargs,
         )
@@ -338,6 +345,22 @@ def _get(client, bucket, key, version, range_string):
         raise wrapped_error from error
 
 
+def _head(client, bucket, key, version):
+    try:
+        if version:
+            return client.head_object(Bucket=bucket, Key=key, VersionId=version)
+        else:
+            return client.head_object(Bucket=bucket, Key=key)
+    except botocore.client.ClientError as error:
+        wrapped_error = IOError(
+            'unable to access bucket: %r key: %r version: %r error: %s' % (
+                bucket, key, version, error
+            )
+        )
+        wrapped_error.backend_error = error
+        raise wrapped_error from error
+
+
 def _unwrap_ioerror(ioe):
     """Given an IOError from _get, return the 'Error' dictionary from boto."""
     try:
@@ -346,27 +369,310 @@ def _unwrap_ioerror(ioe):
         return None
 
 
-class _SeekableRawReader(object):
-    """Read an S3 object.
+# class _SeekableRawReader(object):
+#     """Read an S3 object.
+#
+#     This class is internal to the S3 submodule.
+#     """
+#
+#     def __init__(
+#         self,
+#         client,
+#         bucket,
+#         key,
+#         stream_range,
+#         version_id=None,
+#     ):
+#         self._client = client
+#         self._bucket = bucket
+#         self._key = key
+#         self._version_id = version_id
+#
+#         self._content_length = None
+#         self._position = 0
+#         self._body = None
+#
+#         # the max_stream_size setting limits how much data will be read in a single HTTP request, this is an
+#         # important protection for the S3 server, ensuring the S3 server doesn't get an open-ended byte-range request
+#         # which can cause it to internally queue up a massive file when only a small bit of it may ultimately be
+#         # read by the user. The variable _stream_range_[from|to] tracks the range of bytes that can be read
+#         # from the current request body (e.g. from the same HTTP request). Note that the first read call
+#         # will always set the byte range header to exactly the read size, an optimization for uses cases in which a
+#         # single small read is performed against a large file (example: random sampling small data samples from
+#         # large files in machine learning contexts).
+#         self._stream_range = stream_range
+#         self._stream_range_from = None  # a None value signifies the first call to `read` where this will be set
+#         self._stream_range_to = None
+#
+#     def seek(self, offset, whence=constants.WHENCE_START):
+#         """Seek to the specified position.
+#
+#         :param int offset: The offset in bytes.
+#         :param int whence: Where the offset is from.
+#
+#         :returns: the position after seeking.
+#         :rtype: int
+#         """
+#         if whence not in constants.WHENCE_CHOICES:
+#             raise ValueError('invalid whence, expected one of %r' % constants.WHENCE_CHOICES)
+#         if whence == constants.WHENCE_END and offset > 0:
+#             raise ValueError('offset must be <= 0 when whence == WHENCE_END, got offset: ' + offset)
+#
+#         if whence == constants.WHENCE_END and self._content_length is None:
+#             # WHENCE_END: head request is necessary to determine file length if it's not known yet
+#             #             this is necessary to return the absolute position as specified by io.IOBase
+#             response = _head(self._client, self._bucket, self._key, self._version_id)
+#             _log_retry_attempts(response)
+#             self._content_length = int(response['ContentLength'])
+#             self._position = self._content_length + offset
+#         elif whence == constants.WHENCE_END:
+#             # WHENCE_END: we already have file length, no API call needed to compute the absolute position
+#             self._position = self._content_length + offset
+#         else:
+#             # WHENCE_START or WHENCE_CURRENT
+#             start = 0 if whence == constants.WHENCE_START else self._position
+#             self._position = start + offset
+#
+#         return self._position
+#
+#     def _open_body(self, start=None, stop=None):
+#         """Open a connection to download the specified range of bytes. Store
+#         the open file handle in self._body.
+#
+#         If no range is specified, start defaults to self._position.
+#         start and stop follow the semantics of the http range header,
+#         so a stop without a start will read bytes beginning at stop.
+#
+#         As a side effect, set self._content_length. Set self._position
+#         to self._content_length if start is past end of file.
+#         """
+#         if start is None and stop is None:
+#             start = self._position
+#         range_string = smart_open.utils.make_range_string(start, stop)
+#
+#         try:
+#             # Optimistically try to fetch the requested content range.
+#             response = _get(
+#                 self._client,
+#                 self._bucket,
+#                 self._key,
+#                 self._version_id,
+#                 range_string,
+#             )
+#         except IOError as ioe:
+#             # Handle requested content range exceeding content size.
+#             error_response = _unwrap_ioerror(ioe)
+#             if error_response is None or error_response.get('Code') != _OUT_OF_RANGE:
+#                 raise
+#             self._position = self._content_length = int(error_response['ActualObjectSize'])
+#             self._body = io.BytesIO()
+#         else:
+#             _log_retry_attempts(response)  # keep track of how many retries boto3 attempted
+#             units, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
+#             self._content_length = length
+#             self._position = start
+#             self._body = response['Body']
+#
+#     def read(self, size=-1):
+#         """Read from the continuous connection with the remote peer."""
+#
+#         # If we can figure out that we've read past the EOF, then we can save
+#         # an extra API call.
+#         reached_eof = True if self._content_length is not None and self._position >= self._content_length else False
+#
+#         if reached_eof or size == 0:
+#             return b''
+#
+#         if self._body is None:
+#             stop = None if size == -1 else self._position + size
+#             self._open_body(start=self._position, stop=stop)
+#
+#         #
+#         # Boto3 has built-in error handling and retry mechanisms:
+#         #
+#         # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/error-handling.html
+#         # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html
+#         #
+#         # Unfortunately, it isn't always enough. There is still a non-zero
+#         # possibility that an exception will slip past these mechanisms and
+#         # terminate the read prematurely.  Luckily, at this stage, it's very
+#         # simple to recover from the problem: wait a little bit, reopen the
+#         # HTTP connection and try again.  Usually, a single retry attempt is
+#         # enough to recover, but we try multiple times "just in case".
+#         #
+#         for attempt, seconds in enumerate([1, 2, 4, 8, 16], 1):
+#             try:
+#                 if size == -1:
+#                     binary = self._body.read()
+#                 else:
+#                     binary = self._body.read(size)
+#             except (
+#                 ConnectionResetError,
+#                 botocore.exceptions.BotoCoreError,
+#                 urllib3.exceptions.HTTPError,
+#             ) as err:
+#                 logger.warning(
+#                     '%s: caught %r while reading %d bytes, sleeping %ds before retry',
+#                     self,
+#                     err,
+#                     size,
+#                     seconds,
+#                 )
+#                 time.sleep(seconds)
+#                 self._open_body()
+#             else:
+#                 self._position += len(binary)
+#                 if self._optimize == 'reading' or (self._optimize == 'auto' and self._read_call_counter == 0):
+#                     self._body.close()
+#                     self._body = None
+#                 self._read_call_counter += 0
+#                 return binary
+#
+#         raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, attempt))
+#
+#     def __str__(self):
+#         return 'smart_open.s3._SeekableReader(%r, %r)' % (self._bucket, self._key)
 
-    This class is internal to the S3 submodule.
-    """
+
+def _initialize_boto3(client, client_kwargs, bucket, key):
+    """Created the required objects for accessing S3.  Ideally, they have
+    been already created for us and we can just reuse them."""
+    if client_kwargs is None:
+        client_kwargs = {}
+
+    if client is None:
+        init_kwargs = client_kwargs.get('S3.Client', {})
+        client = boto3.client('s3', **init_kwargs)
+    assert client
+
+    _client = _ClientWrapper(client, client_kwargs)
+    _bucket = bucket
+    _key = key
+
+    return _client, _bucket, _key
+
+
+class Reader(io.BufferedIOBase):
+    """Reads bytes from S3.
+
+    Implements the io.BufferedIOBase interface of the standard library."""
 
     def __init__(
         self,
-        client,
         bucket,
         key,
         version_id=None,
+        buffer_size=DEFAULT_BUFFER_SIZE,
+        line_terminator=constants.BINARY_NEWLINE,
+        stream_range=DEFAULT_STREAM_RANGE,
+        client=None,
+        client_kwargs=None,
     ):
-        self._client = client
-        self._bucket = bucket
-        self._key = key
+        assert isinstance(stream_range, int), \
+            'stream_range should be an integer number of bytes that restricts the maximum size the S3 server ' \
+            'needs to prepare for a single HTTP request. Got type: ' + type(stream_range)
+
+        self._version_id = version_id
+        self._buffer_size = buffer_size
+
+        self._client, self._bucket, self._key = _initialize_boto3(client, client_kwargs, bucket, key)
         self._version_id = version_id
 
         self._content_length = None
+        self._eof = False
         self._position = 0
         self._body = None
+        self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
+        self._line_terminator = line_terminator
+
+        # the max_stream_size setting limits how much data will be read in a single HTTP request, this is an
+        # important protection for the S3 server, ensuring the S3 server doesn't get an open-ended byte-range request
+        # which can cause it to internally queue up a massive file when only a small bit of it may ultimately be
+        # read by the user. The variable _stream_range_[from|to] tracks the range of bytes that can be read
+        # from the current request body (e.g. from the same HTTP request). Note that the first read call
+        # will always set the byte range header to exactly the read size, an optimization for uses cases in which a
+        # single small read is performed against a large file (example: random sampling small data samples from
+        # large files in machine learning contexts).
+        self._stream_range = stream_range
+        self._stream_range_from = None  # a None value signifies the first call to `read` where this will be set
+        self._stream_range_to = None
+
+        #
+        # This member is part of the io.BufferedIOBase interface.
+        #
+        self.raw = None
+
+    #
+    # io.BufferedIOBase methods.
+    #
+    def close(self):
+        """Flush and close this stream."""
+        pass
+
+    def readable(self):
+        """Return True if the stream can be read from."""
+        return True
+
+    def read(self, size=-1):
+        """Read up to size bytes from the object and return them."""
+
+        # if an absolute size can be calculated we do calculate it to determine if it's available in the buffer already
+        if size < 0:
+            size = size if self._content_length is None else self._content_length - self._position
+
+        # Fill the buffer with at least enough data to satisfy the request
+        if size < 0 or len(self._buffer) < size:
+            user_request_size = size - len(self._buffer)
+            fill_amount = -1 if size < 0 else max(user_request_size, self._buffer_size)
+            self._fill_buffer(fill_amount)
+
+        b = self._buffer.read(size)
+        self._position += len(b)
+
+        return b
+
+    def read1(self, size=-1):
+        """This is the same as read()."""
+        return self.read(size=size)
+
+    def readinto(self, b):
+        """Read up to len(b) bytes into b, and return the number of bytes
+        read."""
+        data = self.read(len(b))
+        if not data:
+            return 0
+        b[:len(data)] = data
+        return len(data)
+
+    def readline(self, size=-1):
+        """Read up to and including the next newline. Returns the bytes read."""
+
+        # smart_open.bytebuffer.ByteBuffer doesn't support this yet
+        if size != -1:
+            raise NotImplementedError('size other than -1 not implemented')
+
+        #
+        # A single line may span multiple buffers.
+        #
+        line = io.BytesIO()
+        while not (self._eof and len(self._buffer) == 0):
+            line_part = self._buffer.readline(self._line_terminator)
+            line.write(line_part)
+            self._position += len(line_part)
+            self._eof = self._position == self._content_length
+
+            if line_part.endswith(self._line_terminator) or self._eof:
+                break
+            else:
+                self._fill_buffer(self._buffer_size)
+
+        return line.getvalue()
+
+    def seekable(self):
+        """If False, seek(), tell() and truncate() will raise IOError.
+
+        We offer only seek support, and no truncate support."""
+        return True
 
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
@@ -374,105 +680,108 @@ class _SeekableRawReader(object):
         :param int offset: The offset in bytes.
         :param int whence: Where the offset is from.
 
-        :returns: the position after seeking.
-        :rtype: int
-        """
+        Returns the position after seeking."""
         if whence not in constants.WHENCE_CHOICES:
             raise ValueError('invalid whence, expected one of %r' % constants.WHENCE_CHOICES)
+        if whence == constants.WHENCE_END and offset > 0:
+            raise ValueError('offset must be <= 0 when whence == WHENCE_END, got offset: ' + offset)
 
-        #
-        # Close old body explicitly.
-        # When first seek() after __init__(), self._body is not exist.
-        #
+        if whence == constants.WHENCE_END and self._content_length is None:
+            # WHENCE_END: head request is necessary to determine file length if it's not known yet
+            #             this API call is necessary to return the absolute position as required by io.IOBase
+            response = _head(self._client, self._bucket, self._key, self._version_id)
+            self._log_retry_attempts(response)
+            self._content_length = int(response['ContentLength'])
+            self._position = self._content_length + offset
+        elif whence == constants.WHENCE_END:
+            # WHENCE_END: we already have file length, no API call needed to compute the absolute position
+            self._position = self._content_length + offset
+        else:
+            # WHENCE_START or WHENCE_CURRENT
+            start = 0 if whence == constants.WHENCE_START else self._position
+            self._position = start + offset
+
+        self._buffer.empty()
         if self._body is not None:
             self._body.close()
-        self._body = None
-
-        start = None
-        stop = None
-        if whence == constants.WHENCE_START:
-            start = max(0, offset)
-        elif whence == constants.WHENCE_CURRENT:
-            start = max(0, offset + self._position)
-        else:
-            stop = max(0, -offset)
-
-        #
-        # If we can figure out that we've read past the EOF, then we can save
-        # an extra API call.
-        #
-        if self._content_length is None:
-            reached_eof = False
-        elif start is not None and start >= self._content_length:
-            reached_eof = True
-        elif stop == 0:
-            reached_eof = True
-        else:
-            reached_eof = False
-
-        if reached_eof:
-            self._body = io.BytesIO()
-            self._position = self._content_length
-        else:
-            self._open_body(start, stop)
+            self._body = self._stream_range_from = self._stream_range_to = None
+        self._eof = False if self._stream_range_from is None or self._position < self._content_length - 1 else True
 
         return self._position
 
-    def _open_body(self, start=None, stop=None):
-        """Open a connection to download the specified range of bytes. Store
-        the open file handle in self._body.
+    def tell(self):
+        """Return the current position within the file."""
+        return self._position
 
-        If no range is specified, start defaults to self._position.
-        start and stop follow the semantics of the http range header,
-        so a stop without a start will read bytes beginning at stop.
+    def truncate(self, size=None):
+        """Unsupported."""
+        raise io.UnsupportedOperation
 
-        As a side effect, set self._content_length. Set self._position
-        to self._content_length if start is past end of file.
+    def detach(self):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def terminate(self):
+        """Do nothing."""
+        pass
+
+    def to_boto3(self, resource):
+        """Create an **independent** `boto3.s3.Object` instance that points to
+        the same S3 object as this instance.
+        Changes to the returned object will not affect the current instance.
         """
-        if start is None and stop is None:
-            start = self._position
-        range_string = smart_open.utils.make_range_string(start, stop)
-
-        try:
-            # Optimistically try to fetch the requested content range.
-            response = _get(
-                self._client,
-                self._bucket,
-                self._key,
-                self._version_id,
-                range_string,
-            )
-        except IOError as ioe:
-            # Handle requested content range exceeding content size.
-            error_response = _unwrap_ioerror(ioe)
-            if error_response is None or error_response.get('Code') != _OUT_OF_RANGE:
-                raise
-            self._position = self._content_length = int(error_response['ActualObjectSize'])
-            self._body = io.BytesIO()
+        assert resource, 'resource must be a boto3.resource instance'
+        obj = resource.Object(self._bucket, self._key)
+        if self._version_id is not None:
+            return obj.Version(self._version_id)
         else:
-            #
-            # Keep track of how many times boto3's built-in retry mechanism
-            # activated.
-            #
-            # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html#checking-retry-attempts-in-an-aws-service-response
-            #
-            logger.debug(
-                '%s: RetryAttempts: %d',
-                self,
-                response['ResponseMetadata']['RetryAttempts'],
-            )
-            units, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
-            self._content_length = length
-            self._position = start
-            self._body = response['Body']
+            return obj
 
-    def read(self, size=-1):
-        """Read from the continuous connection with the remote peer."""
+    #
+    # Internal methods.
+    #
+
+    def _fill_buffer(self, size=-1):
+        # check if existing body range is sufficient to satisfy this request, if not close it so that it re-opens
+        # with an appropriate range.
+        is_stream_limit_before_eof = self._body is not None \
+            and size < 0 \
+            and self._stream_range_to < self._content_length - 1
+        is_request_beyond_stream_limit = self._body is not None \
+            and size > 0 \
+            and self._stream_range_to is not None \
+            and self._stream_range_to - self._position < size
+        if is_stream_limit_before_eof or is_request_beyond_stream_limit:
+            self._body.close()
+            self._body = self._stream_range_from = self._stream_range_to = None
+
+        # open the HTTP request if it's not open already
         if self._body is None:
-            # This is necessary for the very first read() after __init__().
-            self._open_body()
-        if self._position >= self._content_length:
+            start = self._position + len(self._buffer)
+            stop = None if size < 0 else \
+                start + size - 1 if self._content_length is None else \
+                start + max(size, self._stream_range) - 1
+            self._open_body(start=start, stop=stop)
+
+        b = [self._stream_from_body(size)]
+        bytes_read = self._buffer.fill(b)
+        if bytes_read == 0:
+            logger.debug('%s: reached EOF while filling buffer', self)
+            self._eof = True
+
+    def _raw_read(self, size=-1):
+        """Internal read from the continuous connection with the remote peer without considering buffering."""
+
+        # If we can figure out that we've read past the EOF, then we can save
+        # an extra API call.
+        reached_eof = True if self._content_length is not None and self._position >= self._content_length else False
+
+        if reached_eof or size == 0:
             return b''
+
+        if self._body is None:
+            stop = None if size == -1 else self._position + size
+            self._open_body(start=self._position, stop=stop)
 
         #
         # Boto3 has built-in error handling and retry mechanisms:
@@ -509,211 +818,103 @@ class _SeekableRawReader(object):
                 self._open_body()
             else:
                 self._position += len(binary)
+                if self._optimize == 'reading' or (self._optimize == 'auto' and self._read_call_counter == 0):
+                    self._body.close()
+                    self._body = None
+                self._read_call_counter += 0
                 return binary
 
         raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, attempt))
 
-    def __str__(self):
-        return 'smart_open.s3._SeekableReader(%r, %r)' % (self._bucket, self._key)
+    def _open_body(self, start=None, stop=None):
+        """Open a connection to download the specified range of bytes. Store
+        the open file handle in self._body.
 
+        If no range is specified, start defaults to self._position.
+        start and stop follow the semantics of the http range header,
+        so a stop without a start will read bytes beginning at stop.
 
-def _initialize_boto3(rw, client, client_kwargs, bucket, key):
-    """Created the required objects for accessing S3.  Ideally, they have
-    been already created for us and we can just reuse them."""
-    if client_kwargs is None:
-        client_kwargs = {}
-
-    if client is None:
-        init_kwargs = client_kwargs.get('S3.Client', {})
-        client = boto3.client('s3', **init_kwargs)
-    assert client
-
-    rw._client = _ClientWrapper(client, client_kwargs)
-    rw._bucket = bucket
-    rw._key = key
-
-
-class Reader(io.BufferedIOBase):
-    """Reads bytes from S3.
-
-    Implements the io.BufferedIOBase interface of the standard library."""
-
-    def __init__(
-        self,
-        bucket,
-        key,
-        version_id=None,
-        buffer_size=DEFAULT_BUFFER_SIZE,
-        line_terminator=constants.BINARY_NEWLINE,
-        defer_seek=False,
-        client=None,
-        client_kwargs=None,
-    ):
-        self._version_id = version_id
-        self._buffer_size = buffer_size
-
-        _initialize_boto3(self, client, client_kwargs, bucket, key)
-
-        self._raw_reader = _SeekableRawReader(
-            self._client,
-            bucket,
-            key,
-            self._version_id,
-        )
-        self._current_pos = 0
-        self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
-        self._eof = False
-        self._line_terminator = line_terminator
-
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
-
-        if not defer_seek:
-            self.seek(0)
-
-    #
-    # io.BufferedIOBase methods.
-    #
-
-    def close(self):
-        """Flush and close this stream."""
-        pass
-
-    def readable(self):
-        """Return True if the stream can be read from."""
-        return True
-
-    def read(self, size=-1):
-        """Read up to size bytes from the object and return them."""
-        if size == 0:
-            return b''
-        elif size < 0:
-            # call read() before setting _current_pos to make sure _content_length is set
-            out = self._read_from_buffer() + self._raw_reader.read()
-            self._current_pos = self._raw_reader._content_length
-            return out
-
-        #
-        # Return unused data first
-        #
-        if len(self._buffer) >= size:
-            return self._read_from_buffer(size)
-
-        #
-        # If the stream is finished, return what we have.
-        #
-        if self._eof:
-            return self._read_from_buffer()
-
-        self._fill_buffer(size)
-        return self._read_from_buffer(size)
-
-    def read1(self, size=-1):
-        """This is the same as read()."""
-        return self.read(size=size)
-
-    def readinto(self, b):
-        """Read up to len(b) bytes into b, and return the number of bytes
-        read."""
-        data = self.read(len(b))
-        if not data:
-            return 0
-        b[:len(data)] = data
-        return len(data)
-
-    def readline(self, limit=-1):
-        """Read up to and including the next newline.  Returns the bytes read."""
-        if limit != -1:
-            raise NotImplementedError('limits other than -1 not implemented yet')
-
-        #
-        # A single line may span multiple buffers.
-        #
-        line = io.BytesIO()
-        while not (self._eof and len(self._buffer) == 0):
-            line_part = self._buffer.readline(self._line_terminator)
-            line.write(line_part)
-            self._current_pos += len(line_part)
-
-            if line_part.endswith(self._line_terminator):
-                break
-            else:
-                self._fill_buffer()
-
-        return line.getvalue()
-
-    def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError.
-
-        We offer only seek support, and no truncate support."""
-        return True
-
-    def seek(self, offset, whence=constants.WHENCE_START):
-        """Seek to the specified position.
-
-        :param int offset: The offset in bytes.
-        :param int whence: Where the offset is from.
-
-        Returns the position after seeking."""
-        # Convert relative offset to absolute, since self._raw_reader
-        # doesn't know our current position.
-        if whence == constants.WHENCE_CURRENT:
-            whence = constants.WHENCE_START
-            offset += self._current_pos
-
-        self._current_pos = self._raw_reader.seek(offset, whence)
-
-        self._buffer.empty()
-        self._eof = self._current_pos == self._raw_reader._content_length
-        return self._current_pos
-
-    def tell(self):
-        """Return the current position within the file."""
-        return self._current_pos
-
-    def truncate(self, size=None):
-        """Unsupported."""
-        raise io.UnsupportedOperation
-
-    def detach(self):
-        """Unsupported."""
-        raise io.UnsupportedOperation
-
-    def terminate(self):
-        """Do nothing."""
-        pass
-
-    def to_boto3(self, resource):
-        """Create an **independent** `boto3.s3.Object` instance that points to
-        the same S3 object as this instance.
-        Changes to the returned object will not affect the current instance.
+        As a side effect, set self._content_length. Set self._position
+        to self._content_length if start is past end of file.
         """
-        assert resource, 'resource must be a boto3.resource instance'
-        obj = resource.Object(self._bucket, self._key)
-        if self._version_id is not None:
-            return obj.Version(self._version_id)
+        if start is None and stop is None:
+            start = self._position
+        range_string = smart_open.utils.make_range_string(start, stop)
+
+        try:
+            # Optimistically try to fetch the requested content range.
+            response = _get(
+                self._client,
+                self._bucket,
+                self._key,
+                self._version_id,
+                range_string,
+            )
+        except IOError as ioe:
+            # Handle requested content range exceeding content size.
+            error_response = _unwrap_ioerror(ioe)
+            if error_response is None or error_response.get('Code') != _OUT_OF_RANGE:
+                raise
+            # self._position = self._content_length = int(error_response['ActualObjectSize'])
+            self._content_length = int(error_response['ActualObjectSize'])
+            self._body = io.BytesIO()
         else:
-            return obj
+            self._log_retry_attempts(response)  # keep track of how many retries boto3 attempted
+            units, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
+            self._stream_range_from = start
+            # _stream_range_to is set to the minimal value for the first read,
+            # after that it's set to the user defined value
+            self._stream_range_to = stop if self._content_length is None else start + self._stream_range
+            self._content_length = length
+            self._body = response['Body']
 
-    #
-    # Internal methods.
-    #
-    def _read_from_buffer(self, size=-1):
-        """Remove at most size bytes from our buffer and return them."""
-        size = size if size >= 0 else len(self._buffer)
-        part = self._buffer.read(size)
-        self._current_pos += len(part)
-        return part
+    def _stream_from_body(self, size=-1):
+        """Reads data from an open Body"""
 
-    def _fill_buffer(self, size=-1):
-        size = max(size, self._buffer._chunk_size)
-        while len(self._buffer) < size and not self._eof:
-            bytes_read = self._buffer.fill(self._raw_reader)
-            if bytes_read == 0:
-                logger.debug('%s: reached EOF while filling buffer', self)
-                self._eof = True
+        #
+        # Boto3 has built-in error handling and retry mechanisms:
+        #
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/error-handling.html
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html
+        #
+        # Unfortunately, it isn't always enough. There is still a non-zero
+        # possibility that an exception will slip past these mechanisms and
+        # terminate the read prematurely.  Luckily, at this stage, it's very
+        # simple to recover from the problem: wait a little bit, reopen the
+        # HTTP connection and try again.  Usually, a single retry attempt is
+        # enough to recover, but we try multiple times "just in case".
+        #
+        for attempt, seconds in enumerate([1, 2, 4, 8, 16], 1):
+            try:
+                binary = self._body.read(None if size < 0 else size)  # botocore requires None rather than -1
+            except (
+                ConnectionResetError,
+                botocore.exceptions.BotoCoreError,
+                urllib3.exceptions.HTTPError,
+            ) as err:
+                logger.warning(
+                    '%s: caught %r while reading %d bytes, sleeping %ds before retry',
+                    self,
+                    err,
+                    size,
+                    seconds,
+                )
+                time.sleep(seconds)
+                self._open_body()
+            else:
+                # self._position += len(binary)
+                return binary
+
+        raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, attempt))
+
+    def _log_retry_attempts(self, response):
+        """Keep track of how many times boto3's built-in retry mechanism activated."""
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html#checking-retry-attempts-in-an-aws-service-response
+        logger.debug(
+            '%s: RetryAttempts: %d',
+            self,
+            response['ResponseMetadata']['RetryAttempts'],
+        )
 
     def __str__(self):
         return "smart_open.s3.Reader(%r, %r)" % (self._bucket, self._key)
@@ -750,11 +951,11 @@ class MultipartWriter(io.BufferedIOBase):
         writebuffer=None,
     ):
         if min_part_size < MIN_MIN_PART_SIZE:
-            logger.warning("S3 requires minimum part size >= 5MB; \
-multipart upload may fail")
+            logger.warning("S3 requires minimum part size >= 5MB; "
+                           "multipart upload may fail")
         self._min_part_size = min_part_size
 
-        _initialize_boto3(self, client, client_kwargs, bucket, key)
+        self._client, self._bucket, self._key = _initialize_boto3(client, client_kwargs, bucket, key)
 
         try:
             partial = functools.partial(
@@ -968,7 +1169,7 @@ class SinglepartWriter(io.BufferedIOBase):
         client_kwargs=None,
         writebuffer=None,
     ):
-        _initialize_boto3(self, client, client_kwargs, bucket, key)
+        self._client, self._bucket, self._key = _initialize_boto3(client, client_kwargs, bucket, key)
 
         try:
             self._client.head_bucket(Bucket=bucket)
