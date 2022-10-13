@@ -138,7 +138,7 @@ class FakeBlob(object):
         if mode.startswith('r'):
             self.__contents.seek(0)
         return self.__contents
-    
+
     def delete(self):
         self._bucket.delete_blob(self)
         self._exists = False
@@ -274,6 +274,7 @@ class OpenTest(unittest.TestCase):
             actual = fin.read()
 
         self.assertEqual(test_string, actual)
+
 
 class WriterTest(unittest.TestCase):
     def setUp(self):

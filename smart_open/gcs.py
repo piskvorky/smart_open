@@ -33,7 +33,6 @@ _DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 _DEFAULT_WRITE_OPEN_KWARGS = {'ignore_flush': True}
 
 
-
 def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
@@ -47,9 +46,11 @@ def open_uri(uri, mode, transport_params):
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     return open(parsed_uri['bucket_id'], parsed_uri['blob_id'], mode, **kwargs)
 
+
 def warn_deprecated(parameter_name):
     message = f"Parameter {parameter_name} is deprecated, this parameter no-longer has any effect"
     warnings.warn(message, UserWarning)
+
 
 def open(
     bucket_id,
