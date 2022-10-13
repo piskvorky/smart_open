@@ -32,9 +32,6 @@ _DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 _DEFAULT_WRITE_OPEN_KWARGS = {'ignore_flush': True}
 
 
-def __noop():
-    pass
-
 
 def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
@@ -85,9 +82,6 @@ def open(
     """
     if blob_open_kwargs is None:
         blob_open_kwargs = {}
-
-    if client is None:
-        client = google.cloud.storage.Client()
 
     if mode in (constants.READ_BINARY, 'r', 'rt'):
         _blob = Reader(bucket=bucket_id,
@@ -171,6 +165,6 @@ def Writer(bucket,
             'Unexpected incompatibility between dependency and google-cloud-storage dependency.'
             'Things may not work as expected'
             )
-    _blob.terminate = __noop
+    _blob.terminate = lambda: None
 
     return _blob

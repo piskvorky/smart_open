@@ -5,12 +5,10 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-import gzip
-import inspect
+
 import io
 import logging
 import os
-import time
 import uuid
 import unittest
 from unittest import mock
@@ -27,13 +25,6 @@ BUCKET_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
 WRITE_BLOB_NAME = 'test-write-blob'
 DISABLE_MOCKS = os.environ.get('SO_DISABLE_GCS_MOCKS') == "1"
-
-RESUMABLE_SESSION_URI_TEMPLATE = (
-    'https://www.googleapis.com/upload/storage/v1/b/'
-    '%(bucket)s'
-    '/o?uploadType=resumable&upload_id='
-    '%(upload_id)s'
-)
 
 logger = logging.getLogger(__name__)
 
@@ -141,55 +132,22 @@ class FakeBlob(object):
         self.__contents.close = lambda: None
         self._create_if_not_exists()
 
-    def create_resumable_upload_session(self):
-        resumeable_upload_url = RESUMABLE_SESSION_URI_TEMPLATE % dict(
-            bucket=self._bucket.name,
-            upload_id=str(uuid.uuid4()),
-        )
-        upload = FakeBlobUpload(resumeable_upload_url, self)
-        self._bucket.register_upload(upload)
-        return resumeable_upload_url
+        self.open = mock.Mock(side_effect=self._mock_open)
 
+    def _mock_open(self, mode, *args, **kwargs):
+        if mode.startswith('r'):
+            self.__contents.seek(0)
+        return self.__contents
+    
     def delete(self):
         self._bucket.delete_blob(self)
         self._exists = False
 
-    def download_as_bytes(self, start=0, end=None):
-        # mimics Google's API by returning bytes
-        # https://googleapis.dev/python/storage/latest/blobs.html#google.cloud.storage.blob.Blob.download_as_bytes
-        if end is None:
-            end = self.__contents.tell()
-        self.__contents.seek(start)
-        return self.__contents.read(end - start)
-
     def exists(self, client=None):
         return self._exists
 
-    def upload_from_string(self, data):
-        # mimics Google's API by accepting bytes or str, despite the method name
-        # https://googleapis.dev/python/storage/latest/blobs.html#google.cloud.storage.blob.Blob.upload_from_string
-        if isinstance(data, str):
-            data = bytes(data, 'utf8')
-        self.__contents.truncate(0)
-        self.__contents.seek(0)
-        self.__contents.write(data)
-
     def write(self, data):
         self.upload_from_string(data)
-
-    def open(
-            self,
-            mode,
-            chunk_size=None,
-            ignore_flush=None,
-            encoding=None,
-            errors=None,
-            newline=None,
-            **kwargs,
-            ):
-        if mode.startswith('r'):
-            self.__contents.seek(0)
-        return self.__contents
 
     @property
     def bucket(self):
@@ -206,52 +164,8 @@ class FakeBlob(object):
         self._exists = True
 
 
-class FakeBlobTest(unittest.TestCase):
-    def setUp(self):
-        self.client = FakeClient()
-        self.bucket = FakeBucket(self.client, 'test-bucket')
-
-    def test_create_resumable_upload_session(self):
-        blob = FakeBlob('fake-blob', self.bucket)
-        resumable_upload_url = blob.create_resumable_upload_session()
-        self.assertTrue(resumable_upload_url in self.client.uploads)
-
-    def test_delete(self):
-        blob = FakeBlob('fake-blob', self.bucket)
-        blob.delete()
-        self.assertFalse(blob.exists())
-        self.assertEqual(self.bucket.list_blobs(), [])
-
-    def test_upload_download(self):
-        blob = FakeBlob('fake-blob', self.bucket)
-        contents = b'test'
-        blob.upload_from_string(contents)
-        self.assertEqual(blob.download_as_bytes(), b'test')
-        self.assertEqual(blob.download_as_bytes(start=2), b'st')
-        self.assertEqual(blob.download_as_bytes(end=2), b'te')
-        self.assertEqual(blob.download_as_bytes(start=2, end=3), b's')
-
-    def test_size(self):
-        blob = FakeBlob('fake-blob', self.bucket)
-        self.assertEqual(blob.size, None)
-        blob.upload_from_string(b'test')
-        self.assertEqual(blob.size, 4)
-
-
-class FakeCredentials(object):
-    def __init__(self, client):
-        self.client = client  # type: FakeClient
-
-    def before_request(self, *args, **kwargs):
-        pass
-
-
 class FakeClient(object):
-    def __init__(self, credentials=None):
-        if credentials is None:
-            credentials = FakeCredentials(self)
-        self._credentials = credentials  # type: FakeCredentials
-        self.uploads = OrderedDict()
+    def __init__(self):
         self.__buckets = OrderedDict()
 
     def bucket(self, bucket_id):
@@ -306,461 +220,38 @@ class FakeClientTest(unittest.TestCase):
         self.assertEqual(actual, bucket)
 
 
-class FakeBlobUpload(object):
-    def __init__(self, url, blob):
-        self.url = url
-        self.blob = blob  # type: FakeBlob
-        self._finished = False
-        self.__contents = io.BytesIO()
-
-    def write(self, data):
-        self.__contents.write(data)
-
-    def finish(self):
-        if not self._finished:
-            self.__contents.seek(0)
-            data = self.__contents.read()
-            self.blob.upload_from_string(data)
-            self._finished = True
-
-    def terminate(self):
-        self.blob.delete()
-        self.__contents = None
+def get_test_bucket(client):
+    return client.bucket(BUCKET_NAME)
 
 
-class FakeResponse(object):
-    def __init__(self, status_code=200, text=None):
-        self.status_code = status_code
-        self.text = text
-
-
-class FakeAuthorizedSession(object):
-    def __init__(self, credentials):
-        self._credentials = credentials  # type: FakeCredentials
-
-    def delete(self, upload_url):
-        upload = self._credentials.client.uploads.pop(upload_url)
-        upload.terminate()
-
-    def put(self, url, data=None, headers=None):
-        upload = self._credentials.client.uploads[url]
-
-        if data is not None:
-            if hasattr(data, 'read'):
-                upload.write(data.read())
-            else:
-                upload.write(data)
-        if not headers.get('Content-Range', '').endswith('*'):
-            upload.finish()
-            return FakeResponse(200)
-        return FakeResponse(308)
-
-    @staticmethod
-    def _blob_with_url(url, client):
-        # type: (str, FakeClient) -> FakeBlobUpload
-        return client.uploads.get(url)
-
-
-if DISABLE_MOCKS:
-    storage_client = google.cloud.storage.Client()
-else:
-    storage_client = FakeClient()
-
-
-def get_bucket():
-    return storage_client.bucket(BUCKET_NAME)
-
-
-def get_blob():
-    bucket = get_bucket()
-    return bucket.blob(BLOB_NAME)
-
-
-def cleanup_bucket():
-    bucket = get_bucket()
+def cleanup_test_bucket(client):
+    bucket = get_test_bucket(client)
 
     blobs = bucket.list_blobs()
     for blob in blobs:
         blob.delete()
 
 
-def put_to_bucket(contents, num_attempts=12, sleep_time=5):
-    logger.debug('%r', locals())
-
-    #
-    # In real life, it can take a few seconds for the bucket to become ready.
-    # If we try to write to the key while the bucket while it isn't ready, we
-    # will get a StorageError: NotFound.
-    #
-    for attempt in range(num_attempts):
-        try:
-            blob = get_blob()
-            blob.upload_from_string(contents)
-            return
-        except google.cloud.exceptions.NotFound as err:
-            logger.error('caught %r, retrying', err)
-            time.sleep(sleep_time)
-
-    assert False, 'failed to create bucket %s after %d attempts' % (BUCKET_NAME, num_attempts)
-
-
-def mock_gcs(class_or_func):
-    """Mock all methods of a class or a function."""
-    if inspect.isclass(class_or_func):
-        for attr in class_or_func.__dict__:
-            if callable(getattr(class_or_func, attr)):
-                setattr(class_or_func, attr, mock_gcs_func(getattr(class_or_func, attr)))
-        return class_or_func
-    else:
-        return mock_gcs_func(class_or_func)
-
-
-def mock_gcs_func(func):
-    """Mock the function and provide additional required arguments."""
-    assert callable(func), '%r is not a callable function' % func
-
-    def inner(*args, **kwargs):
-        #
-        # Is it a function or a method? The latter requires a self parameter.
-        #
-        signature = inspect.signature(func)
-
-        fake_session = FakeAuthorizedSession(storage_client._credentials)
-        patched_client = mock.patch(
-            'google.cloud.storage.Client',
-            return_value=storage_client,
-        )
-        patched_session = mock.patch(
-            'google.auth.transport.requests.AuthorizedSession',
-            return_value=fake_session,
-        )
-
-        with patched_client, patched_session:
-            if not hasattr(signature, 'self'):
-                return func(*args, **kwargs)
-            else:
-                return func(signature.self, *args, **kwargs)
-
-    return inner
-
-
-def maybe_mock_gcs(func):
-    if DISABLE_MOCKS:
-        return func
-    else:
-        return mock_gcs(func)
-
-
-@maybe_mock_gcs
-def setUpModule():  # noqa
-    """Called once by unittest when initializing this module.  Set up the
-    test GCS bucket.
-    """
-    storage_client.create_bucket(BUCKET_NAME)
-
-
-@maybe_mock_gcs
-def tearDownModule():  # noqa
-    """Called once by unittest when tearing down this module.  Empty and
-    removes the test GCS bucket.
-    """
-    try:
-        bucket = get_bucket()
-        bucket.delete()
-    except google.cloud.exceptions.NotFound:
-        pass
-
-
-@maybe_mock_gcs
-class ReaderTest(unittest.TestCase):
-    def setUp(self):
-        ignore_resource_warnings()
-
-    def tearDown(self):
-        cleanup_bucket()
-
-    def test_iter(self):
-        """Are GCS files iterated over correctly?"""
-        expected = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=expected)
-
-        # connect to fake GCS and read from the fake key we filled above
-        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
-        output = [line.rstrip(b'\n') for line in fin]
-        self.assertEqual(output, expected.split(b'\n'))
-
-    def test_iter_context_manager(self):
-        # same thing but using a context manager
-        expected = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=expected)
-        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
-            output = [line.rstrip(b'\n') for line in fin]
-            self.assertEqual(output, expected.split(b'\n'))
-
-    def test_read(self):
-        """Are GCS files read correctly?"""
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-        logger.debug('content: %r len: %r', content, len(content))
-
-        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
-        self.assertEqual(content[:6], fin.read(6))
-        self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
-        self.assertEqual(content[14:], fin.read())  # read the rest
-
-    def test_seek_beginning(self):
-        """Does seeking to the beginning of GCS files work correctly?"""
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-
-        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
-        self.assertEqual(content[:6], fin.read(6))
-        self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
-
-        fin.seek(0)
-        self.assertEqual(content, fin.read())  # no size given => read whole file
-
-        fin.seek(0)
-        self.assertEqual(content, fin.read(-1))  # same thing
-
-    def test_seek_start(self):
-        """Does seeking from the start of GCS files work correctly?"""
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-
-        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
-        seek = fin.seek(6)
-        self.assertEqual(seek, 6)
-        self.assertEqual(fin.tell(), 6)
-        self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
-
-    def test_seek_current(self):
-        """Does seeking from the middle of GCS files work correctly?"""
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-
-        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
-        self.assertEqual(fin.read(5), b'hello')
-        seek = fin.seek(1, smart_open.constants.WHENCE_CURRENT)
-        self.assertEqual(seek, 6)
-        self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
-
-    def test_seek_end(self):
-        """Does seeking from the end of GCS files work correctly?"""
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-
-        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
-        seek = fin.seek(-4, smart_open.constants.WHENCE_END)
-        self.assertEqual(seek, len(content) - 4)
-        self.assertEqual(fin.read(), b'you?')
-
-    def test_detect_eof(self):
-        content = u"hello wořld\nhow are you?".encode('utf8')
-        put_to_bucket(contents=content)
-
-        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
-        fin.read()
-        eof = fin.tell()
-        self.assertEqual(eof, len(content))
-        fin.seek(0, smart_open.constants.WHENCE_END)
-        self.assertEqual(eof, fin.tell())
-
-    def test_read_gzip(self):
-        expected = u'раcцветали яблони и груши, поплыли туманы над рекой...'.encode('utf-8')
-        buf = io.BytesIO()
-        buf.close = lambda: None  # keep buffer open so that we can .getvalue()
-        with gzip.GzipFile(fileobj=buf, mode='w') as zipfile:
-            zipfile.write(expected)
-        put_to_bucket(contents=buf.getvalue())
-
-        #
-        # Make sure we're reading things correctly.
-        #
-        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
-            self.assertEqual(fin.read(), buf.getvalue())
-
-        #
-        # Make sure the buffer we wrote is legitimate gzip.
-        #
-        sanity_buf = io.BytesIO(buf.getvalue())
-        with gzip.GzipFile(fileobj=sanity_buf) as zipfile:
-            self.assertEqual(zipfile.read(), expected)
-
-        logger.debug('starting actual test')
-        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
-            with gzip.GzipFile(fileobj=fin) as zipfile:
-                actual = zipfile.read()
-
-        self.assertEqual(expected, actual)
-
-    def test_readline(self):
-        content = b'englishman\nin\nnew\nyork\n'
-        put_to_bucket(contents=content)
-
-        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
-            fin.readline()
-            self.assertEqual(fin.tell(), content.index(b'\n')+1)
-
-            fin.seek(0)
-            actual = list(fin)
-            self.assertEqual(fin.tell(), len(content))
-
-        expected = [b'englishman\n', b'in\n', b'new\n', b'york\n']
-        self.assertEqual(expected, actual)
-
-    def test_read0_does_not_return_data(self):
-        content = b'englishman\nin\nnew\nyork\n'
-        put_to_bucket(contents=content)
-
-        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
-            data = fin.read(0)
-
-        self.assertEqual(data, b'')
-
-    def test_read_past_end(self):
-        content = b'englishman\nin\nnew\nyork\n'
-        put_to_bucket(contents=content)
-
-        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
-            data = fin.read(100)
-
-        self.assertEqual(data, content)
-
-
-@maybe_mock_gcs
-class WriterTest(unittest.TestCase):
-    """
-    Test writing into GCS files.
-
-    """
-    def setUp(self):
-        ignore_resource_warnings()
-
-    def tearDown(self):
-        cleanup_bucket()
-
-    def test_write_01(self):
-        """Does writing into GCS work correctly?"""
-        test_string = u"žluťoučký koníček".encode('utf8')
-
-        with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
-            fout.write(test_string)
-
-        with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), "rb") as fin:
-            output = list(fin)
-
-        self.assertEqual(output, [test_string])
-
-    def test_incorrect_input(self):
-        """Does gcs write fail on incorrect input?"""
-        try:
-            with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fin:
-                fin.write(None)
-        except TypeError:
-            pass
-        else:
-            self.fail()
-
-    def test_write_02(self):
-        """Does gcs write unicode-utf8 conversion work?"""
-        smart_open_write = smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME)
-        smart_open_write.tell()
-        logger.info("smart_open_write: %r", smart_open_write)
-        with smart_open_write as fout:
-            fout.write(u"testžížáč".encode("utf-8"))
-            self.assertEqual(fout.tell(), 14)
-
-    def test_write_04(self):
-        """Does writing no data cause key with an empty value to be created?"""
-        smart_open_write = smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME)
-        with smart_open_write as fout:  # noqa
-            pass
-
-        # read back the same key and check its content
-        output = list(smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME)))
-
-        self.assertEqual(output, [])
-
-    def test_gzip(self):
-        expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
-        with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
-            with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
-                zipfile.write(expected)
-
-        with smart_open.gcs.Reader(BUCKET_NAME, WRITE_BLOB_NAME) as fin:
-            with gzip.GzipFile(fileobj=fin) as zipfile:
-                actual = zipfile.read()
-
-        self.assertEqual(expected, actual)
-
-    def test_buffered_writer_wrapper_works(self):
-        """
-        Ensure that we can wrap a smart_open gcs stream in a BufferedWriter, which
-        passes a memoryview object to the underlying stream in python >= 2.7
-        """
-        expected = u'не думай о секундах свысока'
-
-        with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
-            with io.BufferedWriter(fout) as sub_out:
-                sub_out.write(expected.encode('utf-8'))
-
-        with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), 'rb') as fin:
-            with io.TextIOWrapper(fin, encoding='utf-8') as text:
-                actual = text.read()
-
-        self.assertEqual(expected, actual)
-
-    def test_binary_iterator(self):
-        expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
-        put_to_bucket(contents=b"\n".join(expected))
-        with smart_open.gcs.open(BUCKET_NAME, BLOB_NAME, 'rb') as fin:
-            actual = [line.rstrip() for line in fin]
-        self.assertEqual(expected, actual)
-
-    def test_nonexisting_bucket(self):
-        expected = u"выйду ночью в поле с конём".encode('utf-8')
-        with self.assertRaises(google.api_core.exceptions.NotFound):
-            with smart_open.gcs.open('thisbucketdoesntexist', 'mykey', 'wb') as fout:
-                fout.write(expected)
-
-    def test_read_nonexisting_key(self):
-        with self.assertRaises(google.api_core.exceptions.NotFound):
-            with smart_open.gcs.open(BUCKET_NAME, 'my_nonexisting_key', 'rb') as fin:
-                fin.read()
-
-    def test_double_close(self):
-        text = u'там за туманами, вечными, пьяными'.encode('utf-8')
-        fout = smart_open.gcs.open(BUCKET_NAME, 'key', 'wb')
-        fout.write(text)
-        fout.close()
-        fout.close()
-
-    def test_flush_close(self):
-        text = u'там за туманами, вечными, пьяными'.encode('utf-8')
-        fout = smart_open.gcs.open(BUCKET_NAME, 'key', 'wb')
-        fout.write(text)
-        fout.flush()
-        fout.close()
-
-    def test_terminate(self):
-        text = u'там за туманами, вечными, пьяными'.encode('utf-8')
-        fout = smart_open.gcs.open(BUCKET_NAME, 'key', 'wb')
-        fout.write(text)
-        fout.terminate()
-
-        with self.assertRaises(google.api_core.exceptions.NotFound):
-            with smart_open.gcs.open(BUCKET_NAME, 'key', 'rb') as fin:
-                fin.read()
-
-
-@maybe_mock_gcs
 class OpenTest(unittest.TestCase):
     def setUp(self):
+        if DISABLE_MOCKS:
+            self.client = google.cloud.storage.Client()
+        else:
+            self.client = FakeClient()
+            self.mock_gcs = mock.patch('smart_open.gcs.google.cloud.storage.Client').start()
+            self.mock_gcs.return_value = self.client
+
+        self.client.create_bucket(BUCKET_NAME)
+
         ignore_resource_warnings()
 
     def tearDown(self):
-        cleanup_bucket()
+        cleanup_test_bucket(self.client)
+        bucket = get_test_bucket(self.client)
+        bucket.delete()
+
+        if not DISABLE_MOCKS:
+            self.mock_gcs.stop()
 
     def test_read_never_returns_none(self):
         """read should never return None."""
@@ -783,6 +274,62 @@ class OpenTest(unittest.TestCase):
             actual = fin.read()
 
         self.assertEqual(test_string, actual)
+
+class WriterTest(unittest.TestCase):
+    def setUp(self):
+        self.client = FakeClient()
+        self.mock_gcs = mock.patch('smart_open.gcs.google.cloud.storage.Client').start()
+        self.mock_gcs.return_value = self.client
+
+        self.client.create_bucket(BUCKET_NAME)
+
+    def tearDown(self):
+        cleanup_test_bucket(self.client)
+        bucket = get_test_bucket(self.client)
+        bucket.delete()
+        self.mock_gcs.stop()
+
+    def test_property_passthrough(self):
+        blob_properties = {'content_type': 'text/utf-8'}
+
+        smart_open.gcs.Writer(BUCKET_NAME, BLOB_NAME, blob_properties=blob_properties)
+
+        b = self.client.bucket(BUCKET_NAME).get_blob(BLOB_NAME)
+
+        for k, v in blob_properties.items():
+            self.assertEqual(getattr(b, k), v)
+
+    def test_default_open_kwargs(self):
+        smart_open.gcs.Writer(BUCKET_NAME, BLOB_NAME)
+
+        self.client.bucket(BUCKET_NAME).get_blob(BLOB_NAME) \
+            .open.assert_called_once_with('wb', **smart_open.gcs._DEFAULT_WRITE_OPEN_KWARGS)
+
+    def test_open_kwargs_passthrough(self):
+        open_kwargs = {'ignore_flush': True, 'property': 'value', 'something': 2}
+
+        smart_open.gcs.Writer(BUCKET_NAME, BLOB_NAME, blob_open_kwargs=open_kwargs)
+
+        self.client.bucket(BUCKET_NAME).get_blob(BLOB_NAME) \
+            .open.assert_called_once_with('wb', **open_kwargs)
+
+    def test_non_existing_bucket(self):
+        with self.assertRaises(google.cloud.exceptions.NotFound):
+            smart_open.gcs.Writer('unknown_bucket', BLOB_NAME)
+
+    def test_will_warn_for_conflict(self):
+        # Add a terminate() to simulate that being added to the underlying google-cloud-storage library
+        original_mo = FakeBlob._mock_open
+
+        def fake_open_with_terminate(*args, **kwargs):
+            original_output = original_mo(*args, **kwargs)
+            original_output.terminate = lambda: None
+            return original_output
+
+        FakeBlob._mock_open = fake_open_with_terminate
+
+        with self.assertRaises(RuntimeWarning):
+            smart_open.gcs.Writer(BUCKET_NAME, BLOB_NAME)
 
 
 if __name__ == '__main__':
