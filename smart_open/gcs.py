@@ -8,6 +8,7 @@
 """Implements file-like objects for reading and writing to/from GCS."""
 
 import logging
+import warnings
 
 try:
     import google.cloud.exceptions
@@ -46,6 +47,9 @@ def open_uri(uri, mode, transport_params):
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     return open(parsed_uri['bucket_id'], parsed_uri['blob_id'], mode, **kwargs)
 
+def warn_deprecated(parameter_name):
+    message = f"Parameter {parameter_name} is deprecated, this parameter no-longer has any effect"
+    warnings.warn(message, UserWarning)
 
 def open(
     bucket_id,
@@ -83,6 +87,9 @@ def open(
     if blob_open_kwargs is None:
         blob_open_kwargs = {}
 
+    if buffer_size is not None:
+        warn_deprecated('buffer_size')
+
     if mode in (constants.READ_BINARY, 'r', 'rt'):
         _blob = Reader(bucket=bucket_id,
                         key=blob_id,
@@ -116,6 +123,10 @@ def Reader(bucket,
         blob_open_kwargs = {}
     if client is None:
         client = google.cloud.storage.Client()
+    if buffer_size is not None:
+        warn_deprecated('buffer_size')
+    if line_terminator is not None:
+        warn_deprecated('line_terminator')
 
     bkt = client.bucket(bucket)
     blob = bkt.get_blob(key)
