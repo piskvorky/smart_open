@@ -32,6 +32,10 @@ _DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 _DEFAULT_WRITE_OPEN_KWARGS = {'ignore_flush': True}
 
 
+def __noop():
+    pass
+
+
 def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
@@ -50,6 +54,7 @@ def open(
     bucket_id,
     blob_id,
     mode,
+    buffer_size=None,
     min_part_size=_DEFAULT_MIN_PART_SIZE,
     client=None,  # type: google.cloud.storage.Client
     blob_properties=None,
@@ -65,6 +70,8 @@ def open(
         The name of the blob within the bucket.
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
+    buffer_size:
+        deprecated
     min_part_size: int, optional
         The minimum part size for multipart uploads.  For writing only.
     client: google.cloud.storage.Client, optional
@@ -74,38 +81,96 @@ def open(
     blob_open_kwargs: dict, optional
         Set properties for opening the blob, passed through directly to
         the google-cloud-storage library
+
     """
     if blob_open_kwargs is None:
         blob_open_kwargs = {}
-    if blob_properties is None:
-        blob_properties = {}
 
     if client is None:
         client = google.cloud.storage.Client()
 
-    bucket = client.bucket(bucket_id)
-    if not bucket.exists():
-        raise google.cloud.exceptions.NotFound(f'bucket {bucket_id} not found')
-
     if mode in (constants.READ_BINARY, 'r', 'rt'):
-        blob = bucket.get_blob(blob_id)
-        if blob is None:
-            raise google.cloud.exceptions.NotFound(f'blob {blob_id} not found in {bucket_id}')
+        _blob = Reader(bucket=bucket_id,
+                        key=blob_id,
+                        client=client,
+                        blob_open_kwargs=blob_open_kwargs)
 
     elif mode in (constants.WRITE_BINARY, 'w', 'wt'):
-        blob_open_kwargs = {**_DEFAULT_WRITE_OPEN_KWARGS, **blob_open_kwargs}
-        blob = bucket.blob(
-            blob_id,
-            chunk_size=min_part_size,
-        )
-
-        for k, v in blob_properties.items():
-            try:
-                setattr(blob, k, v)
-            except AttributeError:
-                logger.warn(f'Unable to set property {k} on blob')
+        _blob = Writer(bucket=bucket_id,
+                        blob=blob_id,
+                        min_part_size=min_part_size,
+                        client=client,
+                        blob_properties=blob_properties,
+                        blob_open_kwargs=blob_open_kwargs,
+                    )
 
     else:
         raise NotImplementedError(f'GCS support for mode {mode} not implemented')
 
-    return blob.open(mode, **blob_open_kwargs)
+    return _blob
+
+
+def Reader(bucket,
+            key,
+            buffer_size=None,
+            line_terminator=None,
+            client=None,
+            blob_open_kwargs=None,
+        ):
+
+    if blob_open_kwargs is None:
+        blob_open_kwargs = {}
+    if client is None:
+        client = google.cloud.storage.Client()
+
+    bkt = client.bucket(bucket)
+    blob = bkt.get_blob(key)
+
+    if blob is None:
+        raise google.cloud.exceptions.NotFound(f'blob {key} not found in {bucket}')
+
+    return blob.open('rb', **blob_open_kwargs)
+
+
+def Writer(bucket,
+            blob,
+            min_part_size=None,
+            client=None,
+            blob_properties=None,
+            blob_open_kwargs=None,
+        ):
+
+    if blob_open_kwargs is None:
+        blob_open_kwargs = {}
+    if blob_properties is None:
+        blob_properties = {}
+    if client is None:
+        client = google.cloud.storage.Client()
+
+    blob_open_kwargs = {**_DEFAULT_WRITE_OPEN_KWARGS, **blob_open_kwargs}
+
+    g_bucket = client.bucket(bucket)
+    if not g_bucket.exists():
+        raise google.cloud.exceptions.NotFound(f'bucket {bucket} not found')
+
+    g_blob = g_bucket.blob(
+        blob,
+        chunk_size=min_part_size,
+    )
+
+    for k, v in blob_properties.items():
+        try:
+            setattr(g_blob, k, v)
+        except AttributeError:
+            logger.warn(f'Unable to set property {k} on blob')
+
+    _blob = g_blob.open('wb', **blob_open_kwargs)
+
+    if hasattr(_blob, 'terminate'):
+        raise RuntimeWarning(
+            'Unexpected incompatibility between dependency and google-cloud-storage dependency.'
+            'Things may not work as expected'
+            )
+    _blob.terminate = __noop
+
+    return _blob

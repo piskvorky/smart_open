@@ -54,8 +54,8 @@ class FakeBucket(object):
         #
         self.client.register_bucket(self)
 
-    def blob(self, blob_id, *args, **kwargs):
-        return self.blobs.get(blob_id, FakeBlob(blob_id, self, *args, **kwargs))
+    def blob(self, blob_id, **kwargs):
+        return self.blobs.get(blob_id, FakeBlob(blob_id, self, **kwargs))
 
     def delete(self):
         self.client.delete_bucket(self)
@@ -66,7 +66,7 @@ class FakeBucket(object):
     def exists(self):
         return self._exists
 
-    def get_blob(self, blob_id, **kwargs):
+    def get_blob(self, blob_id):
         try:
             return self.blobs[blob_id]
         except KeyError as e:
@@ -133,13 +133,12 @@ class FakeBucketTest(unittest.TestCase):
 
 
 class FakeBlob(object):
-    def __init__(self, name, bucket, *args, **kwargs):
+    def __init__(self, name, bucket, **kwargs):
         self.name = name
         self._bucket = bucket  # type: FakeBucket
         self._exists = False
         self.__contents = io.BytesIO()
         self.__contents.close = lambda: None
-        self._size = 0
         self._create_if_not_exists()
 
     def create_resumable_upload_session(self):
@@ -174,7 +173,6 @@ class FakeBlob(object):
         self.__contents.truncate(0)
         self.__contents.seek(0)
         self.__contents.write(data)
-        self._size = self.__contents.tell()
 
     def write(self, data):
         self.upload_from_string(data)
@@ -199,7 +197,9 @@ class FakeBlob(object):
 
     @property
     def size(self):
-        return self._size if self._size > 0 else None
+        if self.__contents.tell() == 0:
+            return None
+        return self.__contents.tell()
 
     def _create_if_not_exists(self):
         self._bucket.register_blob(self)
@@ -485,7 +485,7 @@ class ReaderTest(unittest.TestCase):
         put_to_bucket(contents=expected)
 
         # connect to fake GCS and read from the fake key we filled above
-        fin = smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=BLOB_NAME, mode='rb')
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         output = [line.rstrip(b'\n') for line in fin]
         self.assertEqual(output, expected.split(b'\n'))
 
@@ -493,7 +493,7 @@ class ReaderTest(unittest.TestCase):
         # same thing but using a context manager
         expected = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=expected)
-        with smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=BLOB_NAME, mode='rb') as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             output = [line.rstrip(b'\n') for line in fin]
             self.assertEqual(output, expected.split(b'\n'))
 
@@ -503,7 +503,7 @@ class ReaderTest(unittest.TestCase):
         put_to_bucket(contents=content)
         logger.debug('content: %r len: %r', content, len(content))
 
-        fin = smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=BLOB_NAME, mode='rb')
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
         self.assertEqual(content[14:], fin.read())  # read the rest
@@ -513,7 +513,7 @@ class ReaderTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        fin = smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=BLOB_NAME, mode='rb')
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         self.assertEqual(content[:6], fin.read(6))
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
 
@@ -528,7 +528,7 @@ class ReaderTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        fin = smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=BLOB_NAME, mode='rb')
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         seek = fin.seek(6)
         self.assertEqual(seek, 6)
         self.assertEqual(fin.tell(), 6)
@@ -539,7 +539,7 @@ class ReaderTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        fin = smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=BLOB_NAME, mode='rb')
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         self.assertEqual(fin.read(5), b'hello')
         seek = fin.seek(1, smart_open.constants.WHENCE_CURRENT)
         self.assertEqual(seek, 6)
@@ -550,7 +550,7 @@ class ReaderTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        fin = smart_open.gcs.open(BUCKET_NAME, BLOB_NAME, mode='rb')
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         seek = fin.seek(-4, smart_open.constants.WHENCE_END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
@@ -559,7 +559,7 @@ class ReaderTest(unittest.TestCase):
         content = u"hello wořld\nhow are you?".encode('utf8')
         put_to_bucket(contents=content)
 
-        fin = smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=BLOB_NAME, mode='rb')
+        fin = smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME)
         fin.read()
         eof = fin.tell()
         self.assertEqual(eof, len(content))
@@ -577,7 +577,7 @@ class ReaderTest(unittest.TestCase):
         #
         # Make sure we're reading things correctly.
         #
-        with smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=BLOB_NAME, mode='rb') as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             self.assertEqual(fin.read(), buf.getvalue())
 
         #
@@ -588,7 +588,7 @@ class ReaderTest(unittest.TestCase):
             self.assertEqual(zipfile.read(), expected)
 
         logger.debug('starting actual test')
-        with smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=BLOB_NAME, mode='rb') as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
@@ -598,7 +598,7 @@ class ReaderTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=BLOB_NAME, mode='rb') as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             fin.readline()
             self.assertEqual(fin.tell(), content.index(b'\n')+1)
 
@@ -613,7 +613,7 @@ class ReaderTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.gcs.open(BUCKET_NAME, BLOB_NAME, mode='rb') as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             data = fin.read(0)
 
         self.assertEqual(data, b'')
@@ -622,7 +622,7 @@ class ReaderTest(unittest.TestCase):
         content = b'englishman\nin\nnew\nyork\n'
         put_to_bucket(contents=content)
 
-        with smart_open.gcs.open(BUCKET_NAME, BLOB_NAME, mode='rb') as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME) as fin:
             data = fin.read(100)
 
         self.assertEqual(data, content)
@@ -644,7 +644,7 @@ class WriterTest(unittest.TestCase):
         """Does writing into GCS work correctly?"""
         test_string = u"žluťoučký koníček".encode('utf8')
 
-        with smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=WRITE_BLOB_NAME, mode='wb') as fout:
+        with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
             fout.write(test_string)
 
         with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), "rb") as fin:
@@ -655,7 +655,7 @@ class WriterTest(unittest.TestCase):
     def test_incorrect_input(self):
         """Does gcs write fail on incorrect input?"""
         try:
-            with smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=WRITE_BLOB_NAME, mode='wb') as fin:
+            with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fin:
                 fin.write(None)
         except TypeError:
             pass
@@ -664,7 +664,7 @@ class WriterTest(unittest.TestCase):
 
     def test_write_02(self):
         """Does gcs write unicode-utf8 conversion work?"""
-        smart_open_write = smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=WRITE_BLOB_NAME, mode='wb')
+        smart_open_write = smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME)
         smart_open_write.tell()
         logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
@@ -673,7 +673,7 @@ class WriterTest(unittest.TestCase):
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
-        smart_open_write = smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=WRITE_BLOB_NAME, mode='wb')
+        smart_open_write = smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME)
         with smart_open_write as fout:  # noqa
             pass
 
@@ -682,27 +682,13 @@ class WriterTest(unittest.TestCase):
 
         self.assertEqual(output, [])
 
-    # def test_write_05(self):
-    #     """Do blob_properties get applied?"""
-    #     smart_open_write = smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=WRITE_BLOB_NAME, mode='wb',
-    #         blob_properties={
-    #             "content_type": "random/x-test",
-    #             "content_encoding": "coded"
-    #         }
-    #     )
-
-    #     # TODO: Mock + assert calls to set content_type + content_encoding
-    #     with smart_open_write as fout:  # noqa
-    #         assert fout.content_type == "random/x-test"
-    #         assert fout.content_encoding == "coded"
-
     def test_gzip(self):
         expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
-        with smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=WRITE_BLOB_NAME, mode='wb') as fout:
+        with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
             with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
                 zipfile.write(expected)
 
-        with smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=WRITE_BLOB_NAME, mode='rb') as fin:
+        with smart_open.gcs.Reader(BUCKET_NAME, WRITE_BLOB_NAME) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
@@ -715,11 +701,11 @@ class WriterTest(unittest.TestCase):
         """
         expected = u'не думай о секундах свысока'
 
-        with smart_open.gcs.open(bucket_id=BUCKET_NAME, blob_id=WRITE_BLOB_NAME, mode='wb') as fout:
+        with smart_open.gcs.Writer(BUCKET_NAME, WRITE_BLOB_NAME) as fout:
             with io.BufferedWriter(fout) as sub_out:
                 sub_out.write(expected.encode('utf-8'))
 
-        with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), mode='rb') as fin:
+        with smart_open.open("gs://{}/{}".format(BUCKET_NAME, WRITE_BLOB_NAME), 'rb') as fin:
             with io.TextIOWrapper(fin, encoding='utf-8') as text:
                 actual = text.read()
 
@@ -756,6 +742,16 @@ class WriterTest(unittest.TestCase):
         fout.write(text)
         fout.flush()
         fout.close()
+
+    def test_terminate(self):
+        text = u'там за туманами, вечными, пьяными'.encode('utf-8')
+        fout = smart_open.gcs.open(BUCKET_NAME, 'key', 'wb')
+        fout.write(text)
+        fout.terminate()
+
+        with self.assertRaises(google.api_core.exceptions.NotFound):
+            with smart_open.gcs.open(BUCKET_NAME, 'key', 'rb') as fin:
+                fin.read()
 
 
 @maybe_mock_gcs
