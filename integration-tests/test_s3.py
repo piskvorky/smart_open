@@ -11,7 +11,6 @@ import contextlib
 import io
 import os
 import random
-import subprocess
 import string
 
 import boto3

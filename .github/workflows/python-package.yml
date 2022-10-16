@@ -18,7 +18,7 @@ jobs:
         run: python -m pip install flake8
 
       - name: Run flake8 linter (source)
-        run: flake8 --ignore E12,E226,W503 --max-line-length 110 --show-source smart_open
+        run: flake8 --show-source smart_open
 
   unit_tests:
     needs: [linters]
