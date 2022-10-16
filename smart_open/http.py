@@ -50,7 +50,7 @@ def open_uri(uri, mode, transport_params):
 
 
 def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
-         headers=None, timeout=None):
+         headers=None, timeout=None, buffer_size=DEFAULT_BUFFER_SIZE):
     """Implement streamed reader from a web site.
 
     Supports Kerberos and Basic HTTP authentication.
@@ -73,6 +73,8 @@ def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
         Any headers to send in the request. If ``None``, the default headers are sent:
         ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
         set this variable to an empty dict, ``{}``.
+    buffer_size: int, optional
+        The buffer size to use when performing I/O.
 
     Note
     ----
@@ -82,7 +84,7 @@ def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
     """
     if mode == constants.READ_BINARY:
         fobj = SeekableBufferedInputBase(
-            uri, mode, kerberos=kerberos,
+            uri, mode, buffer_size=buffer_size, kerberos=kerberos,
             user=user, password=password, cert=cert,
             headers=headers, timeout=timeout,
         )
