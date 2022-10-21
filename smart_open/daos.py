@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright 2022 Hewlett Packard Enterprise Development LP.
+# Copyright (C) 2022 Radim Rehurek <radim@rare-technologies.com>
+# Author(s): Sridhar Balachandriah, Hewlett Packard Enterprise Development LP.
 #
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
@@ -20,8 +21,6 @@ import logging
 import smart_open.utils
 
 try:
-    import sys
-    sys.path.append("/opt/daos/lib64/python3.6/site-packages/")
     from pydaos import (DCont, DObjNotFound)
 except ImportError:
     MISSING_DEPS = True
