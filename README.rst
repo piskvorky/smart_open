@@ -93,6 +93,9 @@ Other examples of URLs that ``smart_open`` accepts::
     s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
     gs://my_bucket/my_blob
     azure://my_bucket/my_blob
+    oss://my_bucket/my_key
+    oss://my_key:my_secret@my_bucket/my_key
+    oss://my_key:my_secret@my_endpoint@my_bucket/my_key
     hdfs:///path/file
     hdfs://path/file
     webhdfs://host:port/path/file
@@ -121,6 +124,7 @@ You can install these dependencies explicitly using::
     pip install smart_open[azure] # Install Azure deps
     pip install smart_open[gcs] # Install GCS deps
     pip install smart_open[s3] # Install S3 deps
+    pip install smart_open[oss] # Install OSS deps
 
 Or, if you don't mind installing a large number of third party libraries, you can install all dependencies using::
 
@@ -216,6 +220,21 @@ For the sake of simplicity, the examples below assume you have all the dependenc
     with open('azure://mycontainer/my_file.txt', 'wb', transport_params=transport_params) as fout:
         fout.write(b'hello world')
 
+    # stream content from Alicloud OSS
+    with open('oss://my_ak:my_sk@my_endpoint@my_bucket/robots.txt', 'rb') as fin:
+            for line in fin:
+                print(repr(line.decode('utf-8')))
+            offset = fin.seek(0)  # seek to the beginning
+            print(fin.read(4))
+
+    endpoint = 'https://oss-cn-hangzhou.aliyuncs.com'
+    oss_client= oss2.Bucket(oss2.Auth('my_ak', 'my_sk'), endpoint, 'my_bucket')
+    url = 'oss://niejn/test.txt'
+    with open(url, 'wb', transport_params={'client': oss_client}) as fout:
+        bytes_written = fout.write(b'hello world!')
+        print(bytes_written)
+
+
 Compression Handling
 --------------------
 
@@ -289,6 +308,7 @@ Transport-specific Options
 - WebHDFS
 - GCS
 - Azure Blob Storage
+- Alicloud OSS
 
 Each option involves setting up its own set of parameters.
 For example, for accessing S3, you often need to set up authentication, like API keys or a profile name.
