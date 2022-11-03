@@ -40,9 +40,8 @@ aws_deps = ['boto3']
 gcs_deps = ['google-cloud-storage>=1.31.0']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 http_deps = ['requests']
-daos_deps = ['pydaos']
 
-all_deps = aws_deps + gcs_deps + azure_deps + http_deps + daos_deps
+all_deps = aws_deps + gcs_deps + azure_deps + http_deps
 tests_require = all_deps + [
     'moto[server]',
     'pathlib2',
@@ -81,7 +80,6 @@ setup(
         'all': all_deps,
         'http': http_deps,
         'webhdfs': http_deps,
-        'daos': daos_deps,
     },
     python_requires=">=3.6,<4.0",
 
