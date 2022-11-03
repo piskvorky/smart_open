@@ -137,6 +137,8 @@ jobs:
 
       - run: bash ci_helpers/helpers.sh enable_moto_server
         if: ${{ matrix.moto_server }}
+      
+      - run: bash ci_helpers/helpers.sh create_ftp_server
 
       - name: Run integration tests
         run: python ci_helpers/run_integration_tests.py
@@ -146,6 +148,8 @@ jobs:
 
       - run: bash ci_helpers/helpers.sh disable_moto_server
         if: ${{ matrix.moto_server }}
+      
+      - run: bash ci_helpers/helpers.sh delete_ftp_server
 
   benchmarks:
     needs: [linters,unit_tests]
