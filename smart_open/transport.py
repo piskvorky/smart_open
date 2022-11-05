@@ -14,6 +14,7 @@ import importlib
 import logging
 
 import smart_open.local_file
+from smart_open.utils import find_entry_points
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,17 @@ register_transport("smart_open.http")
 register_transport("smart_open.s3")
 register_transport("smart_open.ssh")
 register_transport("smart_open.webhdfs")
+
+
+def _register_transport_entry_point(ep):
+    try:
+        register_transport(ep.value)
+    except Exception:
+        logger.warning("Fail to load smart_open transport extension: %s (target: %s)", ep.name, ep.value)
+
+
+for ep in find_entry_points(group='smart_open_transport'):
+    _register_transport_entry_point(ep)
 
 SUPPORTED_SCHEMES = tuple(sorted(_REGISTRY.keys()))
 """The transport schemes that the local installation of ``smart_open`` supports."""

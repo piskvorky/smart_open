@@ -10,7 +10,15 @@
 
 import inspect
 import logging
+import sys
 import urllib.parse
+
+# Library has been added in version 3.8
+# See: https://docs.python.org/3.8/library/importlib.metadata.html#module-importlib.metadata
+if sys.version_info >= (3, 8):
+    import importlib.metadata as importlib_metadata
+else:
+    import importlib_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -189,3 +197,30 @@ def safe_urlsplit(url):
 
     path = sr.path.replace(placeholder, '?')
     return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, '', '')
+
+
+def find_entry_points(group):
+    """Search packages entry points and filter value based
+    on their group name.
+
+    Parameters
+    ----------
+    group: str
+        An entry point group name to filter registered entry points.
+
+    Returns
+    -------
+    list[EntryPoint]
+        Valid registered entry points.
+    """
+
+    try:
+        # Try new filter API (python 3.10+ and importlib_metadata 3.6+).
+        #
+        # Check "Compatibility Note" here:
+        # https://docs.python.org/3.10/library/importlib.metadata.html#entry-points
+        return importlib_metadata.entry_points(group=group)
+    except Exception:
+        # Legacy API
+        eps = importlib_metadata.entry_points()
+        return eps.get(group, [])

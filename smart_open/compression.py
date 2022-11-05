@@ -9,6 +9,8 @@
 import logging
 import os.path
 
+from smart_open.utils import find_entry_points
+
 logger = logging.getLogger(__name__)
 
 _COMPRESSOR_REGISTRY = {}
@@ -145,3 +147,16 @@ def compression_wrapper(file_obj, mode, compression):
 #
 register_compressor('.bz2', _handle_bz2)
 register_compressor('.gz', _handle_gzip)
+
+
+def _register_compressor_entry_point(ep):
+    try:
+        assert len(ep.name) > 0, "At least one char is required for ep.name"
+        extension = ".{}".format(ep.name)
+        register_compressor(extension, ep.load())
+    except Exception:
+        logger.warning("Fail to load smart_open compressor extension: %s (target: %s)", ep.name, ep.value)
+
+
+for ep in find_entry_points('smart_open_compressor'):
+    _register_compressor_entry_point(ep)
