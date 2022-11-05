@@ -1189,18 +1189,27 @@ def iter_bucket(
 
     with smart_open.concurrency.create_pool(processes=workers) as pool:
         result_iterator = pool.imap_unordered(download_key, key_iterator)
-        for key_no, (key, content) in enumerate(result_iterator):
-            if True or key_no % 1000 == 0:
-                logger.info(
-                    "yielding key #%i: %s, size %i (total %.1fMB)",
-                    key_no, key, len(content), total_size / 1024.0 ** 2
-                )
-            yield key, content
-            total_size += len(content)
-
-            if key_limit is not None and key_no + 1 >= key_limit:
-                # we were asked to output only a limited number of keys => we're done
+        key_no = 0
+        while True:
+            try:
+                (key, content) = result_iterator.__next__()
+                if True or key_no % 1000 == 0:
+                    logger.info(
+                        "yielding key #%i: %s, size %i (total %.1fMB)",
+                        key_no, key, len(content), total_size / 1024.0 ** 2
+                    )
+                yield key, content
+                total_size += len(content)
+                if key_limit is not None and key_no + 1 >= key_limit:
+                    # we were asked to output only a limited number of keys => we're done
+                    break
+            except botocore.exceptions.ClientError as err:
+                # ignore 404 not found errors
+                if not ('Error' in err.response and err.response['Error'].get('Code') == '404'):
+                    raise err
+            except StopIteration:
                 break
+            key_no += 1
     logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
 
 

@@ -681,6 +681,38 @@ class IterBucketTest(unittest.TestCase):
         results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
         self.assertEqual(len(results), 10)
 
+    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
+    @pytest.mark.xfail(
+        condition=sys.platform == 'darwin',
+        reason="MacOS uses spawn rather than fork for multiprocessing",
+    )
+    def test_iter_bucket_404(self):
+        populate_bucket()
+
+        def throw_404_error_for_key_4(*args):
+            if args[1] == "key_4":
+                raise botocore.exceptions.ClientError(
+                    error_response={"Error": {"Code": "404", "Message": "Not Found"}},
+                    operation_name="HeadObject",
+                )
+            else:
+                return [0]
+
+        with mock.patch("smart_open.s3._download_fileobj", side_effect=throw_404_error_for_key_4):
+            results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
+            self.assertEqual(len(results), 9)
+
+    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
+    @pytest.mark.xfail(
+        condition=sys.platform == 'darwin',
+        reason="MacOS uses spawn rather than fork for multiprocessing",
+    )
+    def test_iter_bucket_non_404(self):
+        populate_bucket()
+        with mock.patch("smart_open.s3._download_fileobj", side_effect=ARBITRARY_CLIENT_ERROR):
+            with pytest.raises(botocore.exceptions.ClientError):
+                list(smart_open.s3.iter_bucket(BUCKET_NAME))
+
     def test_deprecated_top_level_s3_iter_bucket(self):
         populate_bucket()
         with self.assertLogs(smart_open.logger.name, level='WARN') as cm:
