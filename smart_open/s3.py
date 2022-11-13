@@ -822,6 +822,7 @@ multipart upload may fail")
                 Bucket=self._bucket,
                 Key=self._key,
                 Body=b'',
+                **self._client.kwargs
             )
             logger.debug('%s: wrote 0 bytes to imitate multipart upload', self)
         self._upload_id = None
@@ -1004,6 +1005,7 @@ class SinglepartWriter(io.BufferedIOBase):
                 Bucket=self._bucket,
                 Key=self._key,
                 Body=self._buf,
+                **self._client.kwargs
             )
         except botocore.client.ClientError as e:
             raise ValueError(
