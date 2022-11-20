@@ -761,6 +761,7 @@ multipart upload may fail")
                 self._client.create_multipart_upload,
                 Bucket=bucket,
                 Key=key,
+                **self._client.kwargs,
             )
             self._upload_id = _retry_if_failed(partial)['UploadId']
         except botocore.client.ClientError as error:
