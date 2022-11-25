@@ -139,6 +139,7 @@ def open(
     mode_to_ftp_cmds = {
         "rb": ("RETR", "rb"),
         "wb": ("STOR", "wb"),
+        "ab": ("APPE", "wb"),
     }
     try:
         ftp_mode, file_obj_mode = mode_to_ftp_cmds[mode]
