@@ -65,3 +65,4 @@ target/
 
 # env files
 .env
+.venv
