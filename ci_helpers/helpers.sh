@@ -11,10 +11,15 @@ create_ftp_ftps_servers(){
   #
   # Must be run as root
   #
-  HOME_DIR=/home/user
-  mkdir $HOME_DIR
-  useradd -p $(echo $PASS | openssl passwd -1 -stdin) -d $HOME_DIR $USER
-  chown $USER:$USER $HOME_DIR
+  home_dir=/home/user
+  user=user
+  pass=123
+  ftp_port=21
+  ftps_port=90
+
+  mkdir $home_dir
+  useradd -p $(echo $pass | openssl passwd -1 -stdin) -d $home_dir $user
+  chown $user:$user $home_dir
 
   server_setup='''
 listen=YES
@@ -35,8 +40,8 @@ require_ssl_reuse=NO
 '''
 
   cp /etc/vsftpd.conf /etc/vsftpd-ssl.conf
-  echo -e "$server_setup\nlisten_port=${FTP_PORT}" >> /etc/vsftpd.conf
-  echo -e "$server_setup\nlisten_port=${FTPS_PORT}\n$additional_ssl_setup" >> /etc/vsftpd-ssl.conf
+  echo -e "$server_setup\nlisten_port=${ftp_port}" >> /etc/vsftpd.conf
+  echo -e "$server_setup\nlisten_port=${ftps_port}\n$additional_ssl_setup" >> /etc/vsftpd-ssl.conf
 
   service vsftpd restart
   vsftpd /etc/vsftpd-ssl.conf &
