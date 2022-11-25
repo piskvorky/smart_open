@@ -11,6 +11,7 @@ create_ftp_ftps_servers(){
   #
   # Must be run as root
   #
+  HOME_DIR=/home/user
   mkdir $HOME_DIR
   useradd -p $(echo $PASS | openssl passwd -1 -stdin) -d $HOME_DIR $USER
   chown $USER:$USER $HOME_DIR

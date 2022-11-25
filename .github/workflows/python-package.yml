@@ -141,12 +141,6 @@ jobs:
       - run: |
           sudo apt-get install vsftpd
           sudo bash ci_helpers/helpers.sh create_ftp_ftps_servers
-        env:
-          HOME_DIR: /home/user
-          USER: user
-          PASS: 123
-          FTP_PORT: 21
-          FTPS_PORT: 90
 
       - name: Run integration tests
         run: python ci_helpers/run_integration_tests.py
