@@ -12,11 +12,11 @@
 import logging
 import urllib.parse
 import smart_open.utils
-from ftplib import FTP, error_reply
+from ftplib import FTP, FTP_TLS, error_reply
 import types
 logger = logging.getLogger(__name__)
 
-SCHEME = "ftp"
+SCHEMES = ("ftp", "ftps")
 
 """Supported URL schemes."""
 
@@ -26,6 +26,9 @@ URI_EXAMPLES = (
     "ftp://username@host/path/file",
     "ftp://username:password@host/path/file",
     "ftp://username:password@host:port/path/file",
+    "ftps://username@host/path/file",
+    "ftps://username:password@host/path/file",
+    "ftps://username:password@host:port/path/file",
 )
 
 
@@ -35,7 +38,7 @@ def _unquote(text):
 
 def parse_uri(uri_as_string):
     split_uri = urllib.parse.urlsplit(uri_as_string)
-    assert split_uri.scheme == SCHEME, 'unexpected scheme: %r' % split_uri.scheme
+    assert split_uri.scheme in SCHEMES
     return dict(
         scheme=split_uri.scheme,
         uri_path=_unquote(split_uri.path),
@@ -50,8 +53,10 @@ def open_uri(uri, mode, transport_params):
     smart_open.utils.check_kwargs(open, transport_params)
     parsed_uri = parse_uri(uri)
     uri_path = parsed_uri.pop("uri_path")
-    parsed_uri.pop("scheme")
-    return open(uri_path, mode, transport_params=transport_params, **parsed_uri)
+    scheme = parsed_uri.pop("scheme")
+    secure_conn = True if scheme == "ftps" else False
+    return open(uri_path, mode, secure_connection=secure_conn,
+            transport_params=transport_params, **parsed_uri)
 
 
 def convert_transport_params_to_args(transport_params):
@@ -71,9 +76,12 @@ def convert_transport_params_to_args(transport_params):
     return kwargs
 
 
-def _connect(hostname, username, port, password, transport_params):
+def _connect(hostname, username, port, password, secure_connection, transport_params):
     kwargs = convert_transport_params_to_args(transport_params)
-    ftp = FTP(**kwargs)
+    if secure_connection:
+        ftp = FTP_TLS(**kwargs)
+    else:
+        ftp = FTP(**kwargs)
     try:
         ftp.connect(hostname, port)
     except Exception as e:
@@ -84,10 +92,11 @@ def _connect(hostname, username, port, password, transport_params):
     except error_reply as e:
         logger.error("Unable to login to FTP server: try checking the username and password!")
         raise e
+    if secure_connection:
+        ftp.prot_p()
     return ftp
 
 
-# transport paramaters can include any extra parameters that you want to be passed into FTP_TLS
 def open(
     path,
     mode="r",
@@ -95,22 +104,42 @@ def open(
     user=None,
     password=None,
     port=DEFAULT_PORT,
+    secure_connection=False,
     transport_params=None,
 ):
+    """Open a file for reading or writing via FTP/FTPS.
+
+    Parameters
+    ----------
+    path: str
+        The path on the remote server
+    mode: str
+        Must be "rb" or "wb"
+    host: str
+        The host to connect to
+    user: str
+        The username to use for the connection
+    password: str
+        The password for the specified username
+    port: int
+        The port to connect to
+    secure_connection: bool
+        True for FTPS, False for FTP
+    transport_params: dict
+        Additional parameters for the FTP connection.
+        Currently supported parameters: timeout, source_address, encoding.
+    """
     if not host:
         raise ValueError("you must specify the host to connect to")
     if not user:
         raise ValueError("you must specify the user")
     if not transport_params:
         transport_params = {}
-    conn = _connect(host, user, port, password, transport_params)
+    conn = _connect(host, user, port, password, secure_connection, transport_params)
     mode_to_ftp_cmds = {
-        "r": ("RETR", "r"),
         "rb": ("RETR", "rb"),
-        "w": ("STOR", "w"),
         "wb": ("STOR", "wb"),
-        "a": ("APPE", "w"),
-        "ab": ("APPE", "wb")
+        "ab": ("APPE", "wb"),
     }
     try:
         ftp_mode, file_obj_mode = mode_to_ftp_cmds[mode]

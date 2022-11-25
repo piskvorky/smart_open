@@ -11,7 +11,6 @@
 import base64
 import io
 import logging
-from typing import Union
 
 import smart_open.bytebuffer
 import smart_open.constants
