@@ -27,7 +27,10 @@ import logging
 import urllib.parse
 import warnings
 
-from paramiko import SSHException
+try:
+    import paramiko
+except ImportError:
+    MISSING_DEPS = True
 
 import smart_open.utils
 
@@ -76,44 +79,16 @@ def open_uri(uri, mode, transport_params):
     return open(uri_path, mode, transport_params=transport_params, **parsed_uri)
 
 
-def _connect_sftp(hostname, username, port, password, transport_params):
-    try:
-        import paramiko
-    except ImportError:
-        warnings.warn(
-            'paramiko missing, opening SSH/SCP/SFTP paths will be disabled. '
-            '`pip install paramiko` to suppress'
-        )
-        raise
-
-    def connect_ssh():
-        ssh = paramiko.SSHClient()
-        ssh.load_system_host_keys()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        kwargs = transport_params.get('connect_kwargs', {}).copy()
-        # if 'key_filename' is present in transport_params, then I do not
-        #   overwrite the credentials.
-        if 'key_filename' not in kwargs:
-            kwargs.setdefault('password', password)
-        kwargs.setdefault('username', username)
-        ssh.connect(hostname, port, **kwargs)
-        return ssh
-
-    def init_sftp(ssh: paramiko.SSHClient):
-        tport = ssh.get_transport()
-        return tport and tport.open_sftp_client()
-
-    key = (hostname, username)
-    ssh = _SSH[key] = _SSH.get(key) or connect_ssh()
-
-    try:
-        return init_sftp(ssh)
-    except SSHException as ex:
-        connection_timed_out = ex.args and ex.args[0] == 'SSH session not active'
-        if connection_timed_out:
-            ssh = _SSH[key] = connect_ssh()  # one reconnect attempt
-            return init_sftp(ssh)
-        raise
+def _connect_ssh(hostname, username, port, password, transport_params):
+    ssh = paramiko.SSHClient()
+    ssh.load_system_host_keys()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    kwargs = transport_params.get('connect_kwargs', {}).copy()
+    if 'key_filename' not in kwargs:
+        kwargs.setdefault('password', password)
+    kwargs.setdefault('username', username)
+    ssh.connect(hostname, port, **kwargs)
+    return ssh
 
 
 def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT, transport_params=None):
@@ -158,7 +133,25 @@ def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT,
     if not transport_params:
         transport_params = {}
 
-    sftp_client = _connect_sftp(host, user, port, password, transport_params)
+    attempts = 2
+    for attempt in range(attempts):
+        try:
+            ssh_session = _connect_ssh(host, user, port, password, transport_params)
+            transport = ssh_session.get_transport()
+            sftp_client = transport.open_sftp_client()
+            break
+        except paramiko.SSHException as ex:
+            if attempt == attempts - 1:
+                #
+                # This was our last attempt, give up.
+                #
+                raise
+
+            connection_timed_out = ex.args and ex.args[0] == 'SSH session not active'
+            if connection_timed_out:
+                continue
+            raise
+
     fobj = sftp_client.open(path, mode)
     fobj.name = path
     return fobj
