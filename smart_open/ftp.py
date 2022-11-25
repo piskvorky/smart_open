@@ -97,7 +97,6 @@ def _connect(hostname, username, port, password, secure_connection, transport_pa
     return ftp
 
 
-# transport paramaters can include any extra parameters that you want to be passed into FTP_TLS
 def open(
     path,
     mode="r",
@@ -108,6 +107,28 @@ def open(
     secure_connection=False,
     transport_params=None,
 ):
+    """Open a file for reading or writing via FTP/FTPS.
+
+    Parameters
+    ----------
+    path: str
+        The path on the remote server
+    mode: str
+        Must be "rb" or "wb"
+    host: str
+        The host to connect to
+    user: str
+        The username to use for the connection
+    password: str
+        The password for the specified username
+    port: int
+        The port to connect to
+    secure_connection: bool
+        True for FTPS, False for FTP
+    transport_params: dict
+        Additional parameters for the FTP connection.
+        Currently supported parameters: timeout, source_address, encoding.
+    """
     if not host:
         raise ValueError("you must specify the host to connect to")
     if not user:
@@ -116,12 +137,8 @@ def open(
         transport_params = {}
     conn = _connect(host, user, port, password, secure_connection, transport_params)
     mode_to_ftp_cmds = {
-        "r": ("RETR", "r"),
         "rb": ("RETR", "rb"),
-        "w": ("STOR", "w"),
         "wb": ("STOR", "wb"),
-        "a": ("APPE", "w"),
-        "ab": ("APPE", "wb")
     }
     try:
         ftp_mode, file_obj_mode = mode_to_ftp_cmds[mode]

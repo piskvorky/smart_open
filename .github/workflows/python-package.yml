@@ -138,7 +138,9 @@ jobs:
       - run: bash ci_helpers/helpers.sh enable_moto_server
         if: ${{ matrix.moto_server }}
       
-      - run: sudo apt-get install vsftpd ; bash ci_helpers/helpers.sh create_ftp_ftps_servers
+      - run: |
+          sudo apt-get install vsftpd
+          sudo bash ci_helpers/helpers.sh create_ftp_ftps_servers
         env:
           HOME_DIR: /home/user
           USER: user
@@ -155,7 +157,7 @@ jobs:
       - run: bash ci_helpers/helpers.sh disable_moto_server
         if: ${{ matrix.moto_server }}
       
-      - run: bash ci_helpers/helpers.sh delete_ftp_ftps_servers
+      - run: sudo bash ci_helpers/helpers.sh delete_ftp_ftps_servers
 
   benchmarks:
     needs: [linters,unit_tests]
