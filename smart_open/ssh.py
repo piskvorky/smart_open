@@ -132,24 +132,29 @@ def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT,
     if not transport_params:
         transport_params = {}
 
+    key = (host, user)
+
     attempts = 2
     for attempt in range(attempts):
         try:
-            ssh_session = _connect_ssh(host, user, port, password, transport_params)
-            transport = ssh_session.get_transport()
+            ssh = _SSH[key]
+        except KeyError:
+            ssh = _SSH[key] = _connect_ssh(host, user, port, password, transport_params)
+
+        try:
+            transport = ssh.get_transport()
             sftp_client = transport.open_sftp_client()
             break
         except paramiko.SSHException as ex:
-            if attempt == attempts - 1:
-                #
-                # This was our last attempt, give up.
-                #
+            connection_timed_out = ex.args and ex.args[0] == 'SSH session not active'
+            if attempt == attempts - 1 or not connection_timed_out:
                 raise
 
-            connection_timed_out = ex.args and ex.args[0] == 'SSH session not active'
-            if connection_timed_out:
-                continue
-            raise
+            #
+            # Try again.  Delete the connection from the cache to force a
+            # reconnect in the next attempt.
+            #
+            del _SSH[key]
 
     fobj = sftp_client.open(path, mode)
     fobj.name = path
