@@ -1,5 +1,9 @@
 # Unreleased
 
+# 6.2.0, 14 September 2022
+
+- Fix quadratic time ByteBuffer operations (PR [#711](https://github.com/RaRe-Technologies/smart_open/pull/711), [@Joshua-Landau-Anthropic](https://github.com/Joshua-Landau-Anthropic))
+
 # 6.1.0, 21 August 2022
 
 - Add cert parameter to http transport params (PR [#703](https://github.com/RaRe-Technologies/smart_open/pull/703), [@stev-0](https://github.com/stev-0))

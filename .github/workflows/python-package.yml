@@ -18,7 +18,7 @@ jobs:
         run: python -m pip install flake8
 
       - name: Run flake8 linter (source)
-        run: flake8 --ignore E12,E226,W503 --max-line-length 110 --show-source smart_open
+        run: flake8 --show-source smart_open
 
   unit_tests:
     needs: [linters]
@@ -44,6 +44,12 @@ jobs:
 
       - name: Update pip
         run: python -m pip install -U pip
+
+      #
+      # https://askubuntu.com/questions/1428181/module-lib-has-no-attribute-x509-v-flag-cb-issuer-check
+      #
+      - name: Upgrade PyOpenSSL
+        run: python -m pip install pyOpenSSL --upgrade
 
       - name: Install smart_open and its dependencies
         run: pip install -e .[test]
@@ -80,6 +86,9 @@ jobs:
 
       - name: Update pip
         run: python -m pip install -U pip
+
+      - name: Upgrade PyOpenSSL
+        run: python -m pip install pyOpenSSL --upgrade
 
       - name: Install smart_open and its dependencies
         run: pip install -e .[test]
@@ -118,6 +127,9 @@ jobs:
       - name: Update pip
         run: python -m pip install -U pip
 
+      - name: Upgrade PyOpenSSL
+        run: python -m pip install pyOpenSSL --upgrade
+
       - run: python -m pip install numpy
 
       - name: Install smart_open and its dependencies
@@ -125,6 +137,10 @@ jobs:
 
       - run: bash ci_helpers/helpers.sh enable_moto_server
         if: ${{ matrix.moto_server }}
+      
+      - run: |
+          sudo apt-get install vsftpd
+          sudo bash ci_helpers/helpers.sh create_ftp_ftps_servers
 
       - name: Run integration tests
         run: python ci_helpers/run_integration_tests.py
@@ -134,6 +150,8 @@ jobs:
 
       - run: bash ci_helpers/helpers.sh disable_moto_server
         if: ${{ matrix.moto_server }}
+      
+      - run: sudo bash ci_helpers/helpers.sh delete_ftp_ftps_servers
 
   benchmarks:
     needs: [linters,unit_tests]
@@ -160,6 +178,9 @@ jobs:
 
       - name: Update pip
         run: python -m pip install -U pip
+
+      - name: Upgrade PyOpenSSL
+        run: python -m pip install pyOpenSSL --upgrade
 
       - name: Install smart_open and its dependencies
         run: pip install -e .[test]

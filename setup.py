@@ -45,7 +45,6 @@ ssh_deps = ['paramiko']
 all_deps = aws_deps + gcs_deps + azure_deps + http_deps + ssh_deps
 tests_require = all_deps + [
     'moto[server]',
-    'pathlib2',
     'responses',
     'boto3',
     'pytest',

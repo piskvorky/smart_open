@@ -9,6 +9,7 @@ subprocess.check_call(
         'pytest',
         'integration-tests/test_207.py',
         'integration-tests/test_http.py',
+        'integration-tests/test_ftp.py'
     ]
 )
 
