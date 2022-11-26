@@ -25,7 +25,6 @@ Similarly, from a command line::
 import getpass
 import logging
 import urllib.parse
-import warnings
 
 try:
     import paramiko
