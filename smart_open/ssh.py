@@ -25,7 +25,11 @@ Similarly, from a command line::
 import getpass
 import logging
 import urllib.parse
-import warnings
+
+try:
+    import paramiko
+except ImportError:
+    MISSING_DEPS = True
 
 import smart_open.utils
 
@@ -74,29 +78,15 @@ def open_uri(uri, mode, transport_params):
     return open(uri_path, mode, transport_params=transport_params, **parsed_uri)
 
 
-def _connect(hostname, username, port, password, transport_params):
-    try:
-        import paramiko
-    except ImportError:
-        warnings.warn(
-            'paramiko missing, opening SSH/SCP/SFTP paths will be disabled. '
-            '`pip install paramiko` to suppress'
-        )
-        raise
-
-    key = (hostname, username)
-    ssh = _SSH.get(key)
-    if ssh is None:
-        ssh = _SSH[key] = paramiko.client.SSHClient()
-        ssh.load_system_host_keys()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        kwargs = transport_params.get('connect_kwargs', {}).copy()
-        # if 'key_filename' is present in transport_params, then I do not
-        #   overwrite the credentials.
-        if 'key_filename' not in kwargs:
-            kwargs.setdefault('password', password)
-        kwargs.setdefault('username', username)
-        ssh.connect(hostname, port, **kwargs)
+def _connect_ssh(hostname, username, port, password, transport_params):
+    ssh = paramiko.SSHClient()
+    ssh.load_system_host_keys()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    kwargs = transport_params.get('connect_kwargs', {}).copy()
+    if 'key_filename' not in kwargs:
+        kwargs.setdefault('password', password)
+    kwargs.setdefault('username', username)
+    ssh.connect(hostname, port, **kwargs)
     return ssh
 
 
@@ -142,8 +132,30 @@ def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT,
     if not transport_params:
         transport_params = {}
 
-    conn = _connect(host, user, port, password, transport_params)
-    sftp_client = conn.get_transport().open_sftp_client()
+    key = (host, user)
+
+    attempts = 2
+    for attempt in range(attempts):
+        try:
+            ssh = _SSH[key]
+        except KeyError:
+            ssh = _SSH[key] = _connect_ssh(host, user, port, password, transport_params)
+
+        try:
+            transport = ssh.get_transport()
+            sftp_client = transport.open_sftp_client()
+            break
+        except paramiko.SSHException as ex:
+            connection_timed_out = ex.args and ex.args[0] == 'SSH session not active'
+            if attempt == attempts - 1 or not connection_timed_out:
+                raise
+
+            #
+            # Try again.  Delete the connection from the cache to force a
+            # reconnect in the next attempt.
+            #
+            del _SSH[key]
+
     fobj = sftp_client.open(path, mode)
     fobj.name = path
     return fobj

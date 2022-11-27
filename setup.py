@@ -40,13 +40,13 @@ aws_deps = ['boto3']
 gcs_deps = ['google-cloud-storage>=1.31.0']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 http_deps = ['requests']
+ssh_deps = ['paramiko']
 
-all_deps = aws_deps + gcs_deps + azure_deps + http_deps
+all_deps = aws_deps + gcs_deps + azure_deps + http_deps + ssh_deps
 tests_require = all_deps + [
     'moto[server]',
     'responses',
     'boto3',
-    'paramiko',
     'pytest',
     'pytest-rerunfailures'
 ]
@@ -79,6 +79,7 @@ setup(
         'all': all_deps,
         'http': http_deps,
         'webhdfs': http_deps,
+        'ssh': ssh_deps,
     },
     python_requires=">=3.6,<4.0",
 
