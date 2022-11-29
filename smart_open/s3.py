@@ -1193,7 +1193,7 @@ def iter_bucket(
         while True:
             try:
                 (key, content) = result_iterator.__next__()
-                if True or key_no % 1000 == 0:
+                if key_no % 1000 == 0:
                     logger.info(
                         "yielding key #%i: %s, size %i (total %.1fMB)",
                         key_no, key, len(content), total_size / 1024.0 ** 2
@@ -1204,7 +1204,11 @@ def iter_bucket(
                     # we were asked to output only a limited number of keys => we're done
                     break
             except botocore.exceptions.ClientError as err:
-                # ignore 404 not found errors
+                #
+                # ignore 404 not found errors: they mean the object was deleted
+                # after we listed the contents of the bucket, but before we
+                # downloaded the object.
+                #
                 if not ('Error' in err.response and err.response['Error'].get('Code') == '404'):
                     raise err
             except StopIteration:
