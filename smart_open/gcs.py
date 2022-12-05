@@ -165,18 +165,11 @@ def Writer(bucket,
     )
 
     for k, v in blob_properties.items():
-        try:
-            setattr(g_blob, k, v)
-        except AttributeError:
-            logger.warn(f'Unable to set property {k} on blob')
+        setattr(g_blob, k, v)
 
     _blob = g_blob.open('wb', **blob_open_kwargs)
 
-    if hasattr(_blob, 'terminate'):
-        raise RuntimeWarning(
-            'Unexpected incompatibility between dependency and google-cloud-storage dependency.'
-            'Things may not work as expected'
-            )
+    # backwards-compatiblity, was deprecated upstream https://cloud.google.com/storage/docs/resumable-uploads
     _blob.terminate = lambda: None
 
     return _blob
