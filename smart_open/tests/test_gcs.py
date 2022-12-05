@@ -318,20 +318,6 @@ class WriterTest(unittest.TestCase):
         with self.assertRaises(google.cloud.exceptions.NotFound):
             smart_open.gcs.Writer('unknown_bucket', BLOB_NAME)
 
-    def test_will_warn_for_conflict(self):
-        # Add a terminate() to simulate that being added to the underlying google-cloud-storage library
-        original_mo = FakeBlob._mock_open
-
-        def fake_open_with_terminate(*args, **kwargs):
-            original_output = original_mo(*args, **kwargs)
-            original_output.terminate = lambda: None
-            return original_output
-
-        FakeBlob._mock_open = fake_open_with_terminate
-
-        with self.assertRaises(RuntimeWarning):
-            smart_open.gcs.Writer(BUCKET_NAME, BLOB_NAME)
-
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
