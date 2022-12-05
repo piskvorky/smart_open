@@ -93,18 +93,17 @@ def open(
 
     if mode in (constants.READ_BINARY, 'r', 'rt'):
         _blob = Reader(bucket=bucket_id,
-                        key=blob_id,
-                        client=client,
-                        blob_open_kwargs=blob_open_kwargs)
+                       key=blob_id,
+                       client=client,
+                       blob_open_kwargs=blob_open_kwargs)
 
     elif mode in (constants.WRITE_BINARY, 'w', 'wt'):
         _blob = Writer(bucket=bucket_id,
-                        blob=blob_id,
-                        min_part_size=min_part_size,
-                        client=client,
-                        blob_properties=blob_properties,
-                        blob_open_kwargs=blob_open_kwargs,
-                    )
+                       blob=blob_id,
+                       min_part_size=min_part_size,
+                       client=client,
+                       blob_properties=blob_properties,
+                       blob_open_kwargs=blob_open_kwargs)
 
     else:
         raise NotImplementedError(f'GCS support for mode {mode} not implemented')
@@ -113,12 +112,11 @@ def open(
 
 
 def Reader(bucket,
-            key,
-            buffer_size=None,
-            line_terminator=None,
-            client=None,
-            blob_open_kwargs=None,
-        ):
+           key,
+           buffer_size=None,
+           line_terminator=None,
+           client=None,
+           blob_open_kwargs=None):
 
     if blob_open_kwargs is None:
         blob_open_kwargs = {}
@@ -139,12 +137,11 @@ def Reader(bucket,
 
 
 def Writer(bucket,
-            blob,
-            min_part_size=None,
-            client=None,
-            blob_properties=None,
-            blob_open_kwargs=None,
-        ):
+           blob,
+           min_part_size=None,
+           client=None,
+           blob_properties=None,
+           blob_open_kwargs=None):
 
     if blob_open_kwargs is None:
         blob_open_kwargs = {}
