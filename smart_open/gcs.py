@@ -71,18 +71,18 @@ def open(
     blob_id: str
         The name of the blob within the bucket.
     mode: str
-        The mode for opening the object.  Must be either "rb" or "wb".
+        The mode for opening the object. Must be either "rb" or "wb".
     buffer_size:
         deprecated
     min_part_size: int, optional
-        The minimum part size for multipart uploads.  For writing only.
+        The minimum part size for multipart uploads. For writing only.
     client: google.cloud.storage.Client, optional
         The GCS client to use when working with google-cloud-storage.
     blob_properties: dict, optional
-        Set properties on blob before writing.  For writing only.
+        Set properties on blob before writing. For writing only.
     blob_open_kwargs: dict, optional
-        Set properties for opening the blob, passed through directly to
-        the google-cloud-storage library
+        Additional keyword arguments to propagate to the blob.open method
+        of the google-cloud-storage library.
 
     """
     if blob_open_kwargs is None:
