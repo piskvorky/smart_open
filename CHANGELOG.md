@@ -1,5 +1,17 @@
 # Unreleased
 
+## 7.0.0, 2022-12-10
+
+* Refactor Google Cloud Storage to use blob.open (__[ddelange](https://github.com/ddelange)__, [#744](https://github.com/RaRe-Technologies/smart_open/pull/744))
+* Add FTP/FTPS support (#33) (__[RachitSharma2001](https://github.com/RachitSharma2001)__, [#739](https://github.com/RaRe-Technologies/smart_open/pull/739))
+* Bring back compression_wrapper(filename) + use case-insensitive extension matching (__[piskvorky](https://github.com/piskvorky)__, [#737](https://github.com/RaRe-Technologies/smart_open/pull/737))
+* Fix avoidable S3 race condition (#693) (__[RachitSharma2001](https://github.com/RachitSharma2001)__, [#735](https://github.com/RaRe-Technologies/smart_open/pull/735))
+* setup.py: Remove pathlib2 (__[jayvdb](https://github.com/jayvdb)__, [#733](https://github.com/RaRe-Technologies/smart_open/pull/733))
+* Add flake8 config globally (__[cadnce](https://github.com/cadnce)__, [#732](https://github.com/RaRe-Technologies/smart_open/pull/732))
+* Added buffer_size parameter to http module (__[mullenkamp](https://github.com/mullenkamp)__, [#730](https://github.com/RaRe-Technologies/smart_open/pull/730))
+* Added documentation to support GCS anonymously (__[cadnce](https://github.com/cadnce)__, [#728](https://github.com/RaRe-Technologies/smart_open/pull/728))
+* Reconnect inactive sftp clients automatically (__[Kache](https://github.com/Kache)__, [#719](https://github.com/RaRe-Technologies/smart_open/pull/719))
+
 # 6.2.0, 14 September 2022
 
 - Fix quadratic time ByteBuffer operations (PR [#711](https://github.com/RaRe-Technologies/smart_open/pull/711), [@Joshua-Landau-Anthropic](https://github.com/Joshua-Landau-Anthropic))
