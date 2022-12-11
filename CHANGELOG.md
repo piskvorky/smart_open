@@ -1,6 +1,6 @@
 # Unreleased
 
-## 7.0.0, 2022-12-10
+## 6.3.0, 2022-12-10
 
 * Refactor Google Cloud Storage to use blob.open (__[ddelange](https://github.com/ddelange)__, [#744](https://github.com/RaRe-Technologies/smart_open/pull/744))
 * Add FTP/FTPS support (#33) (__[RachitSharma2001](https://github.com/RachitSharma2001)__, [#739](https://github.com/RaRe-Technologies/smart_open/pull/739))
