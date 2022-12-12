@@ -62,6 +62,7 @@ def register_compressor(ext, callback):
     """
     if not (ext and ext[0] == '.'):
         raise ValueError('ext must be a string starting with ., not %r' % ext)
+    ext = ext.lower()
     if ext in _COMPRESSOR_REGISTRY:
         logger.warning('overriding existing compression handler for %r', ext)
     _COMPRESSOR_REGISTRY[ext] = callback
@@ -103,24 +104,23 @@ def _handle_gzip(file_obj, mode):
     return result
 
 
-def compression_wrapper(file_obj, mode, compression):
+def compression_wrapper(file_obj, mode, compression=INFER_FROM_EXTENSION, filename=None):
     """
-    This function will wrap the file_obj with an appropriate
-    [de]compression mechanism based on the specified extension.
+    Wrap `file_obj` with an appropriate [de]compression mechanism based on its file extension.
 
-    file_obj must either be a filehandle object, or a class which behaves
-    like one. It must have a .name attribute.
+    If the filename extension isn't recognized, simply return the original `file_obj` unchanged.
 
-    If the filename extension isn't recognized, will simply return the original
-    file_obj.
+    `file_obj` must either be a filehandle object, or a class which behaves like one.
+
+    If `filename` is specified, it will be used to extract the extension.
+    If not, the `file_obj.name` attribute is used as the filename.
 
     """
     if compression == NO_COMPRESSION:
         return file_obj
     elif compression == INFER_FROM_EXTENSION:
         try:
-            filename = file_obj.name
-            filename.upper()  # make sure this thing is a string
+            filename = (filename or file_obj.name).lower()
         except (AttributeError, TypeError):
             logger.warning(
                 'unable to transparently decompress %r because it '

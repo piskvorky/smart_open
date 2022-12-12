@@ -1,0 +1,9 @@
+[flake8]
+# E121: Continuation line under-indented for hanging indent
+# E123: Continuation line missing indentation or outdented
+# E125:	Continuation line with same indent as next logical line
+# E128: Continuation line under-indented for visual indent
+# E226: Missing whitespace around arithmetic operator
+# W503: Line break occurred before a binary operator
+ignore=E121,E123,E125,E128,E226,W503
+max-line-length=110
