@@ -1176,17 +1176,18 @@ def iter_bucket(
         pass
 
     total_size, key_no = 0, -1
+    global session
+    session = boto3.session.Session(**session_kwargs)
     key_iterator = _list_bucket(
         bucket_name,
         prefix=prefix,
         accept_key=accept_key,
-        **session_kwargs)
+        create_session=False)
     download_key = functools.partial(
         _download_key,
         bucket_name=bucket_name,
         retries=retries,
-        **session_kwargs)
-
+        create_session=False)
     with smart_open.concurrency.create_pool(processes=workers) as pool:
         result_iterator = pool.imap_unordered(download_key, key_iterator)
         key_no = 0
@@ -1221,9 +1222,12 @@ def _list_bucket(
         bucket_name,
         prefix='',
         accept_key=lambda k: True,
+        create_session=True,
         **session_kwargs):
-    session = boto3.session.Session(**session_kwargs)
-    client = session.client('s3')
+    if create_session:
+        client = boto3.session.Session(**session_kwargs).client('s3')
+    else:
+        client = session.client('s3')
     ctoken = None
 
     while True:
@@ -1248,15 +1252,17 @@ def _list_bucket(
             break
 
 
-def _download_key(key_name, bucket_name=None, retries=3, **session_kwargs):
+def _download_key(key_name, bucket_name=None, retries=3, create_session=True, **session_kwargs):
     if bucket_name is None:
         raise ValueError('bucket_name may not be None')
 
     #
     # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/resources.html#multithreading-or-multiprocessing-with-resources
     #
-    session = boto3.session.Session(**session_kwargs)
-    s3 = session.resource('s3')
+    if create_session:
+        s3 = boto3.session.Session(**session_kwargs).resource('s3')
+    else:
+        s3 = session.resource('s3')
     bucket = s3.Bucket(bucket_name)
 
     # Sometimes, https://github.com/boto/boto/issues/2409 can happen

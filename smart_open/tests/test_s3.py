@@ -686,6 +686,34 @@ class IterBucketTest(unittest.TestCase):
         condition=sys.platform == 'darwin',
         reason="MacOS uses spawn rather than fork for multiprocessing",
     )
+    def test_iter_bucket_passed_in_session_multiprocessing_true(self):
+        populate_bucket()
+        smart_open.concurrency._MULTIPROCESSING = True
+        my_session = botocore.session.Session()
+        results = list(smart_open.s3.iter_bucket(bucket_name=BUCKET_NAME,
+                                      botocore_session=my_session,
+                                      workers=1))
+        self.assertEqual(len(results), 10)
+
+    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
+    @pytest.mark.xfail(
+        condition=sys.platform == 'darwin',
+        reason="MacOS uses spawn rather than fork for multiprocessing",
+    )
+    def test_iter_bucket_passed_in_session_multiprocessing_false(self):
+        populate_bucket()
+        smart_open.concurrency._MULTIPROCESSING = False
+        my_session = botocore.session.Session()
+        results = list(smart_open.s3.iter_bucket(bucket_name=BUCKET_NAME,
+                                      botocore_session=my_session,
+                                      workers=1))
+        self.assertEqual(len(results), 10)
+
+    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
+    @pytest.mark.xfail(
+        condition=sys.platform == 'darwin',
+        reason="MacOS uses spawn rather than fork for multiprocessing",
+    )
     def test_iter_bucket_404(self):
         populate_bucket()
 
