@@ -554,7 +554,6 @@ class MultipartWriterTest(unittest.TestCase):
 
             assert actual == contents
 
-
     def test_write_gz_with_error(self):
         """Does s3 multipart chunking work correctly if exception is raised for compression file?"""
 
