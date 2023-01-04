@@ -555,6 +555,34 @@ class MultipartWriterTest(unittest.TestCase):
             assert actual == contents
 
 
+    def test_write_gz_with_error(self):
+        """Does s3 multipart chunking work correctly if exception is raised for compression file?"""
+
+        session = boto3.Session()
+        resource = session.resource('s3', region_name='us-east-1')
+        resource.create_bucket(Bucket=BUCKET_NAME)
+
+        with self.assertRaises(ValueError):
+            with smart_open.open(
+                    f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}',
+                    mode="wb",
+                    compression='.gz',
+                    transport_params={
+                        "multipart_upload": True,
+                        "min_part_size": 10,
+                    }
+            ) as fout:
+                fout.write(b"test12345678test12345678")
+                fout.write(b"test\n")
+
+                raise ValueError("some error")
+
+        with self.assertRaises(OSError) as cm:
+            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb')
+
+        assert 'The specified key does not exist.' in cm.exception.args[0]
+
+
 @moto.mock_s3
 class SinglepartWriterTest(unittest.TestCase):
     """

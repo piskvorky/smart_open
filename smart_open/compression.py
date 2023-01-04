@@ -8,6 +8,9 @@
 """Implements the compression layer of the ``smart_open`` library."""
 import logging
 import os.path
+import sys
+
+from smart_open.s3 import MultipartWriter
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +86,15 @@ def tweak_close(outer, inner):
         try:
             outer_close()
         finally:
-            if inner:
-                inner, fp = None, inner
-                fp.close()
+            ex, _, _ = sys.exc_info()
+
+            # https://github.com/RaRe-Technologies/smart_open/issues/684
+            # If exception is raised multipart writer should be terminated to abort file uploading to S3
+            # If not incomplete file will be saved in bucket
+            if type(inner) == MultipartWriter and ex:
+                inner.terminate()
+            elif inner:
+                inner.close()
 
     outer.close = close_both
 
