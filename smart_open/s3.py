@@ -88,10 +88,6 @@ def parse_uri(uri_as_string):
     #
     split_uri = smart_open.utils.safe_urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
-    if split_uri.scheme == "s3u":
-        ssl_mode = ""
-    else:
-        ssl_mode = "s"
 
     port = DEFAULT_PORT
     host = DEFAULT_HOST
@@ -134,7 +130,6 @@ def parse_uri(uri_as_string):
         ordinary_calling_format=ordinary_calling_format,
         access_id=access_id,
         access_secret=access_secret,
-        ssl_mode=ssl_mode,
     )
 
 
@@ -189,7 +184,11 @@ def _consolidate_params(uri, transport_params):
         )
         uri.update(host=None)
     elif uri['host'] != DEFAULT_HOST:
-        inject(endpoint_url='http%(ssl_mode)s://%(host)s:%(port)d' % uri)
+        if uri['scheme'] == 's3u':
+            scheme = 'http'
+        else:
+            scheme = 'https'
+        inject(endpoint_url=scheme + '://%(host)s:%(port)d' % uri)
         uri.update(host=None)
 
     return uri, transport_params
