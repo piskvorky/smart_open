@@ -436,7 +436,6 @@ This can be helpful when e.g. working with compressed files.
     >>>
     >>> with path.open("r") as infile:
     ...     print(infile.readline()[:41])
-    В начале июля, в чрезвычайно жаркое время
 
 How do I ...?
 =============
