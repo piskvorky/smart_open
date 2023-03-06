@@ -1,12 +1,10 @@
+import typing
 import io
 import re
 import logging
-import urllib.parse
 
 try:
-    from lakefs_client import client
-    from lakefs_client import apis
-    from lakefs_client import models
+    from lakefs_client import client, apis, models
 except ImportError:
     MISSING_DEPS = True
 
@@ -38,7 +36,8 @@ def parse_uri(uri_as_string):
     both for path prefixes and for full paths. In similar fashion, lakefs://<REPO>/<REF>
     identifies the repository at a ref expression, and lakefs://<REPO> identifes a repo.
     """
-    sr = urllib.parse.urlsplit(uri_as_string, allow_fragments=False)
+    # sr = urllib.parse.urlsplit(uri_as_string, allow_fragments=False)
+    sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
     repo = sr.netloc
     _pattern = r"^/(?P<ref>[^/]+)/(?P<key>.+)"
@@ -52,7 +51,17 @@ def parse_uri(uri_as_string):
     return dict(scheme=SCHEME, repo=repo, ref=ref, key=key)
 
 
-def open_uri(uri, mode, transport_params):
+def open_uri(uri: str, mode: str, transport_params: dict) -> typing.IO:
+    """Return a file-like object pointing to the URI.
+
+    Args:
+        uri: The URI to open
+        mode: Either "rb" or "wb".
+        transport_params:  Any additional parameters to pass to the `open` function (see below).
+
+    Returns:
+        file-like object.
+    """
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     return open(
@@ -165,7 +174,9 @@ class Reader(io.BufferedIOBase):
 
     def close(self):
         """Flush and close this stream."""
-        pass
+        # todo: check what to close
+        # self._raw_reader.
+        self._buffer.empty()
 
     def readable(self):
         """Return True if the stream can be read from."""
@@ -228,6 +239,30 @@ class Reader(io.BufferedIOBase):
     def detach(self):
         """Unsupported."""
         raise io.UnsupportedOperation
+
+    def seek(self, offset, whence=smart_open.constants.WHENCE_START):
+        """Seek to the specified position.
+
+        :param int offset: The offset in bytes.
+        :param int whence: Where the offset is from.
+
+        Returns the position after seeking."""
+        logger.debug('seeking to offset: %r whence: %r', offset, whence)
+        if whence not in smart_open.constants.WHENCE_CHOICES:
+            raise ValueError('invalid whence %i, expected one of %r' % (whence,
+                                                                       smart_open.constants.WHENCE_CHOICES))
+
+        # Convert relative offset to absolute, since self._raw_reader
+        # doesn't know our current position.
+        if whence == constants.WHENCE_CURRENT:
+            whence = constants.WHENCE_START
+            offset += self._position
+
+        self._position = self._raw_reader.seek(offset, whence)
+        self._buffer.empty()
+        self._eof = self._position == self._raw_reader._content_length
+        logger.debug('current_pos: %r', self._position)
+        return self._position
 
     def tell(self):
         """Return the current position within the file."""
