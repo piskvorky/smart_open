@@ -2,6 +2,7 @@ import typing
 import io
 import re
 import logging
+import functools
 
 try:
     from lakefs_client import client, apis, models
@@ -18,12 +19,8 @@ URI_EXAMPLES = (
     "lakefs:///REPO/main/file.bz2",
 )
 
-DEFAULT_BUFFER_SIZE = 4 * 1024**2
 """Default buffer size is 256MB."""
-
-DEFAULT_MAX_CONCURRENCY = 1
-"""Default number of parallel connections with which to download."""
-
+DEFAULT_BUFFER_SIZE = 4 * 1024**2
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +33,6 @@ def parse_uri(uri_as_string):
     both for path prefixes and for full paths. In similar fashion, lakefs://<REPO>/<REF>
     identifies the repository at a ref expression, and lakefs://<REPO> identifes a repo.
     """
-    # sr = urllib.parse.urlsplit(uri_as_string, allow_fragments=False)
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
     repo = sr.netloc
@@ -54,13 +50,12 @@ def parse_uri(uri_as_string):
 def open_uri(uri: str, mode: str, transport_params: dict) -> typing.IO:
     """Return a file-like object pointing to the URI.
 
-    Args:
-        uri: The URI to open
-        mode: Either "rb" or "wb".
-        transport_params:  Any additional parameters to pass to the `open` function (see below).
+    :param str uri: The URI to open
+    :param str mode: Either "rb" or "wb".
+    :param dict transport_params:  Any additional parameters to pass to the `open` function (see below).
 
-    Returns:
-        file-like object.
+    :returns: file-like object.
+    :rtype: file-like
     """
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
@@ -73,16 +68,16 @@ def open(
     repo,
     ref,
     key,
+    mode,
     client=None,
     buffer_size=DEFAULT_BUFFER_SIZE,
-    max_concurrency=DEFAULT_MAX_CONCURRENCY,
     client_kwargs=None,
     writebuffer=None,
 ):
     pass
 
 
-class _RawReader(object):
+class _RawReader:
     """Read a lakeFS object."""
 
     def __init__(
@@ -97,23 +92,23 @@ class _RawReader(object):
         self._ref = ref
         self._path = path
 
-        self._content_length = self._get_content_length()
         self._position = 0
 
-    def _get_content_length(self):
+    @functools.cached_property
+    def _content_length(self) -> int:
         objects: apis.ObjectsApi = self._client.objects
         obj_stats: models.ObjectStats = objects.stat_object(
             self._repo, self._ref, self._path
         )
         return obj_stats.size_bytes
 
-    def seek(self, offset, whence=constants.WHENCE_START):
+    def seek(self, offset: int, whence: int = constants.WHENCE_START) -> int:
         """Seek to the specified position.
 
-        :param int offset: The offset in bytes.
+        :param int offset: The byte offset.
         :param int whence: Where the offset is from.
 
-        :returns: the position after seeking.
+        :returns: The position after seeking.
         :rtype: int
         """
         if whence not in constants.WHENCE_CHOICES:
@@ -132,14 +127,21 @@ class _RawReader(object):
 
         return self._position
 
-    def read(self, size=-1):
+    def read(self, size: int = -1) -> bytes:
+        """Read from lakefs using the objects api.
+
+        :param int size: number of bytes to read.
+
+        :returns: the bytes read from lakefs
+        :rtype: bytes
+        """
         if self._position >= self._content_length:
             return b""
         _size = max(-1, size)
-        objects: apis.ObjectsApi = self._client.objects
         start_range = self._position
         end_range = self._content_length if _size == -1 else (start_range + _size)
         range = f"bytes={start_range}-{end_range}"
+        objects: apis.ObjectsApi = self._client.objects
         binary = objects.get_object(
             self._repo, self._ref, self._path, range=range
         ).read()
@@ -148,6 +150,10 @@ class _RawReader(object):
 
 
 class Reader(io.BufferedIOBase):
+    """Reads bytes from a lakefs object.
+
+    Implements the io.BufferedIOBase interface of the standard library.
+    """
     def __init__(
         self,
         client: client.LakeFSClient,
@@ -163,57 +169,64 @@ class Reader(io.BufferedIOBase):
         self._raw_reader = _RawReader(client, repo, ref, path)
         self._position = 0
         self._eof = False
-        self._buffer_size = buffer_size
         self._buffer = bytebuffer.ByteBuffer(buffer_size)
         self._line_terminator = line_terminator
-        self.raw = None
 
-    #
-    # io.BufferedIOBase methods.
-    #
-
-    def close(self):
+    def close(self) -> None:
         """Flush and close this stream."""
-        # todo: check what to close
-        # self._raw_reader.
         self._buffer.empty()
 
-    def readable(self):
+    def readable(self) -> bool:
         """Return True if the stream can be read from."""
         return True
 
-    def read(self, size=-1):
-        """Read up to size bytes from the object and return them."""
+    def read(self, size: int = -1) -> bytes:
+        """Read and return up to size bytes.
+
+        :param int size:
+
+        :returns: read bytes
+        :rtype: bytes
+        """
         if size == 0:
             return b""
         elif size < 0:
             out = self._read_from_buffer() + self._raw_reader.read()
             self._position = self._raw_reader._content_length
             return out
-
-        if len(self._buffer) >= size:
+        elif size <= len(self._buffer):
+            return self._read_from_buffer(size)
+        elif self._eof:
+            return self._read_from_buffer()
+        else:
+            self._fill_buffer(size)
             return self._read_from_buffer(size)
 
-        if self._eof:
-            return self._read_from_buffer()
-
-        self._fill_buffer(size)
-        return self._read_from_buffer(size)
-
-    def read1(self, size=-1):
-        """This is the same as read()."""
+    def read1(self, size: int = -1):
         return self.read(size=size)
 
-    def readinto(self, b):
-        """Read up to len(b) bytes into b, and return the number of bytes read."""
+    def readinto(self, b: bytes) -> int:
+        """Read bytes into b.
+
+        :param bytes b: pre-allocated, writable bytes-like object.
+
+        :returns: the number of bytes read.
+        :rtype: int
+        """
         data = self.read(len(b))
         if not data:
             return 0
         b[: len(data)] = data
         return len(data)
 
-    def readline(self, limit=-1):
-        """Read up to and including the next newline. Returns the bytes read."""
+    def readline(self, limit=-1) -> bytes:
+        """Read up to and including the next newline.
+
+        :param int limit:
+
+        :returns: bytes read
+        :rtype: bytes
+        """
         if limit != -1:
             raise NotImplementedError("limits other than -1 not implemented yet")
 
@@ -222,31 +235,33 @@ class Reader(io.BufferedIOBase):
             line_part = self._buffer.readline(self._line_terminator)
             line.write(line_part)
             self._position += len(line_part)
-
             if line_part.endswith(self._line_terminator):
                 break
             else:
                 self._fill_buffer()
-
         return line.getvalue()
 
     def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError.
-
-        We offer only seek support, and no truncate support."""
+        """If the stream supports random access or not."""
         return True
 
     def detach(self):
         """Unsupported."""
         raise io.UnsupportedOperation
 
-    def seek(self, offset, whence=smart_open.constants.WHENCE_START):
+    def truncate(self, size=None):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def seek(self, offset: int, whence: int = smart_open.constants.WHENCE_START):
         """Seek to the specified position.
 
         :param int offset: The offset in bytes.
         :param int whence: Where the offset is from.
 
-        Returns the position after seeking."""
+        :returns: the position after seeking.
+        :r
+        """
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
         if whence not in smart_open.constants.WHENCE_CHOICES:
             raise ValueError('invalid whence %i, expected one of %r' % (whence,
@@ -265,23 +280,17 @@ class Reader(io.BufferedIOBase):
         return self._position
 
     def tell(self):
-        """Return the current position within the file."""
+        """Return the current stream position."""
         return self._position
 
-    def truncate(self, size=None):
-        """Unsupported."""
-        raise io.UnsupportedOperation
-
-    #
-    # Internal methods.
-    #
-    def _read_from_buffer(self, size=-1):
-        size = size if size >= 0 else len(self._buffer)
+    def _read_from_buffer(self, size: int = -1) -> bytes:
+        """Reads from buffer and updates position."""
         part = self._buffer.read(size)
         self._position += len(part)
         return part
 
-    def _fill_buffer(self, size=-1):
+    def _fill_buffer(self, size: int = -1) -> None:
+        """Fills the buffer with either the default buffer size or size."""
         size = max(size, self._buffer._chunk_size)
         while len(self._buffer) < size and not self._eof:
             bytes_read = self._buffer.fill(self._raw_reader)
@@ -303,4 +312,4 @@ class Reader(io.BufferedIOBase):
             "ref=%r, "
             "path=%r, "
             "buffer_size=%r"
-        ) % (self._repo, self._ref, self._path, self._buffer_size)
+        ) % (self._repo, self._ref, self._path, self._buffer._chunk_size)

@@ -184,7 +184,6 @@ class TestReader:
         assert fin.seek(1, whence=constants.WHENCE_CURRENT) == 6
         assert fin.read(6) == u'wořld'.encode('utf-8')
 
-
     def test_seek_end(self, lakefs, repo, file):
         from smart_open import constants
 
