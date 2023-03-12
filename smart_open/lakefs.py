@@ -20,7 +20,6 @@ URI_EXAMPLES = (
     "lakefs:///REPO/main/file.bz2",
 )
 
-"""Default buffer size is 256MB."""
 DEFAULT_BUFFER_SIZE = 4 * 1024**2
 
 logger = logging.getLogger(__name__)
@@ -66,13 +65,13 @@ def open_uri(uri: str, mode: str, transport_params: dict) -> typing.IO:
 
 
 def open(
-    repo,
-    ref,
-    key,
-    mode,
-    client=None,
-    commit_message=None,
-    buffer_size=DEFAULT_BUFFER_SIZE,
+    repo: str,
+    ref: str,
+    key: str,
+    mode: str,
+    client: str | None = None,
+    commit_message: str | None = None,
+    buffer_size: int = DEFAULT_BUFFER_SIZE,
 ):
     """Open a lakefs object for reading or writing.
 
@@ -89,27 +88,21 @@ def open(
     client: lakefs_client.client.LakeFSClient
         The lakefs client to use.
     commit_message: str
-        The message to include in the commit.
+        Only when writing. The message to include in the commit.
     buffer_size: int, optional
-        The buffer size to use when performing I/O. For reading only.
+        The buffer size to use when performing I/O.
     """
     if not client:
-        raise ValueError('you must specify the client to connect to lakefs')
+        raise ValueError("you must specify the client to connect to lakefs")
 
     if mode == smart_open.constants.READ_BINARY:
-        return Reader(
-            client,
-            repo,
-            ref,
-            key,
-            buffer_size=buffer_size,
-            line_terminator=smart_open.constants.BINARY_NEWLINE,
-        )
+        raw = _RawReader(client, repo, ref, key)
+        return io.BufferedReader(raw, buffer_size)
     elif mode == smart_open.constants.WRITE_BINARY:
         raw_writer = _RawWriter(client, repo, ref, key, commit_message)
         return io.BufferedWriter(raw_writer, buffer_size)
     else:
-        raise NotImplementedError(f'Lakefs support for mode {mode} not implemented')
+        raise NotImplementedError(f"Lakefs support for mode {mode} not implemented")
 
 
 class _RawReader(io.RawIOBase):
@@ -146,7 +139,7 @@ class _RawReader(io.RawIOBase):
     def eof(self) -> bool:
         return self._position == self.content_length
 
-    def seek(self, offset: int, whence: int = constants.WHENCE_START) -> int:
+    def seek(self, __offset: int, __whence: int = constants.WHENCE_START) -> int:
         """Seek to the specified position.
 
         :param int offset: The byte offset.
@@ -155,17 +148,17 @@ class _RawReader(io.RawIOBase):
         :returns: The position after seeking.
         :rtype: int
         """
-        if whence not in constants.WHENCE_CHOICES:
+        if __whence not in constants.WHENCE_CHOICES:
             raise ValueError(
                 "invalid whence, expected one of %r" % constants.WHENCE_CHOICES
             )
 
-        if whence == constants.WHENCE_START:
-            start = max(0, offset)
-        elif whence == constants.WHENCE_CURRENT:
-            start = max(0, self._position + offset)
-        elif whence == constants.WHENCE_END:
-            start = max(0, self.content_length + offset)
+        if __whence == constants.WHENCE_START:
+            start = max(0, __offset)
+        elif __whence == constants.WHENCE_CURRENT:
+            start = max(0, self._position + __offset)
+        elif __whence == constants.WHENCE_END:
+            start = max(0, self.content_length + __offset)
 
         self._position = min(start, self.content_length)
 
@@ -183,17 +176,16 @@ class _RawReader(io.RawIOBase):
             return 0
         size = len(__buffer)
         start_range = self._position
-        end_range = max(self.content_length, (start_range + size))
+        end_range = min(self.content_length, (start_range + size)) - 1
         range = f"bytes={start_range}-{end_range}"
         objects: apis.ObjectsApi = self._client.objects
-        data = objects.get_object(
-            self._repo, self._ref, self._path, range=range
-        ).read()
+        data = objects.get_object(self._repo, self._ref, self._path, range=range).read()
         if not data:
             return 0
         self._position += len(data)
         __buffer[: len(data)] = data
         return len(data)
+
 
 class _RawWriter(io.RawIOBase):
     def __init__(
@@ -202,7 +194,7 @@ class _RawWriter(io.RawIOBase):
         repo: str,
         ref: str,
         key: str,
-        commit_message: str | None
+        commit_message: str | None,
     ):
         self._client = client
         self._repo = repo
@@ -211,7 +203,7 @@ class _RawWriter(io.RawIOBase):
         if commit_message:
             self._message = commit_message
         else:
-            self._message = f'Update {self._path}.'
+            self._message = f"Update {self._path}."
 
     def writable(self) -> bool:
         return True
@@ -222,18 +214,14 @@ class _RawWriter(io.RawIOBase):
         stream = io.BytesIO(__b)
         stream.name = self._path
         try:
-            object_stats = objects.upload_object(self.repo.id, self._ref, self._path, content=stream)
+            object_stats = objects.upload_object(
+                self._repo, self._ref, self._path, content=stream
+            )
             message = models.CommitCreation(self._message)
-            _ = commits.commit(self.repo.id, self._ref, message)
+            _ = commits.commit(self._repo, self._ref, message)
         except lakefs_client.ApiException as e:
             raise Exception("Error uploading object: %s\n" % e) from e
-
         return object_stats.size_bytes
-
-    @functools.cached_property
-    def repo(self) -> models.Repository:
-        repositories_api: apis.RepositoriesApi = self._client.repositories
-        return repositories_api.get_repository(self._repo)
 
 
 class Reader(io.BufferedIOBase):
@@ -241,6 +229,7 @@ class Reader(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library.
     """
+
     def __init__(
         self,
         client: client.LakeFSClient,
@@ -309,7 +298,7 @@ class Reader(io.BufferedIOBase):
             return self._read_from_buffer(size)
         else:
             out = self._read_from_buffer()
-            out += self.raw.read(size-len(out))
+            out += self.raw.read(size - len(out))
             self._position += len(out)
             return out
 
@@ -357,10 +346,12 @@ class Reader(io.BufferedIOBase):
         :returns: the position after seeking.
         :r
         """
-        logger.debug('seeking to offset: %r whence: %r', offset, whence)
+        logger.debug("seeking to offset: %r whence: %r", offset, whence)
         if whence not in smart_open.constants.WHENCE_CHOICES:
-            raise ValueError('invalid whence %i, expected one of %r' % (whence,
-                                                                       smart_open.constants.WHENCE_CHOICES))
+            raise ValueError(
+                "invalid whence %i, expected one of %r"
+                % (whence, smart_open.constants.WHENCE_CHOICES)
+            )
 
         # Convert relative offset to absolute, since self.raw
         # doesn't know our current position.
@@ -370,7 +361,7 @@ class Reader(io.BufferedIOBase):
 
         self._position = self.raw.seek(offset, whence)
         self._buffer.empty()
-        logger.debug('current_pos: %r', self._position)
+        logger.debug("current_pos: %r", self._position)
         return self._position
 
     def tell(self):
