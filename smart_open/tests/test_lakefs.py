@@ -155,8 +155,17 @@ class TestReader:
         path, content = file
         fin = Reader(client=lakefs, repo=repo.id, ref=repo.default_branch, path=path)
         assert content[:6] == fin.read(6)
-        assert content[6:6+8] == fin.read(8)
+        assert content[6:6+8] == fin.read1(8)
         assert content[6+8:] == fin.read()
+
+    def test_readinto(self, lakefs, repo, file):
+        path, content = file
+        fin = Reader(client=lakefs, repo=repo.id, ref=repo.default_branch, path=path)
+        b = bytearray(6)
+        assert len(b) == fin.readinto(b)
+        assert content[:6] == b
+        assert len(b) == fin.readinto1(b)
+        assert content[6:6+6] == b
 
     def test_seek_beginning(self, lakefs, repo, file):
         path, content = file
