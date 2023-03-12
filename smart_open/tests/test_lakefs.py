@@ -8,7 +8,7 @@ import pytest
 import lakefs_client
 from lakefs_client import client, models, apis
 import logging
-from smart_open.lakefs import Reader
+from smart_open.lakefs import open, Reader
 
 
 """It needs docker compose to run lakefs locally:
@@ -83,6 +83,10 @@ def lakefs():
     subprocess.Popen(shlex.split("docker-compose -f - down"), stdin=compose.stdout)
     compose.stdout.close()
 
+@pytest.fixture(scope="module")
+def repo(lakefs) -> models.Repository:
+    repositories_api: apis.RepositoriesApi = lakefs.repositories
+    return repositories_api.list_repositories().results[0]
 
 @pytest.mark.parametrize(
     "uri, parsed",
@@ -100,11 +104,6 @@ def test_parse_uri(uri, parsed):
 
 
 class TestReader:
-
-    @pytest.fixture(scope="module")
-    def repo(self, lakefs) -> models.Repository:
-        repositories_api: apis.RepositoriesApi = lakefs.repositories
-        return repositories_api.list_repositories().results[0]
 
     @pytest.fixture(scope="module")
     def put_to_repo(
@@ -191,6 +190,19 @@ class TestReader:
         fin = Reader(client=lakefs, repo=repo.id, ref=repo.default_branch, path=path)
         assert fin.read(5) == b'hello'
         assert fin.seek(1, whence=constants.WHENCE_CURRENT) == 6
+        assert fin.read(6) == u'wořld'.encode('utf-8')
+
+    def test_seek_current_io(self, lakefs, repo, file):
+        from smart_open import constants
+        from smart_open.lakefs import _RawReader
+        import io
+
+        path, _ = file
+        # fin = Reader(client=lakefs, repo=repo.id, ref=repo.default_branch, path=path)
+        raw = _RawReader(client=lakefs, repo=repo.id, ref=repo.default_branch, key=path)
+        fin = io.BufferedReader(raw=raw)
+        assert fin.read(5) == b'hello'
+        assert fin.seek(1, constants.WHENCE_CURRENT) == 6
         assert fin.read(6) == u'wořld'.encode('utf-8')
 
     def test_seek_end(self, lakefs, repo, file):
@@ -284,3 +296,29 @@ class TestReader:
         _ = put_to_repo(path, content)
         with Reader(client=lakefs, repo=repo.id, ref=repo.default_branch, path=path, buffer_size=8) as fin:
             assert fin.read() == b''
+
+    def test_open(self, lakefs, repo, file):
+        path, content = file
+        with open(repo.id, repo.default_branch, path, "rb", client=lakefs) as fin:
+            assert fin.read(100) == content
+
+class TestWriter:
+    def commits(self, lakefs, repo):
+        refs: apis.RefsApi = lakefs.refs
+        commit_list = refs.log_commits(repo.id, repo.default_branch)
+        return commit_list.results
+
+    def test_write(self, lakefs, repo):
+        content = u"ветер по морю гуляет...".encode('utf8')
+        with open(repo.id, repo.default_branch, "write.txt", "wb", lakefs) as fout:
+            assert fout.write(content) == len(content)
+
+        with open(repo.id, repo.default_branch, "write.txt", "rb", lakefs) as fin:
+            assert fin.read() == content
+
+    def test_commit(self, lakefs, repo):
+        content = u"ветер по морю гуляет...".encode('utf8')
+        message = "Modify file."
+        with open(repo.id, repo.default_branch, "write.txt", "wb", lakefs, message) as fout:
+            assert fout.write(content) == len(content)
+        assert self.commits(lakefs, repo)[0].message == message

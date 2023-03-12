@@ -5,6 +5,7 @@ import logging
 import functools
 
 try:
+    import lakefs_client
     from lakefs_client import client, apis, models
 except ImportError:
     MISSING_DEPS = True
@@ -70,11 +71,45 @@ def open(
     key,
     mode,
     client=None,
+    commit_message=None,
     buffer_size=DEFAULT_BUFFER_SIZE,
-    client_kwargs=None,
-    writebuffer=None,
 ):
-    pass
+    """Open a lakefs object for reading or writing.
+
+    Parameters
+    ----------
+    repo: str
+        The name of the repository this object resides in.
+    ref: str
+        The name of the branch or commit.
+    key: str
+        The path to the object for a given repo and branch.
+    mode: str
+        The mode for opening the object.  Must be either "rb" or "wb".
+    client: lakefs_client.client.LakeFSClient
+        The lakefs client to use.
+    commit_message: str
+        The message to include in the commit.
+    buffer_size: int, optional
+        The buffer size to use when performing I/O. For reading only.
+    """
+    if not client:
+        raise ValueError('you must specify the client to connect to lakefs')
+
+    if mode == smart_open.constants.READ_BINARY:
+        return Reader(
+            client,
+            repo,
+            ref,
+            key,
+            buffer_size=buffer_size,
+            line_terminator=smart_open.constants.BINARY_NEWLINE,
+        )
+    elif mode == smart_open.constants.WRITE_BINARY:
+        raw_writer = _RawWriter(client, repo, ref, key, commit_message)
+        return io.BufferedWriter(raw_writer, buffer_size)
+    else:
+        raise NotImplementedError(f'Lakefs support for mode {mode} not implemented')
 
 
 class _RawReader(io.RawIOBase):
@@ -85,12 +120,12 @@ class _RawReader(io.RawIOBase):
         client: client.LakeFSClient,
         repo: str,
         ref: str,
-        path: str,
+        key: str,
     ):
         self._client = client
         self._repo = repo
         self._ref = ref
-        self._path = path
+        self._path = key
         self._position = 0
 
     def seekable(self) -> bool:
@@ -160,6 +195,46 @@ class _RawReader(io.RawIOBase):
         __buffer[: len(data)] = data
         return len(data)
 
+class _RawWriter(io.RawIOBase):
+    def __init__(
+        self,
+        client: client.LakeFSClient,
+        repo: str,
+        ref: str,
+        key: str,
+        commit_message: str | None
+    ):
+        self._client = client
+        self._repo = repo
+        self._ref = ref
+        self._path = key
+        if commit_message:
+            self._message = commit_message
+        else:
+            self._message = f'Update {self._path}.'
+
+    def writable(self) -> bool:
+        return True
+
+    def write(self, __b: bytes) -> int | None:
+        objects: apis.ObjectsApi = self._client.objects
+        commits: apis.CommitsApi = self._client.commits
+        stream = io.BytesIO(__b)
+        stream.name = self._path
+        try:
+            object_stats = objects.upload_object(self.repo.id, self._ref, self._path, content=stream)
+            message = models.CommitCreation(self._message)
+            _ = commits.commit(self.repo.id, self._ref, message)
+        except lakefs_client.ApiException as e:
+            raise Exception("Error uploading object: %s\n" % e) from e
+
+        return object_stats.size_bytes
+
+    @functools.cached_property
+    def repo(self) -> models.Repository:
+        repositories_api: apis.RepositoriesApi = self._client.repositories
+        return repositories_api.get_repository(self._repo)
+
 
 class Reader(io.BufferedIOBase):
     """Reads bytes from a lakefs object.
@@ -171,14 +246,14 @@ class Reader(io.BufferedIOBase):
         client: client.LakeFSClient,
         repo: str,
         ref: str,
-        path: str,
+        key: str,
         buffer_size=DEFAULT_BUFFER_SIZE,
         line_terminator=smart_open.constants.BINARY_NEWLINE,
     ):
         self._repo = repo
         self._ref = ref
-        self._path = path
-        self.raw = _RawReader(client, repo, ref, path)
+        self._path = key
+        self.raw = _RawReader(client, repo, ref, key)
         self._position = 0
         self._buffer = bytebuffer.ByteBuffer(buffer_size)
         self._line_terminator = line_terminator
