@@ -77,7 +77,7 @@ def open(
     pass
 
 
-class _RawReader:
+class _RawReader(io.RawIOBase):
     """Read a lakeFS object."""
 
     def __init__(
@@ -91,16 +91,25 @@ class _RawReader:
         self._repo = repo
         self._ref = ref
         self._path = path
-
         self._position = 0
 
+    def seekable(self) -> bool:
+        return True
+
+    def readable(self) -> bool:
+        return True
+
     @functools.cached_property
-    def _content_length(self) -> int:
+    def content_length(self) -> int:
         objects: apis.ObjectsApi = self._client.objects
         obj_stats: models.ObjectStats = objects.stat_object(
             self._repo, self._ref, self._path
         )
         return obj_stats.size_bytes
+
+    @property
+    def eof(self) -> bool:
+        return self._position == self.content_length
 
     def seek(self, offset: int, whence: int = constants.WHENCE_START) -> int:
         """Seek to the specified position.
@@ -121,32 +130,35 @@ class _RawReader:
         elif whence == constants.WHENCE_CURRENT:
             start = max(0, self._position + offset)
         elif whence == constants.WHENCE_END:
-            start = max(0, self._content_length + offset)
+            start = max(0, self.content_length + offset)
 
-        self._position = min(start, self._content_length)
+        self._position = min(start, self.content_length)
 
         return self._position
 
-    def read(self, size: int = -1) -> bytes:
-        """Read from lakefs using the objects api.
+    def readinto(self, __buffer: bytes) -> int | None:
+        """Read bytes into a pre-allocated bytes-like object __buffer.
 
         :param int size: number of bytes to read.
 
-        :returns: the bytes read from lakefs
-        :rtype: bytes
+        :returns: the number of bytes read from lakefs
+        :rtype: int
         """
-        if self._position >= self._content_length:
-            return b""
-        _size = max(-1, size)
+        if self._position >= self.content_length:
+            return 0
+        size = len(__buffer)
         start_range = self._position
-        end_range = self._content_length if _size == -1 else (start_range + _size)
+        end_range = max(self.content_length, (start_range + size))
         range = f"bytes={start_range}-{end_range}"
         objects: apis.ObjectsApi = self._client.objects
-        binary = objects.get_object(
+        data = objects.get_object(
             self._repo, self._ref, self._path, range=range
         ).read()
-        self._position += len(binary)
-        return binary
+        if not data:
+            return 0
+        self._position += len(data)
+        __buffer[: len(data)] = data
+        return len(data)
 
 
 class Reader(io.BufferedIOBase):
@@ -166,11 +178,14 @@ class Reader(io.BufferedIOBase):
         self._repo = repo
         self._ref = ref
         self._path = path
-        self._raw_reader = _RawReader(client, repo, ref, path)
+        self.raw = _RawReader(client, repo, ref, path)
         self._position = 0
-        self._eof = False
         self._buffer = bytebuffer.ByteBuffer(buffer_size)
         self._line_terminator = line_terminator
+
+    @property
+    def bytes_buffered(self) -> int:
+        return len(self._buffer)
 
     def close(self) -> None:
         """Flush and close this stream."""
@@ -191,33 +206,37 @@ class Reader(io.BufferedIOBase):
         if size == 0:
             return b""
         elif size < 0:
-            out = self._read_from_buffer() + self._raw_reader.read()
-            self._position = self._raw_reader._content_length
+            out = self._read_from_buffer() + self.raw.read()
+            self._position = self.raw.content_length
             return out
-        elif size <= len(self._buffer):
+        elif size <= self.bytes_buffered:
+            # Fast path: the data to read is fully buffered.
             return self._read_from_buffer(size)
-        elif self._eof:
-            return self._read_from_buffer()
-        else:
+        if not self.raw.eof:
             self._fill_buffer(size)
-            return self._read_from_buffer(size)
+        return self._read_from_buffer(size)
 
     def read1(self, size: int = -1):
-        return self.read(size=size)
+        """Read and return up to size bytes.
 
-    def readinto(self, b: bytes) -> int:
-        """Read bytes into b.
-
-        :param bytes b: pre-allocated, writable bytes-like object.
-
-        :returns: the number of bytes read.
-        :rtype: int
+        with at most one call to the underlying raw stream readinto().
+        This can be useful if you are implementing your own buffering
+        on top of a BufferedIOBase object.
         """
-        data = self.read(len(b))
-        if not data:
-            return 0
-        b[: len(data)] = data
-        return len(data)
+        if size == 0:
+            return b""
+        elif size < 0:
+            out = self._read_from_buffer() + self.raw.read()
+            self._position = self.raw.content_length
+            return out
+        elif size <= self.bytes_buffered:
+            # Fast path: the data to read is fully buffered.
+            return self._read_from_buffer(size)
+        else:
+            out = self._read_from_buffer()
+            out += self.raw.read(size-len(out))
+            self._position += len(out)
+            return out
 
     def readline(self, limit=-1) -> bytes:
         """Read up to and including the next newline.
@@ -231,7 +250,8 @@ class Reader(io.BufferedIOBase):
             raise NotImplementedError("limits other than -1 not implemented yet")
 
         line = io.BytesIO()
-        while not (self._eof and len(self._buffer) == 0):
+        while not (self.raw.eof and self.bytes_buffered == 0):
+            # while we are not in eof or buffer is not empty
             line_part = self._buffer.readline(self._line_terminator)
             line.write(line_part)
             self._position += len(line_part)
@@ -267,15 +287,14 @@ class Reader(io.BufferedIOBase):
             raise ValueError('invalid whence %i, expected one of %r' % (whence,
                                                                        smart_open.constants.WHENCE_CHOICES))
 
-        # Convert relative offset to absolute, since self._raw_reader
+        # Convert relative offset to absolute, since self.raw
         # doesn't know our current position.
         if whence == constants.WHENCE_CURRENT:
             whence = constants.WHENCE_START
             offset += self._position
 
-        self._position = self._raw_reader.seek(offset, whence)
+        self._position = self.raw.seek(offset, whence)
         self._buffer.empty()
-        self._eof = self._position == self._raw_reader._content_length
         logger.debug('current_pos: %r', self._position)
         return self._position
 
@@ -292,11 +311,10 @@ class Reader(io.BufferedIOBase):
     def _fill_buffer(self, size: int = -1) -> None:
         """Fills the buffer with either the default buffer size or size."""
         size = max(size, self._buffer._chunk_size)
-        while len(self._buffer) < size and not self._eof:
-            bytes_read = self._buffer.fill(self._raw_reader)
+        while self.bytes_buffered < size and not self.raw.eof:
+            bytes_read = self._buffer.fill(self.raw)
             if bytes_read == 0:
                 logger.debug("%s: reached EOF while filling buffer", self)
-                self._eof = True
 
     def __str__(self):
         return "smart_open.lakefs.Reader(%r, %r, %r)" % (
