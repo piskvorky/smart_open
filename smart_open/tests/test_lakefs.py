@@ -23,15 +23,13 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="module")
 def lakefs():
+    import os
     import shlex
     import subprocess
     from urllib3.exceptions import MaxRetryError
 
-    compose = subprocess.Popen(
-        shlex.split("curl https://compose.lakefs.io"), stdout=subprocess.PIPE
-    )
-    subprocess.Popen(shlex.split("docker-compose -f - up -d"), stdin=compose.stdout)
-    compose.stdout.close()
+    cwd = os.path.dirname(os.path.realpath(__file__))
+    subprocess.Popen(shlex.split("docker compose up -d"), cwd=cwd)
 
     configuration = lakefs_client.Configuration(_LAKEFS_HOST)
     lfs_client = client.LakeFSClient(configuration)
@@ -77,11 +75,7 @@ def lakefs():
 
     yield lfs_client
 
-    compose = subprocess.Popen(
-        shlex.split("curl https://compose.lakefs.io"), stdout=subprocess.PIPE
-    )
-    subprocess.Popen(shlex.split("docker-compose -f - down"), stdin=compose.stdout)
-    compose.stdout.close()
+    subprocess.Popen(shlex.split("docker compose down"), cwd=cwd)
 
 
 @pytest.fixture(scope="module")
@@ -337,9 +331,12 @@ class TestReader:
             assert fin.read() == b""
 
     def test_open(self, lakefs, repo, file):
+        from smart_open import open
         path, content = file
-        with open(repo.id, repo.default_branch, path, "rb", client=lakefs) as fin:
-            assert fin.read(100) == content
+        transport_params = {'client': lakefs}
+        uri=f"lakefs://{repo.id}/{repo.default_branch}/{path}"
+        with open(uri, transport_params=transport_params) as fin:
+            assert fin.read() == content.decode()
 
 
 class TestWriter:
