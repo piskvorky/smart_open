@@ -123,6 +123,7 @@ class _RawReader(io.RawIOBase):
         self._ref = ref
         self._path = key
         self._position = 0
+        self.name = key
 
     def seekable(self) -> bool:
         return True
@@ -212,6 +213,7 @@ class _RawWriter(io.RawIOBase):
             self._message = commit_message
         else:
             self._message = f"Update {self._path}."
+        self.name = key
 
     def writable(self) -> bool:
         return True
