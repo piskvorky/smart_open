@@ -4,6 +4,8 @@ import logging
 import unittest
 from unittest import mock
 
+from paramiko import SSHException
+
 import smart_open.ssh
 
 
@@ -12,8 +14,8 @@ def mock_ssh(func):
         smart_open.ssh._SSH.clear()
         return func(*args, **kwargs)
 
-    return mock.patch("paramiko.client.SSHClient.get_transport")(
-        mock.patch("paramiko.client.SSHClient.connect")(wrapper)
+    return mock.patch("paramiko.SSHClient.get_transport")(
+        mock.patch("paramiko.SSHClient.connect")(wrapper)
     )
 
 
@@ -48,6 +50,23 @@ class SSHOpen(unittest.TestCase):
             transport_params={"connect_kwargs": {"key_filename": "key"}},
         )
         mock_connect.assert_called_with("some-host", 22, username="user", key_filename="key")
+
+    @mock_ssh
+    def test_reconnect_after_session_timeout(self, mock_connect, get_transp_mock):
+        mock_sftp = get_transp_mock().open_sftp_client()
+        get_transp_mock().open_sftp_client.reset_mock()
+
+        def mocked_open_sftp():
+            if len(mock_connect.call_args_list) < 2:  # simulate timeout until second connect()
+                yield SSHException('SSH session not active')
+            while True:
+                yield mock_sftp
+
+        get_transp_mock().open_sftp_client.side_effect = mocked_open_sftp()
+
+        smart_open.open("ssh://user:pass@some-host/")
+        mock_connect.assert_called_with("some-host", 22, username="user", password="pass")
+        mock_sftp.open.assert_called_once()
 
 
 if __name__ == "__main__":

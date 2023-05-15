@@ -151,6 +151,7 @@ For the sake of simplicity, the examples below assume you have all the dependenc
 .. code-block:: python
 
     >>> import os, boto3
+    >>> from smart_open import open
     >>>
     >>> # stream content *into* S3 (write mode) using a custom session
     >>> session = boto3.Session(
