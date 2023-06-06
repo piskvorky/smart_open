@@ -1206,6 +1206,15 @@ class SmartOpenTest(unittest.TestCase):
         smart_open.open("s3://mybucket/mykey", "w", transport_params=transport_params)
         mock_client.assert_called_with('s3', endpoint_url='http://s3.amazonaws.com')
 
+    @mock.patch("boto3.client")
+    @mock.patch.dict(os.environ, {"AWS_ENDPOINT_URL": "https://my-endpoit.com:443", }, clear=True,)
+    def test_s3_endpoint_from_env_var(self, mock_client):
+        """Are s3:// open modes passed correctly with endpoint from environment variables?"""
+
+        smart_open.open("s3://mybucket/mykey", "w")
+
+        mock_client.assert_called_with("s3", endpoint_url="https://my-endpoit.com:443")
+
     @mock.patch('smart_open.hdfs.subprocess')
     def test_hdfs(self, mock_subprocess):
         """Is HDFS write called correctly"""

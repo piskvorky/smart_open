@@ -13,6 +13,8 @@ import logging
 import time
 import warnings
 
+from os import getenv
+
 try:
     import boto3
     import botocore.client
@@ -89,8 +91,11 @@ def parse_uri(uri_as_string):
     split_uri = smart_open.utils.safe_urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
 
-    port = DEFAULT_PORT
-    host = DEFAULT_HOST
+    custom_endpoint_url = getenv('AWS_ENDPOINT_URL', '')
+    split_custom_endpoint_url = smart_open.utils.safe_urlsplit(custom_endpoint_url)
+
+    port = split_custom_endpoint_url.port or DEFAULT_PORT
+    host = split_custom_endpoint_url.hostname or DEFAULT_HOST
     ordinary_calling_format = False
     #
     # These defaults tell boto3 to look for credentials elsewhere
