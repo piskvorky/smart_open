@@ -218,6 +218,24 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, None)
         self.assertEqual(parsed_uri.access_secret, None)
 
+    def test_s3_uri_with_at_symbol_in_key_name0(self):
+        """ Correctly parse the s3 url if there is an @ symbol (and colon) in the key or dir """
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir:my@key")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "mydir:my@key")
+        self.assertEqual(parsed_uri.access_id, None)
+        self.assertEqual(parsed_uri.access_secret, None)
+
+    def test_s3_uri_with_at_symbol_in_key_name1(self):
+        """ Correctly parse the s3 url if there is an @ symbol (and colon) in the key or dir """
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/my:dir@my/key")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "my:dir@my/key")
+        self.assertEqual(parsed_uri.access_id, None)
+        self.assertEqual(parsed_uri.access_secret, None)
+
     def test_s3_uri_contains_question_mark(self):
         parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey?param")
         self.assertEqual(parsed_uri.scheme, "s3")
