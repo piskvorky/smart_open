@@ -105,10 +105,13 @@ def parse_uri(uri_as_string):
     #
     uri = split_uri.netloc + split_uri.path
 
-    # "s3://mybucket/my:dir@my/key" --> Not interpreted as auth since "mybucket/my" has "/" in access id
+    # "s3://mybucket/my:dir@my/key" --> Not interpreted as auth since
+    # "mybucket/my" has "/" in access id
     # See https://summitroute.com/blog/2018/06/20/aws_security_credential_formats/
-    # "s3://mybucketmy:dir@my/key" --> Removing the "/" would result in an invalid bucket name ("mybucketmy:dir@my")
-    # "s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y" --> Still interpreted as auth
+    # "s3://mybucketmy:dir@my/key" --> Removing the "/" would result in an invalid
+    # bucket name ("mybucketmy:dir@my")
+    # "s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y" --> Still
+    # interpreted as auth
     if '@' in uri and ':' in uri.split('@')[0] and '/' not in uri.split('@')[0].split(':')[0]:
         auth, uri = uri.split('@', 1)
         access_id, access_secret = auth.split(':')
