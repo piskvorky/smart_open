@@ -455,9 +455,7 @@ class _SeekableRawReader(object):
             if error_response is None or error_response.get("Code") != _OUT_OF_RANGE:
                 raise
             try:
-                self._position = self._content_length = int(
-                    error_response["ActualObjectSize"]
-                )
+                self._position = self._content_length = int(error_response['ActualObjectSize'])
                 self._body = io.BytesIO()
             except KeyError:
                 response = _get(
@@ -484,9 +482,7 @@ class _SeekableRawReader(object):
             units, start, stop, length = smart_open.utils.parse_content_range(
                 response["ContentRange"]
             )
-            _, start, stop, length = smart_open.utils.parse_content_range(
-                response["ContentRange"]
-            )
+            _, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
             self._content_length = length
             self._position = start
             self._body = response["Body"]
