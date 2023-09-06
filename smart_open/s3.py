@@ -105,16 +105,20 @@ def parse_uri(uri_as_string):
     #
     uri = split_uri.netloc + split_uri.path
 
-    # "s3://mybucket/my:dir@my/key" --> Not interpreted as auth since
-    # "mybucket/my" has "/" in access id
-    # See https://summitroute.com/blog/2018/06/20/aws_security_credential_formats/
-    # "s3://mybucketmy:dir@my/key" --> Removing the "/" would result in an invalid
-    # bucket name ("mybucketmy:dir@my")
-    # "s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y" --> Still
-    # interpreted as auth
-    if '@' in uri and ':' in uri.split('@')[0] and '/' not in uri.split('@')[0].split(':')[0]:
-        auth, uri = uri.split('@', 1)
-        access_id, access_secret = auth.split(':')
+    #
+    # Attempt to extract edge-case authentication details from the URL.
+    #
+    # See:
+    #   1. https://summitroute.com/blog/2018/06/20/aws_security_credential_formats/
+    #   2. test_s3_uri_with_credentials* in test_smart_open.py for example edge cases
+    #
+    if '@' in uri:
+        maybe_auth, rest = uri.split('@', 1)
+        if ':' in maybe_auth:
+            maybe_id, maybe_secret = maybe_auth.split(':')
+            if '/' not in maybe_id:
+                access_id, access_secret = maybe_id, maybe_secret
+                uri = rest
 
     head, key_id = uri.split('/', 1)
     if '@' in head and ':' in head:
