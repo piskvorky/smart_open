@@ -105,9 +105,20 @@ def parse_uri(uri_as_string):
     #
     uri = split_uri.netloc + split_uri.path
 
-    if '@' in uri and ':' in uri.split('@')[0]:
-        auth, uri = uri.split('@', 1)
-        access_id, access_secret = auth.split(':')
+    #
+    # Attempt to extract edge-case authentication details from the URL.
+    #
+    # See:
+    #   1. https://summitroute.com/blog/2018/06/20/aws_security_credential_formats/
+    #   2. test_s3_uri_with_credentials* in test_smart_open.py for example edge cases
+    #
+    if '@' in uri:
+        maybe_auth, rest = uri.split('@', 1)
+        if ':' in maybe_auth:
+            maybe_id, maybe_secret = maybe_auth.split(':', 1)
+            if '/' not in maybe_id:
+                access_id, access_secret = maybe_id, maybe_secret
+                uri = rest
 
     head, key_id = uri.split('/', 1)
     if '@' in head and ':' in head:
