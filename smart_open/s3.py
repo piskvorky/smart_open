@@ -115,7 +115,7 @@ def parse_uri(uri_as_string):
     if '@' in uri:
         maybe_auth, rest = uri.split('@', 1)
         if ':' in maybe_auth:
-            maybe_id, maybe_secret = maybe_auth.split(':')
+            maybe_id, maybe_secret = maybe_auth.split(':', 1)
             if '/' not in maybe_id:
                 access_id, access_secret = maybe_id, maybe_secret
                 uri = rest
