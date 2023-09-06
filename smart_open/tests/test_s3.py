@@ -73,6 +73,8 @@ def patch_invalid_range_response(actual_size):
                 error_response['ActualObjectSize'] = actual_size
                 error_response['Code'] = 'InvalidRange'
                 error_response['Message'] = 'The requested range is not satisfiable'
+            if actual_size is None:
+                error_response.pop('ActualObjectSize', None)
             raise
 
     with mock.patch('smart_open.s3._get', new=mock_get):
@@ -394,6 +396,15 @@ class ReaderTest(BaseTest):
         _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'')
 
         with self.assertApiCalls(GetObject=1), patch_invalid_range_response('0'):
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
+                data = fin.read()
+
+        self.assertEqual(data, b'')
+
+    def test_read_empty_file_no_actual_size(self):
+        _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'')
+
+        with self.assertApiCalls(GetObject=2), patch_invalid_range_response(None):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
                 data = fin.read()
 
