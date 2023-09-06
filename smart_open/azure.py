@@ -306,7 +306,7 @@ class Reader(io.BufferedIOBase):
         if self._position == self._size:
             return self._read_from_buffer()
 
-        self._fill_buffer()
+        self._fill_buffer(size)
         return self._read_from_buffer(size)
 
     def read1(self, size=-1):
