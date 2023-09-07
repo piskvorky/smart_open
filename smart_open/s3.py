@@ -335,10 +335,13 @@ def open(
 
 def _get(client, bucket, key, version, range_string):
     try:
+        params = dict(Bucket=bucket, Key=key)
         if version:
-            return client.get_object(Bucket=bucket, Key=key, VersionId=version, Range=range_string)
-        else:
-            return client.get_object(Bucket=bucket, Key=key, Range=range_string)
+            params["VersionId"] = version
+        if range_string:
+            params["Range"] = range_string
+
+        return client.get_object(**params)
     except botocore.client.ClientError as error:
         wrapped_error = IOError(
             'unable to access bucket: %r key: %r version: %r error: %s' % (
@@ -458,8 +461,19 @@ class _SeekableRawReader(object):
             error_response = _unwrap_ioerror(ioe)
             if error_response is None or error_response.get('Code') != _OUT_OF_RANGE:
                 raise
-            self._position = self._content_length = int(error_response['ActualObjectSize'])
-            self._body = io.BytesIO()
+            try:
+                self._position = self._content_length = int(error_response['ActualObjectSize'])
+                self._body = io.BytesIO()
+            except KeyError:
+                response = _get(
+                    self._client,
+                    self._bucket,
+                    self._key,
+                    self._version_id,
+                    None,
+                )
+                self._position = self._content_length = response["ContentLength"]
+                self._body = response["Body"]
         else:
             #
             # Keep track of how many times boto3's built-in retry mechanism
@@ -472,7 +486,7 @@ class _SeekableRawReader(object):
                 self,
                 response['ResponseMetadata']['RetryAttempts'],
             )
-            units, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
+            _, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
             self._content_length = length
             self._position = start
             self._body = response['Body']
@@ -575,6 +589,7 @@ class Reader(io.BufferedIOBase):
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
         self._line_terminator = line_terminator
+        self._seek_initialized = False
 
         #
         # This member is part of the io.BufferedIOBase interface.
@@ -674,10 +689,16 @@ class Reader(io.BufferedIOBase):
             whence = constants.WHENCE_START
             offset += self._current_pos
 
-        self._current_pos = self._raw_reader.seek(offset, whence)
+        if not self._seek_initialized or not (
+            whence == constants.WHENCE_START and offset == self._current_pos
+        ):
+            self._current_pos = self._raw_reader.seek(offset, whence)
 
-        self._buffer.empty()
+            self._buffer.empty()
+
         self._eof = self._current_pos == self._raw_reader._content_length
+
+        self._seek_initialized = True
         return self._current_pos
 
     def tell(self):
