@@ -1,5 +1,15 @@
 # Unreleased
 
+## 6.4.0, 2023-09-07
+
+* Ignore S3 seeks to the current position (PR [#782](https://github.com/RaRe-Technologies/smart_open/pull/782), [@beck3905](https://github.com/beck3905))
+* Set binary mode prior to FTP write (PR [#781](https://github.com/RaRe-Technologies/smart_open/pull/781), [@beck3905](https://github.com/beck3905))
+* Improve S3 URI Parsing for URIs with "@", "/", and ":" (PR [#776](https://github.com/RaRe-Technologies/smart_open/pull/776), [@rileypeterson](https://github.com/rileypeterson))
+* Add python 3.11 to setup.py (PR [#775](https://github.com/RaRe-Technologies/smart_open/pull/775), [@tooptoop4](https://github.com/tooptoop4))
+* Fix retrieving empty but existing object from S3 (PR [#771](https://github.com/RaRe-Technologies/smart_open/pull/771), [@Darkheir](https://github.com/Darkheir))
+* Avoid overfilling buffer when reading from Azure (PR [#767](https://github.com/RaRe-Technologies/smart_open/pull/767), [@ronreiter](https://github.com/ronreiter))
+* Add required import for example to work (PR [#756](https://github.com/RaRe-Technologies/smart_open/pull/756), [@jensenbox](https://github.com/jensenbox))
+
 ## 6.3.0, 2022-12-12
 
 * Refactor Google Cloud Storage to use blob.open (__[ddelange](https://github.com/ddelange)__, [#744](https://github.com/RaRe-Technologies/smart_open/pull/744))
