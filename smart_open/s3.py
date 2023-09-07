@@ -578,6 +578,7 @@ class Reader(io.BufferedIOBase):
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._eof = False
         self._line_terminator = line_terminator
+        self._seek_initialized = False
 
         #
         # This member is part of the io.BufferedIOBase interface.
@@ -677,10 +678,16 @@ class Reader(io.BufferedIOBase):
             whence = constants.WHENCE_START
             offset += self._current_pos
 
-        self._current_pos = self._raw_reader.seek(offset, whence)
+        if not self._seek_initialized or not (
+            whence == constants.WHENCE_START and offset == self._current_pos
+        ):
+            self._current_pos = self._raw_reader.seek(offset, whence)
 
-        self._buffer.empty()
+            self._buffer.empty()
+
         self._eof = self._current_pos == self._raw_reader._content_length
+
+        self._seek_initialized = True
         return self._current_pos
 
     def tell(self):
