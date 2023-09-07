@@ -682,7 +682,7 @@ class Reader(io.BufferedIOBase):
             whence == constants.WHENCE_START and offset == self._current_pos
         ):
             self._current_pos = self._raw_reader.seek(offset, whence)
-    
+
             self._buffer.empty()
 
         self._eof = self._current_pos == self._raw_reader._content_length
