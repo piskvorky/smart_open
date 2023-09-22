@@ -1136,7 +1136,7 @@ def _retry_if_failed(
             )
             time.sleep(sleep_seconds)
         except botocore.exceptions.ClientError as err:
-            error_code =  err.response['Error'].get('Code')
+            error_code = err.response['Error'].get('Code')
             if error_code not in client_error_codes:
                 raise
             msg = client_error_codes[error_code]
