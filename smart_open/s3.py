@@ -1118,7 +1118,9 @@ def _retry_if_failed(
         client_error_codes=None):  # Dict[str, str]
     if exceptions is None:
         exceptions = {
-            botocore.exceptions.EndpointConnectionError: 'Unable to connect to the endpoint. Check your network connection.',
+            botocore.exceptions.EndpointConnectionError: (
+                'Unable to connect to the endpoint. Check your network connection.'
+            ),
         }
     if client_error_codes is None:
         client_error_codes = {'NoSuchUpload': 'Server-side flaky error (NoSuchUpload).'}
@@ -1144,7 +1146,6 @@ def _retry_if_failed(
                 attempts - attempt - 1,
             )
             time.sleep(sleep_seconds)
-            
     else:
         logger.critical('%s Giving up.', msg)
         raise IOError('%s failed after %d attempts', partial.func.__name__, attempts)
