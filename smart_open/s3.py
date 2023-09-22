@@ -1127,16 +1127,16 @@ def _retry_if_failed(
     for attempt in range(attempts):
         try:
             return partial()
-        except tuple(exceptions) as exc:
-            msg = exceptions[type(exc)]
+        except tuple(exceptions) as err:
+            msg = exceptions[type(err)]
             logger.critical(
                 '%s Sleeping and retrying %d more times before giving up.',
                 msg,
                 attempts - attempt - 1,
             )
             time.sleep(sleep_seconds)
-        except botocore.exceptions.ClientError as exc:
-            error_code = exc['Error']['Code']
+        except botocore.exceptions.ClientError as err:
+            error_code =  err.response['Error'].get('Code')
             if error_code not in client_error_codes:
                 raise
             msg = client_error_codes[error_code]
