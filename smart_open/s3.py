@@ -834,13 +834,7 @@ multipart upload may fail")
                 UploadId=self._upload_id,
                 MultipartUpload={'Parts': self._parts},
             )
-            _retry_if_failed(
-                partial, 
-                exceptions=(
-                    botocore.exceptions.EndpointConnectionError, 
-                    botocore.errorfactory.NoSuchUpload,
-                ),
-            )
+            _retry_if_failed(partial)
             logger.debug('%s: completed multipart upload', self)
         elif self._upload_id:
             #
@@ -1120,22 +1114,40 @@ def _retry_if_failed(
         partial,
         attempts=_UPLOAD_ATTEMPTS,
         sleep_seconds=_SLEEP_SECONDS,
-        exceptions=None):
+        exceptions=None,  # Dict[Exception, str]
+        client_error_codes=None):  # Dict[str, str]
     if exceptions is None:
-        exceptions = (botocore.exceptions.EndpointConnectionError, )
+        exceptions = {
+            botocore.exceptions.EndpointConnectionError: 'Unable to connect to the endpoint. Check your network connection.',
+        }
+    if client_error_codes is None:
+        client_error_codes = {'NoSuchUpload': 'Server-side flaky error (NoSuchUpload).'}
     for attempt in range(attempts):
         try:
             return partial()
-        except exceptions:
+        except tuple(exceptions) as exc:
+            msg = exceptions[type(exc)]
             logger.critical(
-                'Unable to connect to the endpoint. Check your network connection. '
-                'Sleeping and retrying %d more times '
-                'before giving up.' % (attempts - attempt - 1)
+                '%s Sleeping and retrying %d more times before giving up.',
+                msg,
+                attempts - attempt - 1,
             )
             time.sleep(sleep_seconds)
+        except botocore.exceptions.ClientError as exc:
+            error_code = exc['Error']['Code']
+            if error_code not in client_error_codes:
+                raise
+            msg = client_error_codes[error_code]
+            logger.critical(
+                '%s Sleeping and retrying %d more times before giving up.',
+                msg,
+                attempts - attempt - 1,
+            )
+            time.sleep(sleep_seconds)
+            
     else:
-        logger.critical('Unable to connect to the endpoint. Giving up.')
-        raise IOError('Unable to connect to the endpoint after %d attempts' % attempts)
+        logger.critical('%s Giving up.', msg)
+        raise IOError('%s failed after %d attempts', partial.func.__name__, attempts)
 
 
 def _accept_all(key):
