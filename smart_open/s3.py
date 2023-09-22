@@ -834,7 +834,13 @@ multipart upload may fail")
                 UploadId=self._upload_id,
                 MultipartUpload={'Parts': self._parts},
             )
-            _retry_if_failed(partial)
+            _retry_if_failed(
+                partial, 
+                exceptions=(
+                    botocore.exceptions.EndpointConnectionError, 
+                    botocore.errorfactory.NoSuchUpload,
+                ),
+            )
             logger.debug('%s: completed multipart upload', self)
         elif self._upload_id:
             #
