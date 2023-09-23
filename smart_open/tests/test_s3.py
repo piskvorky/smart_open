@@ -954,7 +954,7 @@ class RetryIfFailedTest(unittest.TestCase):
 
     def test_failure(self):
         partial = mock.Mock(side_effect=ValueError)
-        exceptions = (ValueError, )
+        exceptions = {ValueError: 'Let us retry ValueError'}
 
         with self.assertRaises(IOError):
             smart_open.s3._retry_if_failed(partial, attempts=3, sleep_seconds=0, exceptions=exceptions)
