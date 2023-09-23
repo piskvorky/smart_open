@@ -21,6 +21,7 @@ import sys
 import boto3
 import botocore.client
 import botocore.endpoint
+import botocore.exceptions
 import moto
 import pytest
 
@@ -958,6 +959,17 @@ class RetryIfFailedTest(unittest.TestCase):
 
         with self.assertRaises(IOError):
             smart_open.s3._retry_if_failed(partial, attempts=3, sleep_seconds=0, exceptions=exceptions)
+
+        self.assertEqual(partial.call_count, 3)
+
+        partial = mock.Mock(
+            side_effect=botocore.exceptions.ClientError(
+                {'Error': {'Code': 'NoSuchUpload'}}, 'NoSuchUpload'
+            )
+        )
+
+        with self.assertRaises(IOError):
+            smart_open.s3._retry_if_failed(partial, attempts=3, sleep_seconds=0)
 
         self.assertEqual(partial.call_count, 3)
 
