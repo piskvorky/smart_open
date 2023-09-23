@@ -1148,7 +1148,7 @@ def _retry_if_failed(
             time.sleep(sleep_seconds)
     else:
         logger.critical('%s Giving up.', msg)
-        raise IOError('%s failed after %d attempts', partial.func.__name__, attempts)
+        raise IOError('%s failed after %d attempts', partial.func, attempts)
 
 
 def _accept_all(key):
