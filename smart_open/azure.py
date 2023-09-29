@@ -417,6 +417,18 @@ class Writer(io.BufferedIOBase):
     def flush(self):
         pass
 
+    def terminate(self):
+        """Do not commit block list on abort.
+
+        Uploaded (uncommitted) blocks will be garbage collected after 7 days.
+
+        See also https://stackoverflow.com/a/69673084/5511061."""
+        logger.debug("terminating")
+        if not self.closed:
+            self._block_list = []
+            self._is_closed = True
+        logger.debug("successfully terminated")
+
     #
     # Override some methods from io.IOBase.
     #
@@ -509,7 +521,10 @@ class Writer(io.BufferedIOBase):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        if exc_type is not None:
+            self.terminate()
+        else:
+            self.close()
 
     def __str__(self):
         return "(%s, %r, %r)" % (
