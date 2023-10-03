@@ -11,6 +11,7 @@
 import inspect
 import logging
 import urllib.parse
+from types import MethodType
 
 logger = logging.getLogger(__name__)
 
@@ -189,3 +190,20 @@ def safe_urlsplit(url):
 
     path = sr.path.replace(placeholder, '?')
     return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, '', '')
+
+
+def propagate_wrapped_method(outer, inner, method):
+    """Patch `outer` object to also execute `method` of the wrapped `inner` object."""
+    if outer is inner:
+        return
+    method_outer = getattr(outer, method)
+    method_inner = getattr(inner, method)
+
+    def method_new(*args, **kwargs):
+        try:
+            method_outer(*args, **kwargs)
+        finally:
+            method_inner(*args, **kwargs)
+
+    # does not work for magic methods ref https://stackoverflow.com/a/74143992/5511061
+    setattr(outer, method, MethodType(method_new, outer))

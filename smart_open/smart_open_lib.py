@@ -41,6 +41,7 @@ from smart_open import transport
 from smart_open.compression import register_compressor  # noqa: F401
 from smart_open.utils import check_kwargs as _check_kwargs  # noqa: F401
 from smart_open.utils import inspect_kwargs as _inspect_kwargs  # noqa: F401
+from smart_open.utils import propagate_wrapped_method as _propagate_wrapped_method
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,7 @@ def open(
 
     binary = _open_binary_stream(uri, binary_mode, transport_params)
     decompressed = so_compression.compression_wrapper(binary, binary_mode, compression)
+    _propagate_wrapped_method(decompressed, binary, "__exit__")
 
     if 'b' not in mode or explicit_encoding is not None:
         decoded = _encoding_wrapper(
@@ -232,6 +234,7 @@ def open(
             errors=errors,
             newline=newline,
         )
+        _propagate_wrapped_method(decoded, decompressed, "__exit__")
     else:
         decoded = decompressed
 
