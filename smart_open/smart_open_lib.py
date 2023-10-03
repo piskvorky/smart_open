@@ -24,6 +24,7 @@ import os.path as P
 import pathlib
 import urllib.parse
 import warnings
+from contextlib import contextmanager
 
 #
 # This module defines a function called smart_open so we cannot use
@@ -41,7 +42,6 @@ from smart_open import transport
 from smart_open.compression import register_compressor  # noqa: F401
 from smart_open.utils import check_kwargs as _check_kwargs  # noqa: F401
 from smart_open.utils import inspect_kwargs as _inspect_kwargs  # noqa: F401
-from smart_open.utils import propagate_wrapped_method as _propagate_wrapped_method
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +224,6 @@ def open(
 
     binary = _open_binary_stream(uri, binary_mode, transport_params)
     decompressed = so_compression.compression_wrapper(binary, binary_mode, compression)
-    _propagate_wrapped_method(decompressed, binary, "__exit__")
 
     if 'b' not in mode or explicit_encoding is not None:
         decoded = _encoding_wrapper(
@@ -234,7 +233,6 @@ def open(
             errors=errors,
             newline=newline,
         )
-        _propagate_wrapped_method(decoded, decompressed, "__exit__")
     else:
         decoded = decompressed
 
@@ -251,7 +249,14 @@ def open(
             except AttributeError:
                 pass
 
-    return decoded
+    @contextmanager
+    def context_wrapper():
+        with binary:
+            with decompressed:
+                with decoded as dec:
+                    yield dec
+
+    return context_wrapper().__enter__()
 
 
 def _get_binary_mode(mode_str):

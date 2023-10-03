@@ -79,8 +79,18 @@ def tweak_close(outer, inner):
     https://github.com/RaRe-Technologies/smart_open/issues/630 for an
     explanation why that is a problem for smart_open.
     """
-    from smart_open.utils import propagate_wrapped_method as _propagate_wrapped_method
-    _propagate_wrapped_method(outer, inner, "close")
+    outer_close = outer.close
+
+    def close_both(*args):
+        nonlocal inner
+        try:
+            outer_close()
+        finally:
+            if inner:
+                inner, fp = None, inner
+                fp.close()
+
+    outer.close = close_both
 
 
 def _handle_bz2(file_obj, mode):
