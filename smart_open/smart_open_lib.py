@@ -24,7 +24,6 @@ import os.path as P
 import pathlib
 import urllib.parse
 import warnings
-from contextlib import contextmanager
 
 #
 # This module defines a function called smart_open so we cannot use
@@ -32,6 +31,7 @@ from contextlib import contextmanager
 #
 import smart_open.local_file as so_file
 import smart_open.compression as so_compression
+import smart_open.utils as so_utils
 
 from smart_open import doctools
 from smart_open import transport
@@ -249,14 +249,7 @@ def open(
             except AttributeError:
                 pass
 
-    @contextmanager
-    def context_wrapper():
-        with binary:
-            with decompressed:
-                with decoded as dec:
-                    yield dec
-
-    return context_wrapper().__enter__()
+    return so_utils.FileLikeProxy(decoded, binary)
 
 
 def _get_binary_mode(mode_str):
