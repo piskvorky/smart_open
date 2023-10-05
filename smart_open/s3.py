@@ -826,6 +826,7 @@ multipart upload may fail")
         if self._buf.tell():
             self._upload_next_part()
 
+        logger.debug('%s: completing multipart upload', self)
         if self._total_bytes and self._upload_id:
             partial = functools.partial(
                 self._client.complete_multipart_upload,
@@ -844,7 +845,6 @@ multipart upload may fail")
             #
             # We work around this by creating an empty file explicitly.
             #
-            assert self._upload_id, "no multipart upload in progress"
             self._client.abort_multipart_upload(
                 Bucket=self._bucket,
                 Key=self._key,
