@@ -423,24 +423,24 @@ class Writer(io.BufferedIOBase):
         Uploaded (uncommitted) blocks will be garbage collected after 7 days.
 
         See also https://stackoverflow.com/a/69673084/5511061."""
-        logger.debug("terminating")
+        logger.debug('%s: terminating multipart upload', self)
         if not self.closed:
             self._block_list = []
             self._is_closed = True
-        logger.debug("successfully terminated")
+        logger.debug('%s: terminated multipart upload', self)
 
     #
     # Override some methods from io.IOBase.
     #
     def close(self):
-        logger.debug("closing")
         if not self.closed:
+            logger.debug('%s: completing multipart upload', self)
             if self._current_part.tell() > 0:
                 self._upload_part()
             self._blob.commit_block_list(self._block_list, **self._blob_kwargs)
             self._block_list = []
             self._is_closed = True
-        logger.debug("successfully closed")
+            logger.debug('%s: completed multipart upload', self)
 
     @property
     def closed(self):
