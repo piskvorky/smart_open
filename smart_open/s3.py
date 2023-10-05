@@ -909,7 +909,8 @@ multipart upload may fail")
 
     def terminate(self):
         """Cancel the underlying multipart upload."""
-        assert self._upload_id, "no multipart upload in progress"
+        if self._upload_id is None:
+            return
         self._client.abort_multipart_upload(
             Bucket=self._bucket,
             Key=self._key,
