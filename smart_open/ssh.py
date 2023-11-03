@@ -129,7 +129,6 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, transport
     # - compression selection
     # - GSS configuration
     for config_filename in _SSH_CONFIG_FILES:
-        print(config_filename)
         if os.path.exists(config_filename):
             try:
                 cfg = paramiko.SSHConfig.from_path(config_filename)
