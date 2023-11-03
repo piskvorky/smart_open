@@ -309,7 +309,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(uri.uri_path, '/path/to/file')
         self.assertEqual(uri.user, 'user')
         self.assertEqual(uri.host, 'host')
-        self.assertEqual(uri.port, 22)
+        self.assertEqual(uri.port, None)
         self.assertEqual(uri.password, None)
 
     def test_scp_with_pass(self):
@@ -319,7 +319,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(uri.uri_path, '/path/to/file')
         self.assertEqual(uri.user, 'user')
         self.assertEqual(uri.host, 'host')
-        self.assertEqual(uri.port, 22)
+        self.assertEqual(uri.port, None)
         self.assertEqual(uri.password, 'pass')
 
     def test_sftp(self):
@@ -329,7 +329,7 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(uri.uri_path, '/path/to/file')
         self.assertEqual(uri.user, None)
         self.assertEqual(uri.host, 'host')
-        self.assertEqual(uri.port, 22)
+        self.assertEqual(uri.port, None)
         self.assertEqual(uri.password, None)
 
     def test_sftp_with_user_and_pass(self):

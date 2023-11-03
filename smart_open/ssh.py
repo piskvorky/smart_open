@@ -23,6 +23,7 @@ Similarly, from a command line::
 """
 
 import getpass
+import os
 import logging
 import urllib.parse
 
@@ -52,9 +53,22 @@ URI_EXAMPLES = (
     'sftp://username@host/path/file',
 )
 
+#
+# Global storage for SSH config files.
+#
+_SSH_CONFIG_FILES = [os.path.expanduser("~/.ssh/config")]
+
 
 def _unquote(text):
     return text and urllib.parse.unquote(text)
+
+
+def _str2bool(string):
+    if string == "no":
+        return False
+    if string == "yes":
+        return True
+    raise ValueError(f"Expected 'yes' / 'no', got {string}.")
 
 
 def parse_uri(uri_as_string):
@@ -65,7 +79,7 @@ def parse_uri(uri_as_string):
         uri_path=_unquote(split_uri.path),
         user=_unquote(split_uri.username),
         host=split_uri.hostname,
-        port=int(split_uri.port or DEFAULT_PORT),
+        port=int(split_uri.port) if split_uri.port else None,
         password=_unquote(split_uri.password),
     )
 
@@ -90,7 +104,75 @@ def _connect_ssh(hostname, username, port, password, transport_params):
     return ssh
 
 
-def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT, transport_params=None):
+def _maybe_fetch_config(host, username=None, password=None, port=None, transport_params=None):
+    # If all fields are set, return as-is.
+    if not any(arg is None for arg in (host, username, password, port, transport_params)):
+        return host, username, password, port, transport_params
+    
+    if not host:
+        raise ValueError('you must specify the host to connect to')
+    if not transport_params:
+        transport_params = {}
+    if "connect_kwargs" not in transport_params:
+        transport_params["connect_kwargs"] = {}
+    
+    # Attempt to load an OpenSSH config.
+    # NOTE: connections configured in this way are not guaranteed to perform exactly as
+    # they do in typical usage due to mismatches between the set of OpenSSH configuration
+    # options and those that Paramiko supports. We provide a best attempt, 
+    # and support:
+    # - hostname -> address resolution
+    # - username inference
+    # - port inference
+    # - identityfile inference
+    # - connection timeout inference
+    # - compression selection
+    # - GSS configuration
+    for config_filename in _SSH_CONFIG_FILES:
+        print(config_filename)
+        if os.path.exists(config_filename):
+            try:
+                cfg = paramiko.SSHConfig.from_path(config_filename)
+            except PermissionError:
+                continue
+            if host in cfg.get_hostnames():
+                cfg = cfg.lookup(host)
+                host = cfg["hostname"]
+                if username is None:
+                    username = cfg.get("user", None)
+                if port is None and cfg.get("port", None) is not None:
+                    port = int(cfg["port"])
+
+                # Special case, as we can have multiple identity files, so we check that the
+                # identityfile list has len > 0. This should be redundant, but keeping it for safety.
+                if (transport_params["connect_kwargs"].get("key_filename", None) is None and
+                    "identityfile" in cfg and len(cfg.get("identityfile", []))
+                ):
+                    transport_params["connect_kwargs"]["key_filename"] = cfg["identityfile"]
+
+                # Map parameters from config to their required values for Paramiko's `connect` fn.
+                _connect_kwarg_map = dict(
+                    timeout=dict(key="connecttimeout", type=float),
+                    compress=dict(key="compression", type=_str2bool),
+                    gss_auth=dict(key="gssapiauthentication", type=_str2bool),
+                    gss_kex=dict(key="gssapikeyexchange", type=_str2bool),
+                    gss_deleg_creds=dict(key="gssapidelegatecredentials", type=_str2bool),
+                    gss_trust_dns=dict(key="gssapitrustdns", type=_str2bool)
+                )
+                for target, field in _connect_kwarg_map.items():
+                    if (
+                        transport_params["connect_kwargs"].get(target, None) is None and field["key"] in cfg
+                    ):
+                        transport_params["connect_kwargs"][target] = field["type"](cfg[field["key"]])
+
+    if port is None:
+        port = DEFAULT_PORT
+    if not username:
+        username = getpass.getuser()
+    return host, username, password, port, transport_params
+
+
+def open(path, mode='r', host=None, user=None, password=None, port=None, transport_params=None):
     """Open a file on a remote machine over SSH.
 
     Expects authentication to be already set up via existing keys on the local machine.
@@ -125,12 +207,8 @@ def open(path, mode='r', host=None, user=None, password=None, port=DEFAULT_PORT,
     If ``username`` or ``password`` are specified in *both* the uri and
     ``transport_params``, ``transport_params`` will take precedence
     """
-    if not host:
-        raise ValueError('you must specify the host to connect to')
-    if not user:
-        user = getpass.getuser()
-    if not transport_params:
-        transport_params = {}
+    
+    host, user, password, port, transport_params = _maybe_fetch_config(host, user, password, port, transport_params)
 
     key = (host, user)
 
