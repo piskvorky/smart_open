@@ -150,7 +150,7 @@ class CrapClient:
             'ContentLength': self._datasize,
             'ContentRange': 'bytes 0-%d/%d' % (self._datasize, self._datasize),
             'Body': self._body,
-            'ResponseMetadata': {'RetryAttempts': 1},
+            'ResponseMetadata': {'RetryAttempts': 1, "HTTPStatusCode": 206},
         }
 
 
