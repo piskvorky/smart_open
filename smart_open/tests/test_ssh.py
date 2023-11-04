@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import copy
 import logging
 import os
 import tempfile
@@ -121,6 +120,7 @@ Host another-host
             key_filename=["/path/to/key/file"], timeout=20., compress=True,
             gss_auth=False, gss_kex=False, gss_deleg_creds=False, gss_trust_dns=False
         )
+
 
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s : %(levelname)s : %(message)s", level=logging.DEBUG)

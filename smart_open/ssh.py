@@ -108,18 +108,18 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, transport
     # If all fields are set, return as-is.
     if not any(arg is None for arg in (host, username, password, port, transport_params)):
         return host, username, password, port, transport_params
-    
+
     if not host:
         raise ValueError('you must specify the host to connect to')
     if not transport_params:
         transport_params = {}
     if "connect_kwargs" not in transport_params:
         transport_params["connect_kwargs"] = {}
-    
+
     # Attempt to load an OpenSSH config.
     # NOTE: connections configured in this way are not guaranteed to perform exactly as
     # they do in typical usage due to mismatches between the set of OpenSSH configuration
-    # options and those that Paramiko supports. We provide a best attempt, 
+    # options and those that Paramiko supports. We provide a best attempt,
     # and support:
     # - hostname -> address resolution
     # - username inference
@@ -144,9 +144,9 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, transport
 
                 # Special case, as we can have multiple identity files, so we check that the
                 # identityfile list has len > 0. This should be redundant, but keeping it for safety.
-                if (transport_params["connect_kwargs"].get("key_filename", None) is None and
-                    "identityfile" in cfg and len(cfg.get("identityfile", []))
-                ):
+                if (transport_params["connect_kwargs"].get("key_filename", None) is None
+                    and "identityfile" in cfg and len(cfg.get("identityfile", []))
+                    ):
                     transport_params["connect_kwargs"]["key_filename"] = cfg["identityfile"]
 
                 # Map parameters from config to their required values for Paramiko's `connect` fn.
@@ -206,8 +206,9 @@ def open(path, mode='r', host=None, user=None, password=None, port=None, transpo
     If ``username`` or ``password`` are specified in *both* the uri and
     ``transport_params``, ``transport_params`` will take precedence
     """
-    
-    host, user, password, port, transport_params = _maybe_fetch_config(host, user, password, port, transport_params)
+    host, user, password, port, transport_params = _maybe_fetch_config(
+        host, user, password, port, transport_params
+    )
 
     key = (host, user)
 
