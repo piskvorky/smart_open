@@ -104,6 +104,23 @@ Host another-host
             gss_auth=False, gss_kex=False, gss_deleg_creds=False, gss_trust_dns=False
         )
 
+    @mock_ssh
+    def test_open_with_openssh_config_override_port(self, mock_connect, get_transp_mock):
+        smart_open.open("ssh://another-host:22/")
+        mock_connect.assert_called_with(
+            "another-host-domain.com", 22, username="another-user",
+            key_filename=["/path/to/key/file"], timeout=20., compress=True,
+            gss_auth=False, gss_kex=False, gss_deleg_creds=False, gss_trust_dns=False
+        )
+
+    @mock_ssh
+    def test_open_with_openssh_config_override_user(self, mock_connect, get_transp_mock):
+        smart_open.open("ssh://new-user@another-host/")
+        mock_connect.assert_called_with(
+            "another-host-domain.com", 2345, username="new-user",
+            key_filename=["/path/to/key/file"], timeout=20., compress=True,
+            gss_auth=False, gss_kex=False, gss_deleg_creds=False, gss_trust_dns=False
+        )
 
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s : %(levelname)s : %(message)s", level=logging.DEBUG)
