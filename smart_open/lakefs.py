@@ -1,12 +1,12 @@
-import typing
-import io
-import re
-import logging
 import functools
+import io
+import logging
+import re
+import typing
 
 try:
     import lakefs_client
-    from lakefs_client import client, apis, models
+    from lakefs_client import apis, client, models
 except ImportError:
     MISSING_DEPS = True
 
@@ -197,6 +197,7 @@ class _RawWriter(io.RawIOBase):
     Provides low-level access to the underlying lakefs api.
     High level primites are implementedu using io.BufferedReader.
     """
+
     def __init__(
         self,
         client: client.LakeFSClient,
