@@ -14,6 +14,7 @@ import urllib.parse
 import smart_open.utils
 from ftplib import FTP, FTP_TLS, error_reply
 import types
+
 logger = logging.getLogger(__name__)
 
 SCHEMES = ("ftp", "ftps")
@@ -55,8 +56,13 @@ def open_uri(uri, mode, transport_params):
     uri_path = parsed_uri.pop("uri_path")
     scheme = parsed_uri.pop("scheme")
     secure_conn = True if scheme == "ftps" else False
-    return open(uri_path, mode, secure_connection=secure_conn,
-            transport_params=transport_params, **parsed_uri)
+    return open(
+        uri_path,
+        mode,
+        secure_connection=secure_conn,
+        transport_params=transport_params,
+        **parsed_uri,
+    )
 
 
 def convert_transport_params_to_args(transport_params):
@@ -90,7 +96,9 @@ def _connect(hostname, username, port, password, secure_connection, transport_pa
     try:
         ftp.login(username, password)
     except error_reply as e:
-        logger.error("Unable to login to FTP server: try checking the username and password!")
+        logger.error(
+            "Unable to login to FTP server: try checking the username and password!"
+        )
         raise e
     if secure_connection:
         ftp.prot_p()
@@ -99,7 +107,7 @@ def _connect(hostname, username, port, password, secure_connection, transport_pa
 
 def open(
     path,
-    mode="r",
+    mode="rb",
     host=None,
     user=None,
     password=None,
@@ -146,6 +154,7 @@ def open(
     except KeyError:
         raise ValueError(f"unsupported mode: {mode!r}")
     ftp_mode, file_obj_mode = mode_to_ftp_cmds[mode]
+    conn.voidcmd("TYPE I")
     socket = conn.transfercmd(f"{ftp_mode} {path}")
     fobj = socket.makefile(file_obj_mode)
 
@@ -153,6 +162,7 @@ def open(
         self.orig_close()
         self.socket.close()
         self.conn.close()
+
     fobj.orig_close = fobj.close
     fobj.socket = socket
     fobj.conn = conn

@@ -132,6 +132,17 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, "accessid")
         self.assertEqual(parsed_uri.access_secret, "access/secret")
 
+    #
+    # Nb. should never happen in theory, but if it does, we should avoid crashing
+    #
+    def test_s3_uri_has_colon_in_secret(self):
+        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret:totally@mybucket/my@ke@y")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "my@ke@y")
+        self.assertEqual(parsed_uri.access_id, "accessid")
+        self.assertEqual(parsed_uri.access_secret, "access/secret:totally")
+
     def test_s3_uri_has_atmark_in_key_name2(self):
         parsed_uri = smart_open_lib._parse_uri(
             "s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y"
@@ -215,6 +226,24 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.key_id, "mydir/my:key")
+        self.assertEqual(parsed_uri.access_id, None)
+        self.assertEqual(parsed_uri.access_secret, None)
+
+    def test_s3_uri_with_at_symbol_in_key_name0(self):
+        """ Correctly parse the s3 url if there is an @ symbol (and colon) in the key or dir """
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir:my@key")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "mydir:my@key")
+        self.assertEqual(parsed_uri.access_id, None)
+        self.assertEqual(parsed_uri.access_secret, None)
+
+    def test_s3_uri_with_at_symbol_in_key_name1(self):
+        """ Correctly parse the s3 url if there is an @ symbol (and colon) in the key or dir """
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/my:dir@my/key")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "my:dir@my/key")
         self.assertEqual(parsed_uri.access_id, None)
         self.assertEqual(parsed_uri.access_secret, None)
 
