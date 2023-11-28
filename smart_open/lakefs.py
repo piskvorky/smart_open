@@ -4,6 +4,7 @@ import dataclasses
 import functools
 import io
 import logging
+import os
 import re
 import typing
 
@@ -101,8 +102,20 @@ def open(
     buffer_size: int, optional
         The buffer size to use when performing I/O.
     """
-    if not client:
-        raise ValueError("you must specify the client to connect to lakefs")
+    if client is None:
+        try:
+            conf = configuration.Configuration(
+                host=os.environ["LAKECTL_SERVER_ENDPOINT_URL"],
+                username=os.environ["LAKECTL_CREDENTIALS_ACCESS_KEY_ID"],
+                password=os.environ["LAKECTL_CREDENTIALS_SECRET_ACCESS_KEY"],
+            )
+            client = lfs_client.LakeFSClient(conf)
+        except KeyError as e:
+            raise ValueError(
+                "Missing lakectl credentials. Please set "
+                "LAKECTL_SERVER_ENDPOINT_URL, LAKECTL_CREDENTIALS_ACCESS_KEY_ID, "
+                "and LAKECTL_CREDENTIALS_SECRET_ACCESS_KEY"
+            ) from e
 
     if mode == constants.READ_BINARY:
         raw = _RawReader(client, repo, ref, key)

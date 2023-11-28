@@ -64,7 +64,9 @@ def lakefs() -> Generator[lfs_client.LakeFSClient, None, None]:
         username=credentials.access_key_id,
         password=credentials.secret_access_key,
     )
-    lfs_client = client.LakeFSClient(configuration)
+    os.environ["LAKECTL_SERVER_ENDPOINT_URL"] = _LAKEFS_HOST
+    os.environ["LAKECTL_CREDENTIALS_ACCESS_KEY_ID"] = credentials.access_key_id
+    os.environ["LAKECTL_CREDENTIALS_SECRET_ACCESS_KEY"] = credentials.secret_access_key
 
     client = lfs_client.LakeFSClient(conf)
 
@@ -304,6 +306,14 @@ class TestReader:
         transport_params = {"client": lakefs}
         uri = f"lakefs://{repo.id}/{repo.default_branch}/{path}"
         with open(uri, transport_params=transport_params) as fin:
+            assert fin.read() == content.decode()
+
+    def test_open_with_envvar_credentials(self, lakefs, repo, file):
+        from smart_open import open
+
+        path, content = file
+        uri = f"lakefs://{repo.id}/{repo.default_branch}/{path}"
+        with open(uri) as fin:
             assert fin.read() == content.decode()
 
 
