@@ -249,12 +249,9 @@ class _RawWriter(io.RawIOBase):
         commits: apis.CommitsApi = self._client.commits
         stream = io.BytesIO(__b)
         stream.name = self._path
-        try:
-            object_stats = objects.upload_object(
-                self._repo, self._ref, self._path, content=stream
-            )
-            message = models.CommitCreation(self._message)
-            _ = commits.commit(self._repo, self._ref, message)
-        except lakefs_client.ApiException as e:
-            raise Exception("Error uploading object: %s\n" % e) from e
+        object_stats = objects.upload_object(
+            self._repo, self._ref, self._path, content=stream
+        )
+        message = models.CommitCreation(self._message)
+        _ = commits.commit(self._repo, self._ref, message)
         return object_stats.size_bytes
