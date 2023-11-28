@@ -6,7 +6,9 @@ import io
 import logging
 import os
 import re
-import typing
+from typing import IO
+
+from typing_extensions import Buffer
 
 try:
     from lakefs_client import apis, configuration, models
@@ -59,7 +61,7 @@ def parse_uri(uri_as_string: str) -> ParsedURI:
         return ParsedURI(scheme=sr.scheme, repo=sr.netloc, ref=ref, key=key)
 
 
-def open_uri(uri: str, mode: str, transport_params: dict) -> typing.IO:
+def open_uri(uri: str, mode: str, transport_params: dict) -> IO:
     """Return a file-like object pointing to the URI.
 
     :param str uri: The URI to open
@@ -191,7 +193,7 @@ class _RawReader(io.RawIOBase):
 
         return self._position
 
-    def readinto(self, __buffer: bytes) -> int | None:
+    def readinto(self, __buffer: Buffer) -> int | None:
         """Read bytes into a pre-allocated bytes-like object __buffer.
 
         :param int size: number of bytes to read.
@@ -242,7 +244,7 @@ class _RawWriter(io.RawIOBase):
     def writable(self) -> bool:
         return True
 
-    def write(self, __b: bytes) -> int | None:
+    def write(self, __b: Buffer) -> int | None:
         objects: apis.ObjectsApi = self._client.objects
         commits: apis.CommitsApi = self._client.commits
         stream = io.BytesIO(__b)
