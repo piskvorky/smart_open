@@ -3,13 +3,16 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-import typing
-import pytest
-import lakefs_client
-from lakefs_client import client, models, apis
-import logging
-from smart_open.lakefs import open
+from __future__ import annotations
 
+import logging
+from typing import Callable, Generator
+
+import pytest
+from lakefs_client import apis, configuration, exceptions, models
+from lakefs_client import client as lfs_client
+
+from smart_open.lakefs import open
 
 """It needs docker compose to run lakefs locally:
 https://docs.lakefs.io/quickstart/run.html
@@ -22,25 +25,26 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="module")
-def lakefs():
+def lakefs() -> Generator[lfs_client.LakeFSClient, None, None]:
     import os
     import shlex
     import subprocess
+
     from urllib3.exceptions import MaxRetryError
 
     cwd = os.path.dirname(os.path.realpath(__file__))
     subprocess.Popen(shlex.split("docker compose up -d"), cwd=cwd)
 
-    configuration = lakefs_client.Configuration(_LAKEFS_HOST)
-    lfs_client = client.LakeFSClient(configuration)
+    conf = configuration.Configuration(_LAKEFS_HOST)
+    client = lfs_client.LakeFSClient(conf)
 
-    healthcheck: apis.HealthCheckApi = lfs_client.healthcheck
+    healthcheck: apis.HealthCheckApi = client.healthcheck
     api_available = False
     while not api_available:
         try:
             healthcheck.health_check()
             api_available = True
-        except (lakefs_client.ApiException, MaxRetryError):
+        except (exceptions.ApiException, MaxRetryError):
             continue
 
     comm_prefs = models.CommPrefsInput(
@@ -50,30 +54,30 @@ def lakefs():
     )
     username = models.Setup(username="admin")
     try:
-        config: apis.ConfigApi = lfs_client.config
+        config: apis.ConfigApi = client.config
         _ = config.setup_comm_prefs(comm_prefs)
         credentials: models.CredentialsWithSecret = config.setup(username)
-    except lakefs_client.ApiException as e:
-        raise Exception(
-            "Error setting up lakefs: %s\n" % e
-        ) from lakefs_client.ApiException
-    configuration = lakefs_client.Configuration(
+    except exceptions.ApiException as e:
+        raise Exception("Error setting up lakefs: %s\n" % e) from e
+    conf = configuration.Configuration(
         host=_LAKEFS_HOST,
         username=credentials.access_key_id,
         password=credentials.secret_access_key,
     )
     lfs_client = client.LakeFSClient(configuration)
 
-    repositories_api: apis.RepositoriesApi = lfs_client.repositories
+    client = lfs_client.LakeFSClient(conf)
+
+    repositories_api: apis.RepositoriesApi = client.repositories
     new_repo = models.RepositoryCreation(
         name="repo", storage_namespace="local:///home/lakefs/", default_branch="main"
     )
     try:
         _: models.Repository = repositories_api.create_repository(new_repo)
-    except lakefs_client.ApiException as e:
+    except exceptions.ApiException as e:
         raise Exception("Error creating repository: %s\n" % e) from e
 
-    yield lfs_client
+    yield client
 
     subprocess.Popen(shlex.split("docker compose down"), cwd=cwd)
 
@@ -116,12 +120,12 @@ class TestReader:
         self,
         lakefs,
         repo: models.Repository,
-    ) -> typing.Callable:
+    ) -> Callable:
         def _put_to_repo(
             path: str,
             content: bytes,
             branch: str | None = None,
-        ) -> typing.IO:
+        ) -> tuple[str, bytes]:
             from io import BytesIO
 
             objects: apis.ObjectsApi = lakefs.objects
@@ -130,14 +134,14 @@ class TestReader:
             stream.name = path
             try:
                 _ = objects.upload_object(repo.id, _branch, path, content=stream)
-            except lakefs_client.ApiException as e:
+            except exceptions.ApiException as e:
                 raise Exception("Error uploading object: %s\n" % e) from e
             return path, content
 
         return _put_to_repo
 
     @pytest.fixture(scope="module")
-    def file(self, put_to_repo) -> typing.IO:
+    def file(self, put_to_repo) -> tuple[str, bytes]:
         path = "test/file.txt"
         content = "hello wořld\nhow are you?".encode("utf8")
         return put_to_repo(path, content)
@@ -150,26 +154,20 @@ class TestReader:
 
     def test_iter_context_manager(self, lakefs, repo, file):
         path, content = file
-        with open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        ) as fin:
+        with open(repo.id, repo.default_branch, path, "rb", lakefs) as fin:
             output = [line.rstrip(b"\n") for line in fin]
         assert output == content.split(b"\n")
 
     def test_read(self, lakefs, repo, file):
         path, content = file
-        fin = open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        )
+        fin = open(repo.id, repo.default_branch, path, "rb", lakefs)
         assert content[:6] == fin.read(6)
         assert content[6 : 6 + 8] == fin.read1(8)
         assert content[6 + 8 :] == fin.read()
 
     def test_readinto(self, lakefs, repo, file):
         path, content = file
-        fin = open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        )
+        fin = open(repo.id, repo.default_branch, path, "rb", lakefs)
         b = bytearray(6)
         assert len(b) == fin.readinto(b)
         assert content[:6] == b
@@ -178,9 +176,7 @@ class TestReader:
 
     def test_seek_beginning(self, lakefs, repo, file):
         path, content = file
-        fin = open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        )
+        fin = open(repo.id, repo.default_branch, path, "rb", lakefs)
         assert content[:6] == fin.read(6)
         assert content[6 : 6 + 8] == fin.read(8)
         fin.seek(0)
@@ -190,9 +186,7 @@ class TestReader:
 
     def test_seek_start(self, lakefs, repo, file):
         path, _ = file
-        fin = open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        )
+        fin = open(repo.id, repo.default_branch, path, "rb", lakefs)
         assert fin.seek(6) == 6
         assert fin.tell() == 6
         assert fin.read(6) == "wořld".encode("utf-8")
@@ -201,9 +195,7 @@ class TestReader:
         from smart_open import constants
 
         path, _ = file
-        fin = open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        )
+        fin = open(repo.id, repo.default_branch, path, "rb", lakefs)
         assert fin.read(5) == b"hello"
         assert fin.seek(1, constants.WHENCE_CURRENT) == 6
         assert fin.read(6) == "wořld".encode("utf-8")
@@ -212,26 +204,20 @@ class TestReader:
         from smart_open import constants
 
         path, content = file
-        fin = open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        )
+        fin = open(repo.id, repo.default_branch, path, "rb", lakefs)
         assert fin.seek(-4, constants.WHENCE_END) == len(content) - 4
         assert fin.read() == b"you?"
 
     def test_seek_past_end(self, lakefs, repo, file):
         path, content = file
-        fin = open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        )
+        fin = open(repo.id, repo.default_branch, path, "rb", lakefs)
         assert fin.seek(60) == len(content)
 
     def test_detect_eof(self, lakefs, repo, file):
         from smart_open import constants
 
         path, content = file
-        fin = open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        )
+        fin = open(repo.id, repo.default_branch, path, "rb", lakefs)
         fin.read()
         eof = fin.tell()
         assert eof == len(content)
@@ -241,8 +227,8 @@ class TestReader:
         assert fin.tell() == eof
 
     def test_read_gzip(self, lakefs, repo, put_to_repo):
-        from io import BytesIO
         import gzip
+        from io import BytesIO
 
         expected = "раcцветали яблони и груши, поплыли туманы над рекой...".encode(
             "utf-8"
@@ -257,9 +243,7 @@ class TestReader:
         #
         # Make sure we're reading things correctly.
         #
-        with open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        ) as fin:
+        with open(repo.id, repo.default_branch, path, "rb", lakefs) as fin:
             assert fin.read() == buf.getvalue()
 
         #
@@ -269,10 +253,7 @@ class TestReader:
         with gzip.GzipFile(fileobj=sanity_buf) as zipfile:
             assert zipfile.read() == expected
 
-        logger.debug("starting actual test")
-        with open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        ) as fin:
+        with open(repo.id, repo.default_branch, path, "rb", lakefs) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 assert zipfile.read() == expected
 
@@ -280,9 +261,7 @@ class TestReader:
         content = b"englishman\nin\nnew\nyork\n"
         path = "many_lines.txt"
         _ = put_to_repo(path, content)
-        with open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        ) as fin:
+        with open(repo.id, repo.default_branch, path, "rb", lakefs) as fin:
             fin.readline()
             assert fin.tell() == content.index(b"\n") + 1
             fin.seek(0)
@@ -294,28 +273,19 @@ class TestReader:
         path = "many_lines.txt"
         _ = put_to_repo(path, content)
         with open(
-            mode="rb",
-            client=lakefs,
-            repo=repo.id,
-            ref=repo.default_branch,
-            key=path,
-            buffer_size=8,
+            repo.id, repo.default_branch, path, "rb", lakefs, buffer_size=8
         ) as fin:
             assert list(fin) == [b"englishman\n", b"in\n", b"new\n", b"york\n"]
             assert fin.tell() == len(content)
 
     def test_read0_does_not_return_data(self, lakefs, repo, file):
         path, _ = file
-        with open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        ) as fin:
+        with open(repo.id, repo.default_branch, path, "rb", lakefs) as fin:
             assert fin.read(0) == b""
 
     def test_read_past_end(self, lakefs, repo, file):
         path, content = file
-        with open(
-            mode="rb", client=lakefs, repo=repo.id, ref=repo.default_branch, key=path
-        ) as fin:
+        with open(repo.id, repo.default_branch, path, "rb", lakefs) as fin:
             assert fin.read(100) == content
 
     def test_read_empty_file(self, lakefs, repo, put_to_repo):
@@ -323,20 +293,16 @@ class TestReader:
         path = "empty_file.txt"
         _ = put_to_repo(path, content)
         with open(
-            mode="rb",
-            client=lakefs,
-            repo=repo.id,
-            ref=repo.default_branch,
-            key=path,
-            buffer_size=8,
+            repo.id, repo.default_branch, path, "rb", lakefs, buffer_size=8
         ) as fin:
             assert fin.read() == b""
 
-    def test_open(self, lakefs, repo, file):
+    def test_open_with_transport_params(self, lakefs, repo, file):
         from smart_open import open
+
         path, content = file
-        transport_params = {'client': lakefs}
-        uri=f"lakefs://{repo.id}/{repo.default_branch}/{path}"
+        transport_params = {"client": lakefs}
+        uri = f"lakefs://{repo.id}/{repo.default_branch}/{path}"
         with open(uri, transport_params=transport_params) as fin:
             assert fin.read() == content.decode()
 
