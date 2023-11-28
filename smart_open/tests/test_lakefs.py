@@ -103,9 +103,11 @@ def repo(lakefs) -> models.Repository:
     ],
 )
 def test_parse_uri(uri, parsed):
+    from dataclasses import asdict
+
     from smart_open.lakefs import parse_uri
 
-    assert parsed == parse_uri(uri)
+    assert parsed == asdict(parse_uri(uri))
 
 
 class TestReader:

@@ -44,17 +44,18 @@ def parse_uri(uri_as_string: str) -> ParsedURI:
     identifies the repository at a ref expression, and lakefs://<REPO> identifes a repo.
     """
     sr = utils.safe_urlsplit(uri_as_string)
-    assert sr.scheme == SCHEME
-    repo = sr.netloc
+    if sr.scheme != SCHEME:
+        raise ValueError(f"Scheme is not `lakefs` in {uri_as_string}")
     _pattern = r"^/(?P<ref>[^/]+)/(?P<key>.+)"
     _match = re.fullmatch(_pattern, sr.path)
-    if _match:
-        ref = _match.group("ref")
-        key = _match.group("key")
+    if _match is None:
+        raise ValueError(
+            f"Missing `branch/commit` and `path` in {uri_as_string}."
+            "The URI should have the format of `lakefs://<REPO>/<REF>/<KEY>`"
+        )
     else:
-        ref = None
-        key = None
-    return dict(scheme=SCHEME, repo=repo, ref=ref, key=key)
+        ref, key = _match.groups()
+        return ParsedURI(scheme=sr.scheme, repo=sr.netloc, ref=ref, key=key)
 
 
 def open_uri(uri: str, mode: str, transport_params: dict) -> typing.IO:
