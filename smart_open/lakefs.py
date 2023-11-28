@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import dataclasses
 import functools
 import io
 import logging
@@ -24,7 +27,15 @@ DEFAULT_BUFFER_SIZE = 4 * 1024**2
 logger = logging.getLogger(__name__)
 
 
-def parse_uri(uri_as_string):
+@dataclasses.dataclass
+class ParsedURI:
+    scheme: str
+    repo: str
+    ref: str
+    key: str
+
+
+def parse_uri(uri_as_string: str) -> ParsedURI:
     """lakefs protocol URIs.
 
     lakeFS uses a specific format for path URIs. The URI lakefs://<REPO>/<REF>/<KEY>
@@ -58,9 +69,7 @@ def open_uri(uri: str, mode: str, transport_params: dict) -> typing.IO:
     """
     parsed_uri = parse_uri(uri)
     kwargs = utils.check_kwargs(open, transport_params)
-    return open(
-        parsed_uri["repo"], parsed_uri["ref"], parsed_uri["key"], mode, **kwargs
-    )
+    return open(parsed_uri.repo, parsed_uri.ref, parsed_uri.key, mode, **kwargs)
 
 
 def open(
