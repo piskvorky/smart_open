@@ -8,8 +8,6 @@ import os
 import re
 from typing import IO
 
-from typing_extensions import Buffer
-
 try:
     from lakefs_client import apis, configuration, models
     from lakefs_client import client as lfs_client
@@ -193,7 +191,7 @@ class _RawReader(io.RawIOBase):
 
         return self._position
 
-    def readinto(self, __buffer: Buffer) -> int | None:
+    def readinto(self, __buffer) -> int | None:
         """Read bytes into a pre-allocated bytes-like object __buffer.
 
         :param int size: number of bytes to read.
@@ -244,7 +242,7 @@ class _RawWriter(io.RawIOBase):
     def writable(self) -> bool:
         return True
 
-    def write(self, __b: Buffer) -> int | None:
+    def write(self, __b) -> int | None:
         objects: apis.ObjectsApi = self._client.objects
         commits: apis.CommitsApi = self._client.commits
         stream = io.BytesIO(__b)
