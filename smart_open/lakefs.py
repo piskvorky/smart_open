@@ -8,8 +8,8 @@ import re
 import typing
 
 try:
-    import lakefs_client
-    from lakefs_client import apis, client, models
+    from lakefs_client import apis, configuration, models
+    from lakefs_client import client as lfs_client
 except ImportError:
     MISSING_DEPS = True
 
@@ -63,7 +63,7 @@ def open_uri(uri: str, mode: str, transport_params: dict) -> typing.IO:
 
     :param str uri: The URI to open
     :param str mode: Either "rb" or "wb".
-    :param dict transport_params:  Any additional parameters to pass to the `open` function (see below).
+    :param dict transport_params:  Any additional parameters to pass to `open`.
 
     :returns: file-like object.
     :rtype: file-like
@@ -78,7 +78,7 @@ def open(
     ref: str,
     key: str,
     mode: str,
-    client: str | None = None,
+    client: lfs_client.LakeFSClient | None = None,
     commit_message: str | None = None,
     buffer_size: int = DEFAULT_BUFFER_SIZE,
 ):
@@ -123,7 +123,7 @@ class _RawReader(io.RawIOBase):
 
     def __init__(
         self,
-        client: client.LakeFSClient,
+        client: lfs_client.LakeFSClient,
         repo: str,
         ref: str,
         key: str,
@@ -205,12 +205,12 @@ class _RawWriter(io.RawIOBase):
     """Write a lakefs object.
 
     Provides low-level access to the underlying lakefs api.
-    High level primites are implementedu using io.BufferedReader.
+    High level primitives are implemented using io.BufferedReader.
     """
 
     def __init__(
         self,
-        client: client.LakeFSClient,
+        client: lfs_client.LakeFSClient,
         repo: str,
         ref: str,
         key: str,
