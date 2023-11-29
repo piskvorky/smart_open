@@ -42,7 +42,7 @@ def parse_uri(uri_as_string: str) -> ParsedURI:
     lakeFS uses a specific format for path URIs. The URI lakefs://<REPO>/<REF>/<KEY>
     is a path to objects in the given repo and ref expression under key. This is used
     both for path prefixes and for full paths. In similar fashion, lakefs://<REPO>/<REF>
-    identifies the repository at a ref expression, and lakefs://<REPO> identifes a repo.
+    identifies the repository at a ref expression, and lakefs://<REPO> identifies a repo.
     """
     sr = utils.safe_urlsplit(uri_as_string)
     if sr.scheme != SCHEME:
@@ -131,7 +131,7 @@ class _RawReader(io.RawIOBase):
     """Read a lakeFS object.
 
     Provides low-level access to the underlying lakefs api.
-    High level primites are implementedu using io.BufferedReader.
+    High level primitives are implemented using io.BufferedReader.
     """
 
     def __init__(

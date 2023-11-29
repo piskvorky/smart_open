@@ -164,8 +164,8 @@ class TestReader:
         path, content = file
         fin = open(repo.id, repo.default_branch, path, "rb", lakefs)
         assert content[:6] == fin.read(6)
-        assert content[6 : 6 + 8] == fin.read1(8)
-        assert content[6 + 8 :] == fin.read()
+        assert content[6:6 + 8] == fin.read1(8)
+        assert content[6 + 8:] == fin.read()
 
     def test_readinto(self, lakefs, repo, file):
         path, content = file
@@ -174,13 +174,13 @@ class TestReader:
         assert len(b) == fin.readinto(b)
         assert content[:6] == b
         assert len(b) == fin.readinto1(b)
-        assert content[6 : 6 + 6] == b
+        assert content[6:6 + 6] == b
 
     def test_seek_beginning(self, lakefs, repo, file):
         path, content = file
         fin = open(repo.id, repo.default_branch, path, "rb", lakefs)
         assert content[:6] == fin.read(6)
-        assert content[6 : 6 + 8] == fin.read(8)
+        assert content[6:6 + 8] == fin.read(8)
         fin.seek(0)
         assert content == fin.read()
         fin.seek(0)
