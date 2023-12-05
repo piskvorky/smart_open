@@ -10,6 +10,7 @@
 """
 
 import logging
+import ssl
 import urllib.parse
 import smart_open.utils
 from ftplib import FTP, FTP_TLS, error_reply
@@ -85,7 +86,8 @@ def convert_transport_params_to_args(transport_params):
 def _connect(hostname, username, port, password, secure_connection, transport_params):
     kwargs = convert_transport_params_to_args(transport_params)
     if secure_connection:
-        ftp = FTP_TLS(**kwargs)
+        ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
+        ftp = FTP_TLS(context=ssl_context, **kwargs)
     else:
         ftp = FTP(**kwargs)
     try:
