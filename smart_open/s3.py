@@ -792,19 +792,26 @@ class MultipartWriter(io.BufferedIOBase):
         min_part_size=DEFAULT_MIN_PART_SIZE,
         client=None,
         client_kwargs=None,
-        writebuffer: io.BytesIO|None=None,
+        writebuffer: io.BytesIO | None = None,
         max_part_size=DEFAULT_MAX_PART_SIZE
     ):
         if min_part_size < MIN_MIN_PART_SIZE:
-            logger.warning(f"min_part_size set to {min_part_size}; "
-                    "S3 requires minimum part size >= 5MiB; "
-"multipart upload may fail")
+            logger.warning(
+                f"min_part_size set to {min_part_size}; "
+                "S3 requires minimum part size >= 5MiB; "
+                "multipart upload may fail"
+            )
         if max_part_size > MAX_MAX_PART_SIZE:
-            logger.warning(f"max_part_size set to {max_part_size}; "
-            "S3 requires maximum part size <= 5GiB; "
-"multipart upload may fail")
+            logger.warning(
+                f"max_part_size set to {max_part_size}; "
+                "S3 requires maximum part size <= 5GiB; "
+                "multipart upload may fail"
+            )
         if max_part_size < min_part_size:
-            logger.warning(f"max_part_size {max_part_size} smaller than min_part_size {min_part_size}. Setting min_part_size to max_part_size")
+            logger.warning(
+                f"max_part_size {max_part_size} smaller than min_part_size {min_part_size}. "
+                "Setting min_part_size to max_part_size"
+            )
             min_part_size = max_part_size
             # Raise error instead?
         self._min_part_size = min_part_size
@@ -948,7 +955,6 @@ class MultipartWriter(io.BufferedIOBase):
             self._upload_next_part()
             i += end-start
         return len(mv)
-
 
     def terminate(self):
         """Cancel the underlying multipart upload."""
