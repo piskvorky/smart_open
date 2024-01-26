@@ -6,12 +6,14 @@
 # from the MIT License (MIT).
 #
 """Implements file-like objects for reading and writing from/to AWS S3."""
+from __future__ import annotations
 
 import io
 import functools
 import logging
 import time
 import warnings
+from typing import TYPE_CHECKING
 
 try:
     import boto3
@@ -27,12 +29,21 @@ import smart_open.utils
 
 from smart_open import constants
 
+if TYPE_CHECKING:
+    from mypy_boto3_s3.client import S3Client
+    from typing_extensions import Buffer
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 """Default minimum part size for S3 multipart uploads"""
 MIN_MIN_PART_SIZE = 5 * 1024 ** 2
 """The absolute minimum permitted by Amazon."""
+
+DEFAULT_MAX_PART_SIZE = 5 * 1024**3
+"""Default maximum part size for S3 multipart uploads"""
+MAX_MAX_PART_SIZE = 5 * 1024 ** 3
+"""The absolute maximum permitted by Amazon."""
 
 SCHEMES = ("s3", "s3n", 's3u', "s3a")
 DEFAULT_PORT = 443
@@ -247,6 +258,7 @@ def open(
     client=None,
     client_kwargs=None,
     writebuffer=None,
+    max_part_size=DEFAULT_MAX_PART_SIZE
 ):
     """Open an S3 object for reading or writing.
 
@@ -317,6 +329,7 @@ def open(
                 client=client,
                 client_kwargs=client_kwargs,
                 writebuffer=writebuffer,
+                max_part_size=max_part_size,
             )
         else:
             fileobj = SinglepartWriter(
@@ -779,14 +792,28 @@ class MultipartWriter(io.BufferedIOBase):
         min_part_size=DEFAULT_MIN_PART_SIZE,
         client=None,
         client_kwargs=None,
-        writebuffer=None,
+        writebuffer: io.BytesIO|None=None,
+        max_part_size=DEFAULT_MAX_PART_SIZE
     ):
         if min_part_size < MIN_MIN_PART_SIZE:
-            logger.warning("S3 requires minimum part size >= 5MB; \
-multipart upload may fail")
+            logger.warning(f"min_part_size set to {min_part_size}; "
+                    "S3 requires minimum part size >= 5MiB; "
+"multipart upload may fail")
+        if max_part_size > MAX_MAX_PART_SIZE:
+            logger.warning(f"max_part_size set to {max_part_size}; "
+            "S3 requires maximum part size <= 5GiB; "
+"multipart upload may fail")
+        if max_part_size < min_part_size:
+            logger.warning(f"max_part_size {max_part_size} smaller than min_part_size {min_part_size}. Setting min_part_size to max_part_size")
+            min_part_size = max_part_size
+            # Raise error instead?
         self._min_part_size = min_part_size
+        self._max_part_size = max_part_size
 
         _initialize_boto3(self, client, client_kwargs, bucket, key)
+        self._client: S3Client
+        self._bucket: str
+        self._key: str
 
         try:
             partial = functools.partial(
@@ -809,12 +836,12 @@ multipart upload may fail")
 
         self._total_bytes = 0
         self._total_parts = 0
-        self._parts = []
+        self._parts: list[dict[str, object]] = []
 
         #
         # This member is part of the io.BufferedIOBase interface.
         #
-        self.raw = None
+        self.raw = None  # type: ignore[assignment]
 
     def flush(self):
         pass
@@ -890,7 +917,7 @@ multipart upload may fail")
     def detach(self):
         raise io.UnsupportedOperation("detach() not supported")
 
-    def write(self, b):
+    def write(self, b: Buffer) -> int:
         """Write the given buffer (bytes, bytearray, memoryview or any buffer
         interface implementation) to the S3 file.
 
@@ -898,14 +925,30 @@ multipart upload may fail")
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
+        # Part size: 5 MiB to 5 GiB. There is no minimum size limit on the last part of your multipart upload.
 
-        length = self._buf.write(b)
-        self._total_bytes += length
+        # botocore does not accept memoryview, otherwise we could've gotten away with
+        # not needing to write a copy to the buffer aside from cases where b is smaller
+        # than min_part_size
 
-        if self._buf.tell() >= self._min_part_size:
+        i = 0
+        mv = memoryview(b)
+        self._total_bytes += len(mv)
+
+        while i < len(mv):
+            start = i
+            end = i + self._max_part_size - self._buf.tell()
+
+            self._buf.write(mv[start:end])
+
+            if self._buf.tell() < self._min_part_size:
+                assert end >= len(mv)
+                return len(mv)
+
             self._upload_next_part()
+            i += end-start
+        return len(mv)
 
-        return length
 
     def terminate(self):
         """Cancel the underlying multipart upload."""
@@ -928,7 +971,7 @@ multipart upload may fail")
     #
     # Internal methods.
     #
-    def _upload_next_part(self):
+    def _upload_next_part(self) -> None:
         part_num = self._total_parts + 1
         logger.info(
             "%s: uploading part_num: %i, %i bytes (total %.3fGB)",
