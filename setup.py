@@ -44,7 +44,7 @@ ssh_deps = ['paramiko']
 
 all_deps = aws_deps + gcs_deps + azure_deps + http_deps + ssh_deps
 tests_require = all_deps + [
-    'moto[server]',
+    'moto[server]<5.0',
     'responses',
     'boto3',
     'pytest',
@@ -86,7 +86,7 @@ setup(
     test_suite="smart_open.tests",
 
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Environment :: Console',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
