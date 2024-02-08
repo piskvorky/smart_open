@@ -41,8 +41,9 @@ gcs_deps = ['google-cloud-storage>=2.6.0']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 http_deps = ['requests']
 ssh_deps = ['paramiko']
+lakefs_deps = ['lakefs_client']
 
-all_deps = aws_deps + gcs_deps + azure_deps + http_deps + ssh_deps
+all_deps = aws_deps + gcs_deps + azure_deps + http_deps + ssh_deps + lakefs_deps
 tests_require = all_deps + [
     'moto[server]<5.0',
     'responses',
@@ -65,7 +66,7 @@ setup(
     url='https://github.com/piskvorky/smart_open',
     download_url='http://pypi.python.org/pypi/smart_open',
 
-    keywords='file streaming, s3, hdfs, gcs, azure blob storage',
+    keywords='file streaming, s3, hdfs, gcs, azure blob storage, lakefs',
 
     license='MIT',
     platforms='any',
@@ -80,6 +81,7 @@ setup(
         'http': http_deps,
         'webhdfs': http_deps,
         'ssh': ssh_deps,
+        'lakefs': lakefs_deps,
     },
     python_requires=">=3.6,<4.0",
 
