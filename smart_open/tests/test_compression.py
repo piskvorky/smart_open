@@ -5,15 +5,13 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-import io
 import gzip
+import io
+
 import pytest
-
-import smart_open.compression
-
 import zstandard as zstd
 
-
+import smart_open.compression
 
 plain = 'доброе утро планета!'.encode()
 
