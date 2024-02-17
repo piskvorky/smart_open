@@ -103,6 +103,11 @@ def _handle_gzip(file_obj, mode):
     tweak_close(result, file_obj)
     return result
 
+def _handle_zstd(file_obj, mode):
+    import zstandard as zstd
+    result = zstd.ZstdDecompressor().stream_reader(file_obj, closefd=True)
+    return result
+
 
 def compression_wrapper(file_obj, mode, compression=INFER_FROM_EXTENSION, filename=None):
     """
@@ -145,3 +150,4 @@ def compression_wrapper(file_obj, mode, compression=INFER_FROM_EXTENSION, filena
 #
 register_compressor('.bz2', _handle_bz2)
 register_compressor('.gz', _handle_gzip)
+register_compressor('.zst', _handle_zstd)
