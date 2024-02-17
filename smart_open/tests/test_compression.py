@@ -11,6 +11,9 @@ import pytest
 
 import smart_open.compression
 
+import zstandard as zstd
+
+
 
 plain = 'доброе утро планета!'.encode()
 
@@ -32,6 +35,10 @@ def label(thing, name):
         (io.BytesIO(gzip.compress(plain)), 'infer_from_extension', 'file.GZ'),
         (label(io.BytesIO(gzip.compress(plain)), 'file.gz'), 'infer_from_extension', ''),
         (io.BytesIO(gzip.compress(plain)), '.gz', 'file.gz'),
+        (io.BytesIO(zstd.ZstdCompressor().compress(plain)), 'infer_from_extension', 'file.zst'),
+        (io.BytesIO(zstd.ZstdCompressor().compress(plain)), 'infer_from_extension', 'file.ZST'),
+        (label(io.BytesIO(zstd.ZstdCompressor().compress(plain)), 'file.zst'), 'infer_from_extension', ''),
+        (io.BytesIO(zstd.ZstdCompressor().compress(plain)), '.zst', 'file.zst'),
     ]
 )
 def test_compression_wrapper_read(fileobj, compression, filename):
