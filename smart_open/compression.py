@@ -103,6 +103,7 @@ def _handle_gzip(file_obj, mode):
     tweak_close(result, file_obj)
     return result
 
+
 def _handle_zstd(file_obj, mode):
     import zstandard as zstd
     result = zstd.ZstdDecompressor().stream_reader(file_obj, closefd=True)
