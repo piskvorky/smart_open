@@ -2,10 +2,8 @@
 
 import logging
 import os
-import tempfile
 import unittest
 from unittest import mock
-import uuid
 
 from paramiko import SSHException
 

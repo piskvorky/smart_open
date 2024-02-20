@@ -76,6 +76,7 @@ def _str2bool(string):
         return True
     raise ValueError(f"Expected 'yes' / 'no', got {string}.")
 
+
 #
 # The parameter names used by Paramiko (and smart_open) slightly differ to
 # those used in ~/.ssh/config, so we use a mapping to bridge the gap.
