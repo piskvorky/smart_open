@@ -492,10 +492,10 @@ class _SeekableRawReader(object):
             # https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests#partial_request_responses
             #
             status_code = response['ResponseMetadata']['HTTPStatusCode']
-            if status_code == http.HttpStatus.PARTIAL_CONTENT:
+            if status_code == http.HTTPStatus.PARTIAL_CONTENT:
                 _, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
                 self._position = start
-            elif status_code == http.HttpStatus.OK:
+            elif status_code == http.HTTPStatus.OK:
                 length = response["ContentLength"]
             self._content_length = length
             self._body = response['Body']
