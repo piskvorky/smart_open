@@ -40,8 +40,6 @@ DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 MIN_MIN_PART_SIZE = 5 * 1024 ** 2
 """The absolute minimum permitted by Amazon."""
 
-DEFAULT_MAX_PART_SIZE = 5 * 1024**3
-"""Default maximum part size for S3 multipart uploads"""
 MAX_MAX_PART_SIZE = 5 * 1024 ** 3
 """The absolute maximum permitted by Amazon."""
 
@@ -258,7 +256,7 @@ def open(
     client=None,
     client_kwargs=None,
     writebuffer=None,
-    max_part_size=DEFAULT_MAX_PART_SIZE
+    max_part_size=MAX_MAX_PART_SIZE,
 ):
     """Open an S3 object for reading or writing.
 
@@ -793,7 +791,7 @@ class MultipartWriter(io.BufferedIOBase):
         client=None,
         client_kwargs=None,
         writebuffer: io.BytesIO | None = None,
-        max_part_size=DEFAULT_MAX_PART_SIZE
+        max_part_size=MAX_MAX_PART_SIZE,
     ):
         if min_part_size < MIN_MIN_PART_SIZE:
             logger.warning(
