@@ -193,8 +193,8 @@ class IncrementalBackoffTest(unittest.TestCase):
 class ReaderTest(BaseTest):
     def setUp(self):
         # lower the multipart upload size, to speed up these tests
-        self.old_min_part_size = smart_open.s3.DEFAULT_MIN_PART_SIZE
-        smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024**2
+        self.old_min_part_size = smart_open.s3.DEFAULT_PART_SIZE
+        smart_open.s3.DEFAULT_PART_SIZE = 5 * 1024**2
 
         ignore_resource_warnings()
 
@@ -207,7 +207,7 @@ class ReaderTest(BaseTest):
         s3.Object(BUCKET_NAME, KEY_NAME).put(Body=self.body)
 
     def tearDown(self):
-        smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
+        smart_open.s3.DEFAULT_PART_SIZE = self.old_min_part_size
 
     def test_iter(self):
         """Are S3 files iterated over correctly?"""

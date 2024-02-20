@@ -35,12 +35,25 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MIN_PART_SIZE = 50 * 1024**2
-"""Default minimum part size for S3 multipart uploads"""
-MIN_MIN_PART_SIZE = 5 * 1024 ** 2
+#
+# AWS puts restrictions on the part size for multipart uploads.
+# Each part must be more than 5MB, and less than 5GB.
+#
+# On top of that, our MultipartWriter has a min_part_size option.
+# In retrospect, it's an unfortunate name, because it conflicts with the
+# minimum allowable part size (5MB), but it's too late to change it, because
+# people are using that parameter (unlike the MIN, DEFAULT, MAX constants).
+# It really just means "part size": as soon as you have this many bytes,
+# write a part to S3 (see the MultipartWriter.write method).
+#
+
+MIN_PART_SIZE = 5 * 1024 ** 2
 """The absolute minimum permitted by Amazon."""
 
-MAX_MAX_PART_SIZE = 5 * 1024 ** 3
+DEFAULT_PART_SIZE = 50 * 1024**2
+"""Default minimum part size for S3 multipart uploads"""
+
+MAX_PART_SIZE = 5 * 1024 ** 3
 """The absolute maximum permitted by Amazon."""
 
 SCHEMES = ("s3", "s3n", 's3u', "s3a")
@@ -250,13 +263,13 @@ def open(
     mode,
     version_id=None,
     buffer_size=DEFAULT_BUFFER_SIZE,
-    min_part_size=DEFAULT_MIN_PART_SIZE,
+    min_part_size=DEFAULT_PART_SIZE,
     multipart_upload=True,
     defer_seek=False,
     client=None,
     client_kwargs=None,
     writebuffer=None,
-    max_part_size=MAX_MAX_PART_SIZE,
+    max_part_size=MAX_PART_SIZE,
 ):
     """Open an S3 object for reading or writing.
 
@@ -787,31 +800,32 @@ class MultipartWriter(io.BufferedIOBase):
         self,
         bucket,
         key,
-        min_part_size=DEFAULT_MIN_PART_SIZE,
+        min_part_size=DEFAULT_PART_SIZE,
         client=None,
         client_kwargs=None,
         writebuffer: io.BytesIO | None = None,
-        max_part_size=MAX_MAX_PART_SIZE,
+        max_part_size=MAX_PART_SIZE,
     ):
-        if min_part_size < MIN_MIN_PART_SIZE:
-            logger.warning(
-                f"min_part_size set to {min_part_size}; "
-                "S3 requires minimum part size >= 5MiB; "
-                "multipart upload may fail"
-            )
-        if max_part_size > MAX_MAX_PART_SIZE:
-            logger.warning(
-                f"max_part_size set to {max_part_size}; "
-                "S3 requires maximum part size <= 5GiB; "
-                "multipart upload may fail"
-            )
-        if max_part_size < min_part_size:
-            logger.warning(
-                f"max_part_size {max_part_size} smaller than min_part_size {min_part_size}. "
-                "Setting min_part_size to max_part_size"
-            )
-            min_part_size = max_part_size
-            # Raise error instead?
+        #
+        # As part of parameter checking, we need to ensure:
+        #
+        # 1) We're within the limits set by AWS
+        # 2) The specified minimum is less than the specified maximum (sanity)
+        #
+        # Adjust the parameters as needed, because otherwise, writes _will_ fail.
+        #
+        min_ps = smart_open.utils.clamp(min_part_size, MIN_PART_SIZE, MAX_PART_SIZE)
+        max_ps = smart_open.utils.clamp(max_part_size, MIN_PART_SIZE, MAX_PART_SIZE)
+        min_ps = min(min_ps, max_ps)
+        max_ps = max(min_ps, max_ps)
+
+        if min_ps != min_part_size:
+            logger.warning(f"adjusting min_part_size from {min_part_size} to {min_ps}")
+            min_part_size = min_ps
+        if max_ps != max_part_size:
+            logger.warning(f"adjusting max_part_size from {max_part_size} to {max_ps}")
+            max_part_size = max_ps
+
         self._min_part_size = min_part_size
         self._max_part_size = max_part_size
 
