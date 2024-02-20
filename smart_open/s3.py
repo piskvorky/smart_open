@@ -944,28 +944,33 @@ class MultipartWriter(io.BufferedIOBase):
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
-        # Part size: 5 MiB to 5 GiB. There is no minimum size limit on the last part of your multipart upload.
+        #
+        # Part size: 5 MiB to 5 GiB. There is no minimum size limit on the last
+        # part of your multipart upload.
 
-        # botocore does not accept memoryview, otherwise we could've gotten away with
-        # not needing to write a copy to the buffer aside from cases where b is smaller
-        # than min_part_size
+        # botocore does not accept memoryview, otherwise we could've gotten
+        # away with not needing to write a copy to the buffer aside from cases
+        # where b is smaller than min_part_size
+        #
 
-        i = 0
+        offset = 0
         mv = memoryview(b)
         self._total_bytes += len(mv)
 
-        while i < len(mv):
-            start = i
-            end = i + self._max_part_size - self._buf.tell()
-
+        while offset < len(mv):
+            start = offset
+            end = offset + self._max_part_size - self._buf.tell()
             self._buf.write(mv[start:end])
-
             if self._buf.tell() < self._min_part_size:
+                #
+                # Not enough data to write a new part just yet. The assert
+                # ensures that we've consumed all of the input buffer.
+                #
                 assert end >= len(mv)
                 return len(mv)
 
             self._upload_next_part()
-            i += end-start
+            offset = end
         return len(mv)
 
     def terminate(self):
