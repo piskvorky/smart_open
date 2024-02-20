@@ -51,7 +51,7 @@ MIN_PART_SIZE = 5 * 1024 ** 2
 """The absolute minimum permitted by Amazon."""
 
 DEFAULT_PART_SIZE = 50 * 1024**2
-"""Default minimum part size for S3 multipart uploads"""
+"""The default part size for S3 multipart uploads, chosen carefully by smart_open"""
 
 MAX_PART_SIZE = 5 * 1024 ** 3
 """The absolute maximum permitted by Amazon."""
