@@ -456,21 +456,30 @@ class MultipartWriterTest(unittest.TestCase):
 
     def test_write_03(self):
         """Does s3 multipart chunking work correctly?"""
-        # write
-        smart_open_write = smart_open.s3.MultipartWriter(
-            BUCKET_NAME, WRITE_KEY_NAME, min_part_size=10
-        )
-        with smart_open_write as fout:
-            fout.write(b"test")
-            self.assertEqual(fout._buf.tell(), 4)
+        min_ps = smart_open.s3.MIN_PART_SIZE
+        max_ps = smart_open.s3.MAX_PART_SIZE
 
-            fout.write(b"test\n")
-            self.assertEqual(fout._buf.tell(), 9)
-            self.assertEqual(fout._total_parts, 0)
+        try:
+            smart_open.s3.MIN_PART_SIZE = 1
+            smart_open.s3.MAX_PART_SIZE = 100
 
-            fout.write(b"test")
-            self.assertEqual(fout._buf.tell(), 0)
-            self.assertEqual(fout._total_parts, 1)
+            smart_open_write = smart_open.s3.MultipartWriter(
+                BUCKET_NAME, WRITE_KEY_NAME, min_part_size=10
+            )
+            with smart_open_write as fout:
+                fout.write(b"test")
+                self.assertEqual(fout._buf.tell(), 4)
+
+                fout.write(b"test\n")
+                self.assertEqual(fout._buf.tell(), 9)
+                self.assertEqual(fout._total_parts, 0)
+
+                fout.write(b"test")
+                self.assertEqual(fout._buf.tell(), 0)
+                self.assertEqual(fout._total_parts, 1)
+        finally:
+            smart_open.s3.MIN_PART_SIZE = min_ps
+            smart_open.s3.MAX_PART_SIZE = max_ps
 
         # read back the same key and check its content
         output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
