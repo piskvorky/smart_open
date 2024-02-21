@@ -9,6 +9,7 @@
 """Helper functions for documentation, etc."""
 
 import inspect
+import io
 import logging
 import urllib.parse
 
@@ -191,6 +192,19 @@ def safe_urlsplit(url):
 
     path = sr.path.replace(placeholder, '?')
     return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, '', '')
+
+
+class TextIOWrapper(io.TextIOWrapper):
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Call close on underlying buffer only when there was no exception.
+
+        Without this patch, TextIOWrapper would call self.buffer.close() during
+        exception handling, which is unwanted for e.g. s3 and azure. They only call
+        self.close() when there was no exception (self.terminate() otherwise) to avoid
+        committing unfinished/failed uploads.
+        """
+        if exc_type is None:
+            self.close()
 
 
 class FileLikeProxy(wrapt.ObjectProxy):

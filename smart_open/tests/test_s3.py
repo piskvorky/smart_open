@@ -596,6 +596,29 @@ class MultipartWriterTest(unittest.TestCase):
 
         assert 'The specified key does not exist.' in cm.exception.args[0]
 
+    def test_write_text_with_error(self):
+        """Does s3 multipart upload abort when for a failed text file upload?"""
+        with self.assertRaises(ValueError):
+            with smart_open.open(
+                    f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}',
+                    mode="w",
+                    transport_params={
+                        "multipart_upload": True,
+                        "min_part_size": 10,
+                    }
+            ) as fout:
+                fout.write("test12345678test12345678")
+                fout.write("test\n")
+
+                raise ValueError("some error")
+
+        # no multipart upload was committed:
+        # smart_open.s3.MultipartWriter.__exit__ was called
+        with self.assertRaises(OSError) as cm:
+            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'r')
+
+        assert 'The specified key does not exist.' in cm.exception.args[0]
+
 
 @mock_s3
 class SinglepartWriterTest(unittest.TestCase):
