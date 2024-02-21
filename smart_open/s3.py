@@ -879,6 +879,7 @@ multipart upload may fail")
         if self._buf.tell():
             self._upload_next_part()
 
+        logger.debug('%s: completing multipart upload', self)
         if self._total_bytes and self._upload_id:
             partial = functools.partial(
                 self._client.complete_multipart_upload,
@@ -897,7 +898,6 @@ multipart upload may fail")
             #
             # We work around this by creating an empty file explicitly.
             #
-            assert self._upload_id, "no multipart upload in progress"
             self._client.abort_multipart_upload(
                 Bucket=self._bucket,
                 Key=self._key,
@@ -962,13 +962,16 @@ multipart upload may fail")
 
     def terminate(self):
         """Cancel the underlying multipart upload."""
-        assert self._upload_id, "no multipart upload in progress"
+        if self._upload_id is None:
+            return
+        logger.debug('%s: terminating multipart upload', self)
         self._client.abort_multipart_upload(
             Bucket=self._bucket,
             Key=self._key,
             UploadId=self._upload_id,
         )
         self._upload_id = None
+        logger.debug('%s: terminated multipart upload', self)
 
     def to_boto3(self, resource):
         """Create an **independent** `boto3.s3.Object` instance that points to

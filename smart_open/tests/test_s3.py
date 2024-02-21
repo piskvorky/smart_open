@@ -572,6 +572,30 @@ class MultipartWriterTest(unittest.TestCase):
 
             assert actual == contents
 
+    def test_write_gz_with_error(self):
+        """Does s3 multipart upload abort when for a failed compressed file upload?"""
+        with self.assertRaises(ValueError):
+            with smart_open.open(
+                    f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}',
+                    mode="wb",
+                    compression='.gz',
+                    transport_params={
+                        "multipart_upload": True,
+                        "min_part_size": 10,
+                    }
+            ) as fout:
+                fout.write(b"test12345678test12345678")
+                fout.write(b"test\n")
+
+                raise ValueError("some error")
+
+        # no multipart upload was committed:
+        # smart_open.s3.MultipartWriter.__exit__ was called
+        with self.assertRaises(OSError) as cm:
+            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb')
+
+        assert 'The specified key does not exist.' in cm.exception.args[0]
+
 
 @mock_s3
 class SinglepartWriterTest(unittest.TestCase):

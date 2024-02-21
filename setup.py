@@ -35,7 +35,7 @@ __version__ = _get_version()
 def read(fname):
     return io.open(os.path.join(os.path.dirname(__file__), fname), encoding='utf-8').read()
 
-
+base_deps = ['wrapt']
 aws_deps = ['boto3']
 gcs_deps = ['google-cloud-storage>=2.6.0']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
@@ -72,6 +72,7 @@ setup(
     license='MIT',
     platforms='any',
 
+    install_requires=base_deps,
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
