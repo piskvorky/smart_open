@@ -971,7 +971,6 @@ class RetryIfFailedTest(unittest.TestCase):
             self.retry._do(partial)
         self.assertEqual(partial.call_count, 3)
 
-
     def test_failure_client_error(self):
         partial = mock.Mock(
             side_effect=botocore.exceptions.ClientError(
