@@ -573,7 +573,7 @@ class MultipartWriterTest(unittest.TestCase):
             assert actual == contents
 
     def test_write_gz_with_error(self):
-        """Does s3 multipart upload abort when for a failed compressed file upload?"""
+        """Does s3 multipart upload abort for a failed compressed file upload?"""
         with self.assertRaises(ValueError):
             with smart_open.open(
                     f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}',
@@ -587,6 +587,7 @@ class MultipartWriterTest(unittest.TestCase):
                 fout.write(b"test12345678test12345678")
                 fout.write(b"test\n")
 
+                # FileLikeWrapper.__exit__ should cause a MultipartWriter.terminate()
                 raise ValueError("some error")
 
         # no multipart upload was committed:
@@ -597,7 +598,7 @@ class MultipartWriterTest(unittest.TestCase):
         assert 'The specified key does not exist.' in cm.exception.args[0]
 
     def test_write_text_with_error(self):
-        """Does s3 multipart upload abort when for a failed text file upload?"""
+        """Does s3 multipart upload abort for a failed text file upload?"""
         with self.assertRaises(ValueError):
             with smart_open.open(
                     f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}',
@@ -610,12 +611,14 @@ class MultipartWriterTest(unittest.TestCase):
                 fout.write("test12345678test12345678")
                 fout.write("test\n")
 
+                # TextIOWrapper.__exit__ should not cause a self.buffer.close()
+                # FileLikeWrapper.__exit__ should cause a MultipartWriter.terminate()
                 raise ValueError("some error")
 
         # no multipart upload was committed:
         # smart_open.s3.MultipartWriter.__exit__ was called
         with self.assertRaises(OSError) as cm:
-            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'r')
+            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb')
 
         assert 'The specified key does not exist.' in cm.exception.args[0]
 
