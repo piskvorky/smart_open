@@ -673,12 +673,8 @@ class SinglepartWriterTest(unittest.TestCase):
             assert actual == contents
 
     def test_str(self):
-        """Check the stringifying works!"""
-        fout = smart_open.s3.open(BUCKET_NAME, 'key', 'wb', multipart_upload=False)
-        fout.write(b"text")
-        fout.flush()
-        fout.close()
-        assert str(fout) != ''
+        with smart_open.s3.open(BUCKET_NAME, 'key', 'wb', multipart_upload=False) as fout:
+            assert str(fout) == "smart_open.s3.SinglepartWriter('test-smartopen', 'key')"
 
 
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
