@@ -28,6 +28,11 @@ import smart_open.utils
 
 from smart_open import constants
 
+from typing import (
+    Callable,
+    List,
+)
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MIN_PART_SIZE = 50 * 1024**2
@@ -47,11 +52,50 @@ URI_EXAMPLES = (
     's3://my_key:my_secret@my_server:my_port@my_bucket/my_key',
 )
 
-_UPLOAD_ATTEMPTS = 6
-_SLEEP_SECONDS = 10
-
 # Returned by AWS when we try to seek beyond EOF.
 _OUT_OF_RANGE = 'InvalidRange'
+
+
+class Retry:
+    def __init__(self):
+        self.attempts: int = 6
+        self.sleep_seconds: int = 10
+        self.exceptions: List[Exception] = [botocore.exceptions.EndpointConnectionError]
+        self.client_error_codes: List[str] = ['NoSuchUpload']
+
+    def _do(self, fn: Callable):
+        for attempt in range(self.attempts):
+            try:
+                return fn()
+            except tuple(self.exceptions) as err:
+                logger.critical(
+                    'Caught non-fatal %s, retrying %d more times',
+                    err,
+                    self.attempts - attempt - 1,
+                )
+                logger.exception(err)
+                time.sleep(self.sleep_seconds)
+            except botocore.exceptions.ClientError as err:
+                error_code = err.response['Error'].get('Code')
+                if error_code not in self.client_error_codes:
+                    raise
+                logger.critical(
+                    'Caught non-fatal ClientError (%s), retrying %d more times',
+                    error_code,
+                    self.attempts - attempt - 1,
+                )
+                logger.exception(err)
+                time.sleep(self.sleep_seconds)
+        else:
+            logger.critical('encountered too many non-fatal errors, giving up')
+            raise IOError('%s failed after %d attempts', fn.func, self.attempts)
+
+
+#
+# The retry mechanism for this submodule.  Client code may modify it, e.g. by
+# updating RETRY.sleep_seconds and friends.
+#
+RETRY = Retry()
 
 
 class _ClientWrapper:
@@ -803,7 +847,7 @@ multipart upload may fail")
                 Bucket=bucket,
                 Key=key,
             )
-            self._upload_id = _retry_if_failed(partial)['UploadId']
+            self._upload_id = RETRY._do(partial)['UploadId']
         except botocore.client.ClientError as error:
             raise ValueError(
                 'the bucket %r does not exist, or is forbidden for access (%r)' % (
@@ -843,7 +887,7 @@ multipart upload may fail")
                 UploadId=self._upload_id,
                 MultipartUpload={'Parts': self._parts},
             )
-            _retry_if_failed(partial)
+            RETRY._do(partial)
             logger.debug('%s: completed multipart upload', self)
         elif self._upload_id:
             #
@@ -954,7 +998,7 @@ multipart upload may fail")
         # of a temporary connection problem, so this part needs to be
         # especially robust.
         #
-        upload = _retry_if_failed(
+        upload = RETRY._do(
             functools.partial(
                 self._client.upload_part,
                 Bucket=self._bucket,
@@ -1117,47 +1161,6 @@ class SinglepartWriter(io.BufferedIOBase):
 
     def __repr__(self):
         return "smart_open.s3.SinglepartWriter(bucket=%r, key=%r)" % (self._bucket, self._key)
-
-
-def _retry_if_failed(
-        partial,
-        attempts=_UPLOAD_ATTEMPTS,
-        sleep_seconds=_SLEEP_SECONDS,
-        exceptions=None,  # Dict[Exception, str]
-        client_error_codes=None):  # Dict[str, str]
-    if exceptions is None:
-        exceptions = {
-            botocore.exceptions.EndpointConnectionError: (
-                'Unable to connect to the endpoint. Check your network connection.'
-            ),
-        }
-    if client_error_codes is None:
-        client_error_codes = {'NoSuchUpload': 'Server-side flaky error (NoSuchUpload).'}
-    for attempt in range(attempts):
-        try:
-            return partial()
-        except tuple(exceptions) as err:
-            msg = exceptions[type(err)]
-            logger.critical(
-                '%s Sleeping and retrying %d more times before giving up.',
-                msg,
-                attempts - attempt - 1,
-            )
-            time.sleep(sleep_seconds)
-        except botocore.exceptions.ClientError as err:
-            error_code = err.response['Error'].get('Code')
-            if error_code not in client_error_codes:
-                raise
-            msg = client_error_codes[error_code]
-            logger.critical(
-                '%s Sleeping and retrying %d more times before giving up.',
-                msg,
-                attempts - attempt - 1,
-            )
-            time.sleep(sleep_seconds)
-    else:
-        logger.critical('%s Giving up.', msg)
-        raise IOError('%s failed after %d attempts', partial.func, attempts)
 
 
 def _accept_all(key):

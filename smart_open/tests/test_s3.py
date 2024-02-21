@@ -953,30 +953,33 @@ def populate_bucket(num_keys=10):
 
 
 class RetryIfFailedTest(unittest.TestCase):
+    def setUp(self):
+        self.retry = smart_open.s3.Retry()
+        self.retry.attempts = 3
+        self.retry.sleep_seconds = 0
+
     def test_success(self):
         partial = mock.Mock(return_value=1)
-        result = smart_open.s3._retry_if_failed(partial, attempts=3, sleep_seconds=0)
+        result = self.retry._do(partial)
         self.assertEqual(result, 1)
         self.assertEqual(partial.call_count, 1)
 
-    def test_failure(self):
+    def test_failure_exception(self):
         partial = mock.Mock(side_effect=ValueError)
-        exceptions = {ValueError: 'Let us retry ValueError'}
-
+        self.retry.exceptions = {ValueError: 'Let us retry ValueError'}
         with self.assertRaises(IOError):
-            smart_open.s3._retry_if_failed(partial, attempts=3, sleep_seconds=0, exceptions=exceptions)
-
+            self.retry._do(partial)
         self.assertEqual(partial.call_count, 3)
 
+
+    def test_failure_client_error(self):
         partial = mock.Mock(
             side_effect=botocore.exceptions.ClientError(
                 {'Error': {'Code': 'NoSuchUpload'}}, 'NoSuchUpload'
             )
         )
-
         with self.assertRaises(IOError):
-            smart_open.s3._retry_if_failed(partial, attempts=3, sleep_seconds=0)
-
+            self.retry._do(partial)
         self.assertEqual(partial.call_count, 3)
 
 
