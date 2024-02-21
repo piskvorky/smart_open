@@ -25,6 +25,13 @@ import botocore.exceptions
 import moto
 import pytest
 
+# See https://github.com/piskvorky/smart_open/issues/800
+# This supports moto 4 & 5 until v4 is no longer used by distros.
+try:
+    from moto import mock_s3
+except ImportError:
+    from moto import mock_aws as mock_s3
+
 import smart_open
 import smart_open.s3
 
@@ -151,7 +158,7 @@ class CrapClient:
             'ContentLength': self._datasize,
             'ContentRange': 'bytes 0-%d/%d' % (self._datasize, self._datasize),
             'Body': self._body,
-            'ResponseMetadata': {'RetryAttempts': 1},
+            'ResponseMetadata': {'RetryAttempts': 1, 'HTTPStatusCode': 206},
         }
 
 
@@ -190,7 +197,7 @@ class IncrementalBackoffTest(unittest.TestCase):
             mock_sleep.reset_mock()
 
 
-@moto.mock_s3
+@mock_s3
 class ReaderTest(BaseTest):
     def setUp(self):
         # lower the multipart upload size, to speed up these tests
@@ -412,7 +419,7 @@ class ReaderTest(BaseTest):
         self.assertEqual(data, b'')
 
 
-@moto.mock_s3
+@mock_s3
 class MultipartWriterTest(unittest.TestCase):
     """
     Test writing into s3 files.
@@ -567,7 +574,7 @@ class MultipartWriterTest(unittest.TestCase):
             assert actual == contents
 
 
-@moto.mock_s3
+@mock_s3
 class SinglepartWriterTest(unittest.TestCase):
     """
     Test writing into s3 files using single part upload.
@@ -677,7 +684,7 @@ class SinglepartWriterTest(unittest.TestCase):
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
 
 
-@moto.mock_s3
+@mock_s3
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
@@ -767,7 +774,7 @@ class IterBucketTest(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(expected))
 
 
-@moto.mock_s3
+@mock_s3
 @pytest.mark.skipif(
     condition=not smart_open.concurrency._CONCURRENT_FUTURES,
     reason='concurrent.futures unavailable',
@@ -798,7 +805,7 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(expected))
 
 
-@moto.mock_s3
+@mock_s3
 @pytest.mark.skipif(
     condition=not smart_open.concurrency._MULTIPROCESSING,
     reason='multiprocessing unavailable',
@@ -829,7 +836,7 @@ class IterBucketMultiprocessingTest(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(expected))
 
 
-@moto.mock_s3
+@mock_s3
 class IterBucketSingleProcessTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
@@ -859,7 +866,7 @@ class IterBucketSingleProcessTest(unittest.TestCase):
 # This has to be a separate test because we cannot run it against real S3
 # (we don't want to expose our real S3 credentials).
 #
-@moto.mock_s3
+@mock_s3
 class IterBucketCredentialsTest(unittest.TestCase):
     def test(self):
         _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
@@ -876,7 +883,7 @@ class IterBucketCredentialsTest(unittest.TestCase):
         self.assertEqual(len(result), num_keys)
 
 
-@moto.mock_s3
+@mock_s3
 class DownloadKeyTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
@@ -921,7 +928,7 @@ class DownloadKeyTest(unittest.TestCase):
                               KEY_NAME, bucket_name=BUCKET_NAME)
 
 
-@moto.mock_s3
+@mock_s3
 class OpenTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
@@ -974,7 +981,7 @@ class RetryIfFailedTest(unittest.TestCase):
         self.assertEqual(partial.call_count, 3)
 
 
-@moto.mock_s3()
+@mock_s3
 def test_client_propagation_singlepart():
     """Does the client parameter make it from the caller to Boto3?"""
     #
@@ -997,7 +1004,7 @@ def test_client_propagation_singlepart():
         assert id(writer._client.client) == id(client)
 
 
-@moto.mock_s3()
+@mock_s3
 def test_client_propagation_multipart():
     """Does the resource parameter make it from the caller to Boto3?"""
     session = boto3.Session()
@@ -1016,7 +1023,7 @@ def test_client_propagation_multipart():
         assert id(writer._client.client) == id(client)
 
 
-@moto.mock_s3()
+@mock_s3
 def test_resource_propagation_reader():
     """Does the resource parameter make it from the caller to Boto3?"""
     session = boto3.Session()

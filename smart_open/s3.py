@@ -7,6 +7,7 @@
 #
 """Implements file-like objects for reading and writing from/to AWS S3."""
 
+import http
 import io
 import functools
 import logging
@@ -486,9 +487,17 @@ class _SeekableRawReader(object):
                 self,
                 response['ResponseMetadata']['RetryAttempts'],
             )
-            _, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
+            #
+            # range request may not always return partial content, see:
+            # https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests#partial_request_responses
+            #
+            status_code = response['ResponseMetadata']['HTTPStatusCode']
+            if status_code == http.HTTPStatus.PARTIAL_CONTENT:
+                _, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
+                self._position = start
+            elif status_code == http.HTTPStatus.OK:
+                length = response["ContentLength"]
             self._content_length = length
-            self._position = start
             self._body = response['Body']
 
     def read(self, size=-1):

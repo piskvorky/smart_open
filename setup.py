@@ -41,14 +41,16 @@ gcs_deps = ['google-cloud-storage>=2.6.0']
 azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 http_deps = ['requests']
 ssh_deps = ['paramiko']
+zst_deps = ['zstandard']
 
-all_deps = aws_deps + gcs_deps + azure_deps + http_deps + ssh_deps
+all_deps = aws_deps + gcs_deps + azure_deps + http_deps + ssh_deps + zst_deps
 tests_require = all_deps + [
     'moto[server]',
     'responses',
     'boto3',
     'pytest',
-    'pytest-rerunfailures'
+    'pytest-rerunfailures',
+    'pytest-benchmark',
 ]
 
 setup(
@@ -80,13 +82,14 @@ setup(
         'http': http_deps,
         'webhdfs': http_deps,
         'ssh': ssh_deps,
+        'zst': zst_deps,
     },
     python_requires=">=3.6,<4.0",
 
     test_suite="smart_open.tests",
 
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Environment :: Console',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
