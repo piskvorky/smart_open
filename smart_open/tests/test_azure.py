@@ -639,6 +639,46 @@ class WriterTest(unittest.TestCase):
             # FakeBlobClient.commit_block_list was not called
             self.assertGreater(len(blob_client._staged_contents), 0)
 
+    def test_abort_upload_text_mode(self):
+        """Does aborted upload skip commit_block_list in text mode?"""
+        test_string = "42" * 42
+        blob_name = "test_abort_upload_%s" % BLOB_NAME
+
+        container_client = CLIENT.get_container_client(CONTAINER_NAME)
+        blob_client = container_client.get_blob_client(blob_name)
+
+        try:
+            with smart_open.open(
+                "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+                "w",
+                transport_params={"client": blob_client, "min_part_size": 42},
+            ) as fout:
+                fout.write(test_string)
+                raise ValueError
+        except ValueError:
+            # FakeBlobClient.commit_block_list was not called
+            self.assertGreater(len(blob_client._staged_contents), 0)
+
+    def test_abort_upload_compressed(self):
+        """Does aborted upload skip commit_block_list with compression?"""
+        test_string = b"42" * 42
+        blob_name = "test_abort_upload_%s.gz" % BLOB_NAME
+
+        container_client = CLIENT.get_container_client(CONTAINER_NAME)
+        blob_client = container_client.get_blob_client(blob_name)
+
+        try:
+            with smart_open.open(
+                "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+                "wb",
+                transport_params={"client": blob_client, "min_part_size": 42},
+            ) as fout:
+                fout.write(test_string)
+                raise ValueError
+        except ValueError:
+            # FakeBlobClient.commit_block_list was not called
+            self.assertGreater(len(blob_client._staged_contents), 0)
+
     def test_incorrect_input(self):
         """Does azure write fail on incorrect input?"""
         blob_name = "test_incorrect_input_%s" % BLOB_NAME
