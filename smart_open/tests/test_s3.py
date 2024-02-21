@@ -22,7 +22,6 @@ import boto3
 import botocore.client
 import botocore.endpoint
 import botocore.exceptions
-import moto
 import pytest
 
 # See https://github.com/piskvorky/smart_open/issues/800
