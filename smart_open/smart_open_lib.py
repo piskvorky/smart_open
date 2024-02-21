@@ -31,6 +31,7 @@ import warnings
 #
 import smart_open.local_file as so_file
 import smart_open.compression as so_compression
+import smart_open.utils as so_utils
 
 from smart_open import doctools
 from smart_open import transport
@@ -248,7 +249,7 @@ def open(
             except AttributeError:
                 pass
 
-    return decoded
+    return so_utils.FileLikeProxy(decoded, binary)
 
 
 def _get_binary_mode(mode_str):

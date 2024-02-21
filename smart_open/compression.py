@@ -71,6 +71,9 @@ def register_compressor(ext, callback):
 def tweak_close(outer, inner):
     """Ensure that closing the `outer` stream closes the `inner` stream as well.
 
+    Deprecated: smart_open.open().__exit__ now always calls __exit__ on the
+    underlying filestream.
+
     Use this when your compression library's `close` method does not
     automatically close the underlying filestream.  See
     https://github.com/RaRe-Technologies/smart_open/issues/630 for an
@@ -93,14 +96,18 @@ def tweak_close(outer, inner):
 def _handle_bz2(file_obj, mode):
     from bz2 import BZ2File
     result = BZ2File(file_obj, mode)
-    tweak_close(result, file_obj)
     return result
 
 
 def _handle_gzip(file_obj, mode):
     import gzip
     result = gzip.GzipFile(fileobj=file_obj, mode=mode)
-    tweak_close(result, file_obj)
+    return result
+
+
+def _handle_zstd(file_obj, mode):
+    import zstandard as zstd
+    result = zstd.ZstdDecompressor().stream_reader(file_obj, closefd=True)
     return result
 
 
@@ -145,3 +152,4 @@ def compression_wrapper(file_obj, mode, compression=INFER_FROM_EXTENSION, filena
 #
 register_compressor('.bz2', _handle_bz2)
 register_compressor('.gz', _handle_gzip)
+register_compressor('.zst', _handle_zstd)

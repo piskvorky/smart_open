@@ -12,6 +12,8 @@ import inspect
 import logging
 import urllib.parse
 
+import wrapt
+
 logger = logging.getLogger(__name__)
 
 WORKAROUND_SCHEMES = ['s3', 's3n', 's3u', 's3a', 'gs']
@@ -189,3 +191,16 @@ def safe_urlsplit(url):
 
     path = sr.path.replace(placeholder, '?')
     return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, '', '')
+
+
+class FileLikeProxy(wrapt.ObjectProxy):
+    def __init__(self, outer, inner):
+        super().__init__(outer)
+        self.__inner = inner
+
+    def __exit__(self, *args, **kwargs):
+        """Exit inner after exiting outer."""
+        try:
+            super().__exit__(*args, **kwargs)
+        finally:
+            self.__inner.__exit__(*args, **kwargs)

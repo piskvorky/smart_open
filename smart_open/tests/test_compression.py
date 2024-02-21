@@ -5,12 +5,13 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-import io
 import gzip
+import io
+
 import pytest
+import zstandard as zstd
 
 import smart_open.compression
-
 
 plain = 'доброе утро планета!'.encode()
 
@@ -32,6 +33,10 @@ def label(thing, name):
         (io.BytesIO(gzip.compress(plain)), 'infer_from_extension', 'file.GZ'),
         (label(io.BytesIO(gzip.compress(plain)), 'file.gz'), 'infer_from_extension', ''),
         (io.BytesIO(gzip.compress(plain)), '.gz', 'file.gz'),
+        (io.BytesIO(zstd.ZstdCompressor().compress(plain)), 'infer_from_extension', 'file.zst'),
+        (io.BytesIO(zstd.ZstdCompressor().compress(plain)), 'infer_from_extension', 'file.ZST'),
+        (label(io.BytesIO(zstd.ZstdCompressor().compress(plain)), 'file.zst'), 'infer_from_extension', ''),
+        (io.BytesIO(zstd.ZstdCompressor().compress(plain)), '.zst', 'file.zst'),
     ]
 )
 def test_compression_wrapper_read(fileobj, compression, filename):
