@@ -15,6 +15,7 @@ with initialize_s3_bucket.py.
 import contextlib
 import gzip
 import io
+import os
 import unittest
 import uuid
 import warnings
@@ -203,7 +204,7 @@ class WriterTest(unittest.TestCase):
 
     def test_multipart(self):
         """Does s3 multipart chunking work correctly?"""
-        data_dir = os.path.join(os.path.dirname(__file__), "test_data")
+        data_dir = os.path.join(os.path.dirname(__file__), "../smart_open/tests/test_data")
         with open(os.path.join(data_dir, "crime-and-punishment.txt"), "rb") as fin:
             crime = fin.read()
         data = b''
