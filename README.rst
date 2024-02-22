@@ -328,7 +328,7 @@ You can customize the credentials when constructing the session for the client.
         aws_session_token=SESSION_TOKEN,
     )
     client = session.client('s3', endpoint_url=..., config=...)
-    fin = open('s3://bucket/key', transport_params=dict(client=client))
+    fin = open('s3://bucket/key', transport_params={'client': client})
 
 Your second option is to specify the credentials within the S3 URL itself:
 
@@ -340,6 +340,18 @@ Your second option is to specify the credentials within the S3 URL itself:
 
 *Important*: ``smart_open`` ignores configuration files from the older ``boto`` library.
 Port your old ``boto`` settings to ``boto3`` in order to use them with ``smart_open``.
+
+S3 Advanced Usage
+-----------------
+
+Additional keyword arguments can be propagated to the boto3 methods that are used by ``smart_open`` under the hood using the ``client_kwargs`` transport parameter.
+
+For instance, to upload a blob with Metadata, ACL, StorageClass, these keyword arguments can be passed to ``create_multipart_upload`` (`docs <https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.create_multipart_upload>`__).
+
+.. code-block:: python
+
+    kwargs = {'Metadata': {'version': 2}, 'ACL': 'authenticated-read', 'StorageClass': 'STANDARD_IA'}
+    fout = open('s3://bucket/key', 'wb', transport_params={'client_kwargs': {'S3.Client.create_multipart_upload': kwargs}})
 
 Iterating Over an S3 Bucket's Contents
 --------------------------------------
@@ -392,7 +404,20 @@ and pass it to the Client. To create an API token for use in the example below, 
 	token = os.environ['GOOGLE_API_TOKEN']
 	credentials = Credentials(token=token)
 	client = Client(credentials=credentials)
-	fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
+	fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params={'client': client})
+
+GCS Advanced Usage
+------------------
+
+Additional keyword arguments can be propagated to the GCS open method (`docs <https://cloud.google.com/python/docs/reference/storage/latest/google.cloud.storage.blob.Blob#google_cloud_storage_blob_Blob_open>`__), which is used by ``smart_open`` under the hood, using the ``blob_open_kwargs`` transport parameter.
+
+Additional blob properties (`docs <https://cloud.google.com/python/docs/reference/storage/latest/google.cloud.storage.blob.Blob#properties>`__) can be set before an upload, as long as they are not read-only, using the ``blob_properties`` transport parameter.
+
+.. code-block:: python
+
+    open_kwargs = {'predefined_acl': 'authenticated-read'}
+    properties = {'metadata': {'version': 2}, 'storage_class': 'COLDLINE'}
+    fout = open('gs://bucket/key', 'wb', transport_params={'blob_open_kwargs': open_kwargs, 'blob_properties': properties})
 
 Azure Credentials
 -----------------
@@ -413,10 +438,20 @@ to setting up authentication.
     from azure.storage.blob import BlobServiceClient
     azure_storage_connection_string = os.environ['AZURE_STORAGE_CONNECTION_STRING']
     client = BlobServiceClient.from_connection_string(azure_storage_connection_string)
-    fin = open('azure://my_container/my_blob.txt', transport_params=dict(client=client))
+    fin = open('azure://my_container/my_blob.txt', transport_params={'client': client})
 
 If you need more credential options, refer to the
 `Azure Storage authentication guide <https://docs.microsoft.com/en-us/azure/storage/common/storage-samples-python#authentication>`__.
+
+Azure Advanced Usage
+--------------------
+
+Additional keyword arguments can be propagated to the ``commit_block_list`` method (`docs <https://azuresdkdocs.blob.core.windows.net/$web/python/azure-storage-blob/12.14.1/azure.storage.blob.html#azure.storage.blob.BlobClient.commit_block_list>`__), which is used by ``smart_open`` under the hood for uploads, using the ``blob_kwargs`` transport parameter.
+
+.. code-block:: python
+
+    kwargs = {'metadata': {'version': 2}}
+    fout = open('azure://container/key', 'wb', transport_params={'blob_kwargs': kwargs})
 
 Drop-in replacement of ``pathlib.Path.open``
 --------------------------------------------
