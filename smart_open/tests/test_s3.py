@@ -200,8 +200,8 @@ class IncrementalBackoffTest(unittest.TestCase):
 class ReaderTest(BaseTest):
     def setUp(self):
         # lower the multipart upload size, to speed up these tests
-        self.old_min_part_size = smart_open.s3.DEFAULT_MIN_PART_SIZE
-        smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024**2
+        self.old_min_part_size = smart_open.s3.DEFAULT_PART_SIZE
+        smart_open.s3.DEFAULT_PART_SIZE = 5 * 1024**2
 
         ignore_resource_warnings()
 
@@ -214,7 +214,7 @@ class ReaderTest(BaseTest):
         s3.Object(BUCKET_NAME, KEY_NAME).put(Body=self.body)
 
     def tearDown(self):
-        smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
+        smart_open.s3.DEFAULT_PART_SIZE = self.old_min_part_size
 
     def test_iter(self):
         """Are S3 files iterated over correctly?"""
@@ -461,27 +461,63 @@ class MultipartWriterTest(unittest.TestCase):
             fout.write(u"testžížáč".encode("utf-8"))
             self.assertEqual(fout.tell(), 14)
 
+    #
+    # Nb. Under Windows, the byte offsets are different for some reason
+    #
+    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
     def test_write_03(self):
         """Does s3 multipart chunking work correctly?"""
-        # write
-        smart_open_write = smart_open.s3.MultipartWriter(
-            BUCKET_NAME, WRITE_KEY_NAME, min_part_size=10
-        )
-        with smart_open_write as fout:
-            fout.write(b"test")
-            self.assertEqual(fout._buf.tell(), 4)
+        #
+        # generate enough test data for a single multipart upload part.
+        # We need this because moto behaves like S3; it refuses to upload
+        # parts smaller than 5MB.
+        #
+        data_dir = os.path.join(os.path.dirname(__file__), "test_data")
+        with open(os.path.join(data_dir, "crime-and-punishment.txt"), "rb") as fin:
+            crime = fin.read()
+        data = b''
+        ps = 5 * 1024 * 1024
+        while len(data) < ps:
+            data += crime
 
-            fout.write(b"test\n")
-            self.assertEqual(fout._buf.tell(), 9)
-            self.assertEqual(fout._total_parts, 0)
+        title = "Преступление и наказание\n\n".encode()
+        to_be_continued = "\n\n... продолжение следует ...\n\n".encode()
 
-            fout.write(b"test")
-            self.assertEqual(fout._buf.tell(), 0)
-            self.assertEqual(fout._total_parts, 1)
+        with smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME, part_size=ps) as fout:
+            #
+            # Write some data without triggering an upload
+            #
+            fout.write(title)
+            assert fout._total_parts == 0
+            assert fout._buf.tell() == 48
 
+            #
+            # Trigger a part upload
+            #
+            fout.write(data)
+            assert fout._total_parts == 1
+            assert fout._buf.tell() == 661
+
+            #
+            # Write _without_ triggering a part upload
+            #
+            fout.write(to_be_continued)
+            assert fout._total_parts == 1
+            assert fout._buf.tell() == 710
+
+        #
+        # We closed the writer, so the final part must have been uploaded
+        #
+        assert fout._buf.tell() == 0
+        assert fout._total_parts == 2
+
+        #
         # read back the same key and check its content
-        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
-        self.assertEqual(output, [b"testtest\n", b"test"])
+        #
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
+            got = fin.read()
+        want = title + data + to_be_continued
+        assert want == got
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
@@ -728,6 +764,10 @@ class SinglepartWriterTest(unittest.TestCase):
                 actual = fin.read()
 
             assert actual == contents
+
+    def test_str(self):
+        with smart_open.s3.open(BUCKET_NAME, 'key', 'wb', multipart_upload=False) as fout:
+            assert str(fout) == "smart_open.s3.SinglepartWriter('test-smartopen', 'key')"
 
 
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')

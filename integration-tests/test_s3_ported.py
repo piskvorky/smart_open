@@ -15,6 +15,7 @@ with initialize_s3_bucket.py.
 import contextlib
 import gzip
 import io
+import os
 import unittest
 import uuid
 import warnings
@@ -203,20 +204,53 @@ class WriterTest(unittest.TestCase):
 
     def test_multipart(self):
         """Does s3 multipart chunking work correctly?"""
-        with smart_open.s3.MultipartWriter(BUCKET_NAME, self.key, min_part_size=10) as fout:
-            fout.write(b"test")
-            self.assertEqual(fout._buf.tell(), 4)
+        data_dir = os.path.join(os.path.dirname(__file__), "../smart_open/tests/test_data")
+        with open(os.path.join(data_dir, "crime-and-punishment.txt"), "rb") as fin:
+            crime = fin.read()
+        data = b''
+        ps = 5 * 1024 * 1024
+        while len(data) < ps:
+            data += crime
 
-            fout.write(b"test\n")
-            self.assertEqual(fout._buf.tell(), 9)
-            self.assertEqual(fout._total_parts, 0)
+        title = "Преступление и наказание\n\n".encode()
+        to_be_continued = "\n\n... продолжение следует ...\n\n".encode()
 
-            fout.write(b"test")
-            self.assertEqual(fout._buf.tell(), 0)
-            self.assertEqual(fout._total_parts, 1)
+        key = "WriterTest.test_multipart"
+        with smart_open.s3.MultipartWriter(BUCKET_NAME, key, part_size=ps) as fout:
+            #
+            # Write some data without triggering an upload
+            #
+            fout.write(title)
+            assert fout._total_parts == 0
+            assert fout._buf.tell() == 48
 
-        data = read_key(self.key)
-        self.assertEqual(data, b"testtest\ntest")
+            #
+            # Trigger a part upload
+            #
+            fout.write(data)
+            assert fout._total_parts == 1
+            assert fout._buf.tell() == 661
+
+            #
+            # Write _without_ triggering a part upload
+            #
+            fout.write(to_be_continued)
+            assert fout._total_parts == 1
+            assert fout._buf.tell() == 710
+
+        #
+        # We closed the writer, so the final part must have been uploaded
+        #
+        assert fout._buf.tell() == 0
+        assert fout._total_parts == 2
+
+        #
+        # read back the same key and check its content
+        #
+        with smart_open.s3.open(BUCKET_NAME, key, 'rb') as fin:
+            got = fin.read()
+        want = title + data + to_be_continued
+        assert want == got
 
     def test_empty_key(self):
         """Does writing no data cause key with an empty value to be created?"""
