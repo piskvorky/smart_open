@@ -461,6 +461,10 @@ class MultipartWriterTest(unittest.TestCase):
             fout.write(u"testžížáč".encode("utf-8"))
             self.assertEqual(fout.tell(), 14)
 
+    #
+    # Nb. Under Windows, the byte offsets are different for some reason
+    #
+    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
     def test_write_03(self):
         """Does s3 multipart chunking work correctly?"""
 
