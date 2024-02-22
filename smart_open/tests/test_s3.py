@@ -467,7 +467,6 @@ class MultipartWriterTest(unittest.TestCase):
     @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
     def test_write_03(self):
         """Does s3 multipart chunking work correctly?"""
-
         #
         # generate enough test data for a single multipart upload part.
         # We need this because moto behaves like S3; it refuses to upload
