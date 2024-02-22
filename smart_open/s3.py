@@ -263,7 +263,11 @@ def _consolidate_params(uri, transport_params):
         )
         uri.update(host=None)
     elif uri['host'] != DEFAULT_HOST:
-        inject(endpoint_url='https://%(host)s:%(port)d' % uri)
+        if uri['scheme'] == 's3u':
+            scheme = 'http'
+        else:
+            scheme = 'https'
+        inject(endpoint_url=scheme + '://%(host)s:%(port)d' % uri)
         uri.update(host=None)
 
     return uri, transport_params
