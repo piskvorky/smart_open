@@ -269,7 +269,6 @@ def open(
     client=None,
     client_kwargs=None,
     writebuffer=None,
-    max_part_size=MAX_PART_SIZE,
 ):
     """Open an S3 object for reading or writing.
 
@@ -284,12 +283,29 @@ def open(
     buffer_size: int, optional
         The buffer size to use when performing I/O.
     min_part_size: int, optional
-        The minimum part size for multipart uploads.  For writing only.
+        The minimum part size for multipart uploads, in bytes.
+
+        When the writebuffer contains this many bytes, smart_open will upload
+        the bytes to S3 as a single part of a multi-part upload, freeing the
+        buffer either partially or entirely.  When you close the writer, it
+        will assemble the parts together.
+
+        The value determines the upper limit for the writebuffer.  If buffer
+        space is short (e.g. you are buffering to memory), then use a smaller
+        value for min_part_size, or consider buffering to disk instead (see
+        the writebuffer option).
+
+        The value must be between 5MB and 5GB.  If you specify a value outside
+        of this range, smart_open will adjust it for you, because otherwise the
+        upload _will_ fail.
+
+        For writing only.  Does not apply if you set multipart_upload=False.
     multipart_upload: bool, optional
         Default: `True`
         If set to `True`, will use multipart upload for writing to S3. If set
         to `False`, S3 upload will use the S3 Single-Part Upload API, which
         is more ideal for small file sizes.
+
         For writing only.
     version_id: str, optional
         Version of the object, used when reading object.
@@ -336,11 +352,10 @@ def open(
             fileobj = MultipartWriter(
                 bucket_id,
                 key_id,
-                min_part_size=min_part_size,
                 client=client,
                 client_kwargs=client_kwargs,
                 writebuffer=writebuffer,
-                max_part_size=max_part_size,
+                part_size=min_part_size,
             )
         else:
             fileobj = SinglepartWriter(
@@ -800,34 +815,16 @@ class MultipartWriter(io.BufferedIOBase):
         self,
         bucket,
         key,
-        min_part_size=DEFAULT_PART_SIZE,
+        part_size=DEFAULT_PART_SIZE,
         client=None,
         client_kwargs=None,
         writebuffer: io.BytesIO | None = None,
-        max_part_size=MAX_PART_SIZE,
     ):
-        #
-        # As part of parameter checking, we need to ensure:
-        #
-        # 1) We're within the limits set by AWS
-        # 2) The specified minimum is less than the specified maximum (sanity)
-        #
-        # Adjust the parameters as needed, because otherwise, writes _will_ fail.
-        #
-        min_ps = smart_open.utils.clamp(min_part_size, MIN_PART_SIZE, MAX_PART_SIZE)
-        max_ps = smart_open.utils.clamp(max_part_size, MIN_PART_SIZE, MAX_PART_SIZE)
-        min_ps = min(min_ps, max_ps)
-        max_ps = max(min_ps, max_ps)
-
-        if min_ps != min_part_size:
-            logger.warning(f"adjusting min_part_size from {min_part_size} to {min_ps}")
-            min_part_size = min_ps
-        if max_ps != max_part_size:
-            logger.warning(f"adjusting max_part_size from {max_part_size} to {max_ps}")
-            max_part_size = max_ps
-
-        self._min_part_size = min_part_size
-        self._max_part_size = max_part_size
+        adjusted_ps = smart_open.utils.clamp(part_size, MIN_PART_SIZE, MAX_PART_SIZE)
+        if part_size != adjusted_ps:
+            logger.warning(f"adjusting part_size from {part_size} to {adjusted_ps}")
+            part_size = adjusted_ps
+        self._part_size = part_size
 
         _initialize_boto3(self, client, client_kwargs, bucket, key)
         self._client: S3Client
@@ -944,24 +941,20 @@ class MultipartWriter(io.BufferedIOBase):
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
-        #
-        # Part size: 5 MiB to 5 GiB. There is no minimum size limit on the last
-        # part of your multipart upload.
-
-        # botocore does not accept memoryview, otherwise we could've gotten
-        # away with not needing to write a copy to the buffer aside from cases
-        # where b is smaller than min_part_size
-        #
-
         offset = 0
         mv = memoryview(b)
         self._total_bytes += len(mv)
 
+        #
+        # botocore does not accept memoryview, otherwise we could've gotten
+        # away with not needing to write a copy to the buffer aside from cases
+        # where b is smaller than part_size
+        #
         while offset < len(mv):
             start = offset
-            end = offset + self._max_part_size - self._buf.tell()
+            end = offset + self._part_size - self._buf.tell()
             self._buf.write(mv[start:end])
-            if self._buf.tell() < self._min_part_size:
+            if self._buf.tell() < self._part_size:
                 #
                 # Not enough data to write a new part just yet. The assert
                 # ensures that we've consumed all of the input buffer.
@@ -1043,10 +1036,10 @@ class MultipartWriter(io.BufferedIOBase):
         return "smart_open.s3.MultipartWriter(%r, %r)" % (self._bucket, self._key)
 
     def __repr__(self):
-        return "smart_open.s3.MultipartWriter(bucket=%r, key=%r, min_part_size=%r)" % (
+        return "smart_open.s3.MultipartWriter(bucket=%r, key=%r, part_size=%r)" % (
             self._bucket,
             self._key,
-            self._min_part_size,
+            self._part_size,
         )
 
 

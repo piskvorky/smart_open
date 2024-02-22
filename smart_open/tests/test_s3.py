@@ -456,34 +456,58 @@ class MultipartWriterTest(unittest.TestCase):
 
     def test_write_03(self):
         """Does s3 multipart chunking work correctly?"""
-        min_ps = smart_open.s3.MIN_PART_SIZE
-        max_ps = smart_open.s3.MAX_PART_SIZE
 
-        try:
-            smart_open.s3.MIN_PART_SIZE = 1
-            smart_open.s3.MAX_PART_SIZE = 100
+        #
+        # generate enough test data for a single multipart upload part.
+        # We need this because moto behaves like S3; it refuses to upload
+        # parts smaller than 5MB.
+        #
+        data_dir = os.path.join(os.path.dirname(__file__), "test_data")
+        with open(os.path.join(data_dir, "crime-and-punishment.txt"), "rb") as fin:
+            crime = fin.read()
+        data = b''
+        ps = 5 * 1024 * 1024
+        while len(data) < ps:
+            data += crime
 
-            smart_open_write = smart_open.s3.MultipartWriter(
-                BUCKET_NAME, WRITE_KEY_NAME, min_part_size=10
-            )
-            with smart_open_write as fout:
-                fout.write(b"test")
-                self.assertEqual(fout._buf.tell(), 4)
+        title = "Преступление и наказание\n\n".encode()
+        to_be_continued = "\n\n... продолжение следует ...\n\n".encode()
 
-                fout.write(b"test\n")
-                self.assertEqual(fout._buf.tell(), 9)
-                self.assertEqual(fout._total_parts, 0)
+        with smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME, part_size=ps) as fout:
+            #
+            # Write some data without triggering an upload
+            #
+            fout.write(title)
+            assert fout._total_parts == 0
+            assert fout._buf.tell() == 48
 
-                fout.write(b"test")
-                self.assertEqual(fout._buf.tell(), 0)
-                self.assertEqual(fout._total_parts, 1)
-        finally:
-            smart_open.s3.MIN_PART_SIZE = min_ps
-            smart_open.s3.MAX_PART_SIZE = max_ps
+            #
+            # Trigger a part upload
+            #
+            fout.write(data)
+            assert fout._total_parts == 1
+            assert fout._buf.tell() == 661
 
+            #
+            # Write _without_ triggering a part upload
+            #
+            fout.write(to_be_continued)
+            assert fout._total_parts == 1
+            assert fout._buf.tell() == 710
+
+        #
+        # We closed the writer, so the final part must have been uploaded
+        #
+        assert fout._buf.tell() == 0
+        assert fout._total_parts == 2
+
+        #
         # read back the same key and check its content
-        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
-        self.assertEqual(output, [b"testtest\n", b"test"])
+        #
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
+            got = fin.read()
+        want = title + data + to_be_continued
+        assert want == got
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
@@ -573,57 +597,6 @@ class MultipartWriterTest(unittest.TestCase):
                 actual = fin.read()
 
             assert actual == contents
-
-    def test_max_part_size_1(self) -> None:
-        """write successive chunks of size 5MiB-1 with a min_part_size of 5MiB and max_part_size=7MiB
-
-        There are no minimum size limits of the last part of a multipart upload, which
-        is why test_write03 can get away with small test data. But since we need to get
-        multiple parts we cannot avoid that.
-        """
-        contents = bytes(5 * 2**20 - 1)
-
-        with smart_open.s3.open(
-            BUCKET_NAME,
-            WRITE_KEY_NAME,
-            "wb",
-            min_part_size=5 * 2**20,
-            max_part_size=7 * 2**20,
-        ) as fout:
-            fout.write(contents)
-            assert fout._total_parts == 0
-            assert fout._buf.tell() == 5 * 2**20 - 1
-
-            fout.write(contents)
-            assert fout._total_parts == 1
-            assert fout._buf.tell() == 3 * 2**20 - 2
-
-            fout.write(contents)
-            assert fout._total_parts == 2
-            assert fout._buf.tell() == 1 * 2**20 - 3
-        contents = b""
-
-        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb"))
-        assert len(output[0]) == 3 * (5 * 2**20 - 1)
-
-    def test_max_part_size_2(self) -> None:
-        """Do a single big write of 15MiB with a max_part_size of 5MiB"""
-        contents = bytes(15 * 2**20)
-
-        with smart_open.s3.open(
-            BUCKET_NAME,
-            WRITE_KEY_NAME,
-            "wb",
-            min_part_size=5 * 2**20,
-            max_part_size=5 * 2**20,
-        ) as fout:
-            fout.write(contents)
-            assert fout._total_parts == 3
-            assert fout._buf.tell() == 0
-        contents = b""
-
-        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb"))
-        assert len(output[0]) == 15 * 2**20
 
 
 @moto.mock_s3
