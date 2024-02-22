@@ -1160,7 +1160,7 @@ class SinglepartWriter(io.BufferedIOBase):
             self.close()
 
     def __str__(self):
-        return "smart_open.s3.SinglepartWriter(%r, %r)" % (self._object.bucket_name, self._object.key)
+        return "smart_open.s3.SinglepartWriter(%r, %r)" % (self._bucket, self._key)
 
     def __repr__(self):
         return "smart_open.s3.SinglepartWriter(bucket=%r, key=%r)" % (self._bucket, self._key)
