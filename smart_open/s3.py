@@ -8,12 +8,18 @@
 """Implements file-like objects for reading and writing from/to AWS S3."""
 from __future__ import annotations
 
+import http
 import io
 import functools
 import logging
 import time
 import warnings
-from typing import TYPE_CHECKING
+
+from typing import (
+    Callable,
+    List,
+    TYPE_CHECKING,
+)
 
 try:
     import boto3
@@ -28,6 +34,7 @@ import smart_open.concurrency
 import smart_open.utils
 
 from smart_open import constants
+
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -68,11 +75,50 @@ URI_EXAMPLES = (
     's3://my_key:my_secret@my_server:my_port@my_bucket/my_key',
 )
 
-_UPLOAD_ATTEMPTS = 6
-_SLEEP_SECONDS = 10
-
 # Returned by AWS when we try to seek beyond EOF.
 _OUT_OF_RANGE = 'InvalidRange'
+
+
+class Retry:
+    def __init__(self):
+        self.attempts: int = 6
+        self.sleep_seconds: int = 10
+        self.exceptions: List[Exception] = [botocore.exceptions.EndpointConnectionError]
+        self.client_error_codes: List[str] = ['NoSuchUpload']
+
+    def _do(self, fn: Callable):
+        for attempt in range(self.attempts):
+            try:
+                return fn()
+            except tuple(self.exceptions) as err:
+                logger.critical(
+                    'Caught non-fatal %s, retrying %d more times',
+                    err,
+                    self.attempts - attempt - 1,
+                )
+                logger.exception(err)
+                time.sleep(self.sleep_seconds)
+            except botocore.exceptions.ClientError as err:
+                error_code = err.response['Error'].get('Code')
+                if error_code not in self.client_error_codes:
+                    raise
+                logger.critical(
+                    'Caught non-fatal ClientError (%s), retrying %d more times',
+                    error_code,
+                    self.attempts - attempt - 1,
+                )
+                logger.exception(err)
+                time.sleep(self.sleep_seconds)
+        else:
+            logger.critical('encountered too many non-fatal errors, giving up')
+            raise IOError('%s failed after %d attempts', fn.func, self.attempts)
+
+
+#
+# The retry mechanism for this submodule.  Client code may modify it, e.g. by
+# updating RETRY.sleep_seconds and friends.
+#
+RETRY = Retry()
 
 
 class _ClientWrapper:
@@ -510,9 +556,17 @@ class _SeekableRawReader(object):
                 self,
                 response['ResponseMetadata']['RetryAttempts'],
             )
-            _, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
+            #
+            # range request may not always return partial content, see:
+            # https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests#partial_request_responses
+            #
+            status_code = response['ResponseMetadata']['HTTPStatusCode']
+            if status_code == http.HTTPStatus.PARTIAL_CONTENT:
+                _, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
+                self._position = start
+            elif status_code == http.HTTPStatus.OK:
+                length = response["ContentLength"]
             self._content_length = length
-            self._position = start
             self._body = response['Body']
 
     def read(self, size=-1):
@@ -840,7 +894,7 @@ class MultipartWriter(io.BufferedIOBase):
                 Bucket=bucket,
                 Key=key,
             )
-            self._upload_id = _retry_if_failed(partial)['UploadId']
+            self._upload_id = RETRY._do(partial)['UploadId']
         except botocore.client.ClientError as error:
             raise ValueError(
                 'the bucket %r does not exist, or is forbidden for access (%r)' % (
@@ -872,6 +926,7 @@ class MultipartWriter(io.BufferedIOBase):
         if self._buf.tell():
             self._upload_next_part()
 
+        logger.debug('%s: completing multipart upload', self)
         if self._total_bytes and self._upload_id:
             partial = functools.partial(
                 self._client.complete_multipart_upload,
@@ -880,7 +935,7 @@ class MultipartWriter(io.BufferedIOBase):
                 UploadId=self._upload_id,
                 MultipartUpload={'Parts': self._parts},
             )
-            _retry_if_failed(partial)
+            RETRY._do(partial)
             logger.debug('%s: completed multipart upload', self)
         elif self._upload_id:
             #
@@ -890,7 +945,6 @@ class MultipartWriter(io.BufferedIOBase):
             #
             # We work around this by creating an empty file explicitly.
             #
-            assert self._upload_id, "no multipart upload in progress"
             self._client.abort_multipart_upload(
                 Bucket=self._bucket,
                 Key=self._key,
@@ -975,13 +1029,16 @@ class MultipartWriter(io.BufferedIOBase):
 
     def terminate(self):
         """Cancel the underlying multipart upload."""
-        assert self._upload_id, "no multipart upload in progress"
+        if self._upload_id is None:
+            return
+        logger.debug('%s: terminating multipart upload', self)
         self._client.abort_multipart_upload(
             Bucket=self._bucket,
             Key=self._key,
             UploadId=self._upload_id,
         )
         self._upload_id = None
+        logger.debug('%s: terminated multipart upload', self)
 
     def to_boto3(self, resource):
         """Create an **independent** `boto3.s3.Object` instance that points to
@@ -1011,7 +1068,7 @@ class MultipartWriter(io.BufferedIOBase):
         # of a temporary connection problem, so this part needs to be
         # especially robust.
         #
-        upload = _retry_if_failed(
+        upload = RETRY._do(
             functools.partial(
                 self._client.upload_part,
                 Bucket=self._bucket,
@@ -1170,32 +1227,10 @@ class SinglepartWriter(io.BufferedIOBase):
             self.close()
 
     def __str__(self):
-        return "smart_open.s3.SinglepartWriter(%r, %r)" % (self._object.bucket_name, self._object.key)
+        return "smart_open.s3.SinglepartWriter(%r, %r)" % (self._bucket, self._key)
 
     def __repr__(self):
         return "smart_open.s3.SinglepartWriter(bucket=%r, key=%r)" % (self._bucket, self._key)
-
-
-def _retry_if_failed(
-        partial,
-        attempts=_UPLOAD_ATTEMPTS,
-        sleep_seconds=_SLEEP_SECONDS,
-        exceptions=None):
-    if exceptions is None:
-        exceptions = (botocore.exceptions.EndpointConnectionError, )
-    for attempt in range(attempts):
-        try:
-            return partial()
-        except exceptions:
-            logger.critical(
-                'Unable to connect to the endpoint. Check your network connection. '
-                'Sleeping and retrying %d more times '
-                'before giving up.' % (attempts - attempt - 1)
-            )
-            time.sleep(sleep_seconds)
-    else:
-        logger.critical('Unable to connect to the endpoint. Giving up.')
-        raise IOError('Unable to connect to the endpoint after %d attempts' % attempts)
 
 
 def _accept_all(key):

@@ -6,10 +6,15 @@ import uuid
 import time
 
 import boto3
-import moto
+
+# See https://github.com/piskvorky/smart_open/issues/800
+# This supports moto 4 & 5 until v4 is no longer used by distros.
+try:
+    from moto import mock_s3
+except ImportError:
+    from moto import mock_aws as mock_s3
 
 from smart_open import open
-
 
 BUCKET_NAME = 'test-smartopen'
 KEY_NAME = 'test-key'
@@ -32,7 +37,7 @@ def get_versions(bucket, key):
     ]
 
 
-@moto.mock_s3
+@mock_s3
 class TestVersionId(unittest.TestCase):
     def setUp(self):
         #
