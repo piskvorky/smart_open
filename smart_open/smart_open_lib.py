@@ -16,7 +16,6 @@ The main functions are:
 """
 
 import collections
-import io
 import locale
 import logging
 import os
@@ -434,7 +433,7 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
     if encoding is None:
         encoding = DEFAULT_ENCODING
 
-    fileobj = io.TextIOWrapper(
+    fileobj = so_utils.TextIOWrapper(
         fileobj,
         encoding=encoding,
         errors=errors,
