@@ -1,4 +1,18 @@
-# Unreleased
+# 7.0.0, 2024-02-26
+
+* Upgrade dev status classifier to stable (PR [#798](https://github.com/piskvorky/smart_open/pull/798), [@seebi](https://github.com/seebi))
+* Add zstandard compression support (PR [#801](https://github.com/piskvorky/smart_open/pull/801), [@rlrs](https://github.com/rlrs))
+* Support moto 4 & 5 (PR [#802](https://github.com/piskvorky/smart_open/pull/802), [@jayvdb](https://github.com/jayvdb))
+* Add logic for handling large files in MultipartWriter uploads to S3 (PR [#796](https://github.com/piskvorky/smart_open/pull/796), [@jakkdl](https://github.com/jakkdl))
+* Add support for SSH connection via aliases from `~/.ssh/config` (PR [#790](https://github.com/piskvorky/smart_open/pull/790), [@wbeardall](https://github.com/wbeardall))
+* Secure the connection using SSL when connecting to the FTPS server (PR [#793](https://github.com/piskvorky/smart_open/pull/793), [@wammaster](https://github.com/wammaster))
+* Make GCS I/O 1000x faster by avoiding unnecessary API call (PR [#788](https://github.com/piskvorky/smart_open/pull/788), [@JohnHBrock](https://github.com/JohnHBrock))
+* Retry finalizing multipart S3 upload (PR [#785](https://github.com/piskvorky/smart_open/pull/785), [@ddelange](https://github.com/ddelange))
+* Handle exceptions during writes to Azure (PR [#783](https://github.com/piskvorky/smart_open/pull/783), [@ddelange](https://github.com/ddelange))
+* Fix formatting of python code in MIGRATING_FROM_OLDER_VERSIONS.rst (PR [#795](https://github.com/piskvorky/smart_open/pull/795), [@kenahoo](https://github.com/kenahoo))
+* Fix __str__ method in SinglepartWriter (PR [#791](https://github.com/piskvorky/smart_open/pull/791), [@ThosRTanner](https://github.com/ThosRTanner))
+* Fix `KeyError: 'ContentRange'` when received full content from S3 (PR [#789](https://github.com/piskvorky/smart_open/pull/789), [@messense](https://github.com/messense))
+* Propagate __exit__ call to the underlying filestream (PR [#786](https://github.com/piskvorky/smart_open/pull/786), [@ddelange](https://github.com/ddelange))
 
 ## 6.4.0, 2023-09-07
 
