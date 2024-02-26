@@ -118,7 +118,8 @@ class Retry:
 # The retry mechanism for this submodule.  Client code may modify it, e.g. by
 # updating RETRY.sleep_seconds and friends.
 #
-RETRY = Retry()
+if 'MISSING_DEPS' not in locals():
+    RETRY = Retry()
 
 
 class _ClientWrapper:
