@@ -4,17 +4,17 @@ Migrating to the new compression parameter
 smart_open versions 6.0.0 and above no longer support the ``ignore_ext`` parameter.
 Use the ``compression`` parameter instead:
 
-```python
-fin = smart_open.open("/path/file.gz", ignore_ext=True)  # No
-fin = smart_open.open("/path/file.gz", compression="disable")  # Yes
+.. code-block:: python
 
-fin = smart_open.open("/path/file.gz", ignore_ext=False)  # No
-fin = smart_open.open("/path/file.gz")  # Yes
-fin = smart_open.open("/path/file.gz", compression="infer_from_extension")  # Yes, if you want to be explicit
+    fin = smart_open.open("/path/file.gz", ignore_ext=True)  # No
+    fin = smart_open.open("/path/file.gz", compression="disable")  # Yes
+    
+    fin = smart_open.open("/path/file.gz", ignore_ext=False)  # No
+    fin = smart_open.open("/path/file.gz")  # Yes
+    fin = smart_open.open("/path/file.gz", compression="infer_from_extension")  # Yes, if you want to be explicit
+    
+    fin = smart_open.open("/path/file", compression=".gz")  # Yes
 
-fin = smart_open.open("/path/file", compression=".gz")  # Yes
-
-```
 
 Migrating to the new client-based S3 API
 ========================================

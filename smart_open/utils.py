@@ -9,8 +9,11 @@
 """Helper functions for documentation, etc."""
 
 import inspect
+import io
 import logging
 import urllib.parse
+
+import wrapt
 
 logger = logging.getLogger(__name__)
 
@@ -189,3 +192,29 @@ def safe_urlsplit(url):
 
     path = sr.path.replace(placeholder, '?')
     return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, '', '')
+
+
+class TextIOWrapper(io.TextIOWrapper):
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Call close on underlying buffer only when there was no exception.
+
+        Without this patch, TextIOWrapper would call self.buffer.close() during
+        exception handling, which is unwanted for e.g. s3 and azure. They only call
+        self.close() when there was no exception (self.terminate() otherwise) to avoid
+        committing unfinished/failed uploads.
+        """
+        if exc_type is None:
+            self.close()
+
+
+class FileLikeProxy(wrapt.ObjectProxy):
+    def __init__(self, outer, inner):
+        super().__init__(outer)
+        self.__inner = inner
+
+    def __exit__(self, *args, **kwargs):
+        """Exit inner after exiting outer."""
+        try:
+            super().__exit__(*args, **kwargs)
+        finally:
+            self.__inner.__exit__(*args, **kwargs)

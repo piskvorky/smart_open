@@ -16,7 +16,6 @@ The main functions are:
 """
 
 import collections
-import io
 import locale
 import logging
 import os
@@ -31,6 +30,7 @@ import warnings
 #
 import smart_open.local_file as so_file
 import smart_open.compression as so_compression
+import smart_open.utils as so_utils
 
 from smart_open import doctools
 from smart_open import transport
@@ -248,7 +248,7 @@ def open(
             except AttributeError:
                 pass
 
-    return decoded
+    return so_utils.FileLikeProxy(decoded, binary)
 
 
 def _get_binary_mode(mode_str):
@@ -433,7 +433,7 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
     if encoding is None:
         encoding = DEFAULT_ENCODING
 
-    fileobj = io.TextIOWrapper(
+    fileobj = so_utils.TextIOWrapper(
         fileobj,
         encoding=encoding,
         errors=errors,

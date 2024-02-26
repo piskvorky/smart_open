@@ -21,8 +21,15 @@ import sys
 import boto3
 import botocore.client
 import botocore.endpoint
-import moto
+import botocore.exceptions
 import pytest
+
+# See https://github.com/piskvorky/smart_open/issues/800
+# This supports moto 4 & 5 until v4 is no longer used by distros.
+try:
+    from moto import mock_s3
+except ImportError:
+    from moto import mock_aws as mock_s3
 
 import smart_open
 import smart_open.s3
@@ -150,7 +157,7 @@ class CrapClient:
             'ContentLength': self._datasize,
             'ContentRange': 'bytes 0-%d/%d' % (self._datasize, self._datasize),
             'Body': self._body,
-            'ResponseMetadata': {'RetryAttempts': 1},
+            'ResponseMetadata': {'RetryAttempts': 1, 'HTTPStatusCode': 206},
         }
 
 
@@ -189,12 +196,12 @@ class IncrementalBackoffTest(unittest.TestCase):
             mock_sleep.reset_mock()
 
 
-@moto.mock_s3
+@mock_s3
 class ReaderTest(BaseTest):
     def setUp(self):
         # lower the multipart upload size, to speed up these tests
-        self.old_min_part_size = smart_open.s3.DEFAULT_MIN_PART_SIZE
-        smart_open.s3.DEFAULT_MIN_PART_SIZE = 5 * 1024**2
+        self.old_min_part_size = smart_open.s3.DEFAULT_PART_SIZE
+        smart_open.s3.DEFAULT_PART_SIZE = 5 * 1024**2
 
         ignore_resource_warnings()
 
@@ -207,7 +214,7 @@ class ReaderTest(BaseTest):
         s3.Object(BUCKET_NAME, KEY_NAME).put(Body=self.body)
 
     def tearDown(self):
-        smart_open.s3.DEFAULT_MIN_PART_SIZE = self.old_min_part_size
+        smart_open.s3.DEFAULT_PART_SIZE = self.old_min_part_size
 
     def test_iter(self):
         """Are S3 files iterated over correctly?"""
@@ -411,7 +418,7 @@ class ReaderTest(BaseTest):
         self.assertEqual(data, b'')
 
 
-@moto.mock_s3
+@mock_s3
 class MultipartWriterTest(unittest.TestCase):
     """
     Test writing into s3 files.
@@ -454,27 +461,63 @@ class MultipartWriterTest(unittest.TestCase):
             fout.write(u"testžížáč".encode("utf-8"))
             self.assertEqual(fout.tell(), 14)
 
+    #
+    # Nb. Under Windows, the byte offsets are different for some reason
+    #
+    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
     def test_write_03(self):
         """Does s3 multipart chunking work correctly?"""
-        # write
-        smart_open_write = smart_open.s3.MultipartWriter(
-            BUCKET_NAME, WRITE_KEY_NAME, min_part_size=10
-        )
-        with smart_open_write as fout:
-            fout.write(b"test")
-            self.assertEqual(fout._buf.tell(), 4)
+        #
+        # generate enough test data for a single multipart upload part.
+        # We need this because moto behaves like S3; it refuses to upload
+        # parts smaller than 5MB.
+        #
+        data_dir = os.path.join(os.path.dirname(__file__), "test_data")
+        with open(os.path.join(data_dir, "crime-and-punishment.txt"), "rb") as fin:
+            crime = fin.read()
+        data = b''
+        ps = 5 * 1024 * 1024
+        while len(data) < ps:
+            data += crime
 
-            fout.write(b"test\n")
-            self.assertEqual(fout._buf.tell(), 9)
-            self.assertEqual(fout._total_parts, 0)
+        title = "Преступление и наказание\n\n".encode()
+        to_be_continued = "\n\n... продолжение следует ...\n\n".encode()
 
-            fout.write(b"test")
-            self.assertEqual(fout._buf.tell(), 0)
-            self.assertEqual(fout._total_parts, 1)
+        with smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME, part_size=ps) as fout:
+            #
+            # Write some data without triggering an upload
+            #
+            fout.write(title)
+            assert fout._total_parts == 0
+            assert fout._buf.tell() == 48
 
+            #
+            # Trigger a part upload
+            #
+            fout.write(data)
+            assert fout._total_parts == 1
+            assert fout._buf.tell() == 661
+
+            #
+            # Write _without_ triggering a part upload
+            #
+            fout.write(to_be_continued)
+            assert fout._total_parts == 1
+            assert fout._buf.tell() == 710
+
+        #
+        # We closed the writer, so the final part must have been uploaded
+        #
+        assert fout._buf.tell() == 0
+        assert fout._total_parts == 2
+
+        #
         # read back the same key and check its content
-        output = list(smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb'))
-        self.assertEqual(output, [b"testtest\n", b"test"])
+        #
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
+            got = fin.read()
+        want = title + data + to_be_continued
+        assert want == got
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
@@ -565,8 +608,58 @@ class MultipartWriterTest(unittest.TestCase):
 
             assert actual == contents
 
+    def test_write_gz_with_error(self):
+        """Does s3 multipart upload abort for a failed compressed file upload?"""
+        with self.assertRaises(ValueError):
+            with smart_open.open(
+                    f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}',
+                    mode="wb",
+                    compression='.gz',
+                    transport_params={
+                        "multipart_upload": True,
+                        "min_part_size": 10,
+                    }
+            ) as fout:
+                fout.write(b"test12345678test12345678")
+                fout.write(b"test\n")
 
-@moto.mock_s3
+                # FileLikeWrapper.__exit__ should cause a MultipartWriter.terminate()
+                raise ValueError("some error")
+
+        # no multipart upload was committed:
+        # smart_open.s3.MultipartWriter.__exit__ was called
+        with self.assertRaises(OSError) as cm:
+            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb')
+
+        assert 'The specified key does not exist.' in cm.exception.args[0]
+
+    def test_write_text_with_error(self):
+        """Does s3 multipart upload abort for a failed text file upload?"""
+        with self.assertRaises(ValueError):
+            with smart_open.open(
+                    f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}',
+                    mode="w",
+                    transport_params={
+                        "multipart_upload": True,
+                        "min_part_size": 10,
+                    }
+            ) as fout:
+                fout.write("test12345678test12345678")
+                fout.write("test\n")
+
+                # TextIOWrapper.__exit__ should not cause a self.buffer.close()
+                # FileLikeWrapper.__exit__ should cause a MultipartWriter.terminate()
+                raise ValueError("some error")
+
+        # no multipart upload was committed:
+        # smart_open.s3.MultipartWriter.__exit__ was called
+        with self.assertRaises(OSError) as cm:
+            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb')
+
+        assert 'The specified key does not exist.' in cm.exception.args[0]
+
+
+@mock_s3
 class SinglepartWriterTest(unittest.TestCase):
     """
     Test writing into s3 files using single part upload.
@@ -672,11 +765,15 @@ class SinglepartWriterTest(unittest.TestCase):
 
             assert actual == contents
 
+    def test_str(self):
+        with smart_open.s3.open(BUCKET_NAME, 'key', 'wb', multipart_upload=False) as fout:
+            assert str(fout) == "smart_open.s3.SinglepartWriter('test-smartopen', 'key')"
+
 
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
 
 
-@moto.mock_s3
+@mock_s3
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
@@ -766,7 +863,7 @@ class IterBucketTest(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(expected))
 
 
-@moto.mock_s3
+@mock_s3
 @pytest.mark.skipif(
     condition=not smart_open.concurrency._CONCURRENT_FUTURES,
     reason='concurrent.futures unavailable',
@@ -797,7 +894,7 @@ class IterBucketConcurrentFuturesTest(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(expected))
 
 
-@moto.mock_s3
+@mock_s3
 @pytest.mark.skipif(
     condition=not smart_open.concurrency._MULTIPROCESSING,
     reason='multiprocessing unavailable',
@@ -828,7 +925,7 @@ class IterBucketMultiprocessingTest(unittest.TestCase):
         self.assertEqual(sorted(keys), sorted(expected))
 
 
-@moto.mock_s3
+@mock_s3
 class IterBucketSingleProcessTest(unittest.TestCase):
     def setUp(self):
         self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
@@ -858,7 +955,7 @@ class IterBucketSingleProcessTest(unittest.TestCase):
 # This has to be a separate test because we cannot run it against real S3
 # (we don't want to expose our real S3 credentials).
 #
-@moto.mock_s3
+@mock_s3
 class IterBucketCredentialsTest(unittest.TestCase):
     def test(self):
         _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
@@ -875,7 +972,7 @@ class IterBucketCredentialsTest(unittest.TestCase):
         self.assertEqual(len(result), num_keys)
 
 
-@moto.mock_s3
+@mock_s3
 class DownloadKeyTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
@@ -920,7 +1017,7 @@ class DownloadKeyTest(unittest.TestCase):
                               KEY_NAME, bucket_name=BUCKET_NAME)
 
 
-@moto.mock_s3
+@mock_s3
 class OpenTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
@@ -946,23 +1043,36 @@ def populate_bucket(num_keys=10):
 
 
 class RetryIfFailedTest(unittest.TestCase):
+    def setUp(self):
+        self.retry = smart_open.s3.Retry()
+        self.retry.attempts = 3
+        self.retry.sleep_seconds = 0
+
     def test_success(self):
         partial = mock.Mock(return_value=1)
-        result = smart_open.s3._retry_if_failed(partial, attempts=3, sleep_seconds=0)
+        result = self.retry._do(partial)
         self.assertEqual(result, 1)
         self.assertEqual(partial.call_count, 1)
 
-    def test_failure(self):
+    def test_failure_exception(self):
         partial = mock.Mock(side_effect=ValueError)
-        exceptions = (ValueError, )
-
+        self.retry.exceptions = {ValueError: 'Let us retry ValueError'}
         with self.assertRaises(IOError):
-            smart_open.s3._retry_if_failed(partial, attempts=3, sleep_seconds=0, exceptions=exceptions)
+            self.retry._do(partial)
+        self.assertEqual(partial.call_count, 3)
 
+    def test_failure_client_error(self):
+        partial = mock.Mock(
+            side_effect=botocore.exceptions.ClientError(
+                {'Error': {'Code': 'NoSuchUpload'}}, 'NoSuchUpload'
+            )
+        )
+        with self.assertRaises(IOError):
+            self.retry._do(partial)
         self.assertEqual(partial.call_count, 3)
 
 
-@moto.mock_s3()
+@mock_s3
 def test_client_propagation_singlepart():
     """Does the client parameter make it from the caller to Boto3?"""
     #
@@ -985,7 +1095,7 @@ def test_client_propagation_singlepart():
         assert id(writer._client.client) == id(client)
 
 
-@moto.mock_s3()
+@mock_s3
 def test_client_propagation_multipart():
     """Does the resource parameter make it from the caller to Boto3?"""
     session = boto3.Session()
@@ -1004,7 +1114,7 @@ def test_client_propagation_multipart():
         assert id(writer._client.client) == id(client)
 
 
-@moto.mock_s3()
+@mock_s3
 def test_resource_propagation_reader():
     """Does the resource parameter make it from the caller to Boto3?"""
     session = boto3.Session()

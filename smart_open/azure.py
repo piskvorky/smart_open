@@ -417,18 +417,30 @@ class Writer(io.BufferedIOBase):
     def flush(self):
         pass
 
+    def terminate(self):
+        """Do not commit block list on abort.
+
+        Uploaded (uncommitted) blocks will be garbage collected after 7 days.
+
+        See also https://stackoverflow.com/a/69673084/5511061."""
+        logger.debug('%s: terminating multipart upload', self)
+        if not self.closed:
+            self._block_list = []
+            self._is_closed = True
+        logger.debug('%s: terminated multipart upload', self)
+
     #
     # Override some methods from io.IOBase.
     #
     def close(self):
-        logger.debug("closing")
         if not self.closed:
+            logger.debug('%s: completing multipart upload', self)
             if self._current_part.tell() > 0:
                 self._upload_part()
             self._blob.commit_block_list(self._block_list, **self._blob_kwargs)
             self._block_list = []
             self._is_closed = True
-        logger.debug("successfully closed")
+            logger.debug('%s: completed multipart upload', self)
 
     @property
     def closed(self):
@@ -509,7 +521,10 @@ class Writer(io.BufferedIOBase):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        if exc_type is not None:
+            self.terminate()
+        else:
+            self.close()
 
     def __str__(self):
         return "(%s, %r, %r)" % (

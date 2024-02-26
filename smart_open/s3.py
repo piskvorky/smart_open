@@ -6,12 +6,20 @@
 # from the MIT License (MIT).
 #
 """Implements file-like objects for reading and writing from/to AWS S3."""
+from __future__ import annotations
 
+import http
 import io
 import functools
 import logging
 import time
 import warnings
+
+from typing import (
+    Callable,
+    List,
+    TYPE_CHECKING,
+)
 
 try:
     import boto3
@@ -27,12 +35,33 @@ import smart_open.utils
 
 from smart_open import constants
 
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3.client import S3Client
+    from typing_extensions import Buffer
+
 logger = logging.getLogger(__name__)
 
-DEFAULT_MIN_PART_SIZE = 50 * 1024**2
-"""Default minimum part size for S3 multipart uploads"""
-MIN_MIN_PART_SIZE = 5 * 1024 ** 2
+#
+# AWS puts restrictions on the part size for multipart uploads.
+# Each part must be more than 5MB, and less than 5GB.
+#
+# On top of that, our MultipartWriter has a min_part_size option.
+# In retrospect, it's an unfortunate name, because it conflicts with the
+# minimum allowable part size (5MB), but it's too late to change it, because
+# people are using that parameter (unlike the MIN, DEFAULT, MAX constants).
+# It really just means "part size": as soon as you have this many bytes,
+# write a part to S3 (see the MultipartWriter.write method).
+#
+
+MIN_PART_SIZE = 5 * 1024 ** 2
 """The absolute minimum permitted by Amazon."""
+
+DEFAULT_PART_SIZE = 50 * 1024**2
+"""The default part size for S3 multipart uploads, chosen carefully by smart_open"""
+
+MAX_PART_SIZE = 5 * 1024 ** 3
+"""The absolute maximum permitted by Amazon."""
 
 SCHEMES = ("s3", "s3n", 's3u', "s3a")
 DEFAULT_PORT = 443
@@ -46,11 +75,50 @@ URI_EXAMPLES = (
     's3://my_key:my_secret@my_server:my_port@my_bucket/my_key',
 )
 
-_UPLOAD_ATTEMPTS = 6
-_SLEEP_SECONDS = 10
-
 # Returned by AWS when we try to seek beyond EOF.
 _OUT_OF_RANGE = 'InvalidRange'
+
+
+class Retry:
+    def __init__(self):
+        self.attempts: int = 6
+        self.sleep_seconds: int = 10
+        self.exceptions: List[Exception] = [botocore.exceptions.EndpointConnectionError]
+        self.client_error_codes: List[str] = ['NoSuchUpload']
+
+    def _do(self, fn: Callable):
+        for attempt in range(self.attempts):
+            try:
+                return fn()
+            except tuple(self.exceptions) as err:
+                logger.critical(
+                    'Caught non-fatal %s, retrying %d more times',
+                    err,
+                    self.attempts - attempt - 1,
+                )
+                logger.exception(err)
+                time.sleep(self.sleep_seconds)
+            except botocore.exceptions.ClientError as err:
+                error_code = err.response['Error'].get('Code')
+                if error_code not in self.client_error_codes:
+                    raise
+                logger.critical(
+                    'Caught non-fatal ClientError (%s), retrying %d more times',
+                    error_code,
+                    self.attempts - attempt - 1,
+                )
+                logger.exception(err)
+                time.sleep(self.sleep_seconds)
+        else:
+            logger.critical('encountered too many non-fatal errors, giving up')
+            raise IOError('%s failed after %d attempts', fn.func, self.attempts)
+
+
+#
+# The retry mechanism for this submodule.  Client code may modify it, e.g. by
+# updating RETRY.sleep_seconds and friends.
+#
+RETRY = Retry()
 
 
 class _ClientWrapper:
@@ -195,7 +263,11 @@ def _consolidate_params(uri, transport_params):
         )
         uri.update(host=None)
     elif uri['host'] != DEFAULT_HOST:
-        inject(endpoint_url='https://%(host)s:%(port)d' % uri)
+        if uri['scheme'] == 's3u':
+            scheme = 'http'
+        else:
+            scheme = 'https'
+        inject(endpoint_url=scheme + '://%(host)s:%(port)d' % uri)
         uri.update(host=None)
 
     return uri, transport_params
@@ -241,7 +313,7 @@ def open(
     mode,
     version_id=None,
     buffer_size=DEFAULT_BUFFER_SIZE,
-    min_part_size=DEFAULT_MIN_PART_SIZE,
+    min_part_size=DEFAULT_PART_SIZE,
     multipart_upload=True,
     defer_seek=False,
     client=None,
@@ -261,12 +333,29 @@ def open(
     buffer_size: int, optional
         The buffer size to use when performing I/O.
     min_part_size: int, optional
-        The minimum part size for multipart uploads.  For writing only.
+        The minimum part size for multipart uploads, in bytes.
+
+        When the writebuffer contains this many bytes, smart_open will upload
+        the bytes to S3 as a single part of a multi-part upload, freeing the
+        buffer either partially or entirely.  When you close the writer, it
+        will assemble the parts together.
+
+        The value determines the upper limit for the writebuffer.  If buffer
+        space is short (e.g. you are buffering to memory), then use a smaller
+        value for min_part_size, or consider buffering to disk instead (see
+        the writebuffer option).
+
+        The value must be between 5MB and 5GB.  If you specify a value outside
+        of this range, smart_open will adjust it for you, because otherwise the
+        upload _will_ fail.
+
+        For writing only.  Does not apply if you set multipart_upload=False.
     multipart_upload: bool, optional
         Default: `True`
         If set to `True`, will use multipart upload for writing to S3. If set
         to `False`, S3 upload will use the S3 Single-Part Upload API, which
         is more ideal for small file sizes.
+
         For writing only.
     version_id: str, optional
         Version of the object, used when reading object.
@@ -313,10 +402,10 @@ def open(
             fileobj = MultipartWriter(
                 bucket_id,
                 key_id,
-                min_part_size=min_part_size,
                 client=client,
                 client_kwargs=client_kwargs,
                 writebuffer=writebuffer,
+                part_size=min_part_size,
             )
         else:
             fileobj = SinglepartWriter(
@@ -486,9 +575,17 @@ class _SeekableRawReader(object):
                 self,
                 response['ResponseMetadata']['RetryAttempts'],
             )
-            _, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
+            #
+            # range request may not always return partial content, see:
+            # https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests#partial_request_responses
+            #
+            status_code = response['ResponseMetadata']['HTTPStatusCode']
+            if status_code == http.HTTPStatus.PARTIAL_CONTENT:
+                _, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
+                self._position = start
+            elif status_code == http.HTTPStatus.OK:
+                length = response["ContentLength"]
             self._content_length = length
-            self._position = start
             self._body = response['Body']
 
     def read(self, size=-1):
@@ -776,17 +873,21 @@ class MultipartWriter(io.BufferedIOBase):
         self,
         bucket,
         key,
-        min_part_size=DEFAULT_MIN_PART_SIZE,
+        part_size=DEFAULT_PART_SIZE,
         client=None,
         client_kwargs=None,
-        writebuffer=None,
+        writebuffer: io.BytesIO | None = None,
     ):
-        if min_part_size < MIN_MIN_PART_SIZE:
-            logger.warning("S3 requires minimum part size >= 5MB; \
-multipart upload may fail")
-        self._min_part_size = min_part_size
+        adjusted_ps = smart_open.utils.clamp(part_size, MIN_PART_SIZE, MAX_PART_SIZE)
+        if part_size != adjusted_ps:
+            logger.warning(f"adjusting part_size from {part_size} to {adjusted_ps}")
+            part_size = adjusted_ps
+        self._part_size = part_size
 
         _initialize_boto3(self, client, client_kwargs, bucket, key)
+        self._client: S3Client
+        self._bucket: str
+        self._key: str
 
         try:
             partial = functools.partial(
@@ -794,7 +895,7 @@ multipart upload may fail")
                 Bucket=bucket,
                 Key=key,
             )
-            self._upload_id = _retry_if_failed(partial)['UploadId']
+            self._upload_id = RETRY._do(partial)['UploadId']
         except botocore.client.ClientError as error:
             raise ValueError(
                 'the bucket %r does not exist, or is forbidden for access (%r)' % (
@@ -809,12 +910,12 @@ multipart upload may fail")
 
         self._total_bytes = 0
         self._total_parts = 0
-        self._parts = []
+        self._parts: list[dict[str, object]] = []
 
         #
         # This member is part of the io.BufferedIOBase interface.
         #
-        self.raw = None
+        self.raw = None  # type: ignore[assignment]
 
     def flush(self):
         pass
@@ -826,6 +927,7 @@ multipart upload may fail")
         if self._buf.tell():
             self._upload_next_part()
 
+        logger.debug('%s: completing multipart upload', self)
         if self._total_bytes and self._upload_id:
             partial = functools.partial(
                 self._client.complete_multipart_upload,
@@ -834,7 +936,7 @@ multipart upload may fail")
                 UploadId=self._upload_id,
                 MultipartUpload={'Parts': self._parts},
             )
-            _retry_if_failed(partial)
+            RETRY._do(partial)
             logger.debug('%s: completed multipart upload', self)
         elif self._upload_id:
             #
@@ -844,7 +946,6 @@ multipart upload may fail")
             #
             # We work around this by creating an empty file explicitly.
             #
-            assert self._upload_id, "no multipart upload in progress"
             self._client.abort_multipart_upload(
                 Bucket=self._bucket,
                 Key=self._key,
@@ -890,7 +991,7 @@ multipart upload may fail")
     def detach(self):
         raise io.UnsupportedOperation("detach() not supported")
 
-    def write(self, b):
+    def write(self, b: Buffer) -> int:
         """Write the given buffer (bytes, bytearray, memoryview or any buffer
         interface implementation) to the S3 file.
 
@@ -898,24 +999,43 @@ multipart upload may fail")
 
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away."""
+        offset = 0
+        mv = memoryview(b)
+        self._total_bytes += len(mv)
 
-        length = self._buf.write(b)
-        self._total_bytes += length
+        #
+        # botocore does not accept memoryview, otherwise we could've gotten
+        # away with not needing to write a copy to the buffer aside from cases
+        # where b is smaller than part_size
+        #
+        while offset < len(mv):
+            start = offset
+            end = offset + self._part_size - self._buf.tell()
+            self._buf.write(mv[start:end])
+            if self._buf.tell() < self._part_size:
+                #
+                # Not enough data to write a new part just yet. The assert
+                # ensures that we've consumed all of the input buffer.
+                #
+                assert end >= len(mv)
+                return len(mv)
 
-        if self._buf.tell() >= self._min_part_size:
             self._upload_next_part()
-
-        return length
+            offset = end
+        return len(mv)
 
     def terminate(self):
         """Cancel the underlying multipart upload."""
-        assert self._upload_id, "no multipart upload in progress"
+        if self._upload_id is None:
+            return
+        logger.debug('%s: terminating multipart upload', self)
         self._client.abort_multipart_upload(
             Bucket=self._bucket,
             Key=self._key,
             UploadId=self._upload_id,
         )
         self._upload_id = None
+        logger.debug('%s: terminated multipart upload', self)
 
     def to_boto3(self, resource):
         """Create an **independent** `boto3.s3.Object` instance that points to
@@ -928,7 +1048,7 @@ multipart upload may fail")
     #
     # Internal methods.
     #
-    def _upload_next_part(self):
+    def _upload_next_part(self) -> None:
         part_num = self._total_parts + 1
         logger.info(
             "%s: uploading part_num: %i, %i bytes (total %.3fGB)",
@@ -945,7 +1065,7 @@ multipart upload may fail")
         # of a temporary connection problem, so this part needs to be
         # especially robust.
         #
-        upload = _retry_if_failed(
+        upload = RETRY._do(
             functools.partial(
                 self._client.upload_part,
                 Bucket=self._bucket,
@@ -977,10 +1097,10 @@ multipart upload may fail")
         return "smart_open.s3.MultipartWriter(%r, %r)" % (self._bucket, self._key)
 
     def __repr__(self):
-        return "smart_open.s3.MultipartWriter(bucket=%r, key=%r, min_part_size=%r)" % (
+        return "smart_open.s3.MultipartWriter(bucket=%r, key=%r, part_size=%r)" % (
             self._bucket,
             self._key,
-            self._min_part_size,
+            self._part_size,
         )
 
 
@@ -1104,32 +1224,10 @@ class SinglepartWriter(io.BufferedIOBase):
             self.close()
 
     def __str__(self):
-        return "smart_open.s3.SinglepartWriter(%r, %r)" % (self._object.bucket_name, self._object.key)
+        return "smart_open.s3.SinglepartWriter(%r, %r)" % (self._bucket, self._key)
 
     def __repr__(self):
         return "smart_open.s3.SinglepartWriter(bucket=%r, key=%r)" % (self._bucket, self._key)
-
-
-def _retry_if_failed(
-        partial,
-        attempts=_UPLOAD_ATTEMPTS,
-        sleep_seconds=_SLEEP_SECONDS,
-        exceptions=None):
-    if exceptions is None:
-        exceptions = (botocore.exceptions.EndpointConnectionError, )
-    for attempt in range(attempts):
-        try:
-            return partial()
-        except exceptions:
-            logger.critical(
-                'Unable to connect to the endpoint. Check your network connection. '
-                'Sleeping and retrying %d more times '
-                'before giving up.' % (attempts - attempt - 1)
-            )
-            time.sleep(sleep_seconds)
-    else:
-        logger.critical('Unable to connect to the endpoint. Giving up.')
-        raise IOError('Unable to connect to the endpoint after %d attempts' % attempts)
 
 
 def _accept_all(key):
