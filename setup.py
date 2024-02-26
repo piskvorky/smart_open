@@ -85,7 +85,7 @@ setup(
         'ssh': ssh_deps,
         'zst': zst_deps,
     },
-    python_requires=">=3.6,<4.0",
+    python_requires=">=3.7,<4.0",
 
     test_suite="smart_open.tests",
 
