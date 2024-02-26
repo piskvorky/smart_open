@@ -1,3 +1,7 @@
+# 7.0.1, 2024-02-26
+
+* Do not touch botocore unless it is installed (PR [#803](https://github.com/piskvorky/smart_open/pull/803), [@ddelange](https://github.com/ddelange))
+
 # 7.0.0, 2024-02-26
 
 * Upgrade dev status classifier to stable (PR [#798](https://github.com/piskvorky/smart_open/pull/798), [@seebi](https://github.com/seebi))
