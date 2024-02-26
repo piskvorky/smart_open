@@ -118,7 +118,11 @@ class Retry:
 # The retry mechanism for this submodule.  Client code may modify it, e.g. by
 # updating RETRY.sleep_seconds and friends.
 #
-RETRY = Retry()
+# The retry mechanism has a bunch of boto3-specific stuff in it, so we only
+# instantiate it if we have dependencies installed.
+#
+if not MISSING_DEPS:
+    RETRY = Retry()
 
 
 class _ClientWrapper:
