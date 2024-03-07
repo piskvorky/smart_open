@@ -259,7 +259,7 @@ def open(path, mode='r', host=None, user=None, password=None, port=None, connect
     the local ~/.ssh/known_hosts *automatically*.
 
     If ``username`` or ``password`` are specified in *both* the uri and
-    ``transport_params``, ``transport_params`` will take precedence
+    ``connect_kwargs``, ``connect_kwargs`` will take precedence
     """
     host, user, password, port, connect_kwargs = _maybe_fetch_config(
         host, user, password, port, connect_kwargs
