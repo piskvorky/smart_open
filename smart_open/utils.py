@@ -215,6 +215,9 @@ class FileLikeProxy(wrapt.ObjectProxy):
     def __exit__(self, *args, **kwargs):
         """Exit inner after exiting outer."""
         try:
-            super().__exit__(*args, **kwargs)
+            return super().__exit__(*args, **kwargs)
         finally:
             self.__inner.__exit__(*args, **kwargs)
+
+    def __next__(self):
+        return self.__wrapped__.__next__()
