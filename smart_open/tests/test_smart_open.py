@@ -78,7 +78,7 @@ def named_temporary_file(mode='w+b', prefix=None, suffix=None, delete=True):
 
 
 def test_zst_write():
-    with tempfile.NamedTemporaryFile(suffix=".zst") as tmp:
+    with named_temporary_file(suffix=".zst") as tmp:
         with smart_open.open(tmp.name, "wt") as fout:
             print("hello world", file=fout)
             print("this is a test", file=fout)
