@@ -128,7 +128,10 @@ def Reader(bucket,
         warn_deprecated('line_terminator')
 
     bkt = client.bucket(bucket)
-    blob = bkt.blob(key)
+    blob = bkt.get_blob(key)
+
+    if blob is None:
+        raise google.cloud.exceptions.NotFound(f'blob {key} not found in {bucket}')
 
     return blob.open('rb', **blob_open_kwargs)
 
