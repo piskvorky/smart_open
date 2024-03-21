@@ -1,3 +1,7 @@
+# 7.0.2, 2024-03-21
+
+* Add `__next__` method to FileLikeProxy (PR [#811](https://github.com/piskvorky/smart_open/pull/811), [@ddelange](https://github.com/ddelange))
+
 # 7.0.1, 2024-02-26
 
 * Do not touch botocore unless it is installed (PR [#803](https://github.com/piskvorky/smart_open/pull/803), [@ddelange](https://github.com/ddelange))
