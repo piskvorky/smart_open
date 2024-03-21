@@ -379,10 +379,36 @@ class ReaderTest(BaseTest):
         expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
         _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'\n'.join(expected))
 
+        # test the __iter__ method
         with self.assertApiCalls(GetObject=1):
             with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'rb') as fin:
                 actual = [line.rstrip() for line in fin]
         self.assertEqual(expected, actual)
+
+        # test the __next__ method
+        with self.assertApiCalls(GetObject=1):
+            with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'rb') as fin:
+                first = next(fin).rstrip()
+        self.assertEqual(expected[0], first)
+
+    def test_text_iterator(self):
+        expected = u"выйду ночью в поле с конём".split(' ')
+        uri = f's3://{BUCKET_NAME}/{KEY_NAME}.gz'
+
+        with smart_open.open(uri, 'w', encoding='utf-8') as fout:
+            fout.write('\n'.join(expected))
+
+        # test the __iter__ method
+        with self.assertApiCalls(GetObject=1):
+            with smart_open.open(uri, 'r', encoding='utf-8') as fin:
+                actual = [line.rstrip() for line in fin]
+        self.assertEqual(expected, actual)
+
+        # test the __next__ method
+        with self.assertApiCalls(GetObject=1):
+            with smart_open.open(uri, 'r', encoding='utf-8') as fin:
+                first = next(fin).rstrip()
+        self.assertEqual(expected[0], first)
 
     def test_defer_seek(self):
         content = b'englishman\nin\nnew\nyork\n'
