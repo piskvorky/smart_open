@@ -1,6 +1,8 @@
 # 7.0.2, 2024-03-21
 
 * Add `__next__` method to FileLikeProxy (PR [#811](https://github.com/piskvorky/smart_open/pull/811), [@ddelange](https://github.com/ddelange))
+* Fix python_requires minimum python version in setup.py (PR [#807](https://github.com/piskvorky/smart_open/pull/807), [@pressler-vsc](https://github.com/pressler-vsc))
+* Add activity check to cached sftp connections (PR [#808](https://github.com/piskvorky/smart_open/pull/808), [@greg-offerfit](https://github.com/greg-offerfit))
 
 # 7.0.1, 2024-02-26
 
