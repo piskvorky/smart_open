@@ -77,6 +77,18 @@ def named_temporary_file(mode='w+b', prefix=None, suffix=None, delete=True):
             logger.error(e)
 
 
+def test_zst_write():
+    with named_temporary_file(suffix=".zst") as tmp:
+        with smart_open.open(tmp.name, "wt") as fout:
+            print("hello world", file=fout)
+            print("this is a test", file=fout)
+
+        with smart_open.open(tmp.name, "rt") as fin:
+            got = list(fin)
+
+    assert got == ["hello world\n", "this is a test\n"]
+
+
 class ParseUriTest(unittest.TestCase):
     """
     Test ParseUri class.
