@@ -7,6 +7,7 @@
 #
 import gzip
 import io
+import tempfile
 
 import pytest
 import zstandard as zstd
@@ -42,3 +43,15 @@ def label(thing, name):
 def test_compression_wrapper_read(fileobj, compression, filename):
     wrapped = smart_open.compression.compression_wrapper(fileobj, 'rb', compression, filename)
     assert wrapped.read() == plain
+
+
+def test_zst_write():
+    with tempfile.NamedTemporaryFile(suffix=".zst") as tmp:
+        with smart_open.open(tmp.name, "wt") as fout:
+            print("hello world", file=fout)
+            print("this is a test", file=fout)
+
+        with smart_open.open(tmp.name, "rt") as fin:
+            got = list(fin)
+
+    assert got == ["hello world\n", "this is a test\n"]

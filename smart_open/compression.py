@@ -106,8 +106,8 @@ def _handle_gzip(file_obj, mode):
 
 
 def _handle_zstd(file_obj, mode):
-    import zstandard as zstd
-    result = zstd.ZstdDecompressor().stream_reader(file_obj, closefd=True)
+    import zstandard  # type: ignore
+    result = zstandard.open(filename=file_obj, mode=mode)
     return result
 
 
