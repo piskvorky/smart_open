@@ -50,7 +50,6 @@ tests_require = all_deps + [
     'boto3',
     'pytest',
     'pytest-rerunfailures',
-    'pytest-benchmark',
 ]
 
 setup(

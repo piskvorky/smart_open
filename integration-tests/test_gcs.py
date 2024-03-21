@@ -28,9 +28,6 @@ def write_read(key, content, write_mode, read_mode, **kwargs):
     with smart_open.open(key, read_mode, **kwargs) as fin:
         return fin.read()
 
-def open_only(key, read_mode, **kwargs) -> None:
-    with smart_open.open(key, read_mode, **kwargs):
-        pass
 
 def read_length_prefixed_messages(key, read_mode, **kwargs):
     result = io.BytesIO()
@@ -124,10 +121,3 @@ def test_gcs_performance_small_reads(benchmark):
 
     actual = benchmark(read_length_prefixed_messages, key, 'rb', buffering=ONE_MIB)
     assert actual == one_megabyte_of_msgs
-
-def test_gcs_performance_open(benchmark):
-    # we don't need to use a uri that actually exists in order to call GCS's open()
-    key = "gs://some-bucket/some_blob.txt"
-    transport_params = {'client': google.cloud.storage.Client()}
-    benchmark(open_only, key, 'rb', transport_params=transport_params)
-    assert True
