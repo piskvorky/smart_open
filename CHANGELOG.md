@@ -1,3 +1,8 @@
+# 7.0.3, 2024-03-21
+
+* add support for zst writing (PR [#812](https://github.com/piskvorky/smart_open/pull/812), [@mpenkov](https://github.com/mpenkov))
+* roll back PR [#812](https://github.com/piskvorky/smart_open/pull/788), restore compatibility with built-in open function ([@mpenkov](https://github.com/mpenkov))
+
 # 7.0.2, 2024-03-21
 
 * Add `__next__` method to FileLikeProxy (PR [#811](https://github.com/piskvorky/smart_open/pull/811), [@ddelange](https://github.com/ddelange))
