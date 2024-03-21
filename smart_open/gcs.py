@@ -152,11 +152,7 @@ def Writer(bucket,
 
     blob_open_kwargs = {**_DEFAULT_WRITE_OPEN_KWARGS, **blob_open_kwargs}
 
-    g_bucket = client.bucket(bucket)
-    if not g_bucket.exists():
-        raise google.cloud.exceptions.NotFound(f'bucket {bucket} not found')
-
-    g_blob = g_bucket.blob(
+    g_blob = client.bucket(bucket).blob(
         blob,
         chunk_size=min_part_size,
     )
