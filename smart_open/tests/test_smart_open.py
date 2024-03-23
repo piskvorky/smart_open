@@ -89,6 +89,18 @@ def test_zst_write():
     assert got == ["hello world\n", "this is a test\n"]
 
 
+def test_zst_write_binary():
+    with named_temporary_file(suffix=".zst") as tmp:
+        with smart_open.open(tmp.name, "wb") as fout:
+            fout.write(b"hello world\n")
+            fout.write(b"this is a test\n")
+
+        with smart_open.open(tmp.name, "rb") as fin:
+            got = list(fin)
+
+    assert got == [b"hello world\n", b"this is a test\n"]
+
+
 class ParseUriTest(unittest.TestCase):
     """
     Test ParseUri class.
