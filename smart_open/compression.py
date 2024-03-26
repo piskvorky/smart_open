@@ -6,6 +6,7 @@
 # from the MIT License (MIT).
 #
 """Implements the compression layer of the ``smart_open`` library."""
+import io
 import logging
 import os.path
 
@@ -108,6 +109,17 @@ def _handle_gzip(file_obj, mode):
 def _handle_zstd(file_obj, mode):
     import zstandard  # type: ignore
     result = zstandard.open(filename=file_obj, mode=mode)
+    # zstandard.open returns an io.TextIOWrapper in text mode, but otherwise
+    # returns a raw stream reader/writer, and we need the `io` wrapper
+    # to make FileLikeProxy work correctly.
+    #
+    # See:
+    #
+    # https://github.com/indygreg/python-zstandard/blob/d7d81e79dbe74feb22fb73405ebfb3e20f4c4653/zstandard/__init__.py#L169-L174
+    if "b" in mode and "w" in mode:
+        result = io.BufferedWriter(result)
+    elif "b" in mode and "r" in mode:
+        result = io.BufferedReader(result)
     return result
 
 
