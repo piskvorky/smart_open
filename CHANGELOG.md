@@ -1,3 +1,8 @@
+# 7.0.4, 2024-03-26
+
+* Fix wb mode with zstd compression (PR [#815](https://github.com/piskvorky/smart_open/pull/815), [@djudd](https://github.com/djudd))
+* Remove GCS bucket.exists call to avoid storage.buckets.get permission (PR [#813](https://github.com/piskvorky/smart_open/pull/813), [@ddelange](https://github.com/ddelange))
+
 # 7.0.3, 2024-03-21
 
 * add support for zst writing (PR [#812](https://github.com/piskvorky/smart_open/pull/812), [@mpenkov](https://github.com/mpenkov))
