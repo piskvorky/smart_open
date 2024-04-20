@@ -795,6 +795,26 @@ class SinglepartWriterTest(unittest.TestCase):
         with smart_open.s3.open(BUCKET_NAME, 'key', 'wb', multipart_upload=False) as fout:
             assert str(fout) == "smart_open.s3.SinglepartWriter('test-smartopen', 'key')"
 
+    def test_ensure_no_side_effects_on_exception(self):
+        class WriteError(Exception):
+            pass
+
+        s3_resource = _resource("s3")
+        obj = s3_resource.Object(BUCKET_NAME, KEY_NAME)
+
+        # wrap in closure to ease writer dereferencing
+        def _run():
+            with smart_open.s3.open(BUCKET_NAME, obj.key, "wb", multipart_upload=False) as fout:
+                fout.write(b"this should not be written")
+                raise WriteError
+
+        try:
+            _run()
+        except WriteError:
+            pass
+        finally:
+            self.assertRaises(s3_resource.meta.client.exceptions.NoSuchKey, obj.get)
+
 
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')
 
