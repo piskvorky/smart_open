@@ -1441,7 +1441,8 @@ def gzip_compress(data, filename=None):
     buf = io.BytesIO()
     buf.name = filename
     with mock.patch('time.time', _MOCK_TIME):
-        gzip.GzipFile(fileobj=buf, mode='w').write(data)
+        with gzip.GzipFile(fileobj=buf, mode='w') as gz:
+            gz.write(data)
     return buf.getvalue()
 
 
