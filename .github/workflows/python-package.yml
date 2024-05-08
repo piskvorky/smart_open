@@ -30,11 +30,13 @@ jobs:
           - {python: '3.9', os: ubuntu-20.04}
           - {python: '3.10', os: ubuntu-20.04}
           - {python: '3.11', os: ubuntu-20.04}
+          - {python: '3.12', os: ubuntu-20.04}
 
           - {python: '3.8', os: windows-2019}
           - {python: '3.9', os: windows-2019}
           - {python: '3.10', os: windows-2019}
           - {python: '3.11', os: windows-2019}
+          - {python: '3.12', os: windows-2019}
     steps:
       - uses: actions/checkout@v2
 
@@ -73,6 +75,7 @@ jobs:
           - {python: '3.9', os: ubuntu-20.04}
           - {python: '3.10', os: ubuntu-20.04}
           - {python: '3.11', os: ubuntu-20.04}
+          - {python: '3.12', os: ubuntu-20.04}
 
           #
           # Some of the doctests don't pass on Windows because of Windows-specific
@@ -115,6 +118,7 @@ jobs:
           - {python: '3.9', os: ubuntu-20.04}
           - {python: '3.10', os: ubuntu-20.04}
           - {python: '3.11', os: ubuntu-20.04}
+          - {python: '3.12', os: ubuntu-20.04}
 
           # Not sure why we exclude these, perhaps for historical reasons?
           #
@@ -143,7 +147,7 @@ jobs:
 
       - run: bash ci_helpers/helpers.sh enable_moto_server
         if: ${{ matrix.moto_server }}
-      
+
       - run: |
           sudo apt-get install vsftpd
           sudo bash ci_helpers/helpers.sh create_ftp_ftps_servers
@@ -156,7 +160,7 @@ jobs:
 
       - run: bash ci_helpers/helpers.sh disable_moto_server
         if: ${{ matrix.moto_server }}
-      
+
       - run: sudo bash ci_helpers/helpers.sh delete_ftp_ftps_servers
 
   benchmarks:
@@ -169,6 +173,7 @@ jobs:
           - {python: '3.9', os: ubuntu-20.04}
           - {python: '3.10', os: ubuntu-20.04}
           - {python: '3.11', os: ubuntu-20.04}
+          - {python: '3.12', os: ubuntu-20.04}
 
           # - {python: '3.7', os: windows-2019}
           # - {python: '3.8', os: windows-2019}
