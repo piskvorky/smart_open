@@ -59,3 +59,12 @@ def test_check_kwargs():
 def test_safe_urlsplit(url, expected):
     actual = smart_open.utils.safe_urlsplit(url)
     assert actual == urllib.parse.SplitResult(*expected)
+
+
+def test_save_defaults():
+    current = {'key1': 1, 'key2': 2}
+    defaults = {'key1': 1, 'key3': 3}
+    expected = {'key1': 1, 'key2': 2, 'key3': 3}
+    smart_open.utils.set_defaults(current, defaults)
+    assert len(expected) == len(current)
+    assert all((current.get(k) == v for k, v in expected.items()))
