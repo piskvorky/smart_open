@@ -221,3 +221,19 @@ class FileLikeProxy(wrapt.ObjectProxy):
 
     def __next__(self):
         return self.__wrapped__.__next__()
+
+
+def set_defaults(first: dict, second: dict):
+    """Sets the values in the first dictionary from the second dictionary,
+       preserving the existing values in the first.
+
+    Parameters
+    ----------
+    first: dict
+        The dict that will be updated.
+    second: dict
+        The dict with default values.
+    """
+    for key, val in second.items():
+        if key not in first:
+            first[key] = val

@@ -93,6 +93,7 @@ Other examples of URLs that ``smart_open`` accepts::
     s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
     gs://my_bucket/my_blob
     azure://my_bucket/my_blob
+    obs://bucket_id.server:port/object_key
     hdfs:///path/file
     hdfs://path/file
     webhdfs://host:port/path/file
@@ -290,6 +291,7 @@ Transport-specific Options
 - WebHDFS
 - GCS
 - Azure Blob Storage
+- OBS (Huawei Object Storage)
 
 Each option involves setting up its own set of parameters.
 For example, for accessing S3, you often need to set up authentication, like API keys or a profile name.
@@ -454,6 +456,55 @@ Additional keyword arguments can be propagated to the ``commit_block_list`` meth
 
     kwargs = {'metadata': {'version': 2}}
     fout = open('azure://container/key', 'wb', transport_params={'blob_kwargs': kwargs})
+
+OBS Credentials
+---------------
+``smart_open`` uses the ``esdk-obs-python`` library to talk to OBS.
+Please see `esdk-obs-python docs <https://support.huaweicloud.com/intl/en-us/sdk-python-devg-obs/obs_22_0500.html>`__.
+
+There are several ways to provide Access key, Secret Key and Security Token
+
+- Using env variables
+- Using custom client params
+
+AK, SK, ST can be encrypted in this case You need install and configure `security provider <https://support.huawei.com/enterprise/en/software/260510077-ESW2000847337>`__.
+
+
+OBS Advanced Usage
+--------------------
+- Supported env variables:
+
+OBS_ACCESS_KEY_ID,
+OBS_SECRET_ACCESS_KEY,
+OBS_SECURITY_TOKEN,
+SMART_OPEN_OBS_USE_CLIENT_WRITE_MODE,
+SMART_OPEN_OBS_DECRYPT_AK_SK,
+SMART_OPEN_OBS_SCC_LIB_PATH,
+SMART_OPEN_OBS_SCC_CONF_PATH
+
+- Configuration via code
+.. code-block:: python
+
+    client = {'access_key_id': 'ak', 'secret_access_key': 'sk', 'security_token': 'st', 'server': 'server_url'}
+    headers = obs.PutObjectHeader(contentType='text/plain')
+    transport_params = {
+    >>> # client can be dict with parameters supported by the obs.ObsClient or instance of the obs.ObsClient
+    >>> 'client': client,
+    >>>  # additional header for request, please see esdk-obs-python docs
+    >>>  'headers': headers,
+    >>> # if True obs.ObsClient will be take write method argument as readable object to get bytes. For writing mode only.
+    >>> # Please see docs for ObsClient.putContent api.
+    >>> 'use_obs_client_write_mode': True,
+    >>> # True if need decrypt Ak, Sk, St
+    >>> # It required to install CryptoAPI libs.
+    >>> # https://support.huawei.com/enterprise/en/software/260510077-ESW2000847337
+    >>> 'decrypt_ak_sk' : True,
+    >>> # path to python libs of the Crypto provider
+    >>> 'scc_lib_path': '/usr/lib/scc',
+    >>> # path to config file of the Crypto provider
+    >>> 'scc_conf_path': '/home/user/scc.conf'}
+
+    fout = open('obs://bucket_id.server:port/object_key', 'wb', transport_params=transport_params)
 
 Drop-in replacement of ``pathlib.Path.open``
 --------------------------------------------

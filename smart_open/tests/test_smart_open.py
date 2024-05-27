@@ -7,23 +7,25 @@
 #
 
 import bz2
-import csv
 import contextlib
+import csv
 import functools
-import io
 import gzip
 import hashlib
+import io
 import logging
 import os
-from smart_open.compression import INFER_FROM_EXTENSION, NO_COMPRESSION
 import tempfile
 import unittest
-from unittest import mock
 import warnings
+from unittest import mock
+from unittest.mock import patch
 
 import boto3
 import pytest
 import responses
+
+from smart_open.compression import INFER_FROM_EXTENSION, NO_COMPRESSION
 
 # See https://github.com/piskvorky/smart_open/issues/800
 # This supports moto 4 & 5 until v4 is no longer used by distros.
@@ -37,6 +39,7 @@ from smart_open import smart_open_lib
 from smart_open import webhdfs
 from smart_open.smart_open_lib import patch_pathlib, _patch_pathlib
 from smart_open.tests.test_s3 import patch_invalid_range_response
+import obs
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +109,7 @@ class ParseUriTest(unittest.TestCase):
     Test ParseUri class.
 
     """
+
     def test_scheme(self):
         """Do URIs schemes parse correctly?"""
         # supported schemes
@@ -417,6 +421,13 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.container_id, "mycontainer")
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
 
+    def test_obs_parse_uri(self):
+        parsed_uri = smart_open_lib._parse_uri("obs://bucketid.server.com:123/folder/file.tgz")
+        self.assertEqual(parsed_uri.scheme, "obs")
+        self.assertEqual(parsed_uri.bucket_id, "bucketid")
+        self.assertEqual(parsed_uri.object_key, "folder/file.tgz")
+        self.assertEqual(parsed_uri.server, "server.com:123")
+
     def test_pathlib_monkeypatch(self):
         from smart_open.smart_open_lib import pathlib
 
@@ -458,6 +469,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     Test reading from HTTP connections in various ways.
 
     """
+
     @mock.patch('smart_open.ssh.open', return_value=open(__file__))
     def test_read_ssh(self, mock_open):
         """Is SSH line iterator called correctly?"""
@@ -918,14 +930,14 @@ class SmartOpenReadTest(unittest.TestCase):
         prefix = "file://"
         full_path = '/tmp/test.txt'
         read_mode = "rb"
-        smart_open_object = smart_open.open(prefix+full_path, read_mode)
+        smart_open_object = smart_open.open(prefix + full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
         mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
         full_path = '/tmp/test#hash##more.txt'
         read_mode = "rb"
-        smart_open_object = smart_open.open(prefix+full_path, read_mode)
+        smart_open_object = smart_open.open(prefix + full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
         mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
@@ -948,7 +960,7 @@ class SmartOpenReadTest(unittest.TestCase):
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)
 
-        smart_open_object = smart_open.open(prefix+short_path, read_mode, errors='strict')
+        smart_open_object = smart_open.open(prefix + short_path, read_mode, errors='strict')
         smart_open_object.__iter__()
         # called with the correct expanded path?
         mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1, errors='strict')
@@ -1023,13 +1035,13 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_s3_iter_moto(self):
         """Are S3 files iterated over correctly?"""
         # a list of strings to test with
-        expected = [b"*" * 5 * 1024**2] + [b'0123456789'] * 1024 + [b"test"]
+        expected = [b"*" * 5 * 1024 ** 2] + [b'0123456789'] * 1024 + [b"test"]
 
         # create fake bucket and fake key
         s3 = _resource('s3')
         s3.create_bucket(Bucket='mybucket')
 
-        tp = dict(s3_min_part_size=5 * 1024**2)
+        tp = dict(s3_min_part_size=5 * 1024 ** 2)
         with smart_open.open("s3://mybucket/mykey", "wb", transport_params=tp) as fout:
             # write a single huge line (=full multipart upload)
             fout.write(expected[0] + b'\n')
@@ -1157,6 +1169,7 @@ class SmartOpenTest(unittest.TestCase):
     Test reading and writing from/into files.
 
     """
+
     def setUp(self):
         self.as_text = u'куда идём мы с пятачком - большой большой секрет'
         self.as_bytes = self.as_text.encode('utf-8')
@@ -1780,6 +1793,54 @@ class S3OpenTest(unittest.TestCase):
         self.assertEqual(mock_open.call_args[1]['client_kwargs']['S3.Client'], expected)
 
 
+class ObsOpenTest(unittest.TestCase):
+
+    def setUp(self):
+        self.test_string = u'ветер по морю гуляет...'
+        self.bucket_id = 'bucketId'
+        self.object_key = 'objectKey'
+
+        response_wrapper = obs.model.ResponseWrapper(conn=None,
+                                                     connHolder=None,
+                                                     result=io.BytesIO(self.test_string.encode('utf-8')))
+        body = obs.model.ObjectStream(response=response_wrapper)
+        self.response = obs.model.GetResult(status=200, body=body)
+
+    def test_open(self):
+        with patch.object(obs.ObsClient, 'getObject', return_value=self.response):
+            with smart_open.open(f'obs://{self.bucket_id}.server/{self.object_key}',
+                                 'rb', transport_params=dict(client=obs.ObsClient(server='server'))) as file:
+                self.assertEqual(file.read(), self.test_string.encode("utf-8"))
+                self.assertEqual(file.read(), b'')
+                self.assertEqual(file.read(), b'')
+
+
+class ObsWriteTest(unittest.TestCase):
+    def setUp(self):
+        self.texst_text = 'ветер по морю гуляет...'
+        self.bucket_id = 'bucketId'
+        self.object_key = 'objectKey'
+
+        response_wrapper = obs.model.ResponseWrapper(conn=None, connHolder=None, result=io.BytesIO(b'ok'))
+        body = obs.model.ObjectStream(response=response_wrapper)
+        self.response = obs.model.GetResult(status=200, body=body)
+
+    def test_write(self):
+        with patch.object(obs.ObsClient, 'putContent', return_value=self.response) as mock_method:
+            with smart_open.open(f'obs://{self.bucket_id}.server/{self.object_key}',
+                                 'wb', transport_params=dict(client=obs.ObsClient(server='server'),
+                                                             headers=obs.PutObjectHeader(
+                                                                 contentType='text/plain'))) as file:
+                file.write(u'ветер по морю '.encode('utf-8'))
+                file.write(u'гуляет...'.encode('utf-8'))
+
+            kwargs = mock_method.call_args.kwargs
+            self.assertEqual(kwargs['bucketName'], self.bucket_id)
+            self.assertEqual(kwargs['objectKey'], self.object_key)
+            self.assertEqual(kwargs['headers']['contentType'], 'text/plain')
+            self.assertEqual(kwargs['content'].read(), self.texst_text.encode('utf-8'))
+
+
 def function(a, b, c, foo='bar', baz='boz'):
     pass
 
@@ -1913,12 +1974,12 @@ def test_get_binary_mode(mode, expected):
 @pytest.mark.parametrize(
     'mode',
     [
-        ('rw', ),
-        ('rwa', ),
-        ('rbt', ),
-        ('r++', ),
-        ('+', ),
-        ('x', ),
+        ('rw',),
+        ('rwa',),
+        ('rbt',),
+        ('r++',),
+        ('+',),
+        ('x',),
     ]
 )
 def test_get_binary_mode_bad(mode):
