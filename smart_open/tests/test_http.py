@@ -15,7 +15,7 @@ import responses
 import smart_open.http
 import smart_open.s3
 import smart_open.constants
-
+import requests
 
 BYTES = b'i tried so hard and got so far but in the end it doesn\'t even matter'
 URL = 'http://localhost'
@@ -161,6 +161,13 @@ class HttpTest(unittest.TestCase):
         assert hasattr(reader, 'timeout')
         assert reader.timeout == timeout
 
+    @responses.activate
+    def test_session_attribute(self):
+        session = requests.Session()
+        responses.add_callback(responses.GET, URL, callback=request_callback)
+        reader = smart_open.open(URL, "rb", transport_params={'session': session})
+        assert hasattr(reader, 'session')
+        assert reader.session == session
 
 @responses.activate
 def test_seek_implicitly_enabled(numbytes=10):
