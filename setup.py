@@ -42,8 +42,9 @@ azure_deps = ['azure-storage-blob', 'azure-common', 'azure-core']
 http_deps = ['requests']
 ssh_deps = ['paramiko']
 zst_deps = ['zstandard']
+obs_deps = ['esdk-obs-python']
 
-all_deps = aws_deps + gcs_deps + azure_deps + http_deps + ssh_deps + zst_deps
+all_deps = aws_deps + gcs_deps + azure_deps + http_deps + ssh_deps + zst_deps + obs_deps
 tests_require = all_deps + [
     'moto[server]',
     'responses',
@@ -83,6 +84,7 @@ setup(
         'webhdfs': http_deps,
         'ssh': ssh_deps,
         'zst': zst_deps,
+        'obs': obs_deps,
     },
     python_requires=">=3.7,<4.0",
 
