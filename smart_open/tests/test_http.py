@@ -169,6 +169,7 @@ class HttpTest(unittest.TestCase):
         assert hasattr(reader, 'session')
         assert reader.session == session
 
+
 @responses.activate
 def test_seek_implicitly_enabled(numbytes=10):
     """Can we seek even if the server hasn't explicitly allowed it?"""

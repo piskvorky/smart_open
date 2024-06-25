@@ -101,9 +101,9 @@ class BufferedInputBase(io.BufferedIOBase):
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
                  kerberos=False, user=None, password=None, cert=None,
                  headers=None, session=None, timeout=None):
-                 
+
         self.session = session
-        
+
         if kerberos:
             import requests_kerberos
             auth = requests_kerberos.HTTPKerberosAuth()
@@ -241,7 +241,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         self.url = url
 
         self.session = session
-        
+
         if kerberos:
             import requests_kerberos
             self.auth = requests_kerberos.HTTPKerberosAuth()
@@ -362,5 +362,5 @@ class SeekableBufferedInputBase(BufferedInputBase):
             headers=self.headers,
             timeout=self.timeout,
         )
-        
+
         return response
