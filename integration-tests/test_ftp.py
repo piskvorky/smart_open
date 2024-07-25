@@ -1,6 +1,11 @@
 from __future__ import unicode_literals
 import pytest
 from smart_open import open
+import ssl
+from functools import partial
+
+# localhost has self-signed cert, see ci_helpers/helpers.sh:create_ftp_ftps_servers
+ssl.create_default_context = partial(ssl.create_default_context, cafile="/etc/vsftpd.pem")
 
 
 @pytest.fixture(params=[("ftp", 21), ("ftps", 90)])
