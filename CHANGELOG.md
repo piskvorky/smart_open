@@ -482,3 +482,4 @@ The old `smart_open.smart_open` function is deprecated, but continues to work as
 
   - support for multistream bzip files (PR #9, @pombredanne)
   - introduce this CHANGELOG
+
