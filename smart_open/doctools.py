@@ -18,7 +18,6 @@ import os.path
 import re
 
 from . import compression
-from . import transport
 
 PLACEHOLDER = '    smart_open/doctools.py magic goes here'
 
@@ -169,6 +168,7 @@ def extract_examples_from_readme_rst(indent='    '):
 
 
 def tweak_open_docstring(f):
+    from . import transport
     buf = io.StringIO()
     seen = set()
 
@@ -214,6 +214,8 @@ def tweak_open_docstring(f):
 
 
 def tweak_parse_uri_docstring(f):
+    from . import transport
+
     buf = io.StringIO()
     seen = set()
     schemes = []

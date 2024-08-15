@@ -33,7 +33,6 @@ import smart_open.compression as so_compression
 import smart_open.utils as so_utils
 
 from smart_open import doctools
-from smart_open import transport
 
 #
 # For backwards compatibility and keeping old unit tests happy.
@@ -77,6 +76,8 @@ def parse_uri(uri_as_string):
     -----
     smart_open/doctools.py magic goes here
     """
+    from smart_open import transport
+
     scheme = _sniff_scheme(uri_as_string)
     submodule = transport.get_transport(scheme)
     as_dict = submodule.parse_uri(uri_as_string)
@@ -332,6 +333,8 @@ def _shortcut_open(
     :returns: The opened file
     :rtype: file
     """
+    from smart_open import transport
+
     if not isinstance(uri, str):
         return None
 
@@ -374,6 +377,8 @@ def _open_binary_stream(uri, mode, transport_params):
     :returns: A named file object
     :rtype: file-like object with a .name attribute
     """
+    from smart_open import transport
+
     if mode not in ('rb', 'rb+', 'wb', 'wb+', 'ab', 'ab+'):
         #
         # This should really be a ValueError, but for the sake of compatibility
