@@ -208,6 +208,8 @@ class TextIOWrapper(io.TextIOWrapper):
 
 
 class FileLikeProxy(wrapt.ObjectProxy):
+    __inner = ...  # initialized before wrapt disallows __setattr__ on certain objects
+
     def __init__(self, outer, inner):
         super().__init__(outer)
         self.__inner = inner
