@@ -373,6 +373,24 @@ class ReaderTest(unittest.TestCase):
         self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
         self.assertEqual(content[14:], fin.read())  # read the rest
 
+    def test_readline(self):
+        """Are Azure Blob Storage files read correctly with readlines?"""
+        content = u"hello wořld\nhow are you?".encode('utf8')
+        blob_name = "test_read_%s" % BLOB_NAME
+        put_to_container(blob_name, contents=content)
+        logger.debug('content: %r len: %r', content, len(content))
+
+        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
+            line = fin.readline()
+            self.assertEqual(line, 'hello wořld\n')
+
+            fin.seek(0)
+            actual = list(fin)
+            self.assertEqual(fin.tell(), len(content))
+
+        expected = ['hello wořld\n', 'how are you?']
+        self.assertEqual(expected, actual)
+
     def test_read_max_concurrency(self):
         """Are Azure Blob Storage files read correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
