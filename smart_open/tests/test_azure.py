@@ -376,7 +376,7 @@ class ReaderTest(unittest.TestCase):
     def test_read_max_concurrency(self):
         """Are Azure Blob Storage files read correctly?"""
         content = u"hello wořld\nhow are you?".encode('utf8')
-        blob_name = "test_read_%s" % BLOB_NAME
+        blob_name = "test_read_max_concurrency_%s" % BLOB_NAME
         put_to_container(blob_name, contents=content)
         logger.debug('content: %r len: %r', content, len(content))
 
