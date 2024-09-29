@@ -117,6 +117,14 @@ def open(
             blob_kwargs=blob_kwargs,
             min_part_size=min_part_size
         )
+    elif mode == smart_open.constants.APPEND_BINARY:
+        return AppendWriter(
+            container_id,
+            blob_id,
+            client,
+            blob_kwargs=blob_kwargs,
+            min_part_size=min_part_size
+        )
     else:
         raise NotImplementedError('Azure Blob Storage support for mode %r not implemented' % mode)
 
@@ -514,6 +522,105 @@ class Writer(io.BufferedIOBase):
         self._bytes_uploaded += content_length
         self._current_part = io.BytesIO(self._current_part.read())
         self._current_part.seek(0, io.SEEK_END)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.terminate()
+        else:
+            self.close()
+
+    def __str__(self):
+        return "(%s, %r, %r)" % (
+            self.__class__.__name__,
+            self._container_name,
+            self._blob.blob_name
+        )
+
+    def __repr__(self):
+        return "%s(container=%r, blob=%r, min_part_size=%r)" % (
+            self.__class__.__name__,
+            self._container_name,
+            self._blob.blob_name,
+            self._min_part_size
+        )
+
+class AppendWriter(io.BufferedIOBase):
+    """Append bytes to Azure Blob Storage.
+
+    Implements the io.BufferedIOBase interface of the standard library."""
+
+    def __init__(
+            self,
+            container,
+            blob,
+            client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
+            blob_kwargs=None,
+            min_part_size=_DEFAULT_MIN_PART_SIZE,
+    ):
+        self._is_closed = False
+        self._container_name = container
+
+        self._blob = _get_blob_client(client, container, blob)
+        self._blob_kwargs = blob_kwargs or {}
+        # type: azure.storage.blob.BlobClient
+
+        self._min_part_size = min_part_size
+        self._total_size = 0
+
+        #
+        # This member is part of the io.BufferedIOBase interface.
+        #
+        self.raw = None
+
+    def flush(self):
+        pass
+
+    def terminate(self):
+        #TODO: re-read github issue and apply recommendations
+        pass
+
+    def close(self):
+        #TODO: re-read github issue and apply recommendations
+
+    @property
+    def closed(self):
+        return self._is_closed
+
+    def writable(self):
+        """Return True if the stream supports writing."""
+        return True
+
+    def seekable(self):
+        """If False, seek(), tell() and truncate() will raise IOError.
+
+        We offer only tell support, and no seek or truncate support."""
+        return True
+
+    def seek(self, offset, whence=smart_open.constants.WHENCE_START):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def truncate(self, size=None):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def tell(self):
+        """Return the current stream position."""
+        return self._total_size
+
+    def detach(self):
+        raise io.UnsupportedOperation("detach() not supported")
+
+    def write(self, b):
+       # TODO: redo entire logic
+       pass
+
+    def _upload_part(self):
+        # TODO: redo entire logic
+        pass
 
     def __enter__(self):
         return self
