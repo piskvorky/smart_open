@@ -464,7 +464,7 @@ class SmartOpenHttpTest(unittest.TestCase):
         obj = smart_open.open(
             "ssh://ubuntu:pass@ip_address:1022/some/path/lines.txt",
             mode='rb',
-            transport_params=dict(hello='world'),
+            transport_params={'connect_kwargs': {'hello': 'world'}},
         )
         obj.__iter__()
         mock_open.assert_called_with(
@@ -474,7 +474,7 @@ class SmartOpenHttpTest(unittest.TestCase):
             user='ubuntu',
             password='pass',
             port=1022,
-            transport_params={'hello': 'world'},
+            connect_kwargs={'hello': 'world'},
         )
 
     @responses.activate
