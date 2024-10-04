@@ -47,9 +47,12 @@ all_deps = aws_deps + gcs_deps + azure_deps + http_deps + ssh_deps + zst_deps
 tests_require = all_deps + [
     'moto[server]',
     'responses',
-    'boto3',
     'pytest',
     'pytest-rerunfailures',
+    'pytest_benchmark',
+    'awscli',
+    'pyopenssl',
+    'numpy',
 ]
 
 setup(

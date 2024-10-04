@@ -21,24 +21,22 @@ BYTES = b'i tried so hard and got so far but in the end it doesn\'t even matter'
 URL = 'http://localhost'
 HTTPS_URL = 'https://localhost'
 HEADERS = {
-    'Content-Length': str(len(BYTES)),
     'Accept-Ranges': 'bytes',
 }
 
 
 def request_callback(request, headers=HEADERS, data=BYTES):
-    try:
-        range_string = request.headers['range']
-    except KeyError:
-        return (200, headers, data)
+    headers = headers.copy()
+    range_string = request.headers.get('range', 'bytes=0-')
 
-    start, end = range_string.replace('bytes=', '').split('-', 1)
+    start, end = range_string.replace('bytes=', '', 1).split('-', 1)
     start = int(start)
-    if end:
-        end = int(end)
-    else:
-        end = len(data)
-    return (200, headers, data[start:end])
+    end = int(end) if end else len(data)
+
+    data = data[start:end]
+    headers['Content-Length'] = str(len(data))
+
+    return (200, headers, data)
 
 
 @unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
