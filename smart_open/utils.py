@@ -223,3 +223,10 @@ class FileLikeProxy(wrapt.ObjectProxy):
 
     def __next__(self):
         return self.__wrapped__.__next__()
+
+    def close(self):
+        try:
+            return self.__wrapped__.close()
+        finally:
+            if self.__inner != self.__wrapped__:  # Don't close again if inner and wrapped are the same
+                self.__inner.close()
