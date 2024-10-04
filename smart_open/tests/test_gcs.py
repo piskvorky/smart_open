@@ -45,6 +45,8 @@ class FakeBucket(object):
         #
         self.client.register_bucket(self)
 
+        self.get_blob = mock.Mock(side_effect=self._get_blob)
+
     def blob(self, blob_id, **kwargs):
         return self.blobs.get(blob_id, FakeBlob(blob_id, self, **kwargs))
 
@@ -57,7 +59,7 @@ class FakeBucket(object):
     def exists(self):
         return self._exists
 
-    def get_blob(self, blob_id):
+    def _get_blob(self, blob_id, **kwargs):
         try:
             return self.blobs[blob_id]
         except KeyError as e:
@@ -299,6 +301,15 @@ class WriterTest(unittest.TestCase):
 
         for k, v in blob_properties.items():
             self.assertEqual(getattr(b, k), v)
+
+    def test_get_blob_kwargs_passthrough(self):
+        get_blob_kwargs = {'generation': '1111111111111111'}
+
+        with self.assertRaises(google.cloud.exceptions.NotFound):
+            smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME, get_blob_kwargs=get_blob_kwargs)
+
+        self.client.bucket(BUCKET_NAME) \
+            .get_blob.assert_called_once_with(BLOB_NAME, **get_blob_kwargs)
 
     def test_default_open_kwargs(self):
         smart_open.gcs.Writer(BUCKET_NAME, BLOB_NAME)

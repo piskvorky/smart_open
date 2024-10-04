@@ -634,6 +634,43 @@ class MultipartWriterTest(unittest.TestCase):
 
             assert actual == contents
 
+    def test_write_gz_using_context_manager(self):
+        """Does s3 multipart upload create a compressed file using context manager?"""
+        contents = b'get ready for a surprise'
+        with smart_open.open(
+                f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz',
+                mode="wb",
+                transport_params={
+                    "multipart_upload": True,
+                    "min_part_size": 10,
+                }
+        ) as fout:
+            fout.write(contents)
+
+        with smart_open.open(f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz', 'rb') as fin:
+            actual = fin.read()
+
+        assert actual == contents
+
+    def test_write_gz_not_using_context_manager(self):
+        """Does s3 multipart upload create a compressed file not using context manager but close()?"""
+        contents = b'get ready for a surprise'
+        fout = smart_open.open(
+            f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz',
+            mode="wb",
+            transport_params={
+                "multipart_upload": True,
+                "min_part_size": 10,
+            }
+        )
+        fout.write(contents)
+        fout.close()
+
+        with smart_open.open(f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz', 'rb') as fin:
+            actual = fin.read()
+
+        assert actual == contents
+
     def test_write_gz_with_error(self):
         """Does s3 multipart upload abort for a failed compressed file upload?"""
         with self.assertRaises(ValueError):
@@ -794,6 +831,26 @@ class SinglepartWriterTest(unittest.TestCase):
     def test_str(self):
         with smart_open.s3.open(BUCKET_NAME, 'key', 'wb', multipart_upload=False) as fout:
             assert str(fout) == "smart_open.s3.SinglepartWriter('test-smartopen', 'key')"
+
+    def test_ensure_no_side_effects_on_exception(self):
+        class WriteError(Exception):
+            pass
+
+        s3_resource = _resource("s3")
+        obj = s3_resource.Object(BUCKET_NAME, KEY_NAME)
+
+        # wrap in closure to ease writer dereferencing
+        def _run():
+            with smart_open.s3.open(BUCKET_NAME, obj.key, "wb", multipart_upload=False) as fout:
+                fout.write(b"this should not be written")
+                raise WriteError
+
+        try:
+            _run()
+        except WriteError:
+            pass
+        finally:
+            self.assertRaises(s3_resource.meta.client.exceptions.NoSuchKey, obj.get)
 
 
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')

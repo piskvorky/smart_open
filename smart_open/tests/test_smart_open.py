@@ -607,6 +607,22 @@ class RealFileSystemTests(unittest.TestCase):
         self.assertEqual(text, SAMPLE_TEXT * 2)
 
 
+class CompressionRealFileSystemTests(RealFileSystemTests):
+    """Same as RealFileSystemTests but with a compressed file."""
+
+    def setUp(self):
+        with named_temporary_file(prefix='test', suffix='.zst', delete=False) as fout:
+            self.temp_file = fout.name
+        with smart_open.open(self.temp_file, 'wb') as fout:
+            fout.write(SAMPLE_BYTES)
+
+    def test_aplus(self):
+        pass  # transparent (de)compression unsupported for mode 'ab+'
+
+    def test_atplus(self):
+        pass  # transparent (de)compression unsupported for mode 'ab+'
+
+
 #
 # What exactly to patch here differs on _how_ we're opening the file.
 # See the _shortcut_open function for details.
@@ -1441,7 +1457,8 @@ def gzip_compress(data, filename=None):
     buf = io.BytesIO()
     buf.name = filename
     with mock.patch('time.time', _MOCK_TIME):
-        gzip.GzipFile(fileobj=buf, mode='w').write(data)
+        with gzip.GzipFile(fileobj=buf, mode='w') as gz:
+            gz.write(data)
     return buf.getvalue()
 
 

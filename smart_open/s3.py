@@ -1209,8 +1209,8 @@ class SinglepartWriter(io.BufferedIOBase):
         return length
 
     def terminate(self):
-        """Nothing to cancel in single-part uploads."""
-        return
+        self._buf = None
+        logger.debug('%s: terminated singlepart upload', self)
 
     #
     # Internal methods.

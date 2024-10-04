@@ -1,5 +1,8 @@
 name: Test
 on: [push, pull_request]
+concurrency:  # https://stackoverflow.com/questions/66335225#comment133398800_72408109
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   linters:
     runs-on: ubuntu-latest
@@ -12,10 +15,10 @@ jobs:
           python-version: "3.11"
 
       - name: Update pip
-        run: python -m pip install -U pip
+        run: pip install -U pip
 
       - name: Install dependencies
-        run: python -m pip install flake8
+        run: pip install flake8
 
       - name: Run flake8 linter (source)
         run: flake8 --show-source smart_open
@@ -26,15 +29,17 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python: '3.8', os: ubuntu-20.04}
-          - {python: '3.9', os: ubuntu-20.04}
-          - {python: '3.10', os: ubuntu-20.04}
-          - {python: '3.11', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-20.04}
+          - {python-version: '3.9', os: ubuntu-20.04}
+          - {python-version: '3.10', os: ubuntu-20.04}
+          - {python-version: '3.11', os: ubuntu-20.04}
+          - {python-version: '3.12', os: ubuntu-20.04}
 
-          - {python: '3.8', os: windows-2019}
-          - {python: '3.9', os: windows-2019}
-          - {python: '3.10', os: windows-2019}
-          - {python: '3.11', os: windows-2019}
+          - {python-version: '3.8', os: windows-2019}
+          - {python-version: '3.9', os: windows-2019}
+          - {python-version: '3.10', os: windows-2019}
+          - {python-version: '3.11', os: windows-2019}
+          - {python-version: '3.12', os: windows-2019}
     steps:
       - uses: actions/checkout@v2
 
@@ -43,13 +48,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Update pip
-        run: python -m pip install -U pip
-
-      #
-      # https://askubuntu.com/questions/1428181/module-lib-has-no-attribute-x509-v-flag-cb-issuer-check
-      #
-      - name: Upgrade PyOpenSSL
-        run: python -m pip install pyOpenSSL --upgrade
+        run: pip install -U pip
 
       - name: Install smart_open without dependencies
         run: pip install -e .
@@ -69,19 +68,20 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python: '3.8', os: ubuntu-20.04}
-          - {python: '3.9', os: ubuntu-20.04}
-          - {python: '3.10', os: ubuntu-20.04}
-          - {python: '3.11', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-20.04}
+          - {python-version: '3.9', os: ubuntu-20.04}
+          - {python-version: '3.10', os: ubuntu-20.04}
+          - {python-version: '3.11', os: ubuntu-20.04}
+          - {python-version: '3.12', os: ubuntu-20.04}
 
           #
           # Some of the doctests don't pass on Windows because of Windows-specific
           # character encoding issues.
           #
-          # - {python: '3.7', os: windows-2019}
-          # - {python: '3.8', os: windows-2019}
-          # - {python: '3.9', os: windows-2019}
-          # - {python: '3.10', os: windows-2019}
+          # - {python-version: '3.7', os: windows-2019}
+          # - {python-version: '3.8', os: windows-2019}
+          # - {python-version: '3.9', os: windows-2019}
+          # - {python-version: '3.10', os: windows-2019}
 
     steps:
       - uses: actions/checkout@v2
@@ -91,10 +91,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Update pip
-        run: python -m pip install -U pip
-
-      - name: Upgrade PyOpenSSL
-        run: python -m pip install pyOpenSSL --upgrade
+        run: pip install -U pip
 
       - name: Install smart_open and its dependencies
         run: pip install -e .[test]
@@ -111,17 +108,18 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python: '3.8', os: ubuntu-20.04}
-          - {python: '3.9', os: ubuntu-20.04}
-          - {python: '3.10', os: ubuntu-20.04}
-          - {python: '3.11', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-20.04}
+          - {python-version: '3.9', os: ubuntu-20.04}
+          - {python-version: '3.10', os: ubuntu-20.04}
+          - {python-version: '3.11', os: ubuntu-20.04}
+          - {python-version: '3.12', os: ubuntu-20.04}
 
           # Not sure why we exclude these, perhaps for historical reasons?
           #
-          # - {python: '3.7', os: windows-2019}
-          # - {python: '3.8', os: windows-2019}
-          # - {python: '3.9', os: windows-2019}
-          # - {python: '3.10', os: windows-2019}
+          # - {python-version: '3.7', os: windows-2019}
+          # - {python-version: '3.8', os: windows-2019}
+          # - {python-version: '3.9', os: windows-2019}
+          # - {python-version: '3.10', os: windows-2019}
 
     steps:
       - uses: actions/checkout@v2
@@ -131,20 +129,17 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Update pip
-        run: python -m pip install -U pip
-
-      - name: Upgrade PyOpenSSL
-        run: python -m pip install pyOpenSSL --upgrade
-
-      - run: python -m pip install numpy
+        run: pip install -U pip
 
       - name: Install smart_open and its dependencies
         run: pip install -e .[test]
 
       - run: bash ci_helpers/helpers.sh enable_moto_server
         if: ${{ matrix.moto_server }}
-      
-      - run: |
+
+      - name: Start vsftpd
+        timeout-minutes: 2
+        run: |
           sudo apt-get install vsftpd
           sudo bash ci_helpers/helpers.sh create_ftp_ftps_servers
 
@@ -156,7 +151,7 @@ jobs:
 
       - run: bash ci_helpers/helpers.sh disable_moto_server
         if: ${{ matrix.moto_server }}
-      
+
       - run: sudo bash ci_helpers/helpers.sh delete_ftp_ftps_servers
 
   benchmarks:
@@ -165,15 +160,16 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python: '3.8', os: ubuntu-20.04}
-          - {python: '3.9', os: ubuntu-20.04}
-          - {python: '3.10', os: ubuntu-20.04}
-          - {python: '3.11', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-20.04}
+          - {python-version: '3.9', os: ubuntu-20.04}
+          - {python-version: '3.10', os: ubuntu-20.04}
+          - {python-version: '3.11', os: ubuntu-20.04}
+          - {python-version: '3.12', os: ubuntu-20.04}
 
-          # - {python: '3.7', os: windows-2019}
-          # - {python: '3.8', os: windows-2019}
-          # - {python: '3.9', os: windows-2019}
-          # - {python: '3.10', os: windows-2019}
+          # - {python-version: '3.7', os: windows-2019}
+          # - {python-version: '3.8', os: windows-2019}
+          # - {python-version: '3.9', os: windows-2019}
+          # - {python-version: '3.10', os: windows-2019}
 
     steps:
       - uses: actions/checkout@v2
@@ -183,15 +179,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Update pip
-        run: python -m pip install -U pip
-
-      - name: Upgrade PyOpenSSL
-        run: python -m pip install pyOpenSSL --upgrade
+        run: pip install -U pip
 
       - name: Install smart_open and its dependencies
         run: pip install -e .[test]
-
-      - run: pip install awscli pytest_benchmark
 
       - name: Run benchmarks
         run: python ci_helpers/run_benchmarks.py
