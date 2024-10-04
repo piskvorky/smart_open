@@ -1,3 +1,13 @@
+# 7.0.5, 2024-10-04
+
+- Fix zstd compression in ab mode (PR [#833](https://github.com/piskvorky/smart_open/pull/833), [@ddelange](https://github.com/ddelange))
+- Fix close function not neing able to upload a compressed S3 (PR [#838](https://github.com/piskvorky/smart_open/pull/838), [@jbarragan-bridge](https://github.com/jbarragan-bridge))
+- Fix test_http.request_callback (PR [#828](https://github.com/piskvorky/smart_open/pull/828), [@ddelange](https://github.com/ddelange))
+- Update readline logic for azure to match s3 (PR [#826](https://github.com/piskvorky/smart_open/pull/826), [@quantumfusion](https://github.com/quantumfusion))
+- Make http handler take an optional requests.Session (PR [#825](https://github.com/piskvorky/smart_open/pull/825), [@arondaniel](https://github.com/arondaniel))
+- Ensure no side effects on SinglepartWriter exception (PR [#820](https://github.com/piskvorky/smart_open/pull/820), [@donsokolone](https://github.com/donsokolone))
+- Add support for `get_blob_kwargs` to GCS blob read operations (PR [#817](https://github.com/piskvorky/smart_open/pull/817), [@thejcannon](https://github.com/thejcannon))
+
 # 7.0.4, 2024-03-26
 
 * Fix wb mode with zstd compression (PR [#815](https://github.com/piskvorky/smart_open/pull/815), [@djudd](https://github.com/djudd))
