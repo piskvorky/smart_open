@@ -166,6 +166,7 @@ class HttpTest(unittest.TestCase):
         reader = smart_open.open(URL, "rb", transport_params={'session': session})
         assert hasattr(reader, 'session')
         assert reader.session == session
+        assert reader.read() == BYTES
 
 
 @responses.activate

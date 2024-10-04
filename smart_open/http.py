@@ -102,7 +102,7 @@ class BufferedInputBase(io.BufferedIOBase):
                  kerberos=False, user=None, password=None, cert=None,
                  headers=None, session=None, timeout=None):
 
-        self.session = session
+        self.session = session or requests
 
         if kerberos:
             import requests_kerberos
@@ -240,7 +240,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         """
         self.url = url
 
-        self.session = session
+        self.session = session or requests
 
         if kerberos:
             import requests_kerberos
@@ -354,13 +354,5 @@ class SeekableBufferedInputBase(BufferedInputBase):
             cert=self.cert,
             headers=self.headers,
             timeout=self.timeout,
-        ) if self.session is not None else requests.get(
-            self.url,
-            auth=self.auth,
-            stream=True,
-            cert=self.cert,
-            headers=self.headers,
-            timeout=self.timeout,
         )
-
         return response
