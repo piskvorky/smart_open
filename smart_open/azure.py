@@ -584,6 +584,7 @@ class AppendWriter(io.BufferedIOBase):
 
     def close(self):
         #TODO: re-read github issue and apply recommendations
+        pass
 
     @property
     def closed(self):
@@ -615,7 +616,9 @@ class AppendWriter(io.BufferedIOBase):
         raise io.UnsupportedOperation("detach() not supported")
 
     def write(self, b):
-       # TODO: redo entire logic
+       if not self._blob.exists():
+           self._blob.create_append_blob()
+       self._blob.append_block(data=b, **self._blob_kwargs)
        pass
 
     def _upload_part(self):

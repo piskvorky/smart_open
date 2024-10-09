@@ -846,3 +846,24 @@ class WriterTest(unittest.TestCase):
         fout.write(text)
         fout.flush()
         fout.close()
+
+class AppendWriterTest(unittest.TestCase):
+    """Test appending into Azure Blob files."""
+
+    def tearDown(self):
+        cleanup_container()
+
+    def test_append_01(self):
+        """Does appending into Azure Blob Storage work correctly?"""
+        test_string = u"žluťoučký koníček".encode('utf8')
+        blob_name = "test_write_01_%s" % BLOB_NAME
+
+        with smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT) as fout:
+            fout.write(test_string)
+
+        output = list(smart_open.open(
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+            "rb",
+            transport_params=dict(client=CLIENT),
+        ))
+        self.assertEqual(output, [test_string])
