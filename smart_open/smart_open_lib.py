@@ -222,7 +222,12 @@ def open(
         raise NotImplementedError(ve.args[0])
 
     binary = _open_binary_stream(uri, binary_mode, transport_params)
-    decompressed = so_compression.compression_wrapper(binary, binary_mode, compression)
+    decompressed = so_compression.compression_wrapper(
+        binary,
+        binary_mode,
+        compression,
+        filename=uri,
+    )
 
     if 'b' not in mode or explicit_encoding is not None:
         decoded = _encoding_wrapper(
