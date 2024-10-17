@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+import gzip
 import pytest
 from smart_open import open
 import ssl
@@ -70,6 +71,15 @@ def test_compression(server_info):
     
     with open(f"{server_type}://user:123@localhost:{port_num}/file.gz", "r") as f:
         read_contents = f.read()
+        assert read_contents == file_contents + appended_content1
+
+    # check that the bytes on server are actually gzip compressed
+    with open(
+        f"{server_type}://user:123@localhost:{port_num}/file.gz",
+        "rb",
+        compression='disable',
+    ) as f:
+        read_contents = gzip.decompress(f.read()).decode()
         assert read_contents == file_contents + appended_content1
 
 def test_line_endings_non_binary(server_info):
