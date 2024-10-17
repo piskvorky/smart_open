@@ -226,7 +226,7 @@ def open(
         binary,
         binary_mode,
         compression,
-        filename=uri,
+        filename=getattr(binary, "name", uri),
     )
 
     if 'b' not in mode or explicit_encoding is not None:
