@@ -222,6 +222,7 @@ def open(
         raise NotImplementedError(ve.args[0])
 
     binary = _open_binary_stream(uri, binary_mode, transport_params)
+    assert hasattr(binary, "name"), "missing 'name' attr (for INFER_FROM_EXTENSION)"
     decompressed = so_compression.compression_wrapper(binary, binary_mode, compression)
 
     if 'b' not in mode or explicit_encoding is not None:

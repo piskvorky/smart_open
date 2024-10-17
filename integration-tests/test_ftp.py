@@ -52,6 +52,26 @@ def test_binary(server_info):
         read_contents = f.read()
         assert read_contents == file_contents + appended_content1
 
+def test_compression(server_info):
+    server_type = server_info[0]
+    port_num = server_info[1]
+    file_contents = "Test Test \n new test \n another tests"
+    appended_content1 = "Added \n to end"
+
+    with open(f"{server_type}://user:123@localhost:{port_num}/file.gz", "w") as f:
+        f.write(file_contents)
+
+    with open(f"{server_type}://user:123@localhost:{port_num}/file.gz", "r") as f:
+        read_contents = f.read()
+        assert read_contents == file_contents
+
+    with open(f"{server_type}://user:123@localhost:{port_num}/file.gz", "a") as f:
+        f.write(appended_content1)
+
+    with open(f"{server_type}://user:123@localhost:{port_num}/file.gz", "r") as f:
+        read_contents = f.read()
+        assert read_contents == file_contents + appended_content1
+
 def test_line_endings_non_binary(server_info):
     server_type = server_info[0]
     port_num = server_info[1]

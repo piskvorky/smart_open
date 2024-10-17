@@ -169,4 +169,5 @@ def open(
     fobj.socket = socket
     fobj.conn = conn
     fobj.close = types.MethodType(full_close, fobj)
+    fobj.name = path
     return fobj
