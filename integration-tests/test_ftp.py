@@ -73,7 +73,11 @@ def test_compression(server_info):
         read_contents = f.read()
         assert read_contents == file_contents + appended_content1
 
-    # check that the bytes on server are actually gzip compressed
+    # ftp socket makefile returns a file whose name attribute is fileno() which is int
+    # that can't be used to infer compression extension, so the calls above would
+    # silently not use any compression (neither reading nor writing) so they would pass
+    # pytest suppresses the logging.warning('unable to transparently decompress...')
+    # so check here explicitly that the bytes on server are gzip compressed
     with open(
         f"{server_type}://user:123@localhost:{port_num}/file.gz",
         "rb",
