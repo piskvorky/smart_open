@@ -122,14 +122,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
         self.timeout = timeout
 
-        self.response = session.get(
-            url,
-            auth=auth,
-            cert=cert,
-            stream=True,
-            headers=self.headers,
-            timeout=self.timeout,
-        ) if session is not None else requests.get(
+        self.response = self.session.get(
             url,
             auth=auth,
             cert=cert,
