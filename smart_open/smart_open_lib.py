@@ -222,7 +222,19 @@ def open(
         raise NotImplementedError(ve.args[0])
 
     binary = _open_binary_stream(uri, binary_mode, transport_params)
-    decompressed = so_compression.compression_wrapper(binary, binary_mode, compression)
+    filename = (
+        binary.name
+        # if name attribute is not string-like (e.g. ftp socket fileno)...
+        if isinstance(getattr(binary, "name", None), (str, bytes))
+        # ...fall back to uri
+        else uri
+    )
+    decompressed = so_compression.compression_wrapper(
+        binary,
+        binary_mode,
+        compression,
+        filename=filename,
+    )
 
     if 'b' not in mode or explicit_encoding is not None:
         decoded = _encoding_wrapper(
