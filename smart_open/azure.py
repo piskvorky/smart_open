@@ -16,8 +16,8 @@ import smart_open.bytebuffer
 import smart_open.constants
 
 try:
-    import azure.storage.blob
     import azure.core.exceptions
+    import azure.storage.blob
 except ImportError:
     MISSING_DEPS = True
 
@@ -558,22 +558,14 @@ class AppendWriter(io.BufferedIOBase):
             blob,
             client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
             blob_kwargs=None,
-            min_part_size=_DEFAULT_MIN_PART_SIZE,
     ):
         self._is_closed = False
         self._container_name = container
 
         self._blob = _get_blob_client(client, container, blob)
-        self._blob_kwargs = blob_kwargs or {}
         # type: azure.storage.blob.BlobClient
+        self._blob_kwargs = blob_kwargs or {}
 
-        self._min_part_size = min_part_size
-        self._total_size = 0
-
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
 
     def flush(self):
         pass
@@ -608,22 +600,18 @@ class AppendWriter(io.BufferedIOBase):
         """Unsupported."""
         raise io.UnsupportedOperation
 
-    def tell(self):
-        """Return the current stream position."""
-        return self._total_size
-
     def detach(self):
         raise io.UnsupportedOperation("detach() not supported")
 
     def write(self, b):
-       if not self._blob.exists():
-           self._blob.create_append_blob()
-       self._blob.append_block(data=b, **self._blob_kwargs)
-       pass
+       if not isinstance(b, _BINARY_TYPES):
+           raise TypeError("input must be one of %r, got: %r" % (_BINARY_TYPES, type(b)))
+       
+       # Uploads data as an AppendBlob type with automatic block chunking. 
+       # The AppendBlob will be created at first if it does not exist or append to it if it does.
 
-    def _upload_part(self):
-        # TODO: redo entire logic
-        pass
+       return self._blob.upload_blob(data=b, blob_type="AppendBlob", overwrite=False, **self._blob_kwargs)
+       
 
     def __enter__(self):
         return self
@@ -642,9 +630,8 @@ class AppendWriter(io.BufferedIOBase):
         )
 
     def __repr__(self):
-        return "%s(container=%r, blob=%r, min_part_size=%r)" % (
+        return "%s(container=%r, blob=%r)" % (
             self.__class__.__name__,
             self._container_name,
             self._blob.blob_name,
-            self._min_part_size
         )
