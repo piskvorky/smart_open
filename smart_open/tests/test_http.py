@@ -44,7 +44,7 @@ class HttpTest(unittest.TestCase):
 
     @responses.activate
     def test_read_all(self):
-        responses.add(responses.GET, URL, body=BYTES, stream=True)
+        responses.add(responses.GET, URL, body=BYTES)
         reader = smart_open.http.SeekableBufferedInputBase(URL)
         read_bytes = reader.read()
         self.assertEqual(BYTES, read_bytes)

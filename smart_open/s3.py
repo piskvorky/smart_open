@@ -703,6 +703,7 @@ class Reader(io.BufferedIOBase):
 
     def close(self):
         """Flush and close this stream."""
+        logger.debug("close: called")
         pass
 
     def readable(self):
@@ -869,6 +870,7 @@ class MultipartWriter(io.BufferedIOBase):
     """Writes bytes to S3 using the multi part API.
 
     Implements the io.BufferedIOBase interface of the standard library."""
+    _upload_id = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(
         self,
@@ -925,6 +927,10 @@ class MultipartWriter(io.BufferedIOBase):
     # Override some methods from io.IOBase.
     #
     def close(self):
+        logger.debug("close: called")
+        if self.closed:
+            return
+
         if self._buf.tell():
             self._upload_next_part()
 
@@ -1027,7 +1033,7 @@ class MultipartWriter(io.BufferedIOBase):
 
     def terminate(self):
         """Cancel the underlying multipart upload."""
-        if self._upload_id is None:
+        if self.closed:
             return
         logger.debug('%s: terminating multipart upload', self)
         self._client.abort_multipart_upload(
@@ -1112,6 +1118,7 @@ class SinglepartWriter(io.BufferedIOBase):
 
     This class buffers all of its input in memory until its `close` method is called. Only then will
     the data be written to S3 and the buffer is released."""
+    _buf = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(
         self,
@@ -1147,7 +1154,8 @@ class SinglepartWriter(io.BufferedIOBase):
     # Override some methods from io.IOBase.
     #
     def close(self):
-        if self._buf is None:
+        logger.debug("close: called")
+        if self.closed:
             return
 
         self._buf.seek(0)
