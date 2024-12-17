@@ -195,8 +195,9 @@ class Reader(io.BufferedIOBase):
     Implements the io.BufferedIOBase interface of the standard library.
 
     :raises azure.core.exceptions.ResourceNotFoundError: Raised when the blob to read from does not exist.
-
     """
+    _blob = None  # so `closed` property works in case __init__ fails and __del__ is called
+
     def __init__(
             self,
             container,
@@ -207,9 +208,10 @@ class Reader(io.BufferedIOBase):
             max_concurrency=DEFAULT_MAX_CONCURRENCY,
     ):
         self._container_name = container
+        self._blob_name = blob
 
-        self._blob = _get_blob_client(client, container, blob)
         # type: azure.storage.blob.BlobClient
+        self._blob = _get_blob_client(client, container, blob)
 
         if self._blob is None:
             raise azure.core.exceptions.ResourceNotFoundError(
@@ -236,8 +238,13 @@ class Reader(io.BufferedIOBase):
     def close(self):
         """Flush and close this stream."""
         logger.debug("close: called")
-        self._blob = None
-        self._raw_reader = None
+        if not self.closed:
+            self._blob = None
+            self._raw_reader = None
+
+    @property
+    def closed(self):
+        return self._blob is None
 
     def readable(self):
         """Return True if the stream can be read from."""
@@ -369,20 +376,26 @@ class Reader(io.BufferedIOBase):
         self.close()
 
     def __str__(self):
-        return "(%s, %r, %r)" % (self.__class__.__name__,
-                                 self._container_name,
-                                 self._blob.blob_name)
+        return "(%s, %r, %r)" % (
+            self.__class__.__name__,
+            self._container_name,
+            self._blob_name
+        )
 
     def __repr__(self):
         return "%s(container=%r, blob=%r)" % (
-            self.__class__.__name__, self._container_name, self._blob.blob_name,
+            self.__class__.__name__,
+            self._container_name,
+            self._blob_name,
         )
 
 
 class Writer(io.BufferedIOBase):
     """Writes bytes to Azure Blob Storage.
 
-    Implements the io.BufferedIOBase interface of the standard library."""
+    Implements the io.BufferedIOBase interface of the standard library.
+    """
+    _blob = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(
             self,
@@ -392,20 +405,18 @@ class Writer(io.BufferedIOBase):
             blob_kwargs=None,
             min_part_size=_DEFAULT_MIN_PART_SIZE,
     ):
-        self._is_closed = False
         self._container_name = container
-
-        self._blob = _get_blob_client(client, container, blob)
+        self._blob_name = blob
         self._blob_kwargs = blob_kwargs or {}
-        # type: azure.storage.blob.BlobClient
-
         self._min_part_size = min_part_size
-
         self._total_size = 0
         self._total_parts = 0
         self._bytes_uploaded = 0
         self._current_part = io.BytesIO()
         self._block_list = []
+
+        # type: azure.storage.blob.BlobClient
+        self._blob = _get_blob_client(client, container, blob)
 
         #
         # This member is part of the io.BufferedIOBase interface.
@@ -424,25 +435,26 @@ class Writer(io.BufferedIOBase):
         logger.debug('%s: terminating multipart upload', self)
         if not self.closed:
             self._block_list = []
-            self._is_closed = True
+            self._blob = None
         logger.debug('%s: terminated multipart upload', self)
 
     #
     # Override some methods from io.IOBase.
     #
     def close(self):
+        logger.debug("close: called")
         if not self.closed:
             logger.debug('%s: completing multipart upload', self)
             if self._current_part.tell() > 0:
                 self._upload_part()
             self._blob.commit_block_list(self._block_list, **self._blob_kwargs)
             self._block_list = []
-            self._is_closed = True
+            self._blob = None
             logger.debug('%s: completed multipart upload', self)
 
     @property
     def closed(self):
-        return self._is_closed
+        return self._blob is None
 
     def writable(self):
         """Return True if the stream supports writing."""
@@ -528,13 +540,13 @@ class Writer(io.BufferedIOBase):
         return "(%s, %r, %r)" % (
             self.__class__.__name__,
             self._container_name,
-            self._blob.blob_name
+            self._blob_name
         )
 
     def __repr__(self):
         return "%s(container=%r, blob=%r, min_part_size=%r)" % (
             self.__class__.__name__,
             self._container_name,
-            self._blob.blob_name,
+            self._blob_name,
             self._min_part_size
         )

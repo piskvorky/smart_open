@@ -101,6 +101,8 @@ def convert_to_http_uri(parsed_uri):
 
 
 class BufferedInputBase(io.BufferedIOBase):
+    _buf = None  # so `closed` property works in case __init__ fails and __del__ is called
+
     def __init__(self, uri):
         self._uri = uri
 
@@ -116,6 +118,12 @@ class BufferedInputBase(io.BufferedIOBase):
     def close(self):
         """Flush and close this stream."""
         logger.debug("close: called")
+        if not self.closed:
+            self._buf = None
+
+    @property
+    def closed(self):
+        return self._buf is None
 
     def readable(self):
         """Return True if the stream can be read from."""

@@ -481,7 +481,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_http_read(self):
         """Does http read method work correctly"""
         responses.add(responses.GET, "http://127.0.0.1/index.html",
-                      body='line1\nline2', stream=True)
+                      body='line1\nline2')
         smart_open_object = smart_open.open("http://127.0.0.1/index.html", 'rb')
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
@@ -489,7 +489,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_https_readline(self):
         """Does https readline method work correctly"""
         responses.add(responses.GET, "https://127.0.0.1/index.html",
-                      body=u'line1\u2028still line1\nline2', stream=True)
+                      body=u'line1\u2028still line1\nline2')
         smart_open_object = smart_open.open("https://127.0.0.1/index.html", 'rb')
         self.assertEqual(smart_open_object.readline().decode("utf-8"), u"line1\u2028still line1\n")
         smart_open_object = smart_open.open("https://127.0.0.1/index.html", 'r', encoding='utf-8')
@@ -499,7 +499,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_http_pass(self):
         """Does http authentication work correctly"""
         responses.add(responses.GET, "http://127.0.0.1/index.html",
-                      body='line1\nline2', stream=True)
+                      body='line1\nline2')
         tp = dict(user='me', password='pass')
         smart_open.open("http://127.0.0.1/index.html", transport_params=tp)
         self.assertEqual(len(responses.calls), 1)
@@ -511,7 +511,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_http_cert(self):
         """Does cert parameter get passed to requests"""
         responses.add(responses.GET, "http://127.0.0.1/index.html",
-                      body='line1\nline2', stream=True)
+                      body='line1\nline2')
         cert_path = '/path/to/my/cert.pem'
         tp = dict(cert=cert_path)
         smart_open.open("http://127.0.0.1/index.html", transport_params=tp)
@@ -527,7 +527,7 @@ class SmartOpenHttpTest(unittest.TestCase):
         raw_data = b'Hello World Compressed.' * 10000
         compressed_data = gzip_compress(raw_data) if suffix == '.gz' else bz2.compress(raw_data)
 
-        responses.add(responses.GET, 'http://127.0.0.1/data' + suffix, body=compressed_data, stream=True)
+        responses.add(responses.GET, 'http://127.0.0.1/data' + suffix, body=compressed_data)
         url = 'http://127.0.0.1/data%s%s' % (suffix, '?some_param=some_val' if query else '')
         smart_open_object = smart_open.open(url, 'rb')
 
@@ -1009,7 +1009,7 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_webhdfs(self):
         """Is webhdfs line iterator called correctly"""
         responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file",
-                      body='line1\nline2', stream=True)
+                      body='line1\nline2')
         smart_open_object = smart_open.open("webhdfs://127.0.0.1:8440/path/file", 'rb')
         iterator = iter(smart_open_object)
         self.assertEqual(next(iterator).decode("utf-8"), "line1\n")
@@ -1022,7 +1022,7 @@ class SmartOpenReadTest(unittest.TestCase):
         actual_url = 'http://127.0.0.1:8440/webhdfs/v1/path/file'
         text = u'не для меня прийдёт весна, не для меня дон разольётся'
         body = text.encode('utf-8')
-        responses.add(responses.GET, actual_url, body=body, stream=True)
+        responses.add(responses.GET, actual_url, body=body)
 
         actual = smart_open.open(input_url, encoding='utf-8').read()
         self.assertEqual(text, actual)
@@ -1031,7 +1031,7 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_webhdfs_read(self):
         """Does webhdfs read method work correctly"""
         responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file",
-                      body='line1\nline2', stream=True)
+                      body='line1\nline2')
         smart_open_object = smart_open.open("webhdfs://127.0.0.1:8440/path/file", 'rb')
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 

@@ -98,6 +98,8 @@ def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
 
 
 class BufferedInputBase(io.BufferedIOBase):
+    response = None  # so `closed` property works in case __init__ fails and __del__ is called
+
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
                  kerberos=False, user=None, password=None, cert=None,
                  headers=None, session=None, timeout=None):
@@ -122,14 +124,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
         self.timeout = timeout
 
-        self.response = session.get(
-            url,
-            auth=auth,
-            cert=cert,
-            stream=True,
-            headers=self.headers,
-            timeout=self.timeout,
-        ) if session is not None else requests.get(
+        self.response = self.session.get(
             url,
             auth=auth,
             cert=cert,
@@ -156,8 +151,13 @@ class BufferedInputBase(io.BufferedIOBase):
     def close(self):
         """Flush and close this stream."""
         logger.debug("close: called")
-        self.response = None
-        self._read_iter = None
+        if not self.closed:
+            self.response = None
+            self._read_iter = None
+
+    @property
+    def closed(self):
+        return self.response is None
 
     def readable(self):
         """Return True if the stream can be read from."""
