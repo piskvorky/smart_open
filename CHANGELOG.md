@@ -1,3 +1,8 @@
+# 7.1.0, 2024-12-17
+
+- Add support for python 3.13 (PR [#847](https://github.com/piskvorky/smart_open/pull/847), [@ddelange](https://github.com/ddelange))
+- Propagate uri to compression_wrapper (PR [#842](https://github.com/piskvorky/smart_open/pull/842), [@ddelange](https://github.com/ddelange))
+
 # 7.0.5, 2024-10-04
 
 - Fix zstd compression in ab mode (PR [#833](https://github.com/piskvorky/smart_open/pull/833), [@ddelange](https://github.com/ddelange))
