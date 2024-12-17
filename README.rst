@@ -227,6 +227,7 @@ The supported values for this parameter are:
 - ``disable``
 - ``.gz``
 - ``.bz2``
+- ``.zst``
 
 By default, ``smart_open`` determines the compression algorithm to use based on the file extension.
 

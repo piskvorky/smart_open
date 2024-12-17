@@ -31,12 +31,14 @@ jobs:
           - {python-version: '3.10', os: ubuntu-20.04}
           - {python-version: '3.11', os: ubuntu-20.04}
           - {python-version: '3.12', os: ubuntu-20.04}
+          - {python-version: '3.13', os: ubuntu-20.04}
 
           - {python-version: '3.8', os: windows-2019}
           - {python-version: '3.9', os: windows-2019}
           - {python-version: '3.10', os: windows-2019}
           - {python-version: '3.11', os: windows-2019}
           - {python-version: '3.12', os: windows-2019}
+          - {python-version: '3.13', os: windows-2019}
     steps:
       - uses: actions/checkout@v2
 
@@ -67,6 +69,7 @@ jobs:
           - {python-version: '3.10', os: ubuntu-20.04}
           - {python-version: '3.11', os: ubuntu-20.04}
           - {python-version: '3.12', os: ubuntu-20.04}
+          - {python-version: '3.13', os: ubuntu-20.04}
 
           #
           # Some of the doctests don't pass on Windows because of Windows-specific
@@ -76,6 +79,9 @@ jobs:
           # - {python-version: '3.8', os: windows-2019}
           # - {python-version: '3.9', os: windows-2019}
           # - {python-version: '3.10', os: windows-2019}
+          # - {python-version: '3.11', os: windows-2019}
+          # - {python-version: '3.12', os: windows-2019}
+          # - {python-version: '3.13', os: windows-2019}
 
     steps:
       - uses: actions/checkout@v2
@@ -104,6 +110,7 @@ jobs:
           - {python-version: '3.10', os: ubuntu-20.04}
           - {python-version: '3.11', os: ubuntu-20.04}
           - {python-version: '3.12', os: ubuntu-20.04}
+          - {python-version: '3.13', os: ubuntu-20.04}
 
           # Not sure why we exclude these, perhaps for historical reasons?
           #
@@ -111,6 +118,9 @@ jobs:
           # - {python-version: '3.8', os: windows-2019}
           # - {python-version: '3.9', os: windows-2019}
           # - {python-version: '3.10', os: windows-2019}
+          # - {python-version: '3.11', os: windows-2019}
+          # - {python-version: '3.12', os: windows-2019}
+          # - {python-version: '3.13', os: windows-2019}
 
     steps:
       - uses: actions/checkout@v2
@@ -153,11 +163,15 @@ jobs:
           - {python-version: '3.10', os: ubuntu-20.04}
           - {python-version: '3.11', os: ubuntu-20.04}
           - {python-version: '3.12', os: ubuntu-20.04}
+          - {python-version: '3.13', os: ubuntu-20.04}
 
           # - {python-version: '3.7', os: windows-2019}
           # - {python-version: '3.8', os: windows-2019}
           # - {python-version: '3.9', os: windows-2019}
           # - {python-version: '3.10', os: windows-2019}
+          # - {python-version: '3.11', os: windows-2019}
+          # - {python-version: '3.12', os: windows-2019}
+          # - {python-version: '3.13', os: windows-2019}
 
     steps:
       - uses: actions/checkout@v2
