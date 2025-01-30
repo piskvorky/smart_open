@@ -68,6 +68,7 @@ class CliRawInputBase(io.RawIOBase):
 
     Implements the io.RawIOBase interface of the standard library.
     """
+    _sub = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(self, uri):
         self._uri = uri
@@ -84,8 +85,13 @@ class CliRawInputBase(io.RawIOBase):
     def close(self):
         """Flush and close this stream."""
         logger.debug("close: called")
-        self._sub.terminate()
-        self._sub = None
+        if not self.closed:
+            self._sub.terminate()
+            self._sub = None
+
+    @property
+    def closed(self):
+        return self._sub is None
 
     def readable(self):
         """Return True if the stream can be read from."""
@@ -125,6 +131,8 @@ class CliRawOutputBase(io.RawIOBase):
 
     Implements the io.RawIOBase interface of the standard library.
     """
+    _sub = None  # so `closed` property works in case __init__ fails and __del__ is called
+
     def __init__(self, uri):
         self._uri = uri
         self._sub = subprocess.Popen(["hdfs", "dfs", '-put', '-f', '-', self._uri],
@@ -136,9 +144,16 @@ class CliRawOutputBase(io.RawIOBase):
         self.raw = None
 
     def close(self):
-        self.flush()
-        self._sub.stdin.close()
-        self._sub.wait()
+        logger.debug("close: called")
+        if not self.closed:
+            self.flush()
+            self._sub.stdin.close()
+            self._sub.wait()
+            self._sub = None
+
+    @property
+    def closed(self):
+        return self._sub is None
 
     def flush(self):
         self._sub.stdin.flush()

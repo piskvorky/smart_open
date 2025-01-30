@@ -634,6 +634,43 @@ class MultipartWriterTest(unittest.TestCase):
 
             assert actual == contents
 
+    def test_write_gz_using_context_manager(self):
+        """Does s3 multipart upload create a compressed file using context manager?"""
+        contents = b'get ready for a surprise'
+        with smart_open.open(
+                f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz',
+                mode="wb",
+                transport_params={
+                    "multipart_upload": True,
+                    "min_part_size": 10,
+                }
+        ) as fout:
+            fout.write(contents)
+
+        with smart_open.open(f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz', 'rb') as fin:
+            actual = fin.read()
+
+        assert actual == contents
+
+    def test_write_gz_not_using_context_manager(self):
+        """Does s3 multipart upload create a compressed file not using context manager but close()?"""
+        contents = b'get ready for a surprise'
+        fout = smart_open.open(
+            f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz',
+            mode="wb",
+            transport_params={
+                "multipart_upload": True,
+                "min_part_size": 10,
+            }
+        )
+        fout.write(contents)
+        fout.close()
+
+        with smart_open.open(f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz', 'rb') as fin:
+            actual = fin.read()
+
+        assert actual == contents
+
     def test_write_gz_with_error(self):
         """Does s3 multipart upload abort for a failed compressed file upload?"""
         with self.assertRaises(ValueError):

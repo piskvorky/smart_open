@@ -15,7 +15,7 @@ import responses
 import smart_open.http
 import smart_open.s3
 import smart_open.constants
-
+import requests
 
 BYTES = b'i tried so hard and got so far but in the end it doesn\'t even matter'
 URL = 'http://localhost'
@@ -44,7 +44,7 @@ class HttpTest(unittest.TestCase):
 
     @responses.activate
     def test_read_all(self):
-        responses.add(responses.GET, URL, body=BYTES, stream=True)
+        responses.add(responses.GET, URL, body=BYTES)
         reader = smart_open.http.SeekableBufferedInputBase(URL)
         read_bytes = reader.read()
         self.assertEqual(BYTES, read_bytes)
@@ -158,6 +158,15 @@ class HttpTest(unittest.TestCase):
         reader = smart_open.open(URL, "rb", transport_params={'timeout': timeout})
         assert hasattr(reader, 'timeout')
         assert reader.timeout == timeout
+
+    @responses.activate
+    def test_session_attribute(self):
+        session = requests.Session()
+        responses.add_callback(responses.GET, URL, callback=request_callback)
+        reader = smart_open.open(URL, "rb", transport_params={'session': session})
+        assert hasattr(reader, 'session')
+        assert reader.session == session
+        assert reader.read() == BYTES
 
 
 @responses.activate

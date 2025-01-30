@@ -554,6 +554,16 @@ class ReaderTest(unittest.TestCase):
 
         assert data == content
 
+    def test_nonexisting_container(self):
+        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
+            with smart_open.azure.open(
+                    'thiscontainerdoesntexist',
+                    'mykey',
+                    'rb',
+                    CLIENT
+            ) as fin:
+                fin.read()
+
 
 class WriterTest(unittest.TestCase):
     """Test writing into Azure Blob files."""
