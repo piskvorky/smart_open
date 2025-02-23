@@ -217,7 +217,16 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
     return host, username, password, port, connect_params
 
 
-def open(path, mode='r', host=None, user=None, password=None, port=None, connect_kwargs=None):
+def open(
+    path,
+    mode="r",
+    host=None,
+    user=None,
+    password=None,
+    port=None,
+    connect_kwargs=None,
+    prefetch_kwargs=None,
+):
     """Open a file on a remote machine over SSH.
 
     Expects authentication to be already set up via existing keys on the local machine.
@@ -239,6 +248,9 @@ def open(path, mode='r', host=None, user=None, password=None, port=None, connect
         The port to connect to.
     connect_kwargs: dict, optional
         Any additional settings to be passed to paramiko.SSHClient.connect.
+    prefetch_kwargs: dict, optional
+        Any additional settings to be passed to paramiko.SFTPFile.prefetch.
+        The presence of this dict (even if empty) triggers prefetching.
 
     Returns
     -------
@@ -287,4 +299,6 @@ def open(path, mode='r', host=None, user=None, password=None, port=None, connect
 
     fobj = sftp_client.open(path, mode)
     fobj.name = path
+    if prefetch_kwargs is not None:
+        fobj.prefetch(**prefetch_kwargs)
     return fobj
