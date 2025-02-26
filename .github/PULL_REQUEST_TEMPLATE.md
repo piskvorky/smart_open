@@ -6,7 +6,7 @@
 
 > Please explain the motivation behind this PR in the description.
 > 
-> If you're fixing a bug, link to the issue using a [supported keyword](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue) like "Fixes #123"
+> If you're fixing a bug, link to the issue using a [supported keyword](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue) like "Fixes #{issue_number}"
 > 
 > If you're adding a new feature, then consider opening a ticket and discussing it with the maintainers before you actually do the hard work.
 
