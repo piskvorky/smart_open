@@ -2,17 +2,17 @@
 > 
 > The title is important because it will appear in [our change log](https://github.com/RaRe-Technologies/smart_open/blob/master/CHANGELOG.md).
 
-#### Motivation
+### Motivation
 
-> Please explain the motivation behind this PR in the description.
+> Please explain the motivation behind this PR.
 > 
-> If you're fixing a bug, link to the issue using a [supported keyword](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue) like "Fixes #{issue_number}"
+> If you're fixing a bug, link to the issue using a [supported keyword](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue) like "Fixes #{issue_number}".
 > 
 > If you're adding a new feature, then consider opening a ticket and discussing it with the maintainers before you actually do the hard work.
 
 Fixes #{issue_number}
 
-#### Tests
+### Tests
 
 > If you're fixing a bug, consider [test-driven development](https://en.wikipedia.org/wiki/Test-driven_development):
 > 
@@ -29,7 +29,7 @@ Fixes #{issue_number}
 > 
 > If there are any failures, please fix them before creating the PR (or mark it as WIP, see below).
 
-#### Work in progress
+### Work in progress
 
 > If you're still working on your PR, mark the PR as [draft PR](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request).
 > 
@@ -37,7 +37,7 @@ Fixes #{issue_number}
 > 
 > Once it's ready, mark the PR as "ready for review", and ping one of the maintainers (e.g. mpenkov).
 
-#### Checklist
+### Checklist
 
 > Before you mark the PR as "ready for review", please make sure you have:
 
@@ -47,7 +47,7 @@ Fixes #{issue_number}
 - [ ] Included tests for any new functionality
 - [ ] Checked that all unit tests pass
 
-#### Workflow
+### Workflow
 
 > Please avoid rebasing and force-pushing to the branch of the PR once a review is in progress.
 > 
