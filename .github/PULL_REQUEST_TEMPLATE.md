@@ -25,7 +25,7 @@ Fixes #{issue_number}
 > Make sure all existing unit tests pass.
 > You can run them locally using:
 > 
->     pytest smart_open
+>     pytest tests
 > 
 > If there are any failures, please fix them before creating the PR (or mark it as WIP, see below).
 

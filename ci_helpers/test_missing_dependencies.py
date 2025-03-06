@@ -4,7 +4,7 @@ import subprocess
 os.environ['SMART_OPEN_TEST_MISSING_DEPS'] = '1'
 command = [
     'pytest',
-    'smart_open/tests/test_package.py',
+    'tests/test_package.py',
     '-v',
     '--cov', 'smart_open',
     '--cov-report', 'term-missing',

@@ -7,10 +7,12 @@ jobs:
   linters:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
       - name: Setup up Python 3.11
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -40,9 +42,11 @@ jobs:
           - {python-version: '3.12', os: windows-2019}
           - {python-version: '3.13', os: windows-2019}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -56,7 +60,7 @@ jobs:
         run: pip install -e .[test]
 
       - name: Run unit tests
-        run: pytest smart_open -v -rfxECs --durations=20
+        run: pytest tests -v -rfxECs --durations=20
 
   doctest:
     needs: [linters,unit_tests]
@@ -84,9 +88,11 @@ jobs:
           # - {python-version: '3.13', os: windows-2019}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -123,9 +129,11 @@ jobs:
           # - {python-version: '3.13', os: windows-2019}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -174,9 +182,11 @@ jobs:
           # - {python-version: '3.13', os: windows-2019}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
