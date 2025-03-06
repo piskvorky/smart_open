@@ -474,7 +474,6 @@ class SmartOpenHttpTest(unittest.TestCase):
             user='ubuntu',
             password='pass',
             port=1022,
-            transport_params={'hello': 'world'},
         )
 
     @responses.activate
