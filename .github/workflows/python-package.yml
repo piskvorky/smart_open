@@ -15,7 +15,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install flake8 -e .
+        run: pip install flake8 -e .[all]
 
       - name: Run flake8 linter (source)
         run: flake8 --show-source smart_open
