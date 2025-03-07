@@ -13,4 +13,4 @@ helptext = subprocess.check_output(
 # remove the user-specific FILE and VERSION section at the bottom to make this script reproducible
 lines = helptext.splitlines()[:-5]
 
-Path("help.txt").write_text("\n".join(lines))
+Path("help.txt").write_text("\n".join(line.rstrip() for line in lines))
