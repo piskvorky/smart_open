@@ -23,8 +23,8 @@ jobs:
       - name: "Check whether help.txt update was forgotten"
         if: github.event_name == 'pull_request'
         run: |
-          python -c 'help("smart_open")' > help.txt
-          test ! "$(git diff)" && echo "no changes" || ( git diff && echo "looks like `python -c 'help(\"smart_open\")' > help.txt` was forgotten" && exit 1 )
+          python update_helptext.py
+          test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
 
   unit_tests:
     needs: [linters]
