@@ -349,7 +349,7 @@ def open(
         For writing only.  Does not apply if you set multipart_upload=False.
     multipart_upload: bool, optional
         Default: `True`
-          If set to `True`, will use multipart upload for writing to S3. If set
+        If set to `True`, will use multipart upload for writing to S3. If set
         to `False`, S3 upload will use the S3 Single-Part Upload API, which
         is more ideal for small file sizes.
         For writing only.
