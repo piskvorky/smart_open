@@ -45,6 +45,7 @@ Fixes #{issue_number}
 - [ ] Clearly explained the motivation behind the PR
 - [ ] Linked to any existing issues that your PR will be solving
 - [ ] Included tests for any new functionality
+- [ ] Run `python update_helptext.py` in case there are API changes
 - [ ] Checked that all unit tests pass
 
 ### Workflow
