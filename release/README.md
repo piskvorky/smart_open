@@ -36,7 +36,7 @@ All of the above are generally freely available, e.g. installable via apt in Ubu
     - `git add CHANGELOG.md && git commit -m "Update CHANGELOG.md" && git push`
 - Click "Publish release".
     - The GitHub Release and corresponding git tag gets created on the "Update CHANGELOG.md" commit.
-    - GitHub Actions `release.yml` is triggered, and uploads distributions to PyPI and to the GitHub Release.
+    - GitHub Actions [`release.yml`](https://github.com/piskvorky/smart_open/actions/workflows/release.yml) is triggered, and uploads distributions to [PyPI](https://pypi.org/project/smart-open/) and to the new [GitHub Release](https://github.com/piskvorky/smart_open/releases).
 
 ## Troubleshooting
 
