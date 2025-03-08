@@ -6,14 +6,7 @@
 # from the MIT License (MIT).
 #
 
-"""Implements the majority of smart_open's top-level API.
-
-The main functions are:
-
-  * ``parse_uri()``
-  * ``open()``
-
-"""
+"""Implements the majority of smart_open's top-level API."""
 
 import collections
 import locale
@@ -160,7 +153,7 @@ def open(
     --------
     - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
     - `smart_open README.rst
-      <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
+      <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
 
     """
     logger.debug('%r', locals())
@@ -498,7 +491,7 @@ def smart_open(
     # 2. compression parameter was called ignore_extension
     # 3. Transport parameters were passed directly as kwargs
     #
-    url = 'https://github.com/RaRe-Technologies/smart_open/blob/develop/MIGRATING_FROM_OLDER_VERSIONS.rst'
+    url = 'https://github.com/piskvorky/smart_open/blob/develop/MIGRATING_FROM_OLDER_VERSIONS.rst'
     if kwargs:
         raise DeprecationWarning(
             'The following keyword parameters are not supported: %r. '
@@ -528,6 +521,6 @@ except Exception as ex:
         'Encountered a non-fatal error while building docstrings (see below). '
         'help(smart_open) will provide incomplete information as a result. '
         'For full help text, see '
-        '<https://github.com/RaRe-Technologies/smart_open/blob/master/help.txt>.'
+        '<https://github.com/piskvorky/smart_open/blob/master/help.txt>.'
     )
     logger.exception(ex)

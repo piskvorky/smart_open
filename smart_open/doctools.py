@@ -182,8 +182,13 @@ def tweak_open_docstring(f):
                 continue
             seen.add(submodule)
 
+            try:
+                schemes = submodule.SCHEMES
+            except AttributeError:
+                schemes = [scheme]
+
             relpath = os.path.relpath(submodule.__file__, start=root_path)
-            heading = '%s (%s)' % (scheme, relpath)
+            heading = '%s (%s)' % ("/".join(schemes), relpath)
             print('    %s' % heading)
             print('    %s' % ('~' * len(heading)))
             print('    %s' % submodule.__doc__.split('\n')[0])
@@ -222,13 +227,18 @@ def tweak_parse_uri_docstring(f):
     for scheme, submodule in sorted(transport._REGISTRY.items()):
         if scheme == transport.NO_SCHEME or submodule in seen:
             continue
-        schemes.append(scheme)
+
         seen.add(submodule)
 
         try:
             examples.extend(submodule.URI_EXAMPLES)
         except AttributeError:
             pass
+
+        try:
+            schemes.extend(submodule.SCHEMES)
+        except AttributeError:
+            schemes.append(scheme)
 
     with contextlib.redirect_stdout(buf):
         print('    Supported URI schemes are:')

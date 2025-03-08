@@ -286,7 +286,7 @@ def open_uri(uri, mode, transport_params):
     detected = [k for k in deprecated if k in transport_params]
     if detected:
         doc_url = (
-            'https://github.com/RaRe-Technologies/smart_open/blob/develop/'
+            'https://github.com/piskvorky/smart_open/blob/develop/'
             'MIGRATING_FROM_OLDER_VERSIONS.rst'
         )
         #
@@ -295,7 +295,7 @@ def open_uri(uri, mode, transport_params):
         # 1) Not everyone has logging enabled; and
         # 2) check_kwargs (below) already uses logger.warn with a similar message
         #
-        # https://github.com/RaRe-Technologies/smart_open/issues/614
+        # https://github.com/piskvorky/smart_open/issues/614
         #
         message = (
             'ignoring the following deprecated transport parameters: %r. '

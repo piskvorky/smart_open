@@ -105,8 +105,8 @@ FUNCTIONS
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements the transport for the file:// schema.
 
-        ftp (smart_open/ftp.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~
+        ftp/ftps (smart_open/ftp.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements I/O streams over FTP.
 
         gs (smart_open/gcs.py)
@@ -126,12 +126,12 @@ FUNCTIONS
             Additional keyword arguments to propagate to the blob.open method
             of the google-cloud-storage library.
 
-        hdfs (smart_open/hdfs.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~
+        hdfs/viewfs (smart_open/hdfs.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements reading and writing to/from HDFS.
 
-        http (smart_open/http.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~
+        http/https (smart_open/http.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements file-like objects for reading from http.
 
         kerberos: boolean, optional
@@ -152,8 +152,8 @@ FUNCTIONS
         buffer_size: int, optional
             The buffer size to use when performing I/O.
 
-        s3 (smart_open/s3.py)
-        ~~~~~~~~~~~~~~~~~~~~~
+        s3/s3n/s3u/s3a (smart_open/s3.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements file-like objects for reading and writing from/to AWS S3.
 
         buffer_size: int, optional
@@ -201,8 +201,8 @@ FUNCTIONS
             disk IO. If you pass in an open file, then you are responsible for
             cleaning it up after writing completes.
 
-        scp (smart_open/ssh.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~
+        ssh/scp/sftp (smart_open/ssh.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements I/O streams over SSH.
 
         mode: str, optional
@@ -287,7 +287,7 @@ FUNCTIONS
         --------
         - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
         - `smart_open README.rst
-          <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
+          <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
 
     parse_uri(uri_as_string)
         Parse the given URI from a string.
@@ -309,11 +309,19 @@ FUNCTIONS
         * azure
         * file
         * ftp
+        * ftps
         * gs
         * hdfs
+        * viewfs
         * http
+        * https
         * s3
+        * s3n
+        * s3u
+        * s3a
+        * ssh
         * scp
+        * sftp
         * webhdfs
 
         Valid URI examples::

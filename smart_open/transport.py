@@ -81,7 +81,7 @@ def get_transport(scheme):
     global _ERRORS, _MISSING_DEPS_ERROR, _REGISTRY, SUPPORTED_SCHEMES
     expected = SUPPORTED_SCHEMES
     readme_url = (
-        "https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst"
+        "https://github.com/piskvorky/smart_open/blob/master/README.rst"
     )
     message = (
         "Unable to handle scheme %(scheme)r, expected one of %(expected)r. "
