@@ -21,21 +21,24 @@ All of the above are generally freely available, e.g. installable via apt in Ubu
 > *New GitHub Release dialog*
 
 - Check that the [latest commit](https://github.com/piskvorky/smart_open/commits/develop) on `develop` passed all CI.
-- Make sure you're on `master` and you're up to date:
-    - `git checkout master && git pull`
-- Merge `develop` into `master`:
-    - `git pull origin develop --no-ff --no-edit && git push`
 - Draft a [new GitHub Release](https://github.com/piskvorky/smart_open/releases/new).
     - Fill in the new tag including a `v` prefix and press enter.
     - Confirm that it reads "Excellent! This tag will be created from the target when you publish this release.".
-    - Select target branch `master`.
+    - Select target branch `develop` (for the release notes).
     - Click "Generate release notes" on the right top.
-    - Keep the tab open.
-- Copy the generated bullet points into `CHANGELOG.md`.
-- Commit `CHANGELOG.md` to `master` and push:
+    - Select target branch `master` (for the actual release).
+    - Keep the tab open in your browser.
+- Make sure you're on `develop` and you're up to date locally:
+    - `git checkout develop && git pull`
+- Copy the generated bullet points from your browser into `CHANGELOG.md`.
+- Commit `CHANGELOG.md` to `develop` and push:
     - `git add CHANGELOG.md && git commit -m "Update CHANGELOG.md" && git push`
-- Click "Publish release".
-    - The GitHub Release and corresponding git tag gets created on the "Update CHANGELOG.md" commit.
+- Make sure you're on `master` and you're up to date locally:
+    - `git checkout master && git pull`
+- Merge `develop` into `master` and push:
+    - `git pull origin develop --no-ff --no-edit && git push`
+- Click "Publish release" in your browser.
+    - The GitHub Release and corresponding git tag gets created on the merge commit on `master`.
     - GitHub Actions [`release.yml`](https://github.com/piskvorky/smart_open/actions/workflows/release.yml) is triggered, and uploads distributions to [PyPI](https://pypi.org/project/smart-open/) and to the new [GitHub Release](https://github.com/piskvorky/smart_open/releases).
 
 ## Troubleshooting
