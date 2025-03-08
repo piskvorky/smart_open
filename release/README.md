@@ -25,15 +25,15 @@ All of the above are generally freely available, e.g. installable via apt in Ubu
 - Merge `develop` into `master`.
     - `git pull origin develop --no-ff --no-edit && git push`
 - Draft a [new release](https://github.com/piskvorky/smart_open/releases/new).
-    - Fill in the new tag + enter.
+    - Fill in the new tag including a `v` prefix and press enter.
     - Confirm that it reads "Excellent! This tag will be created from the target when you publish this release.".
     - Select target branch `master`.
     - Click "Generate release notes" on the right top.
     - Keep the tab open.
 - Copy the generated bullet points into `CHANGELOG.md`.
 - Commit `CHANGELOG.md` to `master` and push:
-  - `git checkout master && git pull && git add CHANGELOG.md && git commit -m "Update CHANGELOG.md" && git push`
-- Click "Publish release".
+  - `git add CHANGELOG.md && git commit -m "Update CHANGELOG.md" && git push`
+- Click "Publish release". The release and corresponding git tag gets created.
 - Github Actions `release.yml` is triggered, and uploads distributions to PyPI and to the Github Release.
 
 ## Troubleshooting
