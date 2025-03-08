@@ -35,8 +35,8 @@ All of the above are generally freely available, e.g. installable via apt in Ubu
 - Commit `CHANGELOG.md` to `master` and push:
     - `git add CHANGELOG.md && git commit -m "Update CHANGELOG.md" && git push`
 - Click "Publish release".
-    - The Github Release and corresponding git tag gets created on the "Update CHANGELOG.md" commit.
-    - Github Actions `release.yml` is triggered, and uploads distributions to PyPI and to the Github Release.
+    - The GitHub Release and corresponding git tag gets created on the "Update CHANGELOG.md" commit.
+    - GitHub Actions `release.yml` is triggered, and uploads distributions to PyPI and to the GitHub Release.
 
 ## Troubleshooting
 
