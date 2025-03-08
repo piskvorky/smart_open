@@ -496,7 +496,7 @@ Before you can run the test suite, install the test dependencies::
 
 Now, you can run the unit tests::
 
-    pytest smart_open
+    pytest tests
 
 The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
 
