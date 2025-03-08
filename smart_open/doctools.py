@@ -89,7 +89,7 @@ def extract_kwargs(docstring):
     lines.pop(0)
 
     for line in lines:
-        if not line.strip(): # stop at the first empty line encountered
+        if not line.strip():  # stop at the first empty line encountered
             break
         is_arg_line = not line.startswith(' ')
         if is_arg_line:
