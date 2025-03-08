@@ -17,14 +17,15 @@ All of the above are generally freely available, e.g. installable via apt in Ubu
 
 ## Release Procedure
 
-![New release](https://github.com/user-attachments/assets/cf8f2fa4-37c1-4e50-9fd8-ab6e3fd705b5)
+> ![New GitHub Release](https://github.com/user-attachments/assets/cf8f2fa4-37c1-4e50-9fd8-ab6e3fd705b5)
+> *New GitHub Release dialog*
 
 - Check that the [latest commit](https://github.com/piskvorky/smart_open/commits/develop) on `develop` passed all CI.
 - Make sure you're on `master` and you're up to date:
     - `git checkout master && git pull`
-- Merge `develop` into `master`.
+- Merge `develop` into `master`:
     - `git pull origin develop --no-ff --no-edit && git push`
-- Draft a [new release](https://github.com/piskvorky/smart_open/releases/new).
+- Draft a [new GitHub Release](https://github.com/piskvorky/smart_open/releases/new).
     - Fill in the new tag including a `v` prefix and press enter.
     - Confirm that it reads "Excellent! This tag will be created from the target when you publish this release.".
     - Select target branch `master`.
@@ -32,9 +33,10 @@ All of the above are generally freely available, e.g. installable via apt in Ubu
     - Keep the tab open.
 - Copy the generated bullet points into `CHANGELOG.md`.
 - Commit `CHANGELOG.md` to `master` and push:
-  - `git add CHANGELOG.md && git commit -m "Update CHANGELOG.md" && git push`
-- Click "Publish release". The release and corresponding git tag gets created.
-- Github Actions `release.yml` is triggered, and uploads distributions to PyPI and to the Github Release.
+    - `git add CHANGELOG.md && git commit -m "Update CHANGELOG.md" && git push`
+- Click "Publish release".
+    - The Github Release and corresponding git tag gets created on the "Update CHANGELOG.md" commit.
+    - Github Actions `release.yml` is triggered, and uploads distributions to PyPI and to the Github Release.
 
 ## Troubleshooting
 
