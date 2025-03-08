@@ -73,7 +73,7 @@ def extract_kwargs(docstring):
         return []
 
     lines = inspect.cleandoc(docstring).split('\n')
-    retval = []
+    kwargs = []
 
     #
     # 1. Find the underlined 'Parameters' section
@@ -88,15 +88,20 @@ def extract_kwargs(docstring):
     lines.pop(0)
     lines.pop(0)
 
-    while lines and lines[0]:
-        name, type_ = lines.pop(0).split(':', 1)
-        description = []
-        while lines and lines[0].startswith('    '):
-            description.append(lines.pop(0).strip())
-        if 'optional' in type_:
-            retval.append((name.strip(), type_.strip(), description))
+    for line in lines:
+        if not line.strip(): # stop at the first empty line encountered
+            break
+        is_arg_line = not line.startswith(' ')
+        if is_arg_line:
+            name, type_ = line.split(':', 1)
+            name, type_, description = name.strip(), type_.strip(), []
+            kwargs.append([name, type_, description])
+            continue
+        is_description_line = line.startswith('    ')
+        if is_description_line:
+            kwargs[-1][-1].append(line.strip())
 
-    return retval
+    return kwargs
 
 
 def to_docstring(kwargs, lpad=''):
