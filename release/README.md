@@ -1,6 +1,6 @@
 # Release Scripts
 
-This subdirectory contains various scripts for making a smart_open release.
+This subdirectory contains various scripts for maintainers.
 
 ## Prerequisites
 
@@ -17,30 +17,24 @@ All of the above are generally freely available, e.g. installable via apt in Ubu
 
 ## Release Procedure
 
-First, check that the [latest commit](https://github.com/RaRe-Technologies/smart_open/commits/master) passed all CI.
+![New release](https://github.com/user-attachments/assets/cf8f2fa4-37c1-4e50-9fd8-ab6e3fd705b5)
 
-For the subsequent steps to work, you will need to be in the top-level subdirectory for the repo (e.g. /home/misha/git/smart_open).
-
-Prepare the release, replacing 2.3.4 with the actual version of the new release:
-
-    bash release/prepare.sh 2.3.4
-
-This will create a local release branch.
-Look around the branch and make sure everything is in order.
-Checklist:
-
-- [ ] Does smart_open/version.py contain the correct version number for the release?
-- [ ] Does the CHANGELOG.md contain a section detailing the new release?
-- [ ] Are there any PRs that should be in CHANGELOG.md, but currently aren't?
-
-If anything is out of order, make the appropriate changes and commit them to the release branch before proceeding.
-
-**This is the point of no return**.
-**Once you're happy with the release branch**, run:
-
-    bash release/merge.sh
-
-Congratulations, at this stage, you are done!
+- Check that the [latest commit](https://github.com/piskvorky/smart_open/commits/develop) on `develop` passed all CI.
+- Make sure you're on `master` and you're up to date:
+    - `git checkout master && git pull`
+- Merge `develop` into `master`.
+    - `git pull origin develop --no-ff --no-edit && git push`
+- Draft a [new release](https://github.com/piskvorky/smart_open/releases/new).
+    - Fill in the new tag + enter.
+    - Confirm that it reads "Excellent! This tag will be created from the target when you publish this release.".
+    - Select target branch `master`.
+    - Click "Generate release notes" on the right top.
+    - Keep the tab open.
+- Copy the generated bullet points into `CHANGELOG.md`.
+- Commit `CHANGELOG.md` to `master` and push:
+  - `git checkout master && git pull && git add CHANGELOG.md && git commit -m "Update CHANGELOG.md" && git push`
+- Click "Publish release".
+- Github Actions `release.yml` is triggered, and uploads distributions to PyPI and to the Github Release.
 
 ## Troubleshooting
 
