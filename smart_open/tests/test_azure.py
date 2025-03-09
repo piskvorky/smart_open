@@ -11,16 +11,17 @@ import io
 import logging
 import os
 import time
-import uuid
 import unittest
+import uuid
 from collections import OrderedDict
+from typing import Literal
+
+import azure.common
+import azure.core.exceptions
+import azure.storage.blob
 
 import smart_open
 import smart_open.constants
-
-import azure.storage.blob
-import azure.common
-import azure.core.exceptions
 
 CONTAINER_NAME = 'test-smartopen-{}'.format(uuid.uuid4().hex)
 BLOB_NAME = 'test-blob'
@@ -71,11 +72,16 @@ class FakeBlobClient(object):
 
     def get_blob_properties(self):
         return self.metadata
+    
+    def get_block_list(self, block_list_type: Literal['all', 'uncommitted', 'committed'] = 'committed'):
+        """Returns a tuple of two lists - committed and uncommitted blocks"""
+        return [], list(self._staged_contents.keys())
 
     def set_blob_metadata(self, metadata):
         self.metadata = metadata
 
     def stage_block(self, block_id, data):
+        """Simulates API call to stage a block of data."""
         self._staged_contents[block_id] = data
 
     def upload_blob(self, data, length=None, metadata=None):
@@ -647,7 +653,7 @@ class WriterTest(unittest.TestCase):
                 raise ValueError
         except ValueError:
             # FakeBlobClient.commit_block_list was not called
-            self.assertGreater(len(blob_client._staged_contents), 0)
+            self.assertGreater(len(blob_client.get_block_list("uncommitted")[1]), 0)
 
     def test_abort_upload_text_mode(self):
         """Does aborted upload skip commit_block_list in text mode?"""
@@ -667,7 +673,7 @@ class WriterTest(unittest.TestCase):
                 raise ValueError
         except ValueError:
             # FakeBlobClient.commit_block_list was not called
-            self.assertGreater(len(blob_client._staged_contents), 0)
+            self.assertGreater(len(blob_client.get_block_list("uncommitted")[1]), 0)
 
     def test_abort_upload_compressed(self):
         """Does aborted upload skip commit_block_list with compression?"""
@@ -687,7 +693,7 @@ class WriterTest(unittest.TestCase):
                 raise ValueError
         except ValueError:
             # FakeBlobClient.commit_block_list was not called
-            self.assertGreater(len(blob_client._staged_contents), 0)
+            self.assertGreater(len(blob_client.get_block_list("uncommitted")[1]), 0)
 
     def test_incorrect_input(self):
         """Does azure write fail on incorrect input?"""
