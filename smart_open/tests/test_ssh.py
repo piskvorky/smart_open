@@ -127,6 +127,23 @@ class SSHOpen(unittest.TestCase):
             gss_trust_dns=False,
         )
 
+    @mock_ssh
+    def test_open_with_prefetch(self, mock_connect, get_transp_mock):
+        smart_open.open(
+            "ssh://user:pass@some-host/",
+            transport_params={"prefetch_kwargs": {"max_concurrent_requests": 3}},
+        )
+        mock_sftp = get_transp_mock().open_sftp_client()
+        mock_fobj = mock_sftp.open()
+        mock_fobj.prefetch.assert_called_with(max_concurrent_requests=3)
+
+    @mock_ssh
+    def test_open_without_prefetch(self, mock_connect, get_transp_mock):
+        smart_open.open("ssh://user:pass@some-host/")
+        mock_sftp = get_transp_mock().open_sftp_client()
+        mock_fobj = mock_sftp.open()
+        mock_fobj.prefetch.assert_not_called()
+
 
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s : %(levelname)s : %(message)s", level=logging.DEBUG)

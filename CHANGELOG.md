@@ -1,3 +1,7 @@
+# 7.2.0, 2025-03-06
+
+- Add support for prefetching to sftp transport (PR [#849](https://github.com/piskvorky/smart_open/pull/849), [@davidszotten](https://github.com/davidszotten))
+
 # 7.1.0, 2024-12-17
 
 - Add support for python 3.13 (PR [#847](https://github.com/piskvorky/smart_open/pull/847), [@ddelange](https://github.com/ddelange))
