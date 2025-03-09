@@ -77,7 +77,7 @@ def tweak_close(outer, inner):
 
     Use this when your compression library's `close` method does not
     automatically close the underlying filestream.  See
-    https://github.com/RaRe-Technologies/smart_open/issues/630 for an
+    https://github.com/piskvorky/smart_open/issues/630 for an
     explanation why that is a problem for smart_open.
     """
     outer_close = outer.close

@@ -6,13 +6,7 @@
 # from the MIT License (MIT).
 #
 
-"""Implements reading and writing to/from HDFS.
-
-The main entry point is the :func:`~smart_open.hdfs.open` function.
-
-Uses the command-line hdfs utility under the covers.
-
-"""
+"""Implements reading and writing to/from HDFS."""
 
 import io
 import logging

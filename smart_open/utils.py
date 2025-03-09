@@ -170,8 +170,8 @@ def safe_urlsplit(url):
     --------
     https://bugs.python.org/issue43882
     https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
-    https://github.com/RaRe-Technologies/smart_open/issues/285
-    https://github.com/RaRe-Technologies/smart_open/issues/458
+    https://github.com/piskvorky/smart_open/issues/285
+    https://github.com/piskvorky/smart_open/issues/458
     smart_open/utils.py:QUESTION_MARK_PLACEHOLDER
     """
     sr = urllib.parse.urlsplit(url, allow_fragments=False)

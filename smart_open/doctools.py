@@ -73,7 +73,7 @@ def extract_kwargs(docstring):
         return []
 
     lines = inspect.cleandoc(docstring).split('\n')
-    retval = []
+    kwargs = []
 
     #
     # 1. Find the underlined 'Parameters' section
@@ -88,15 +88,20 @@ def extract_kwargs(docstring):
     lines.pop(0)
     lines.pop(0)
 
-    while lines and lines[0]:
-        name, type_ = lines.pop(0).split(':', 1)
-        description = []
-        while lines and lines[0].startswith('    '):
-            description.append(lines.pop(0).strip())
-        if 'optional' in type_:
-            retval.append((name.strip(), type_.strip(), description))
+    for line in lines:
+        if not line.strip():  # stop at the first empty line encountered
+            break
+        is_arg_line = not line.startswith(' ')
+        if is_arg_line:
+            name, type_ = line.split(':', 1)
+            name, type_, description = name.strip(), type_.strip(), []
+            kwargs.append([name, type_, description])
+            continue
+        is_description_line = line.startswith('    ')
+        if is_description_line:
+            kwargs[-1][-1].append(line.strip())
 
-    return retval
+    return kwargs
 
 
 def to_docstring(kwargs, lpad=''):
@@ -182,8 +187,13 @@ def tweak_open_docstring(f):
                 continue
             seen.add(submodule)
 
+            try:
+                schemes = submodule.SCHEMES
+            except AttributeError:
+                schemes = [scheme]
+
             relpath = os.path.relpath(submodule.__file__, start=root_path)
-            heading = '%s (%s)' % (scheme, relpath)
+            heading = '%s (%s)' % ("/".join(schemes), relpath)
             print('    %s' % heading)
             print('    %s' % ('~' * len(heading)))
             print('    %s' % submodule.__doc__.split('\n')[0])
@@ -222,13 +232,18 @@ def tweak_parse_uri_docstring(f):
     for scheme, submodule in sorted(transport._REGISTRY.items()):
         if scheme == transport.NO_SCHEME or submodule in seen:
             continue
-        schemes.append(scheme)
+
         seen.add(submodule)
 
         try:
             examples.extend(submodule.URI_EXAMPLES)
         except AttributeError:
             pass
+
+        try:
+            schemes.extend(submodule.SCHEMES)
+        except AttributeError:
+            schemes.append(scheme)
 
     with contextlib.redirect_stdout(buf):
         print('    Supported URI schemes are:')
