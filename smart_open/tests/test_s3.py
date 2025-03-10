@@ -840,6 +840,9 @@ class SinglepartWriterTest(unittest.TestCase):
             fout.write(b'  ')
             self.assertEqual(2, fout.tell())
 
+        with self.assertRaises(ValueError, msg="I/O operation on closed file"):
+            fout.seekable()
+
         with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
             actual = fin.read()
 
