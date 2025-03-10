@@ -1137,15 +1137,10 @@ class SinglepartWriter(io.BufferedIOBase):
 
         if writebuffer is None:
             self._buf = io.BytesIO()
+        elif not writebuffer.seekable():
+            raise ValueError('writebuffer needs to be seekable')
         else:
             self._buf = writebuffer
-
-        self._total_bytes = 0
-
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
 
     def flush(self):
         pass
@@ -1158,7 +1153,7 @@ class SinglepartWriter(io.BufferedIOBase):
         if self.closed:
             return
 
-        self._buf.seek(0)
+        self.seek(0)
 
         try:
             self._client.put_object(
@@ -1171,33 +1166,31 @@ class SinglepartWriter(io.BufferedIOBase):
                 'the bucket %r does not exist, or is forbidden for access' % self._bucket) from e
 
         logger.debug("%s: direct upload finished", self)
-        self._buf = None
+        self._buf.close()
 
     @property
     def closed(self):
-        return self._buf is None
+        return self._buf is None or self._buf.closed
 
     def writable(self):
-        """Return True if the stream supports writing."""
-        return True
+        """Return True if the stream is opened and supports writing."""
+        return self._buf.writable()
 
     def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError.
-
-        We offer only tell support, and no seek or truncate support."""
-        return True
+        """Return True if the stream is opened and supports seeking."""
+        return self._buf.seekable()
 
     def seek(self, offset, whence=constants.WHENCE_START):
-        """Unsupported."""
-        raise io.UnsupportedOperation
+        """Propagate."""
+        return self._buf.seek(offset, whence)
 
     def truncate(self, size=None):
-        """Unsupported."""
-        raise io.UnsupportedOperation
+        """Propagate."""
+        return self._buf.truncate(size)
 
     def tell(self):
-        """Return the current stream position."""
-        return self._total_bytes
+        """Propagate."""
+        return self._buf.tell()
 
     #
     # io.BufferedIOBase methods.
@@ -1211,13 +1204,10 @@ class SinglepartWriter(io.BufferedIOBase):
         written to S3 on close as a single-part upload.
 
         For more information about buffers, see https://docs.python.org/3/c-api/buffer.html"""
-
-        length = self._buf.write(b)
-        self._total_bytes += length
-        return length
+        return self._buf.write(b)
 
     def terminate(self):
-        self._buf = None
+        self._buf.close()
         logger.debug('%s: terminated singlepart upload', self)
 
     #
