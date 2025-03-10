@@ -84,7 +84,7 @@ class FakeBlobClient(object):
         """Simulates API call to stage a block of data."""
         self._staged_contents[block_id] = data
 
-    def upload_blob(self, data, length=None, metadata=None):
+    def upload_blob(self, data, length=None, metadata=None, **kwargs):
         if metadata is not None:
             self.set_blob_metadata(metadata)
         self.__contents = io.BytesIO(data[:length])
@@ -300,7 +300,7 @@ def get_container_client():
 
 def cleanup_container():
     container_client = get_container_client()
-    container_client.delete_blobs()
+    container_client.delete_blobs(delete_snapshots="include")
 
 
 def put_to_container(blob_name, contents, num_attempts=12, sleep_time=5):
@@ -865,18 +865,73 @@ class WriterTest(unittest.TestCase):
 
 class AppendWriterTest(unittest.TestCase):
     """Test appending into Azure Blob files."""
-
     def tearDown(self):
         cleanup_container()
 
-    def test_append_01(self):
-        """Does appending into Azure Blob Storage work correctly?"""
+    def test_append_non_existing_blob(self):
+        """Does appending into a non-existing Azure Blob file work correctly?"""
         test_string = u"žluťoučký koníček".encode('utf8')
-        blob_name = "test_write_01_%s" % BLOB_NAME
+        blob_name = "test_append_non_existing_%s" % BLOB_NAME
 
         with smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT) as fout:
             fout.write(test_string)
 
+        output = list(smart_open.open(
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+            "rb",
+            transport_params=dict(client=CLIENT),
+        ))
+        self.assertEqual(output, [test_string])
+
+    def test_append_existing_blob(self):
+        """Does appending into an existing Azure Blob file work correctly?"""
+        test_string_1 = u"žluťoučký koníček".encode('utf8')
+        test_string_2 = u"příliš žluťoučký kůň".encode('utf8')
+        blob_name = "test_append_existing_%s" % BLOB_NAME
+
+        with smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT) as fout:
+            fout.write(test_string_1)
+
+        with smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT) as fout:
+            fout.write(test_string_2)
+
+        output = list(smart_open.open(
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+            "rb",
+            transport_params=dict(client=CLIENT),
+        ))
+        self.assertEqual(output, [test_string_1 + test_string_2])
+
+    def test_append_existing_write_blob(self):
+        """
+        Does appending into an existing Azure Blob file but not of type AppendBlob work correctly?
+        It the already existing blob is of type BlockBlob, PageBlob, etc., the write should fail.
+        """
+        test_string = u"žluťoučký koníček".encode('utf8')
+        blob_name = "test_append_existing_write_blob_%s" % BLOB_NAME
+
+        # Creating blob of type BlockBlob
+        with smart_open.azure.Writer(CONTAINER_NAME, blob_name, CLIENT) as fout:
+            fout.write(test_string)
+
+        with self.assertRaises(azure.core.exceptions.ResourceExistsError, msg="The blob type is invalid for this operation."):
+            with smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT) as fout:
+                fout.write(test_string)
+
+    def test_append_on_error(self):
+        """
+        Does appending into an Azure Blob file work correctly when an error occurs? 
+        It cannot be aborted, so the file should be written anyway.
+        """
+        test_string = u"žluťoučký koníček".encode('utf8')
+        blob_name = "test_append_on_error_%s" % BLOB_NAME
+
+        try:
+            with smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT) as fout:
+                fout.write(test_string)
+                raise ValueError
+        except ValueError:
+            pass
         output = list(smart_open.open(
             "azure://%s/%s" % (CONTAINER_NAME, blob_name),
             "rb",
