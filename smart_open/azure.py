@@ -581,11 +581,11 @@ class AppendWriter(io.BufferedIOBase):
         pass
 
     def terminate(self):
-        # AppendBlob cannot be aborted, so we do nothing here
+        """AppendBlob cannot be aborted, so we do nothing here"""
         pass
 
     def close(self):
-        # No action needed here, as the AppendBlob is automatically committed
+        """No action needed here, as the AppendBlob is automatically committed"""
         pass
 
     @property
@@ -619,7 +619,6 @@ class AppendWriter(io.BufferedIOBase):
 
         # Uploads data as an AppendBlob type with automatic block chunking.
         # The AppendBlob will be created at first if it does not exist or append to it if it does already.
-
         return self._blob.upload_blob(
             data=b,
             blob_type=azure.storage.blob.BlobType.APPENDBLOB,

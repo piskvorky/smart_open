@@ -938,3 +938,59 @@ class AppendWriterTest(unittest.TestCase):
             transport_params=dict(client=CLIENT),
         ))
         self.assertEqual(output, [test_string])
+
+    def test_append_multiple(self):
+        """Does appending multiple times into an Azure Blob file work correctly?"""
+        test_string_1 = u"žluťoučký koníček".encode('utf8')
+        test_string_2 = u"příliš žluťoučký kůň".encode('utf8')
+        test_string_3 = u"škubání skřetů úpělo".encode('utf8')
+        blob_name = "test_append_multiple_%s" % BLOB_NAME
+
+        with smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT) as fout:
+            fout.write(test_string_1)
+            fout.write(test_string_2)
+            fout.write(test_string_3)
+
+        output = list(smart_open.open(
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+            "rb",
+            transport_params=dict(client=CLIENT),
+        ))
+        self.assertEqual(output, [test_string_1 + test_string_2 + test_string_3])
+
+    def test_append_block_over_max_block_size(self):
+        """
+        Does appending into an Azure Blob file work correctly when the block size is over the max block size?
+        By default, this block size is 4MB. Refer to official Azure documentation for more information: 
+        https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.appendblobservice?view=azure-python-previous
+        """
+        test_string = b"0" * 4 * 1024 * 1024 + b"1" * 1024 # Create file with size over 4MB
+        blob_name = "test_append_block_over_max_block_size_%s" % BLOB_NAME
+
+        with smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT) as fout:
+            fout.write(test_string)
+        
+        output = list(smart_open.open(
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+            "rb",
+            transport_params=dict(client=CLIENT),
+        ))
+        self.assertEqual(output, [test_string])
+
+    def test_append_compressed_gzip(self):
+        """
+        Does appending into an Azure Blob file work correctly when the file is compressed?
+        We should be able to append into a compressed file. We will test this with a Gzip file.
+        """
+        expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
+        blob_name = "test_append_gzip_%s" % BLOB_NAME
+
+        with smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT) as fout:
+            with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
+                zipfile.write(expected)
+
+        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
+            with gzip.GzipFile(fileobj=fin) as zipfile:
+                actual = zipfile.read()
+
+        self.assertEqual(expected, actual)
