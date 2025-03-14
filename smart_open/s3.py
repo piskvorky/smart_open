@@ -1172,12 +1172,16 @@ class SinglepartWriter(io.BufferedIOBase):
     def closed(self):
         return self._buf is None or self._buf.closed
 
+    def readable(self):
+        """Propagate."""
+        return self._buf.readable()
+
     def writable(self):
-        """Return True if the stream is opened and supports writing."""
+        """Propagate."""
         return self._buf.writable()
 
     def seekable(self):
-        """Return True if the stream is opened and supports seeking."""
+        """Propagate."""
         return self._buf.seekable()
 
     def seek(self, offset, whence=constants.WHENCE_START):
@@ -1192,12 +1196,6 @@ class SinglepartWriter(io.BufferedIOBase):
         """Propagate."""
         return self._buf.tell()
 
-    #
-    # io.BufferedIOBase methods.
-    #
-    def detach(self):
-        raise io.UnsupportedOperation("detach() not supported")
-
     def write(self, b):
         """Write the given buffer (bytes, bytearray, memoryview or any buffer
         interface implementation) into the buffer. Content of the buffer will be
@@ -1206,7 +1204,16 @@ class SinglepartWriter(io.BufferedIOBase):
         For more information about buffers, see https://docs.python.org/3/c-api/buffer.html"""
         return self._buf.write(b)
 
+    def read(self, size=-1):
+        """Propagate."""
+        return self._buf.read(size)
+
+    def read1(self, size=-1):
+        """Propagate."""
+        return self._buf.read1(size)
+
     def terminate(self):
+        """Close buffer and skip upload."""
         self._buf.close()
         logger.debug('%s: terminated singlepart upload', self)
 

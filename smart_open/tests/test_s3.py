@@ -839,9 +839,20 @@ class SinglepartWriterTest(unittest.TestCase):
             self.assertEqual(0, fout.tell())
             fout.write(b'  ')
             self.assertEqual(2, fout.tell())
+            fout.seek(0)
+            self.assertEqual(expected, fout.read())
 
-        with self.assertRaises(ValueError, msg="I/O operation on closed file"):
+        with self.assertRaises(ValueError, msg='I/O operation on closed file'):
             fout.seekable()
+
+        with self.assertRaises(io.UnsupportedOperation, msg='SinglepartWriter.detach() not supported'):
+            fout.detach()
+
+        with self.assertRaises(ValueError, msg='read from closed file'):
+            fout.read()
+
+        with self.assertRaises(ValueError, msg='write to closed file'):
+            fout.write(b' ')
 
         with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
             actual = fin.read()
