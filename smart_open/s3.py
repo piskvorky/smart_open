@@ -1130,11 +1130,6 @@ class SinglepartWriter(io.BufferedIOBase):
     ):
         _initialize_boto3(self, client, client_kwargs, bucket, key)
 
-        try:
-            self._client.head_bucket(Bucket=bucket)
-        except botocore.client.ClientError as e:
-            raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket) from e
-
         if writebuffer is None:
             self._buf = io.BytesIO()
         else:
