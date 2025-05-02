@@ -42,7 +42,6 @@ def register_transport(submodule):
     Once registered, you can get the submodule by calling :func:`get_transport`.
 
     """
-    global _REGISTRY, _ERRORS
     module_name = submodule
     if isinstance(submodule, str):
         try:
@@ -78,7 +77,6 @@ def get_transport(scheme):
     This submodule must have been previously registered via :func:`register_transport`.
 
     """
-    global _ERRORS, _MISSING_DEPS_ERROR, _REGISTRY, SUPPORTED_SCHEMES
     expected = SUPPORTED_SCHEMES
     readme_url = (
         "https://github.com/piskvorky/smart_open/blob/master/README.rst"
