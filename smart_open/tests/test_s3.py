@@ -588,8 +588,12 @@ class MultipartWriterTest(unittest.TestCase):
 
     def test_nonexisting_bucket(self):
         expected = u"выйду ночью в поле с конём".encode('utf-8')
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, "does not exist"):
             with smart_open.s3.open('thisbucketdoesntexist', 'mykey', 'wb') as fout:
+                fout.write(expected)
+
+        with self.assertRaisesRegex(ValueError, "does not exist"):
+            with smart_open.s3.open('thisbucketdoesntexist', 'mykey', 'wb', multipart_upload=False) as fout:
                 fout.write(expected)
 
     def test_read_nonexisting_key(self):
