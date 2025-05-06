@@ -32,10 +32,8 @@ PACKAGE CONTENTS
     s3
     smart_open_lib
     ssh
-    tests (package)
     transport
     utils
-    version
     webhdfs
 
 FUNCTIONS
