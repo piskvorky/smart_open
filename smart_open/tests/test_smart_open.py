@@ -1248,7 +1248,7 @@ class SmartOpenTest(unittest.TestCase):
 
     def test_newline_csv(self):
         #
-        # See https://github.com/RaRe-Technologies/smart_open/issues/477
+        # See https://github.com/piskvorky/smart_open/issues/477
         #
         rows = [{'name': 'alice\u2028beatrice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
         expected = 'name,color\r\nalice\u2028beatrice,aqua\r\nbob,blue\r\n'

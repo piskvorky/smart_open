@@ -6,10 +6,7 @@
 # from the MIT License (MIT).
 #
 
-"""Common functionality for concurrent processing.
-
-The main entry point is :func:`create_pool`.
-"""
+"""Common functionality for concurrent processing. The main entry point is :func:`create_pool`."""
 
 import contextlib
 import logging
