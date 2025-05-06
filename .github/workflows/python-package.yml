@@ -17,10 +17,16 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install flake8
+        run: pip install flake8 -e .[all]
 
       - name: Run flake8 linter (source)
         run: flake8 --show-source smart_open
+
+      - name: "Check whether help.txt update was forgotten"
+        if: github.event_name == 'pull_request'
+        run: |
+          python update_helptext.py
+          test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
 
   unit_tests:
     needs: [linters]
@@ -28,12 +34,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-20.04}
-          - {python-version: '3.9', os: ubuntu-20.04}
-          - {python-version: '3.10', os: ubuntu-20.04}
-          - {python-version: '3.11', os: ubuntu-20.04}
-          - {python-version: '3.12', os: ubuntu-20.04}
-          - {python-version: '3.13', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-22.04}
+          - {python-version: '3.9', os: ubuntu-22.04}
+          - {python-version: '3.10', os: ubuntu-22.04}
+          - {python-version: '3.11', os: ubuntu-22.04}
+          - {python-version: '3.12', os: ubuntu-22.04}
+          - {python-version: '3.13', os: ubuntu-22.04}
 
           - {python-version: '3.8', os: windows-2019}
           - {python-version: '3.9', os: windows-2019}
@@ -68,12 +74,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-20.04}
-          - {python-version: '3.9', os: ubuntu-20.04}
-          - {python-version: '3.10', os: ubuntu-20.04}
-          - {python-version: '3.11', os: ubuntu-20.04}
-          - {python-version: '3.12', os: ubuntu-20.04}
-          - {python-version: '3.13', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-22.04}
+          - {python-version: '3.9', os: ubuntu-22.04}
+          - {python-version: '3.10', os: ubuntu-22.04}
+          - {python-version: '3.11', os: ubuntu-22.04}
+          - {python-version: '3.12', os: ubuntu-22.04}
+          - {python-version: '3.13', os: ubuntu-22.04}
 
           #
           # Some of the doctests don't pass on Windows because of Windows-specific
@@ -111,12 +117,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-20.04}
-          - {python-version: '3.9', os: ubuntu-20.04}
-          - {python-version: '3.10', os: ubuntu-20.04}
-          - {python-version: '3.11', os: ubuntu-20.04}
-          - {python-version: '3.12', os: ubuntu-20.04}
-          - {python-version: '3.13', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-22.04}
+          - {python-version: '3.9', os: ubuntu-22.04}
+          - {python-version: '3.10', os: ubuntu-22.04}
+          - {python-version: '3.11', os: ubuntu-22.04}
+          - {python-version: '3.12', os: ubuntu-22.04}
+          - {python-version: '3.13', os: ubuntu-22.04}
 
           # Not sure why we exclude these, perhaps for historical reasons?
           #
@@ -166,12 +172,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-20.04}
-          - {python-version: '3.9', os: ubuntu-20.04}
-          - {python-version: '3.10', os: ubuntu-20.04}
-          - {python-version: '3.11', os: ubuntu-20.04}
-          - {python-version: '3.12', os: ubuntu-20.04}
-          - {python-version: '3.13', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-22.04}
+          - {python-version: '3.9', os: ubuntu-22.04}
+          - {python-version: '3.10', os: ubuntu-22.04}
+          - {python-version: '3.11', os: ubuntu-22.04}
+          - {python-version: '3.12', os: ubuntu-22.04}
+          - {python-version: '3.13', os: ubuntu-22.04}
 
           # - {python-version: '3.7', os: windows-2019}
           # - {python-version: '3.8', os: windows-2019}

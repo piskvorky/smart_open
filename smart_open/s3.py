@@ -286,7 +286,7 @@ def open_uri(uri, mode, transport_params):
     detected = [k for k in deprecated if k in transport_params]
     if detected:
         doc_url = (
-            'https://github.com/RaRe-Technologies/smart_open/blob/develop/'
+            'https://github.com/piskvorky/smart_open/blob/develop/'
             'MIGRATING_FROM_OLDER_VERSIONS.rst'
         )
         #
@@ -295,7 +295,7 @@ def open_uri(uri, mode, transport_params):
         # 1) Not everyone has logging enabled; and
         # 2) check_kwargs (below) already uses logger.warn with a similar message
         #
-        # https://github.com/RaRe-Technologies/smart_open/issues/614
+        # https://github.com/piskvorky/smart_open/issues/614
         #
         message = (
             'ignoring the following deprecated transport parameters: %r. '
@@ -335,28 +335,23 @@ def open(
         The buffer size to use when performing I/O.
     min_part_size: int, optional
         The minimum part size for multipart uploads, in bytes.
-
         When the writebuffer contains this many bytes, smart_open will upload
         the bytes to S3 as a single part of a multi-part upload, freeing the
         buffer either partially or entirely.  When you close the writer, it
         will assemble the parts together.
-
         The value determines the upper limit for the writebuffer.  If buffer
         space is short (e.g. you are buffering to memory), then use a smaller
         value for min_part_size, or consider buffering to disk instead (see
         the writebuffer option).
-
         The value must be between 5MB and 5GB.  If you specify a value outside
         of this range, smart_open will adjust it for you, because otherwise the
         upload _will_ fail.
-
         For writing only.  Does not apply if you set multipart_upload=False.
     multipart_upload: bool, optional
         Default: `True`
         If set to `True`, will use multipart upload for writing to S3. If set
         to `False`, S3 upload will use the S3 Single-Part Upload API, which
         is more ideal for small file sizes.
-
         For writing only.
     version_id: str, optional
         Version of the object, used when reading object.

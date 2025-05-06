@@ -6,8 +6,7 @@
 # from the MIT License (MIT).
 #
 
-"""Implements I/O streams over FTP.
-"""
+"""Implements I/O streams over FTP."""
 
 import logging
 import ssl
