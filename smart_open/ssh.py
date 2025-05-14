@@ -226,6 +226,7 @@ def open(
     port=None,
     connect_kwargs=None,
     prefetch_kwargs=None,
+    buffer_size=-1,
 ):
     """Open a file on a remote machine over SSH.
 
@@ -238,7 +239,7 @@ def open(
     mode: str, optional
         The mode to use for opening the file.
     host: str, optional
-        The hostname of the remote machine.  May not be None.
+        The hostname of the remote machine. May not be None.
     user: str, optional
         The username to use to login to the remote machine.
         If None, defaults to the name of the current user.
@@ -251,6 +252,8 @@ def open(
     prefetch_kwargs: dict, optional
         Any additional settings to be passed to paramiko.SFTPFile.prefetch.
         The presence of this dict (even if empty) triggers prefetching.
+    buffer_size: int, optional
+        Passed to the bufsize argument of paramiko.SFTPClient.open.
 
     Returns
     -------
@@ -297,7 +300,7 @@ def open(
             #
             del _SSH[key]
 
-    fobj = sftp_client.open(path, mode)
+    fobj = sftp_client.open(path, mode=mode, bufsize=buffer_size)
     fobj.name = path
     if prefetch_kwargs is not None:
         fobj.prefetch(**prefetch_kwargs)
