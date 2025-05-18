@@ -21,16 +21,7 @@ All of the above are generally freely available, e.g. installable via apt in Ubu
 > *New GitHub Release dialog*
 
 - Check that the [latest commit](https://github.com/piskvorky/smart_open/commits/develop) on `develop` passed all CI.
-- Make sure you're on `develop` and you're up to date locally:
-    - `git checkout develop && git pull`
-- Prepare `CHANGELOG.md` for the new release:
-    - `python release/update_changelog.py {new_version}`
-- Commit `CHANGELOG.md` to `develop` and push:
-    - `git add CHANGELOG.md && git commit -m "Update CHANGELOG.md" && git push`
-- Make sure you're on `master` and you're up to date locally:
-    - `git checkout master && git pull`
-- Merge `develop` into `master` and push:
-    - `git pull origin develop --no-ff --no-edit && git push`
+- Run `bash release/release.sh` to update `CHANGELOG.md` and then update `master` branch.
 - Create a [new GitHub Release](https://github.com/piskvorky/smart_open/releases/new).
     - Fill in the new version including a `v` prefix and press enter.
     - Confirm that it reads "Excellent! This tag will be created from the target when you publish this release.".
