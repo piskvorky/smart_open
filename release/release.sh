@@ -18,7 +18,7 @@ git push
 git checkout master
 git pull
 # Merge `develop` into `master` and push
-git pull origin develop --no-ff --no-edit
+git pull . develop --no-ff --no-edit
 git push
 # Open the new GitHub Release page for convenience
 new_release_url="https://github.com/piskvorky/smart_open/releases/new"
