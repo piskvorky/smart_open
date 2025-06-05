@@ -180,7 +180,7 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
         if port is None:
             try:
                 port = int(cfg["port"])
-            except (IndexError, ValueError):
+            except (KeyError, ValueError):
                 #
                 # Nb. ignore missing/invalid port numbers
                 #
