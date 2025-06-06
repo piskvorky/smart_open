@@ -252,7 +252,7 @@ FUNCTIONS
         mode: str, optional
             The mode to use for opening the file.
         host: str, optional
-            The hostname of the remote machine.  May not be None.
+            The hostname of the remote machine. May not be None.
         user: str, optional
             The username to use to login to the remote machine.
             If None, defaults to the name of the current user.
@@ -265,6 +265,8 @@ FUNCTIONS
         prefetch_kwargs: dict, optional
             Any additional settings to be passed to paramiko.SFTPFile.prefetch.
             The presence of this dict (even if empty) triggers prefetching.
+        buffer_size: int, optional
+            Passed to the bufsize argument of paramiko.SFTPClient.open.
 
         webhdfs (smart_open/webhdfs.py)
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

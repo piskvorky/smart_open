@@ -9,7 +9,7 @@ concurrency:  # https://stackoverflow.com/questions/66335225#comment133398800_72
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   linters:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,19 +38,19 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-22.04}
-          - {python-version: '3.9', os: ubuntu-22.04}
-          - {python-version: '3.10', os: ubuntu-22.04}
-          - {python-version: '3.11', os: ubuntu-22.04}
-          - {python-version: '3.12', os: ubuntu-22.04}
-          - {python-version: '3.13', os: ubuntu-22.04}
+          - {python-version: '3.8', os: ubuntu-24.04}
+          - {python-version: '3.9', os: ubuntu-24.04}
+          - {python-version: '3.10', os: ubuntu-24.04}
+          - {python-version: '3.11', os: ubuntu-24.04}
+          - {python-version: '3.12', os: ubuntu-24.04}
+          - {python-version: '3.13', os: ubuntu-24.04}
 
-          - {python-version: '3.8', os: windows-2019}
-          - {python-version: '3.9', os: windows-2019}
-          - {python-version: '3.10', os: windows-2019}
-          - {python-version: '3.11', os: windows-2019}
-          - {python-version: '3.12', os: windows-2019}
-          - {python-version: '3.13', os: windows-2019}
+          - {python-version: '3.8', os: windows-2025}
+          - {python-version: '3.9', os: windows-2025}
+          - {python-version: '3.10', os: windows-2025}
+          - {python-version: '3.11', os: windows-2025}
+          - {python-version: '3.12', os: windows-2025}
+          - {python-version: '3.13', os: windows-2025}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,24 +78,23 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-22.04}
-          - {python-version: '3.9', os: ubuntu-22.04}
-          - {python-version: '3.10', os: ubuntu-22.04}
-          - {python-version: '3.11', os: ubuntu-22.04}
-          - {python-version: '3.12', os: ubuntu-22.04}
-          - {python-version: '3.13', os: ubuntu-22.04}
+          - {python-version: '3.8', os: ubuntu-24.04}
+          - {python-version: '3.9', os: ubuntu-24.04}
+          - {python-version: '3.10', os: ubuntu-24.04}
+          - {python-version: '3.11', os: ubuntu-24.04}
+          - {python-version: '3.12', os: ubuntu-24.04}
+          - {python-version: '3.13', os: ubuntu-24.04}
 
           #
           # Some of the doctests don't pass on Windows because of Windows-specific
           # character encoding issues.
           #
-          # - {python-version: '3.7', os: windows-2019}
-          # - {python-version: '3.8', os: windows-2019}
-          # - {python-version: '3.9', os: windows-2019}
-          # - {python-version: '3.10', os: windows-2019}
-          # - {python-version: '3.11', os: windows-2019}
-          # - {python-version: '3.12', os: windows-2019}
-          # - {python-version: '3.13', os: windows-2019}
+          # - {python-version: '3.8', os: windows-2025}
+          # - {python-version: '3.9', os: windows-2025}
+          # - {python-version: '3.10', os: windows-2025}
+          # - {python-version: '3.11', os: windows-2025}
+          # - {python-version: '3.12', os: windows-2025}
+          # - {python-version: '3.13', os: windows-2025}
 
     steps:
       - uses: actions/checkout@v4
@@ -121,22 +120,21 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-22.04}
-          - {python-version: '3.9', os: ubuntu-22.04}
-          - {python-version: '3.10', os: ubuntu-22.04}
-          - {python-version: '3.11', os: ubuntu-22.04}
-          - {python-version: '3.12', os: ubuntu-22.04}
-          - {python-version: '3.13', os: ubuntu-22.04}
+          - {python-version: '3.8', os: ubuntu-24.04}
+          - {python-version: '3.9', os: ubuntu-24.04}
+          - {python-version: '3.10', os: ubuntu-24.04}
+          - {python-version: '3.11', os: ubuntu-24.04}
+          - {python-version: '3.12', os: ubuntu-24.04}
+          - {python-version: '3.13', os: ubuntu-24.04}
 
           # Not sure why we exclude these, perhaps for historical reasons?
           #
-          # - {python-version: '3.7', os: windows-2019}
-          # - {python-version: '3.8', os: windows-2019}
-          # - {python-version: '3.9', os: windows-2019}
-          # - {python-version: '3.10', os: windows-2019}
-          # - {python-version: '3.11', os: windows-2019}
-          # - {python-version: '3.12', os: windows-2019}
-          # - {python-version: '3.13', os: windows-2019}
+          # - {python-version: '3.8', os: windows-2025}
+          # - {python-version: '3.9', os: windows-2025}
+          # - {python-version: '3.10', os: windows-2025}
+          # - {python-version: '3.11', os: windows-2025}
+          # - {python-version: '3.12', os: windows-2025}
+          # - {python-version: '3.13', os: windows-2025}
 
     steps:
       - uses: actions/checkout@v4
@@ -176,20 +174,19 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-22.04}
-          - {python-version: '3.9', os: ubuntu-22.04}
-          - {python-version: '3.10', os: ubuntu-22.04}
-          - {python-version: '3.11', os: ubuntu-22.04}
-          - {python-version: '3.12', os: ubuntu-22.04}
-          - {python-version: '3.13', os: ubuntu-22.04}
+          - {python-version: '3.8', os: ubuntu-24.04}
+          - {python-version: '3.9', os: ubuntu-24.04}
+          - {python-version: '3.10', os: ubuntu-24.04}
+          - {python-version: '3.11', os: ubuntu-24.04}
+          - {python-version: '3.12', os: ubuntu-24.04}
+          - {python-version: '3.13', os: ubuntu-24.04}
 
-          # - {python-version: '3.7', os: windows-2019}
-          # - {python-version: '3.8', os: windows-2019}
-          # - {python-version: '3.9', os: windows-2019}
-          # - {python-version: '3.10', os: windows-2019}
-          # - {python-version: '3.11', os: windows-2019}
-          # - {python-version: '3.12', os: windows-2019}
-          # - {python-version: '3.13', os: windows-2019}
+          # - {python-version: '3.8', os: windows-2025}
+          # - {python-version: '3.9', os: windows-2025}
+          # - {python-version: '3.10', os: windows-2025}
+          # - {python-version: '3.11', os: windows-2025}
+          # - {python-version: '3.12', os: windows-2025}
+          # - {python-version: '3.13', os: windows-2025}
 
     steps:
       - uses: actions/checkout@v4
