@@ -115,7 +115,8 @@ def open_uri(uri, mode, transport_params):
     parsed_uri = parse_uri(uri)
     uri_path = parsed_uri.pop('uri_path')
     parsed_uri.pop('scheme')
-    return open(uri_path, mode, **parsed_uri, **kwargs)
+    final_params = {**parsed_uri, **kwargs}  # transport_params takes precedence over uri
+    return open(uri_path, mode, **final_params)
 
 
 def _connect_ssh(hostname, username, port, password, connect_kwargs):
@@ -180,7 +181,7 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
         if port is None:
             try:
                 port = int(cfg["port"])
-            except (IndexError, ValueError):
+            except (KeyError, ValueError):
                 #
                 # Nb. ignore missing/invalid port numbers
                 #
