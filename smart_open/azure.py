@@ -16,8 +16,8 @@ import smart_open.bytebuffer
 import smart_open.constants
 
 try:
-    import azure.storage.blob
     import azure.core.exceptions
+    import azure.storage.blob
 except ImportError:
     MISSING_DEPS = True
 
@@ -111,6 +111,14 @@ def open(
         )
     elif mode == smart_open.constants.WRITE_BINARY:
         return Writer(
+            container_id,
+            blob_id,
+            client,
+            blob_kwargs=blob_kwargs,
+            min_part_size=min_part_size
+        )
+    elif mode == smart_open.constants.APPEND_BINARY:
+        return AppendWriter(
             container_id,
             blob_id,
             client,
@@ -549,4 +557,95 @@ class Writer(io.BufferedIOBase):
             self._container_name,
             self._blob_name,
             self._min_part_size
+        )
+
+
+class AppendWriter(io.BufferedIOBase):
+    """Append bytes to Azure Blob Storage.
+
+    Implements the io.BufferedIOBase interface of the standard library."""
+
+    def __init__(
+        self,
+        container,
+        blob,
+        client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
+        blob_kwargs=None,
+    ):
+        self._container_name = container
+
+        self._blob = _get_blob_client(client, container, blob)
+        # type: azure.storage.blob.BlobClient
+        self._blob_kwargs = blob_kwargs or {}
+
+    def flush(self):
+        pass
+
+    def terminate(self):
+        """AppendBlob cannot be aborted, so we do nothing here"""
+        pass
+
+    def close(self):
+        """No action needed here, as the AppendBlob is automatically committed"""
+        pass
+
+    @property
+    def closed(self):
+        return self._blob is None
+
+    def writable(self):
+        """Return True if the stream supports writing."""
+        return True
+
+    def seekable(self):
+        """Updating or deleting of existing blocks is not supported for AppendBlob."""
+        return False
+
+    def seek(self, offset, whence=smart_open.constants.WHENCE_START):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def truncate(self, size=None):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def detach(self):
+        raise io.UnsupportedOperation("detach() not supported")
+
+    def write(self, b):
+        if not isinstance(b, _BINARY_TYPES):
+            raise TypeError(
+                "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b))
+            )
+
+        # Uploads data as an AppendBlob type with automatic block chunking.
+        # The AppendBlob will be created at first if it does not exist or append to it if it does already.
+        return self._blob.upload_blob(
+            data=b,
+            blob_type=azure.storage.blob.BlobType.APPENDBLOB,
+            overwrite=False,
+            **self._blob_kwargs,
+        )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.terminate()
+        else:
+            self.close()
+
+    def __str__(self):
+        return "(%s, %r, %r)" % (
+            self.__class__.__name__,
+            self._container_name,
+            self._blob.blob_name
+        )
+
+    def __repr__(self):
+        return "%s(container=%r, blob=%r)" % (
+            self.__class__.__name__,
+            self._container_name,
+            self._blob.blob_name,
         )
