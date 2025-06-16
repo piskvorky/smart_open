@@ -559,6 +559,7 @@ class Writer(io.BufferedIOBase):
             self._min_part_size
         )
 
+
 class AppendWriter(io.BufferedIOBase):
     """Append bytes to Azure Blob Storage.
 
