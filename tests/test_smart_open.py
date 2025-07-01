@@ -36,7 +36,8 @@ import smart_open
 from smart_open import smart_open_lib
 from smart_open import webhdfs
 from smart_open.smart_open_lib import patch_pathlib, _patch_pathlib
-from smart_open.tests.test_s3 import patch_invalid_range_response
+
+from .test_s3 import patch_invalid_range_response
 
 logger = logging.getLogger(__name__)
 

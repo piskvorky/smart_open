@@ -1,6 +1,6 @@
 # Release Scripts
 
-This subdirectory contains various scripts for making a smart_open release.
+This subdirectory contains various scripts for maintainers.
 
 ## Prerequisites
 
@@ -17,30 +17,19 @@ All of the above are generally freely available, e.g. installable via apt in Ubu
 
 ## Release Procedure
 
-First, check that the [latest commit](https://github.com/RaRe-Technologies/smart_open/commits/master) passed all CI.
+> ![New GitHub Release](https://github.com/user-attachments/assets/cf8f2fa4-37c1-4e50-9fd8-ab6e3fd705b5)
+> *New GitHub Release dialog*
 
-For the subsequent steps to work, you will need to be in the top-level subdirectory for the repo (e.g. /home/misha/git/smart_open).
-
-Prepare the release, replacing 2.3.4 with the actual version of the new release:
-
-    bash release/prepare.sh 2.3.4
-
-This will create a local release branch.
-Look around the branch and make sure everything is in order.
-Checklist:
-
-- [ ] Does smart_open/version.py contain the correct version number for the release?
-- [ ] Does the CHANGELOG.md contain a section detailing the new release?
-- [ ] Are there any PRs that should be in CHANGELOG.md, but currently aren't?
-
-If anything is out of order, make the appropriate changes and commit them to the release branch before proceeding.
-
-**This is the point of no return**.
-**Once you're happy with the release branch**, run:
-
-    bash release/merge.sh
-
-Congratulations, at this stage, you are done!
+- Check that the [latest commit](https://github.com/piskvorky/smart_open/commits/develop) on `develop` passed all CI.
+- Run `bash release/release.sh` to update `CHANGELOG.md` and then update `master` branch.
+- Create a [new GitHub Release](https://github.com/piskvorky/smart_open/releases/new).
+    - Fill in the new version including a `v` prefix and press enter.
+    - Confirm that it reads "Excellent! This tag will be created from the target when you publish this release.".
+    - Select target branch `master`.
+    - Click "Generate release notes" on the right top.
+    - Click "Publish release".
+    - The GitHub Release and corresponding git tag gets created on the merge commit on `master`.
+    - GitHub Actions [`release.yml`](https://github.com/piskvorky/smart_open/actions/workflows/release.yml) is triggered, and uploads distributions to [PyPI](https://pypi.org/project/smart-open/) and to the new [GitHub Release](https://github.com/piskvorky/smart_open/releases).
 
 ## Troubleshooting
 
