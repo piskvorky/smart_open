@@ -150,21 +150,33 @@ For the sake of simplicity, the examples below assume you have all the dependenc
 
 .. code-block:: python
 
-    >>> import os, boto3
-    >>> from smart_open import open
-    >>>
-    >>> # stream content *into* S3 (write mode) using a custom session
-    >>> session = boto3.Session(
-    ...     aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-    ...     aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
-    ... )
-    >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-    >>> with open(url, 'wb', transport_params={'client': session.client('s3')}) as fout:
-    ...     bytes_written = fout.write(b'hello world!')
-    ...     print(bytes_written)
-    12
+    import os, boto3, botocore
+    from smart_open import open
 
-.. code-block:: python
+    # stream content *into* S3 (write mode) using a custom client
+    # this client is thread-safe ref https://github.com/boto/boto3/blob/1.38.41/docs/source/guide/clients.rst?plain=1#L111
+    config = botocore.client.Config(
+        max_pool_connections=64,
+        tcp_keepalive=True,
+        retries={"max_attempts": 6, "mode": "adaptive"},
+    )
+    client = boto3.Session(
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    ).client("s3", config=config)
+    with open('s3://smart-open-py37-benchmark-results/test.txt', 'wb', transport_params={'client': client}) as fout:
+        bytes_written = fout.write(b'hello world!')
+        print(bytes_written)
+
+    # perform a single-part upload to S3 (saves billable API requests, and allows seek() before upload)
+    with open('s3://smart-open-py37-benchmark-results/test.txt', 'wb', transport_params={'multipart_upload': False}) as fout:
+        bytes_written = fout.write(b'hello world!')
+        print(bytes_written)
+    # now with tempfile.TemporaryFile instead of the default io.BytesIO (to reduce memory footprint)
+    import tempfile
+    with tempfile.TemporaryFile() as tmp, open('s3://smart-open-py37-benchmark-results/test.txt', 'wb', transport_params={'multipart_upload': False, 'writebuffer': tmp}) as fout:
+        bytes_written = fout.write(b'hello world!')
+        print(bytes_written)
 
     # stream from HDFS
     for line in open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):
