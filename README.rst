@@ -51,7 +51,7 @@ How?
   'User-Agent: *\n'
 
   >>> # stream from/to compressed files, with transparent (de)compression:
-  >>> for line in open('smart_open/tests/test_data/1984.txt.gz', encoding='utf-8'):
+  >>> for line in open('tests/test_data/1984.txt.gz', encoding='utf-8'):
   ...    print(repr(line))
   'It was a bright cold day in April, and the clocks were striking thirteen.\n'
   'Winston Smith, his chin nuzzled into his breast in an effort to escape the vile\n'
@@ -59,8 +59,8 @@ How?
   'quickly enough to prevent a swirl of gritty dust from entering along with him.\n'
 
   >>> # can use context managers too:
-  >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
-  ...    with open('smart_open/tests/test_data/1984.txt.bz2', 'w') as fout:
+  >>> with open('tests/test_data/1984.txt.gz') as fin:
+  ...    with open('tests/test_data/1984.txt.bz2', 'w') as fout:
   ...        for line in fin:
   ...           fout.write(line)
   74
@@ -246,7 +246,7 @@ By default, ``smart_open`` determines the compression algorithm to use based on 
 .. code-block:: python
 
     >>> from smart_open import open, register_compressor
-    >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
+    >>> with open('tests/test_data/1984.txt.gz') as fin:
     ...     print(fin.read(32))
     It was a bright cold day in Apri
 
@@ -256,7 +256,7 @@ To disable compression:
 .. code-block:: python
 
     >>> from smart_open import open, register_compressor
-    >>> with open('smart_open/tests/test_data/1984.txt.gz', 'rb', compression='disable') as fin:
+    >>> with open('tests/test_data/1984.txt.gz', 'rb', compression='disable') as fin:
     ...     print(fin.read(32))
     b'\x1f\x8b\x08\x08\x85F\x94\\\x00\x031984.txt\x005\x8f=r\xc3@\x08\x85{\x9d\xe2\x1d@'
 
@@ -266,7 +266,7 @@ To specify the algorithm explicitly (e.g. for non-standard file extensions):
 .. code-block:: python
 
     >>> from smart_open import open, register_compressor
-    >>> with open('smart_open/tests/test_data/1984.txt.gzip', compression='.gz') as fin:
+    >>> with open('tests/test_data/1984.txt.gzip', compression='.gz') as fin:
     ...     print(fin.read(32))
     It was a bright cold day in Apri
 
@@ -283,7 +283,7 @@ For example, to open xz-compressed files:
 
     >>> register_compressor('.xz', _handle_xz)
 
-    >>> with open('smart_open/tests/test_data/1984.txt.xz') as fin:
+    >>> with open('tests/test_data/1984.txt.xz') as fin:
     ...     print(fin.read(32))
     It was a bright cold day in Apri
 
@@ -482,7 +482,7 @@ This can be helpful when e.g. working with compressed files.
     >>>
     >>> _ = patch_pathlib()  # replace `Path.open` with `smart_open.open`
     >>>
-    >>> path = Path("smart_open/tests/test_data/crime-and-punishment.txt.gz")
+    >>> path = Path("tests/test_data/crime-and-punishment.txt.gz")
     >>>
     >>> with path.open("r") as infile:
     ...     print(infile.readline()[:41])
