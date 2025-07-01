@@ -1,24 +1,36 @@
-name: Test
-on: [push, pull_request]
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [master, develop]
+  workflow_dispatch:  # allows running CI manually from the Actions tab
 concurrency:  # https://stackoverflow.com/questions/66335225#comment133398800_72408109
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   linters:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
       - name: Setup up Python 3.11
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install flake8
+        run: pip install flake8 -e .[all]
 
       - name: Run flake8 linter (source)
         run: flake8 --show-source smart_open
+
+      - name: "Check whether help.txt update was forgotten"
+        if: github.event_name == 'pull_request'
+        run: |
+          python update_helptext.py
+          test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
 
   unit_tests:
     needs: [linters]
@@ -26,23 +38,25 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-20.04}
-          - {python-version: '3.9', os: ubuntu-20.04}
-          - {python-version: '3.10', os: ubuntu-20.04}
-          - {python-version: '3.11', os: ubuntu-20.04}
-          - {python-version: '3.12', os: ubuntu-20.04}
-          - {python-version: '3.13', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-24.04}
+          - {python-version: '3.9', os: ubuntu-24.04}
+          - {python-version: '3.10', os: ubuntu-24.04}
+          - {python-version: '3.11', os: ubuntu-24.04}
+          - {python-version: '3.12', os: ubuntu-24.04}
+          - {python-version: '3.13', os: ubuntu-24.04}
 
-          - {python-version: '3.8', os: windows-2019}
-          - {python-version: '3.9', os: windows-2019}
-          - {python-version: '3.10', os: windows-2019}
-          - {python-version: '3.11', os: windows-2019}
-          - {python-version: '3.12', os: windows-2019}
-          - {python-version: '3.13', os: windows-2019}
+          - {python-version: '3.8', os: windows-2025}
+          - {python-version: '3.9', os: windows-2025}
+          - {python-version: '3.10', os: windows-2025}
+          - {python-version: '3.11', os: windows-2025}
+          - {python-version: '3.12', os: windows-2025}
+          - {python-version: '3.13', os: windows-2025}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -56,7 +70,7 @@ jobs:
         run: pip install -e .[test]
 
       - name: Run unit tests
-        run: pytest smart_open -v -rfxECs --durations=20
+        run: pytest tests -v -rfxECs --durations=20
 
   doctest:
     needs: [linters,unit_tests]
@@ -64,29 +78,30 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-20.04}
-          - {python-version: '3.9', os: ubuntu-20.04}
-          - {python-version: '3.10', os: ubuntu-20.04}
-          - {python-version: '3.11', os: ubuntu-20.04}
-          - {python-version: '3.12', os: ubuntu-20.04}
-          - {python-version: '3.13', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-24.04}
+          - {python-version: '3.9', os: ubuntu-24.04}
+          - {python-version: '3.10', os: ubuntu-24.04}
+          - {python-version: '3.11', os: ubuntu-24.04}
+          - {python-version: '3.12', os: ubuntu-24.04}
+          - {python-version: '3.13', os: ubuntu-24.04}
 
           #
           # Some of the doctests don't pass on Windows because of Windows-specific
           # character encoding issues.
           #
-          # - {python-version: '3.7', os: windows-2019}
-          # - {python-version: '3.8', os: windows-2019}
-          # - {python-version: '3.9', os: windows-2019}
-          # - {python-version: '3.10', os: windows-2019}
-          # - {python-version: '3.11', os: windows-2019}
-          # - {python-version: '3.12', os: windows-2019}
-          # - {python-version: '3.13', os: windows-2019}
+          # - {python-version: '3.8', os: windows-2025}
+          # - {python-version: '3.9', os: windows-2025}
+          # - {python-version: '3.10', os: windows-2025}
+          # - {python-version: '3.11', os: windows-2025}
+          # - {python-version: '3.12', os: windows-2025}
+          # - {python-version: '3.13', os: windows-2025}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -105,27 +120,28 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-20.04}
-          - {python-version: '3.9', os: ubuntu-20.04}
-          - {python-version: '3.10', os: ubuntu-20.04}
-          - {python-version: '3.11', os: ubuntu-20.04}
-          - {python-version: '3.12', os: ubuntu-20.04}
-          - {python-version: '3.13', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-24.04}
+          - {python-version: '3.9', os: ubuntu-24.04}
+          - {python-version: '3.10', os: ubuntu-24.04}
+          - {python-version: '3.11', os: ubuntu-24.04}
+          - {python-version: '3.12', os: ubuntu-24.04}
+          - {python-version: '3.13', os: ubuntu-24.04}
 
           # Not sure why we exclude these, perhaps for historical reasons?
           #
-          # - {python-version: '3.7', os: windows-2019}
-          # - {python-version: '3.8', os: windows-2019}
-          # - {python-version: '3.9', os: windows-2019}
-          # - {python-version: '3.10', os: windows-2019}
-          # - {python-version: '3.11', os: windows-2019}
-          # - {python-version: '3.12', os: windows-2019}
-          # - {python-version: '3.13', os: windows-2019}
+          # - {python-version: '3.8', os: windows-2025}
+          # - {python-version: '3.9', os: windows-2025}
+          # - {python-version: '3.10', os: windows-2025}
+          # - {python-version: '3.11', os: windows-2025}
+          # - {python-version: '3.12', os: windows-2025}
+          # - {python-version: '3.13', os: windows-2025}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -158,25 +174,26 @@ jobs:
     strategy:
       matrix:
         include:
-          - {python-version: '3.8', os: ubuntu-20.04}
-          - {python-version: '3.9', os: ubuntu-20.04}
-          - {python-version: '3.10', os: ubuntu-20.04}
-          - {python-version: '3.11', os: ubuntu-20.04}
-          - {python-version: '3.12', os: ubuntu-20.04}
-          - {python-version: '3.13', os: ubuntu-20.04}
+          - {python-version: '3.8', os: ubuntu-24.04}
+          - {python-version: '3.9', os: ubuntu-24.04}
+          - {python-version: '3.10', os: ubuntu-24.04}
+          - {python-version: '3.11', os: ubuntu-24.04}
+          - {python-version: '3.12', os: ubuntu-24.04}
+          - {python-version: '3.13', os: ubuntu-24.04}
 
-          # - {python-version: '3.7', os: windows-2019}
-          # - {python-version: '3.8', os: windows-2019}
-          # - {python-version: '3.9', os: windows-2019}
-          # - {python-version: '3.10', os: windows-2019}
-          # - {python-version: '3.11', os: windows-2019}
-          # - {python-version: '3.12', os: windows-2019}
-          # - {python-version: '3.13', os: windows-2019}
+          # - {python-version: '3.8', os: windows-2025}
+          # - {python-version: '3.9', os: windows-2025}
+          # - {python-version: '3.10', os: windows-2025}
+          # - {python-version: '3.11', os: windows-2025}
+          # - {python-version: '3.12', os: windows-2025}
+          # - {python-version: '3.13', os: windows-2025}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 

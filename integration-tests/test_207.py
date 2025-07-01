@@ -27,17 +27,10 @@ def tofile():
         return fout.name
 
 
-def test():
+def test_fromfile():
     try:
         path = tofile()
         with smart_open.smart_open(path, 'rb') as fin:
-            loaded = np.fromfile(fin)
-            del loaded
-        return 0
+            np.fromfile(fin)
     finally:
         os.unlink(path)
-    return 1
-
-
-if __name__ == '__main__':
-    sys.exit(test())

@@ -6,11 +6,11 @@ smart_open — utils for streaming large files in Python
 |License|_ |GHA|_ |Coveralls|_ |Downloads|_
 
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
-.. |GHA| image:: https://github.com/RaRe-Technologies/smart_open/workflows/Test/badge.svg
+.. |GHA| image:: https://github.com/piskvorky/smart_open/workflows/Test/badge.svg
 .. |Coveralls| image:: https://coveralls.io/repos/github/RaRe-Technologies/smart_open/badge.svg?branch=develop
 .. |Downloads| image:: https://pepy.tech/badge/smart-open/month
-.. _License: https://github.com/RaRe-Technologies/smart_open/blob/master/LICENSE
-.. _GHA: https://github.com/RaRe-Technologies/smart_open/actions?query=workflow%3ATest
+.. _License: https://github.com/piskvorky/smart_open/blob/master/LICENSE
+.. _GHA: https://github.com/piskvorky/smart_open/actions?query=workflow%3ATest
 .. _Coveralls: https://coveralls.io/github/RaRe-Technologies/smart_open?branch=HEAD
 .. _Downloads: https://pypi.org/project/smart-open/
 
@@ -22,7 +22,7 @@ What?
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
-**Python 2.7 is no longer supported. If you need Python 2.7, please use** `smart_open 1.10.1 <https://github.com/RaRe-Technologies/smart_open/releases/tag/1.10.0>`_, **the last version to support Python 2.**
+**Python 2.7 is no longer supported. If you need Python 2.7, please use** `smart_open 1.10.1 <https://github.com/piskvorky/smart_open/releases/tag/1.10.0>`_, **the last version to support Python 2.**
 
 Why?
 ====
@@ -110,17 +110,17 @@ Other examples of URLs that ``smart_open`` accepts::
 Documentation
 =============
 
+The API reference can be viewed at `help.txt <https://github.com/piskvorky/smart_open/blob/master/help.txt>`__
+
 Installation
 ------------
 
-``smart_open`` supports a wide range of storage solutions, including AWS S3, Google Cloud and Azure.
+``smart_open`` supports a wide range of storage solutions. For all options, see the API reference.
 Each individual solution has its own dependencies.
 By default, ``smart_open`` does not install any dependencies, in order to keep the installation size small.
-You can install these dependencies explicitly using::
+You can install one or more of these dependencies explicitly using optional dependencies:
 
-    pip install smart_open[azure] # Install Azure deps
-    pip install smart_open[gcs] # Install GCS deps
-    pip install smart_open[s3] # Install S3 deps
+    pip install smart_open[s3,gcs,azure,http,webhdfs,ssh,zst]
 
 Or, if you don't mind installing a large number of third party libraries, you can install all dependencies using::
 
@@ -133,13 +133,13 @@ If you're upgrading from ``smart_open`` versions 2.x and below, please check out
 Built-in help
 -------------
 
-For detailed API info, see the online help:
+To view the API reference, use the ``help`` python builtin:
 
 .. code-block:: python
 
     help('smart_open')
 
-or click `here <https://github.com/RaRe-Technologies/smart_open/blob/master/help.txt>`__ to view the help in your browser.
+or view `help.txt <https://github.com/piskvorky/smart_open/blob/master/help.txt>`__ in your browser.
 
 More examples
 -------------
@@ -150,21 +150,33 @@ For the sake of simplicity, the examples below assume you have all the dependenc
 
 .. code-block:: python
 
-    >>> import os, boto3
-    >>> from smart_open import open
-    >>>
-    >>> # stream content *into* S3 (write mode) using a custom session
-    >>> session = boto3.Session(
-    ...     aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-    ...     aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
-    ... )
-    >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-    >>> with open(url, 'wb', transport_params={'client': session.client('s3')}) as fout:
-    ...     bytes_written = fout.write(b'hello world!')
-    ...     print(bytes_written)
-    12
+    import os, boto3, botocore
+    from smart_open import open
 
-.. code-block:: python
+    # stream content *into* S3 (write mode) using a custom client
+    # this client is thread-safe ref https://github.com/boto/boto3/blob/1.38.41/docs/source/guide/clients.rst?plain=1#L111
+    config = botocore.client.Config(
+        max_pool_connections=64,
+        tcp_keepalive=True,
+        retries={"max_attempts": 6, "mode": "adaptive"},
+    )
+    client = boto3.Session(
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    ).client("s3", config=config)
+    with open('s3://smart-open-py37-benchmark-results/test.txt', 'wb', transport_params={'client': client}) as fout:
+        bytes_written = fout.write(b'hello world!')
+        print(bytes_written)
+
+    # perform a single-part upload to S3 (saves billable API requests, and allows seek() before upload)
+    with open('s3://smart-open-py37-benchmark-results/test.txt', 'wb', transport_params={'multipart_upload': False}) as fout:
+        bytes_written = fout.write(b'hello world!')
+        print(bytes_written)
+    # now with tempfile.TemporaryFile instead of the default io.BytesIO (to reduce memory footprint)
+    import tempfile
+    with tempfile.TemporaryFile() as tmp, open('s3://smart-open-py37-benchmark-results/test.txt', 'wb', transport_params={'multipart_upload': False, 'writebuffer': tmp}) as fout:
+        bytes_written = fout.write(b'hello world!')
+        print(bytes_written)
 
     # stream from HDFS
     for line in open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):
@@ -496,14 +508,14 @@ Before you can run the test suite, install the test dependencies::
 
 Now, you can run the unit tests::
 
-    pytest smart_open
+    pytest tests
 
-The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
+The tests are also run automatically with `GitHub Actions <https://github.com/piskvorky/smart_open/actions/workflows/python-package.yml>`_ on every commit push & pull request.
 
 Comments, bug reports
 =====================
 
-``smart_open`` lives on `Github <https://github.com/RaRe-Technologies/smart_open>`_. You can file
+``smart_open`` lives on `Github <https://github.com/piskvorky/smart_open>`_. You can file
 issues or pull requests there. Suggestions, pull requests and improvements welcome!
 
 ----------------

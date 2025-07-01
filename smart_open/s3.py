@@ -286,7 +286,7 @@ def open_uri(uri, mode, transport_params):
     detected = [k for k in deprecated if k in transport_params]
     if detected:
         doc_url = (
-            'https://github.com/RaRe-Technologies/smart_open/blob/develop/'
+            'https://github.com/piskvorky/smart_open/blob/develop/'
             'MIGRATING_FROM_OLDER_VERSIONS.rst'
         )
         #
@@ -295,7 +295,7 @@ def open_uri(uri, mode, transport_params):
         # 1) Not everyone has logging enabled; and
         # 2) check_kwargs (below) already uses logger.warn with a similar message
         #
-        # https://github.com/RaRe-Technologies/smart_open/issues/614
+        # https://github.com/piskvorky/smart_open/issues/614
         #
         message = (
             'ignoring the following deprecated transport parameters: %r. '
@@ -335,28 +335,23 @@ def open(
         The buffer size to use when performing I/O.
     min_part_size: int, optional
         The minimum part size for multipart uploads, in bytes.
-
         When the writebuffer contains this many bytes, smart_open will upload
         the bytes to S3 as a single part of a multi-part upload, freeing the
         buffer either partially or entirely.  When you close the writer, it
         will assemble the parts together.
-
         The value determines the upper limit for the writebuffer.  If buffer
         space is short (e.g. you are buffering to memory), then use a smaller
         value for min_part_size, or consider buffering to disk instead (see
         the writebuffer option).
-
         The value must be between 5MB and 5GB.  If you specify a value outside
         of this range, smart_open will adjust it for you, because otherwise the
         upload _will_ fail.
-
         For writing only.  Does not apply if you set multipart_upload=False.
     multipart_upload: bool, optional
         Default: `True`
         If set to `True`, will use multipart upload for writing to S3. If set
         to `False`, S3 upload will use the S3 Single-Part Upload API, which
         is more ideal for small file sizes.
-
         For writing only.
     version_id: str, optional
         Version of the object, used when reading object.
@@ -1130,22 +1125,12 @@ class SinglepartWriter(io.BufferedIOBase):
     ):
         _initialize_boto3(self, client, client_kwargs, bucket, key)
 
-        try:
-            self._client.head_bucket(Bucket=bucket)
-        except botocore.client.ClientError as e:
-            raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket) from e
-
         if writebuffer is None:
             self._buf = io.BytesIO()
+        elif not writebuffer.seekable():
+            raise ValueError('writebuffer needs to be seekable')
         else:
             self._buf = writebuffer
-
-        self._total_bytes = 0
-
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
 
     def flush(self):
         pass
@@ -1158,7 +1143,7 @@ class SinglepartWriter(io.BufferedIOBase):
         if self.closed:
             return
 
-        self._buf.seek(0)
+        self.seek(0)
 
         try:
             self._client.put_object(
@@ -1171,39 +1156,35 @@ class SinglepartWriter(io.BufferedIOBase):
                 'the bucket %r does not exist, or is forbidden for access' % self._bucket) from e
 
         logger.debug("%s: direct upload finished", self)
-        self._buf = None
+        self._buf.close()
 
     @property
     def closed(self):
-        return self._buf is None
+        return self._buf is None or self._buf.closed
+
+    def readable(self):
+        """Propagate."""
+        return self._buf.readable()
 
     def writable(self):
-        """Return True if the stream supports writing."""
-        return True
+        """Propagate."""
+        return self._buf.writable()
 
     def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError.
-
-        We offer only tell support, and no seek or truncate support."""
-        return True
+        """Propagate."""
+        return self._buf.seekable()
 
     def seek(self, offset, whence=constants.WHENCE_START):
-        """Unsupported."""
-        raise io.UnsupportedOperation
+        """Propagate."""
+        return self._buf.seek(offset, whence)
 
     def truncate(self, size=None):
-        """Unsupported."""
-        raise io.UnsupportedOperation
+        """Propagate."""
+        return self._buf.truncate(size)
 
     def tell(self):
-        """Return the current stream position."""
-        return self._total_bytes
-
-    #
-    # io.BufferedIOBase methods.
-    #
-    def detach(self):
-        raise io.UnsupportedOperation("detach() not supported")
+        """Propagate."""
+        return self._buf.tell()
 
     def write(self, b):
         """Write the given buffer (bytes, bytearray, memoryview or any buffer
@@ -1211,13 +1192,19 @@ class SinglepartWriter(io.BufferedIOBase):
         written to S3 on close as a single-part upload.
 
         For more information about buffers, see https://docs.python.org/3/c-api/buffer.html"""
+        return self._buf.write(b)
 
-        length = self._buf.write(b)
-        self._total_bytes += length
-        return length
+    def read(self, size=-1):
+        """Propagate."""
+        return self._buf.read(size)
+
+    def read1(self, size=-1):
+        """Propagate."""
+        return self._buf.read1(size)
 
     def terminate(self):
-        self._buf = None
+        """Close buffer and skip upload."""
+        self._buf.close()
         logger.debug('%s: terminated singlepart upload', self)
 
     #

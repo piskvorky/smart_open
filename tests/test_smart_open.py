@@ -36,7 +36,8 @@ import smart_open
 from smart_open import smart_open_lib
 from smart_open import webhdfs
 from smart_open.smart_open_lib import patch_pathlib, _patch_pathlib
-from smart_open.tests.test_s3 import patch_invalid_range_response
+
+from .test_s3 import patch_invalid_range_response
 
 logger = logging.getLogger(__name__)
 
@@ -1248,7 +1249,7 @@ class SmartOpenTest(unittest.TestCase):
 
     def test_newline_csv(self):
         #
-        # See https://github.com/RaRe-Technologies/smart_open/issues/477
+        # See https://github.com/piskvorky/smart_open/issues/477
         #
         rows = [{'name': 'alice\u2028beatrice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
         expected = 'name,color\r\nalice\u2028beatrice,aqua\r\nbob,blue\r\n'

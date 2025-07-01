@@ -588,8 +588,12 @@ class MultipartWriterTest(unittest.TestCase):
 
     def test_nonexisting_bucket(self):
         expected = u"выйду ночью в поле с конём".encode('utf-8')
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, "does not exist"):
             with smart_open.s3.open('thisbucketdoesntexist', 'mykey', 'wb') as fout:
+                fout.write(expected)
+
+        with self.assertRaisesRegex(ValueError, "does not exist"):
+            with smart_open.s3.open('thisbucketdoesntexist', 'mykey', 'wb', multipart_upload=False) as fout:
                 fout.write(expected)
 
     def test_read_nonexisting_key(self):
@@ -827,6 +831,52 @@ class SinglepartWriterTest(unittest.TestCase):
                 actual = fin.read()
 
             assert actual == contents
+
+    def test_seekable(self):
+        """Test that SinglepartWriter is seekable."""
+        expected = b'  34'
+
+        with smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+            fout.write(b'1234')
+            self.assertEqual(len(expected), fout.tell())
+            fout.seek(0)
+            self.assertEqual(0, fout.tell())
+            fout.write(b'  ')
+            self.assertEqual(2, fout.tell())
+            fout.seek(0)
+            self.assertEqual(expected, fout.read())
+
+        with self.assertRaises(ValueError, msg='I/O operation on closed file'):
+            fout.seekable()
+
+        with self.assertRaises(io.UnsupportedOperation, msg='SinglepartWriter.detach() not supported'):
+            fout.detach()
+
+        with self.assertRaises(ValueError, msg='read from closed file'):
+            fout.read()
+
+        with self.assertRaises(ValueError, msg='write to closed file'):
+            fout.write(b' ')
+
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
+            actual = fin.read()
+
+        self.assertEqual(expected, actual)
+
+    def test_truncate(self):
+        """Test that SinglepartWriter.truncate works."""
+        expected = u'не думай о секундах свысока'
+
+        with smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+            fout.write(expected.encode('utf-8'))
+            fout.write(b'42')
+            fout.truncate(len(expected.encode('utf-8')))
+
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
+            with io.TextIOWrapper(fin, encoding='utf-8') as text:
+                actual = text.read()
+
+        self.assertEqual(expected, actual)
 
     def test_str(self):
         with smart_open.s3.open(BUCKET_NAME, 'key', 'wb', multipart_upload=False) as fout:

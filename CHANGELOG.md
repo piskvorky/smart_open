@@ -1,3 +1,13 @@
+# 7.3.0, 2025-07-01
+
+- Remove head_bucket call from s3.SinglepartWriter (PR [#857](https://github.com/piskvorky/smart_open/pull/857), [@ddelange](https://github.com/ddelange))
+- Add help.txt linting step (PR [#853](https://github.com/piskvorky/smart_open/pull/853), [@ddelange](https://github.com/ddelange))
+- Add buffer_size transport param to ssh.py (PR [#861](https://github.com/piskvorky/smart_open/pull/861), [@ddelange](https://github.com/ddelange))
+- Fix integration test CI rot (PR [#864](https://github.com/piskvorky/smart_open/pull/864), [@ddelange](https://github.com/ddelange))
+- Fix try-except in ssh.py for missing port in ssh config (PR [#863](https://github.com/piskvorky/smart_open/pull/863), [@ddelange](https://github.com/ddelange))
+- Make s3.SinglepartWriter seekable (PR [#854](https://github.com/piskvorky/smart_open/pull/854), [@ddelange](https://github.com/ddelange))
+- Modernize python packaging (PR [#851](https://github.com/piskvorky/smart_open/pull/851), [@ddelange](https://github.com/ddelange))
+
 # 7.2.0, 2025-03-06
 
 - Add support for prefetching to sftp transport (PR [#849](https://github.com/piskvorky/smart_open/pull/849), [@davidszotten](https://github.com/davidszotten))
@@ -501,4 +511,3 @@ The old `smart_open.smart_open` function is deprecated, but continues to work as
 
   - support for multistream bzip files (PR #9, @pombredanne)
   - introduce this CHANGELOG
-
