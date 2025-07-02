@@ -6,11 +6,11 @@ smart_open — utils for streaming large files in Python
 |License|_ |GHA|_ |Coveralls|_ |Downloads|_
 
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
-.. |GHA| image:: https://github.com/piskvorky/smart_open/workflows/Test/badge.svg
+.. |CI| image:: https://github.com/piskvorky/smart_open/actions/workflows/python-package.yml/badge.svg?branch=develop&event=push
 .. |Coveralls| image:: https://coveralls.io/repos/github/RaRe-Technologies/smart_open/badge.svg?branch=develop
 .. |Downloads| image:: https://pepy.tech/badge/smart-open/month
 .. _License: https://github.com/piskvorky/smart_open/blob/master/LICENSE
-.. _GHA: https://github.com/piskvorky/smart_open/actions?query=workflow%3ATest
+.. _CI: https://github.com/piskvorky/smart_open/actions/workflows/python-package.yml
 .. _Coveralls: https://coveralls.io/github/RaRe-Technologies/smart_open?branch=HEAD
 .. _Downloads: https://pypi.org/project/smart-open/
 
