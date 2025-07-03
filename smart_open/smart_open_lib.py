@@ -151,7 +151,7 @@ def open(
 
     See Also
     --------
-    - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
+    - `Standard library reference <https://docs.python.org/3.13/library/functions.html#open>`__
     - `smart_open README.rst
       <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
 
