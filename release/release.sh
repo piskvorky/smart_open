@@ -20,6 +20,9 @@ git pull
 # Merge `develop` into `master` and push
 git merge develop --no-ff -m "Merge branch 'develop' into master"
 git push
+# Make sure you're on `develop` and you're up to date locally
+git checkout develop
+git pull
 # Merge `master` back into `develop` and push
 git merge master --no-ff -m "Merge branch 'master' into develop"
 git push
