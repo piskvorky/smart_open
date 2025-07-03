@@ -1,3 +1,10 @@
+# 7.3.0.post1, 2025-07-03
+
+- Fix release.sh merge message and final merge (PR [#868](https://github.com/piskvorky/smart_open/pull/868), [@ddelange](https://github.com/ddelange))
+- Bump softprops/action-gh-release from 2.2.1 to 2.3.2 in the github-actions group (PR [#867](https://github.com/piskvorky/smart_open/pull/867), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Fix CI badge (PR [#869](https://github.com/piskvorky/smart_open/pull/869), [@ddelange](https://github.com/ddelange))
+- Drop 3.7 support in pyproject.toml (PR [#871](https://github.com/piskvorky/smart_open/pull/871), [@ddelange](https://github.com/ddelange))
+
 # 7.3.0, 2025-07-01
 
 - Remove head_bucket call from s3.SinglepartWriter (PR [#857](https://github.com/piskvorky/smart_open/pull/857), [@ddelange](https://github.com/ddelange))
