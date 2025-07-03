@@ -18,7 +18,10 @@ git push
 git checkout master
 git pull
 # Merge `develop` into `master` and push
-git pull . develop --no-ff --no-edit
+git merge develop --no-ff -m "Merge branch 'develop' into master"
+git push
+# Merge `master` back into `develop` and push
+git merge master --no-ff -m "Merge branch 'master' into develop"
 git push
 # Open the new GitHub Release page for convenience
 new_release_url="https://github.com/piskvorky/smart_open/releases/new"

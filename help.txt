@@ -289,7 +289,7 @@ FUNCTIONS
         'User-Agent: *\n'
 
         >>> # stream from/to compressed files, with transparent (de)compression:
-        >>> for line in open('smart_open/tests/test_data/1984.txt.gz', encoding='utf-8'):
+        >>> for line in open('tests/test_data/1984.txt.gz', encoding='utf-8'):
         ...    print(repr(line))
         'It was a bright cold day in April, and the clocks were striking thirteen.\n'
         'Winston Smith, his chin nuzzled into his breast in an effort to escape the vile\n'
@@ -297,8 +297,8 @@ FUNCTIONS
         'quickly enough to prevent a swirl of gritty dust from entering along with him.\n'
 
         >>> # can use context managers too:
-        >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
-        ...    with open('smart_open/tests/test_data/1984.txt.bz2', 'w') as fout:
+        >>> with open('tests/test_data/1984.txt.gz') as fin:
+        ...    with open('tests/test_data/1984.txt.bz2', 'w') as fout:
         ...        for line in fin:
         ...           fout.write(line)
         74
@@ -333,7 +333,7 @@ FUNCTIONS
 
         See Also
         --------
-        - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
+        - `Standard library reference <https://docs.python.org/3.13/library/functions.html#open>`__
         - `smart_open README.rst
           <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
 

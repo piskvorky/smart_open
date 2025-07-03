@@ -11,7 +11,7 @@ description = "Utils for streaming large files (S3, HDFS, GCS, SFTP, Azure Blob 
 readme = "README.rst"
 urls = {Repository = "https://github.com/piskvorky/smart_open"}
 authors = [{name = "Radim Rehurek", email = "me@radimrehurek.com"}]
-requires-python = ">=3.7,<4.0" # sync with classifiers below
+requires-python = ">=3.8,<4.0" # sync with classifiers below
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
@@ -20,7 +20,6 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.7",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
