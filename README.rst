@@ -245,7 +245,7 @@ By default, ``smart_open`` determines the compression algorithm to use based on 
 
 .. code-block:: python
 
-    >>> from smart_open import open, register_compressor
+    >>> from smart_open import open
     >>> with open('tests/test_data/1984.txt.gz') as fin:
     ...     print(fin.read(32))
     It was a bright cold day in Apri
@@ -255,7 +255,7 @@ To disable compression:
 
 .. code-block:: python
 
-    >>> from smart_open import open, register_compressor
+    >>> from smart_open import open
     >>> with open('tests/test_data/1984.txt.gz', 'rb', compression='disable') as fin:
     ...     print(fin.read(32))
     b'\x1f\x8b\x08\x08\x85F\x94\\\x00\x031984.txt\x005\x8f=r\xc3@\x08\x85{\x9d\xe2\x1d@'
@@ -265,7 +265,7 @@ To specify the algorithm explicitly (e.g. for non-standard file extensions):
 
 .. code-block:: python
 
-    >>> from smart_open import open, register_compressor
+    >>> from smart_open import open
     >>> with open('tests/test_data/1984.txt.gzip', compression='.gz') as fin:
     ...     print(fin.read(32))
     It was a bright cold day in Apri
@@ -279,7 +279,7 @@ For example, to open xz-compressed files:
     >>> from smart_open import open, register_compressor
 
     >>> def _handle_xz(file_obj, mode):
-    ...      return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+    ...      return lzma.LZMAFile(filename=file_obj, mode=mode)
 
     >>> register_compressor('.xz', _handle_xz)
 
@@ -287,10 +287,7 @@ For example, to open xz-compressed files:
     ...     print(fin.read(32))
     It was a bright cold day in Apri
 
-``lzma`` is in the standard library in Python 3.3 and greater.
-For 2.7, use `backports.lzma`_.
-
-.. _backports.lzma: https://pypi.org/project/backports.lzma/
+This is just an example: ``lzma`` is in the standard library and is registered by default.
 
 Transport-specific Options
 --------------------------

@@ -128,7 +128,7 @@ For example:
 ```python
 def _handle_xz(file_obj, mode):
     import lzma
-    return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+    return lzma.LZMAFile(filename=file_obj, mode=mode)
 
 
 register_compressor('.xz', _handle_xz)
