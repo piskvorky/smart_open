@@ -78,28 +78,37 @@ def named_temporary_file(mode='w+b', prefix=None, suffix=None, delete=True):
             logger.error(e)
 
 
-def test_zst_write():
-    with named_temporary_file(suffix=".zst") as tmp:
-        with smart_open.open(tmp.name, "wt") as fout:
-            print("hello world", file=fout)
-            print("this is a test", file=fout)
+def test_compression_extensions():
+    for extension in smart_open.compression.get_supported_extensions():
+        with named_temporary_file(suffix=extension) as tmp:
+            with smart_open.open(tmp.name, "wt") as fout:
+                print("hello world", file=fout)
+                print("this is a test", file=fout)
 
-        with smart_open.open(tmp.name, "rt") as fin:
-            got = list(fin)
+            with smart_open.open(tmp.name, "rt") as fin:
+                got = list(fin)
 
-    assert got == ["hello world\n", "this is a test\n"]
+        assert got == ["hello world\n", "this is a test\n"], f"Error for {extension=}, mode='wt'"
 
+        with named_temporary_file(suffix=extension) as tmp:
+            with smart_open.open(tmp.name, "w") as fout:
+                fout.write("hello world\n")
+                fout.write("this is a test\n")
 
-def test_zst_write_binary():
-    with named_temporary_file(suffix=".zst") as tmp:
-        with smart_open.open(tmp.name, "wb") as fout:
-            fout.write(b"hello world\n")
-            fout.write(b"this is a test\n")
+            with smart_open.open(tmp.name, "r") as fin:
+                got = list(fin)
 
-        with smart_open.open(tmp.name, "rb") as fin:
-            got = list(fin)
+        assert got == ["hello world\n", "this is a test\n"], f"Error for {extension=}, mode='w'"
 
-    assert got == [b"hello world\n", b"this is a test\n"]
+        with named_temporary_file(suffix=extension) as tmp:
+            with smart_open.open(tmp.name, "wb") as fout:
+                fout.write(b"hello world\n")
+                fout.write(b"this is a test\n")
+
+            with smart_open.open(tmp.name, "rb") as fin:
+                got = list(fin)
+
+        assert got == [b"hello world\n", b"this is a test\n"], f"Error for {extension=}, mode='wb'"
 
 
 class ParseUriTest(unittest.TestCase):
