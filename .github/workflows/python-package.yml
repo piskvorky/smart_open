@@ -11,7 +11,7 @@ jobs:
   linters:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
@@ -52,7 +52,7 @@ jobs:
           - {python-version: '3.12', os: windows-2025}
           - {python-version: '3.13', os: windows-2025}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
@@ -97,7 +97,7 @@ jobs:
           # - {python-version: '3.13', os: windows-2025}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
@@ -137,7 +137,7 @@ jobs:
           # - {python-version: '3.13', os: windows-2025}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
@@ -189,7 +189,7 @@ jobs:
           # - {python-version: '3.13', os: windows-2025}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
