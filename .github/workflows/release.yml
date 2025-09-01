@@ -14,7 +14,7 @@ jobs:
       pull-requests: write # apexskier/github-release-commenter
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
