@@ -1,3 +1,10 @@
+# 7.3.1, 2025-09-08
+
+- Fix release.sh for the final merge back into develop (PR [#872](https://github.com/piskvorky/smart_open/pull/872), [@ddelange](https://github.com/ddelange))
+- Bump actions/checkout from 4 to 5 in the github-actions group (PR [#877](https://github.com/piskvorky/smart_open/pull/877), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Bump pypa/gh-action-pypi-publish from 1.12.4 to 1.13.0 in /.github/workflows (PR [#878](https://github.com/piskvorky/smart_open/pull/878), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Add .xz and increase performance of compression module (PR [#875](https://github.com/piskvorky/smart_open/pull/875), [@ddelange](https://github.com/ddelange))
+
 # 7.3.0.post1, 2025-07-03
 
 - Fix release.sh merge message and final merge (PR [#868](https://github.com/piskvorky/smart_open/pull/868), [@ddelange](https://github.com/ddelange))

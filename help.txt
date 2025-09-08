@@ -326,6 +326,7 @@ FUNCTIONS
 
         * .bz2
         * .gz
+        * .xz
         * .zst
 
         The function depends on the file extension to determine the appropriate codec.
@@ -405,10 +406,10 @@ FUNCTIONS
         Parameters
         ----------
         ext: str
-            The extension.  Must include the leading period, e.g. ``.gz``.
+            The extension.  Must include the leading period, e.g. `.gz`.
         callback: callable
             The callback.  It must accept two position arguments, file_obj and mode.
-            This function will be called when ``smart_open`` is opening a file with
+            This function will be called when `smart_open` is opening a file with
             the specified extension.
 
         Examples
@@ -419,9 +420,11 @@ FUNCTIONS
 
         >>> def _handle_xz(file_obj, mode):
         ...     import lzma
-        ...     return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+        ...     return lzma.LZMAFile(filename=file_obj, mode=mode)
         >>>
         >>> register_compressor('.xz', _handle_xz)
+
+        This is just an example: `lzma` is in the standard library and is registered by default.
 
     s3_iter_bucket(bucket_name, prefix='', accept_key=None, key_limit=None, workers=16, retries=3, **session_kwargs)
         Deprecated.  Use smart_open.s3.iter_bucket instead.
