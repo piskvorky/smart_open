@@ -39,7 +39,6 @@ def request_callback(request, headers=HEADERS, data=BYTES):
     return (200, headers, data)
 
 
-@unittest.skipIf(os.environ.get('TRAVIS'), 'This test does not work on TravisCI for some reason')
 class HttpTest(unittest.TestCase):
 
     @responses.activate
