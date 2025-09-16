@@ -228,6 +228,14 @@ FUNCTIONS
             If set to `True` on a file opened for reading, GetObject will not be
             called until the first seek() or read().
             Avoids redundant API queries when seeking before reading.
+        range_chunk_size: int, optional
+            Default: `None`
+            If set to an integer value, S3 requests will be made in chunks
+            of this size in bytes. This is useful for reading small portions of
+            large files, as it prevents S3-compatible storage systems from
+            internally queueing up the entire file when only a small portion
+            will be read. When None (default), a single request will be made
+            for the whole file, which can help to minimize per-request costs on S3.
         client: object, optional
             The S3 client to use when working with boto3.
             If you don't specify this, then smart_open will create a new client for you.
