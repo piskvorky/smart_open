@@ -320,6 +320,7 @@ def open(
     client=None,
     client_kwargs=None,
     writebuffer=None,
+    range_chunk_size=None,
 ):
     """Open an S3 object for reading or writing.
 
@@ -361,6 +362,14 @@ def open(
         If set to `True` on a file opened for reading, GetObject will not be
         called until the first seek() or read().
         Avoids redundant API queries when seeking before reading.
+    range_chunk_size: int, optional
+        Default: `None`
+        If set to an integer value, S3 requests will be made in chunks
+        of this size in bytes. This is useful for reading small portions of
+        large files, as it prevents S3-compatible storage systems from
+        internally queueing up the entire file when only a small portion
+        will be read. When None (default), a single request will be made
+        for the whole file, which can help to minimize per-request costs on S3.
     client: object, optional
         The S3 client to use when working with boto3.
         If you don't specify this, then smart_open will create a new client for you.
@@ -392,6 +401,7 @@ def open(
             defer_seek=defer_seek,
             client=client,
             client_kwargs=client_kwargs,
+            range_chunk_size=range_chunk_size,
         )
     elif mode == constants.WRITE_BINARY:
         if multipart_upload:
@@ -457,15 +467,20 @@ class _SeekableRawReader(object):
         bucket,
         key,
         version_id=None,
+        range_chunk_size=None,
     ):
         self._client = client
         self._bucket = bucket
         self._key = key
         self._version_id = version_id
+        self._range_chunk_size = range_chunk_size
 
         self._content_length = None
-        self._position = 0
         self._body = None
+        # Inclusive start position of current chunk in _body
+        self._position = 0
+        # Exclusive end position of current chunk in _body
+        self._chunk_end = None 
 
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
@@ -512,25 +527,44 @@ class _SeekableRawReader(object):
         if reached_eof:
             self._body = io.BytesIO()
             self._position = self._content_length
+            self._chunk_end = None
         else:
             self._open_body(start, stop)
 
         return self._position
 
     def _open_body(self, start=None, stop=None):
-        """Open a connection to download the specified range of bytes. Store
+        """Open a connection to download the range of bytes [start,stop]. Store
         the open file handle in self._body.
 
         If no range is specified, start defaults to self._position.
         start and stop follow the semantics of the http range header,
-        so a stop without a start will read bytes beginning at stop.
+        so a stop without a start will read the last "stop" bytes in the file.
 
         As a side effect, set self._content_length. Set self._position
         to self._content_length if start is past end of file.
         """
         if start is None and stop is None:
             start = self._position
+
+        if start is not None and start < 0:
+            raise ValueError('start must be non-negative, got %r' % start)
+        
+        if stop is not None and stop < 0:
+            raise ValueError('stop must be non-negative, got %r' % stop)
+
+        if self._range_chunk_size is not None and start is not None:
+            chunk_end = start + self._range_chunk_size - 1
+            if stop is None:
+                stop = chunk_end
+            else:
+                stop = min(stop, chunk_end)
+
         range_string = smart_open.utils.make_range_string(start, stop)
+
+        if self._body is not None:
+            self._body.close()
+            self._body = None
 
         try:
             # Optimistically try to fetch the requested content range.
@@ -546,10 +580,16 @@ class _SeekableRawReader(object):
             error_response = _unwrap_ioerror(ioe)
             if error_response is None or error_response.get('Code') != _OUT_OF_RANGE:
                 raise
+            
             try:
+                # If we get this error, we know that we're at the end of the file
                 self._position = self._content_length = int(error_response['ActualObjectSize'])
-                self._body = io.BytesIO()
+                body = io.BytesIO()
+                self._chunk_end = None
             except KeyError:
+                # When reading an empty file, ActualObjectSize can be missing (https://github.com/piskvorky/smart_open/pull/771)
+                # As a final fallback, request the whole file. We try to be robust to the case when the file is 
+                # non-empty even though this may not actually happen in practice.
                 response = _get(
                     self._client,
                     self._bucket,
@@ -557,8 +597,10 @@ class _SeekableRawReader(object):
                     self._version_id,
                     None,
                 )
-                self._position = self._content_length = response["ContentLength"]
-                self._body = response["Body"]
+                self._content_length = response["ContentLength"]
+                body = response["Body"]
+                self._position = 0
+                self._chunk_end = None
         else:
             #
             # Keep track of how many times boto3's built-in retry mechanism
@@ -577,20 +619,54 @@ class _SeekableRawReader(object):
             #
             status_code = response['ResponseMetadata']['HTTPStatusCode']
             if status_code == http.HTTPStatus.PARTIAL_CONTENT:
-                _, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
-                self._position = start
+                _, response_start, response_stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
+                self._position = response_start
+                self._chunk_end = response_stop + 1
             elif status_code == http.HTTPStatus.OK:
                 length = response["ContentLength"]
+                self._position = 0
+                self._chunk_end = None
+            else:
+                raise ValueError("Unexpected status code %r" % status_code)
+
             self._content_length = length
-            self._body = response['Body']
+            body = response['Body']
+
+        # If we got a full request when we were actually expecting a range, we need to
+        # read some data to ensure that the body starts in the place that the caller expects
+        if start is not None:
+            expected_position = min(self._content_length, start)
+        elif start is None and stop is not None:
+            expected_position = max(0, self._content_length - stop)
+        else:
+            raise ValueError()
+
+        should_discard_bytes = expected_position - self._position
+        if should_discard_bytes <= 0:
+            discarded_bytes = 0
+        else:
+            logger.debug(
+                '%s: discarding %d bytes to reach expected position %d',
+                self,
+                should_discard_bytes,
+                expected_position,
+            )
+            discarded_bytes = len(body.read(should_discard_bytes))
+            self._position += discarded_bytes
+        
+        if discarded_bytes != should_discard_bytes:
+            raise IOError(
+                '%s: we wanted to open a stream starting at position %d (start=%s, end=%s), '
+                'in a file with content length %d, but only managed to reach position %d'
+                % (self, expected_position, start, stop, self._content_length, self._position)
+            )
+
+        self._body = body
 
     def read(self, size=-1):
         """Read from the continuous connection with the remote peer."""
-        if self._body is None:
-            # This is necessary for the very first read() after __init__().
-            self._open_body()
-        if self._position >= self._content_length:
-            return b''
+        if size < -1:
+            raise ValueError(f'size must be >= -1, got {size}')
 
         #
         # Boto3 has built-in error handling and retry mechanisms:
@@ -605,31 +681,68 @@ class _SeekableRawReader(object):
         # HTTP connection and try again.  Usually, a single retry attempt is
         # enough to recover, but we try multiple times "just in case".
         #
-        for attempt, seconds in enumerate([1, 2, 4, 8, 16], 1):
-            try:
-                if size == -1:
-                    binary = self._body.read()
-                else:
-                    binary = self._body.read(size)
-            except (
-                ConnectionResetError,
-                botocore.exceptions.BotoCoreError,
-                urllib3.exceptions.HTTPError,
-            ) as err:
-                logger.warning(
-                    '%s: caught %r while reading %d bytes, sleeping %ds before retry',
-                    self,
-                    err,
-                    size,
-                    seconds,
-                )
-                time.sleep(seconds)
-                self._open_body()
-            else:
-                self._position += len(binary)
-                return binary
+        binary_collected = []
+        bytes_read = 0 # == sum(map(len, binary_collected))
 
-        raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, attempt))
+        while True:
+            if self._body is None:
+                # This is necessary for the very first read() after __init__(),
+                # or after a chunk is exhausted (if using chunk_range)
+                self._open_body()
+                is_fresh_chunk = True
+            else:
+                is_fresh_chunk = False
+            
+            if self._position >= self._content_length or (size >= 0 and bytes_read >= size):
+                break
+
+            secondss = [1, 2, 4, 8, 16]
+            for seconds in secondss:
+                try:
+                    if size == -1:
+                        binary = self._body.read()
+                    else:
+                        binary = self._body.read(size - bytes_read)
+                except (
+                    ConnectionResetError,
+                    botocore.exceptions.BotoCoreError,
+                    urllib3.exceptions.HTTPError,
+                ) as err:
+                    logger.warning(
+                        '%s: caught %r while reading %d bytes, sleeping %ds before retry',
+                        self,
+                        err,
+                        size,
+                        seconds,
+                    )
+                    time.sleep(seconds)
+                    self._open_body()
+                else:
+                    break
+            else:
+                raise IOError('%s: failed to read after %d attempts' % (self, len(secondss)))
+
+            if binary:
+                self._position += len(binary)
+                binary_collected.append(binary)
+                bytes_read += len(binary)
+            else:
+                # By construction we always try to read >= 1 bytes, so if we see this
+                # we know that we are at the end of the current _body.
+                # here just in case.
+                if self._chunk_end is None or is_fresh_chunk:
+                    # The unchunked case will probably will have been caught by the
+                    # position >= content_length check above, but no harm in an extra check.
+                    # 
+                    # The "is_fresh_chunk" check is a conservative addition to avoid a tight
+                    # loop where we continually create a new chunk and read 0 bytes from it.
+                    break
+                else:
+                    # We've exhausted the current chunk, but there's potentially more chunks
+                    self._body.close()
+                    self._body = None
+
+        return b''.join(binary_collected)
 
     def __str__(self):
         return 'smart_open.s3._SeekableReader(%r, %r)' % (self._bucket, self._key)
@@ -666,6 +779,7 @@ class Reader(io.BufferedIOBase):
         defer_seek=False,
         client=None,
         client_kwargs=None,
+        range_chunk_size=None,
     ):
         self._version_id = version_id
         self._buffer_size = buffer_size
@@ -677,6 +791,7 @@ class Reader(io.BufferedIOBase):
             bucket,
             key,
             self._version_id,
+            range_chunk_size=range_chunk_size,
         )
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
