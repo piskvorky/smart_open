@@ -333,7 +333,8 @@ def open(
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
     buffer_size: int, optional
-        The buffer size to use when performing I/O.
+        The buffer size to use when reading. This helps avoid making
+        lots of tiny reads from the S3 network stream.
     min_part_size: int, optional
         The minimum part size for multipart uploads, in bytes.
         When the writebuffer contains this many bytes, smart_open will upload
@@ -364,12 +365,21 @@ def open(
         Avoids redundant API queries when seeking before reading.
     range_chunk_size: int, optional
         Default: `None`
-        If set to an integer value, S3 requests will be made in chunks
-        of this size in bytes. This is useful for reading small portions of
-        large files, as it prevents S3-compatible storage systems from
-        internally queueing up the entire file when only a small portion
-        will be read. When None (default), a single request will be made
-        for the whole file, which can help to minimize per-request costs on S3.
+        When None (default), only a single get_object request will be made for
+        the whole file during reads, which helps to minimize per-request costs.
+        If set to a positive integer value, S3 reads will be made in chunks
+        of this size in bytes, rather than using a single request for the entire
+        file. This is useful for reading small portions of a large file,
+        and can help prevent S3-compatible storage systems like SeaweedFS/Ceph 
+        from moving large amounts of data. However, the tradeoff is that the number
+        or requests to S3 will increase.
+        It's fine to set this to a value larger than the file size - in this case
+        we'll simply read the whole file in a single request.
+        Only `buffer_size` should change the amount of memory that Python uses -
+        `range_chunk_size` only controls the maximum number of bytes we stream from
+        the server for each GET request.
+        Note that this parameter does not affect writes. Note also that seek()
+        is also likely to trigger a new S3 request regardless of the value of this parameter.
     client: object, optional
         The S3 client to use when working with boto3.
         If you don't specify this, then smart_open will create a new client for you.
