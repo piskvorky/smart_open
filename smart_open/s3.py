@@ -370,7 +370,7 @@ def open(
         If set to a positive integer value, S3 reads will be made in chunks
         of this size in bytes, rather than using a single request for the entire
         file. This is useful for reading small portions of a large file,
-        and can help prevent S3-compatible storage systems like SeaweedFS/Ceph 
+        and can help prevent S3-compatible storage systems like SeaweedFS/Ceph
         from moving large amounts of data. However, the tradeoff is that the number
         or requests to S3 will increase.
         It's fine to set this to a value larger than the file size - in this case
@@ -490,7 +490,7 @@ class _SeekableRawReader(object):
         # Inclusive start position of current chunk in _body
         self._position = 0
         # Exclusive end position of current chunk in _body
-        self._chunk_end = None 
+        self._chunk_end = None
 
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
@@ -559,7 +559,7 @@ class _SeekableRawReader(object):
 
         if start is not None and start < 0:
             raise ValueError('start must be non-negative, got %r' % start)
-        
+
         if stop is not None and stop < 0:
             raise ValueError('stop must be non-negative, got %r' % stop)
 
@@ -590,15 +590,17 @@ class _SeekableRawReader(object):
             error_response = _unwrap_ioerror(ioe)
             if error_response is None or error_response.get('Code') != _OUT_OF_RANGE:
                 raise
-            
+
             try:
                 # If we get this error, we know that we're at the end of the file
                 self._position = self._content_length = int(error_response['ActualObjectSize'])
                 body = io.BytesIO()
                 self._chunk_end = None
             except KeyError:
-                # When reading an empty file, ActualObjectSize can be missing (https://github.com/piskvorky/smart_open/pull/771)
-                # As a final fallback, request the whole file. We try to be robust to the case when the file is 
+                # When reading an empty file, ActualObjectSize can be missing
+                # (https://github.com/piskvorky/smart_open/pull/771)
+                # As a final fallback, request the whole file. We try to be robust to
+                # the case when the file is
                 # non-empty even though this may not actually happen in practice.
                 response = _get(
                     self._client,
@@ -629,7 +631,9 @@ class _SeekableRawReader(object):
             #
             status_code = response['ResponseMetadata']['HTTPStatusCode']
             if status_code == http.HTTPStatus.PARTIAL_CONTENT:
-                _, response_start, response_stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
+                content_range = response['ContentRange']
+                _, response_start, response_stop, length = \
+                    smart_open.utils.parse_content_range(content_range)
                 self._position = response_start
                 self._chunk_end = response_stop + 1
             elif status_code == http.HTTPStatus.OK:
@@ -663,7 +667,7 @@ class _SeekableRawReader(object):
             )
             discarded_bytes = len(body.read(should_discard_bytes))
             self._position += discarded_bytes
-        
+
         if discarded_bytes != should_discard_bytes:
             raise IOError(
                 '%s: we wanted to open a stream starting at position %d (start=%s, end=%s), '
@@ -692,7 +696,7 @@ class _SeekableRawReader(object):
         # enough to recover, but we try multiple times "just in case".
         #
         binary_collected = []
-        bytes_read = 0 # == sum(map(len, binary_collected))
+        bytes_read = 0  # == sum(map(len, binary_collected))
 
         while True:
             if self._body is None:
@@ -702,7 +706,7 @@ class _SeekableRawReader(object):
                 is_fresh_chunk = True
             else:
                 is_fresh_chunk = False
-            
+
             if self._position >= self._content_length or (size >= 0 and bytes_read >= size):
                 break
 
@@ -743,7 +747,7 @@ class _SeekableRawReader(object):
                 if self._chunk_end is None or is_fresh_chunk:
                     # The unchunked case will probably will have been caught by the
                     # position >= content_length check above, but no harm in an extra check.
-                    # 
+                    #
                     # The "is_fresh_chunk" check is a conservative addition to avoid a tight
                     # loop where we continually create a new chunk and read 0 bytes from it.
                     break
