@@ -85,6 +85,28 @@ FUNCTIONS
 
         smart_open supports the following transport mechanisms:
 
+        azure (smart_open/azure.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements file-like objects for reading and writing to/from Azure Blob Storage.
+
+        container_id: str
+            The name of the container this object resides in.
+        blob_id: str
+            The name of the blob within the bucket.
+        mode: str
+            The mode for opening the object.  Must be either "rb" or "wb".
+        client: azure.storage.blob.BlobServiceClient, ContainerClient, or BlobClient
+            The Azure Blob Storage client to use when working with azure-storage-blob.
+        blob_kwargs: dict, optional
+            Additional parameters to pass to `BlobClient.commit_block_list`.
+            For writing only.
+        buffer_size: int, optional
+            The buffer size to use when performing I/O. For reading only.
+        min_part_size: int, optional
+            The minimum part size for multipart uploads. For writing only.
+        max_concurrency: int, optional
+            The number of parallel connections with which to download. For reading only.
+
         file (smart_open/local_file.py)
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements the transport for the file:// schema.
@@ -239,6 +261,31 @@ FUNCTIONS
             disk IO. If you pass in an open file, then you are responsible for
             cleaning it up after writing completes.
 
+        ssh/scp/sftp (smart_open/ssh.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements I/O streams over SSH.
+
+        path: str
+            The path to the file to open on the remote machine.
+        mode: str, optional
+            The mode to use for opening the file.
+        host: str, optional
+            The hostname of the remote machine. May not be None.
+        user: str, optional
+            The username to use to login to the remote machine.
+            If None, defaults to the name of the current user.
+        password: str, optional
+            The password to use to login to the remote machine.
+        port: int, optional
+            The port to connect to.
+        connect_kwargs: dict, optional
+            Any additional settings to be passed to paramiko.SSHClient.connect.
+        prefetch_kwargs: dict, optional
+            Any additional settings to be passed to paramiko.SFTPFile.prefetch.
+            The presence of this dict (even if empty) triggers prefetching.
+        buffer_size: int, optional
+            Passed to the bufsize argument of paramiko.SFTPClient.open.
+
         webhdfs (smart_open/webhdfs.py)
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements reading and writing to/from WebHDFS.
@@ -326,6 +373,7 @@ FUNCTIONS
         -----
         Supported URI schemes are:
 
+        * azure
         * file
         * ftp
         * ftps
@@ -338,6 +386,9 @@ FUNCTIONS
         * s3n
         * s3u
         * s3a
+        * ssh
+        * scp
+        * sftp
         * webhdfs
 
         Valid URI examples::
@@ -361,6 +412,10 @@ FUNCTIONS
         * s3://my_bucket/my_key
         * s3://my_key:my_secret@my_bucket/my_key
         * s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
+        * ssh://username@host/path/file
+        * ssh://username@host//path/file
+        * scp://username@host/path/file
+        * sftp://username@host/path/file
         * webhdfs://host:port/path/file
 
     register_compressor(ext, callback)
