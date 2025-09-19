@@ -695,8 +695,7 @@ class _SeekableRawReader(object):
         # HTTP connection and try again.  Usually, a single retry attempt is
         # enough to recover, but we try multiple times "just in case".
         #
-        binary_collected = []
-        bytes_read = 0  # == sum(map(len, binary_collected))
+        binary_collected = bytearray()
 
         while True:
             if self._body is None:
@@ -707,7 +706,7 @@ class _SeekableRawReader(object):
             else:
                 is_fresh_chunk = False
 
-            if self._position >= self._content_length or (size >= 0 and bytes_read >= size):
+            if self._position >= self._content_length or (size >= 0 and len(binary_collected) >= size):
                 break
 
             secondss = [1, 2, 4, 8, 16]
@@ -716,7 +715,7 @@ class _SeekableRawReader(object):
                     if size == -1:
                         binary = self._body.read()
                     else:
-                        binary = self._body.read(size - bytes_read)
+                        binary = self._body.read(size - len(binary_collected))
                 except (
                     ConnectionResetError,
                     botocore.exceptions.BotoCoreError,
@@ -738,8 +737,7 @@ class _SeekableRawReader(object):
 
             if binary:
                 self._position += len(binary)
-                binary_collected.append(binary)
-                bytes_read += len(binary)
+                binary_collected += binary
             else:
                 # By construction we always try to read >= 1 bytes, so if we see this
                 # we know that we are at the end of the current _body.
@@ -756,7 +754,7 @@ class _SeekableRawReader(object):
                     self._body.close()
                     self._body = None
 
-        return b''.join(binary_collected)
+        return bytes(binary_collected)
 
     def __str__(self):
         return 'smart_open.s3._SeekableReader(%r, %r)' % (self._bucket, self._key)
