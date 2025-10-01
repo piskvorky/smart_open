@@ -14,6 +14,7 @@ import functools
 import logging
 import time
 import warnings
+from math import inf
 
 from typing import (
     Callable,
@@ -490,6 +491,15 @@ class _SeekableRawReader(object):
         # Inclusive start position of current chunk in _body
         self._position = 0
 
+    @property
+    def closed(self):
+        return self._body is None
+
+    def close(self):
+        if not self.closed:
+            self._body.close()
+            self._body = None
+
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
 
@@ -504,11 +514,8 @@ class _SeekableRawReader(object):
 
         #
         # Close old body explicitly.
-        # When first seek() after __init__(), self._body is not exist.
         #
-        if self._body is not None:
-            self._body.close()
-        self._body = None
+        self.close()
 
         start = None
         stop = None
@@ -569,9 +576,7 @@ class _SeekableRawReader(object):
 
         range_string = smart_open.utils.make_range_string(start, stop)
 
-        if self._body is not None:
-            self._body.close()
-            self._body = None
+        self.close()
 
         try:
             # Optimistically try to fetch the requested content range.
@@ -627,7 +632,7 @@ class _SeekableRawReader(object):
             status_code = response['ResponseMetadata']['HTTPStatusCode']
             if status_code == http.HTTPStatus.PARTIAL_CONTENT:
                 content_range = response['ContentRange']
-                _, response_start, _response_stop, length = \
+                _, response_start, response_stop, length = \
                     smart_open.utils.parse_content_range(content_range)
                 self._position = response_start
             elif status_code == http.HTTPStatus.OK:
@@ -672,13 +677,15 @@ class _SeekableRawReader(object):
 
     def read(self, size=-1):
         """Read from the continuous connection with the remote peer."""
-        if self._body is None:
-            # This is necessary to initialize _content_length for the very first read() after __init__().
-            self._open_body()
+        if size < -1:
+            raise ValueError(f'size must be >= -1, got {size}')
 
-        if self._position >= self._content_length:
-            return b''
+        if size == -1:
+            size = inf  # makes for a simple while-condition below
 
+        binary_collected = io.BytesIO()
+
+        #
         # Boto3 has built-in error handling and retry mechanisms:
         #
         # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/error-handling.html
@@ -690,57 +697,40 @@ class _SeekableRawReader(object):
         # simple to recover from the problem: wait a little bit, reopen the
         # HTTP connection and try again.  Usually, a single retry attempt is
         # enough to recover, but we try multiple times "just in case".
-        retry_errors = (
-            ConnectionResetError,
-            botocore.exceptions.BotoCoreError,
-            urllib3.exceptions.HTTPError,
-        )
-
-        if size is None:
-            size = -1
-
-        if size < -1:
-            raise ValueError(f'size must be >= -1, got {size}')
-
-        inf = float('inf')
-        if size == -1:
-            size = inf
-
-        binary_collected = io.BytesIO()
-
-        while self._position < self._content_length and binary_collected.tell() < size:
-            if self._body is None:
-                # In chunked read mode we might need to open the next chunk
-                self._open_body()
-
-            binary = None
-            for seconds in [1, 2, 4, 8, 16]:
+        #
+        def retry_read(attempts=(1, 2, 4, 8, 16)) -> bytes:
+            for seconds in attempts:
+                if self.closed:
+                    self._open_body()
                 try:
                     if size == inf:
-                        binary = self._body.read()
-                    else:
-                        binary = self._body.read(size - binary_collected.tell())
-                    break  # success - exit retry loop
-                except retry_errors as err:
+                        return self._body.read()
+                    return self._body.read(size - binary_collected.tell())
+                except (
+                    ConnectionResetError,
+                    botocore.exceptions.BotoCoreError,
+                    urllib3.exceptions.HTTPError,
+                ) as err:
                     logger.warning(
-                        '%s: caught %r while reading %s bytes, sleeping %ds before retry',
+                        '%s: caught %r while reading %d bytes, sleeping %ds before retry',
                         self,
                         err,
                         size,
                         seconds,
                     )
+                    self.close()
                     time.sleep(seconds)
-                    self._open_body()
+            raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, len(attempts)))
 
-            if binary is None:
-                raise IOError('%s: failed to read after %d attempts' % (self, 5))
-
-            if binary:
-                self._position += len(binary)
-                binary_collected.write(binary)
-            else:  # end of stream
-                self._body.close()
-                self._body = None
+        while (
+            self._position < self._content_length  # not yet end of file
+            and binary_collected.tell() < size  # not yet read enough
+        ):
+            binary = retry_read()
+            self._position += len(binary)
+            binary_collected.write(binary)
+            if not binary:  # end of stream
+                self.close()
 
         return binary_collected.getvalue()
 
