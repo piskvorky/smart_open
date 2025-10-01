@@ -488,7 +488,6 @@ class _SeekableRawReader(object):
 
         self._content_length = None
         self._body = None
-        # Inclusive start position of current chunk in _body
         self._position = 0
 
     @property
@@ -548,12 +547,12 @@ class _SeekableRawReader(object):
         return self._position
 
     def _open_body(self, start=None, stop=None):
-        """Open a connection to download the range of bytes [start,stop]. Store
+        """Open a connection to download the specified range of bytes. Store
         the open file handle in self._body.
 
         If no range is specified, start defaults to self._position.
         start and stop follow the semantics of the http range header,
-        so a stop without a start will read the last "stop" bytes in the file.
+        so a stop without a start will read bytes beginning at stop.
 
         As a side effect, set self._content_length. Set self._position
         to self._content_length if start is past end of file.
@@ -561,22 +560,11 @@ class _SeekableRawReader(object):
         if start is None and stop is None:
             start = self._position
 
-        if start is not None and start < 0:
-            raise ValueError('start must be non-negative, got %r' % start)
-
-        if stop is not None and stop < 0:
-            raise ValueError('stop must be non-negative, got %r' % stop)
-
-        if self._range_chunk_size is not None and start is not None:
-            chunk_end = start + self._range_chunk_size - 1
-            if stop is None:
-                stop = chunk_end
-            else:
-                stop = min(stop, chunk_end)
+        # Apply chunking: limit the stop position if range_chunk_size is set
+        if self._range_chunk_size is not None and start is not None and stop is None:
+            stop = start + self._range_chunk_size - 1
 
         range_string = smart_open.utils.make_range_string(start, stop)
-
-        self.close()
 
         try:
             # Optimistically try to fetch the requested content range.
@@ -594,15 +582,12 @@ class _SeekableRawReader(object):
                 raise
 
             try:
-                # If we get this error, we know that we're at the end of the file
                 self._position = self._content_length = int(error_response['ActualObjectSize'])
-                body = io.BytesIO()
+                self._body = io.BytesIO()
             except KeyError:
                 # When reading an empty file, ActualObjectSize can be missing
                 # (https://github.com/piskvorky/smart_open/pull/771)
-                # As a final fallback, request the whole file. We try to be robust to
-                # the case when the file is
-                # non-empty even though this may not actually happen in practice.
+                # As a final fallback, request the whole file.
                 response = _get(
                     self._client,
                     self._bucket,
@@ -611,69 +596,34 @@ class _SeekableRawReader(object):
                     None,
                 )
                 self._content_length = response["ContentLength"]
-                body = response["Body"]
+                self._body = response["Body"]
                 self._position = 0
-        else:
-            #
-            # Keep track of how many times boto3's built-in retry mechanism
-            # activated.
-            #
-            # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html#checking-retry-attempts-in-an-aws-service-response
-            #
-            logger.debug(
-                '%s: RetryAttempts: %d',
-                self,
-                response['ResponseMetadata']['RetryAttempts'],
-            )
-            #
-            # range request may not always return partial content, see:
-            # https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests#partial_request_responses
-            #
-            status_code = response['ResponseMetadata']['HTTPStatusCode']
-            if status_code == http.HTTPStatus.PARTIAL_CONTENT:
-                content_range = response['ContentRange']
-                _, response_start, response_stop, length = \
-                    smart_open.utils.parse_content_range(content_range)
-                self._position = response_start
-            elif status_code == http.HTTPStatus.OK:
-                length = response["ContentLength"]
-                self._position = 0
-            else:
-                raise ValueError("Unexpected status code %r" % status_code)
+            return
 
+        # Keep track of how many times boto3's built-in retry mechanism activated.
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html
+        logger.debug(
+            '%s: RetryAttempts: %d',
+            self,
+            response['ResponseMetadata']['RetryAttempts'],
+        )
+
+        # Range request may not always return partial content, see:
+        # https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
+        status_code = response['ResponseMetadata']['HTTPStatusCode']
+        if status_code == http.HTTPStatus.PARTIAL_CONTENT:
+            _, response_start, response_stop, length = \
+                smart_open.utils.parse_content_range(response['ContentRange'])
+            self._position = response_start
             self._content_length = length
-            body = response['Body']
-
-        # If we got a full request when we were actually expecting a range, we need to
-        # read some data to ensure that the body starts in the place that the caller expects
-        if start is not None:
-            expected_position = min(self._content_length, start)
-        elif start is None and stop is not None:
-            expected_position = max(0, self._content_length - stop)
+        elif status_code == http.HTTPStatus.OK:
+            # Server ignored range header, returned full file
+            self._content_length = response["ContentLength"]
+            self._position = 0
         else:
-            raise ValueError()
+            raise ValueError("Unexpected status code %r" % status_code)
 
-        should_discard_bytes = expected_position - self._position
-        if should_discard_bytes <= 0:
-            discarded_bytes = 0
-        else:
-            logger.debug(
-                '%s: discarding %d bytes to reach expected position %d',
-                self,
-                should_discard_bytes,
-                expected_position,
-            )
-            discarded_bytes = len(body.read(should_discard_bytes))
-            self._position += discarded_bytes
-
-        if discarded_bytes != should_discard_bytes:
-            raise IOError(
-                '%s: we wanted to open a stream starting at position %d (start=%s, end=%s), '
-                'in a file with content length %d, but only managed to reach position %d'
-                % (self, expected_position, start, stop, self._content_length, self._position)
-            )
-
-        self._body = body
+        self._body = response['Body']
 
     def read(self, size=-1):
         """Read from the continuous connection with the remote peer."""
@@ -723,7 +673,7 @@ class _SeekableRawReader(object):
             raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, len(attempts)))
 
         while (
-            self._position < self._content_length  # not yet end of file
+            self._position < (self._content_length or inf)  # not yet end of file
             and binary_collected.tell() < size  # not yet read enough
         ):
             binary = retry_read()
