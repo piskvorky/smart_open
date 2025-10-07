@@ -675,7 +675,7 @@ class _SeekableRawReader(object):
         if self._body is None:
             # This is necessary to initialize _content_length for the very first read() after __init__().
             self._open_body()
-        
+
         if self._position >= self._content_length:
             return b''
 
