@@ -689,13 +689,12 @@ class _SeekableRawReader(object):
                 (self, -1 if size == inf else size, len(attempts)),
             )
 
-        # ensure self._content_length is set
-        if self.closed:
-            self._open_body()
-
         while (
-            self._position < self._content_length  # not yet end of file
-            and binary_collected.tell() < size  # not yet read enough
+            self._content_length is None  # very first read call
+            or (
+                self._position < self._content_length  # not yet end of file
+                and binary_collected.tell() < size  # not yet read enough
+            )
         ):
             binary = retry_read()
             self._position += len(binary)

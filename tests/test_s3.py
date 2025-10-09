@@ -459,18 +459,16 @@ class ReaderTest(BaseTest):
 
         with self.assertApiCalls(GetObject=1), patch_invalid_range_response('0'):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
-                data = fin.read()
-
-        self.assertEqual(data, b'')
+                self.assertEqual(fin.read(), b'')
 
     def test_read_empty_file_no_actual_size(self):
         _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'')
 
         with self.assertApiCalls(GetObject=1), patch_invalid_range_response(None):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
-                data = fin.read()
-
-        self.assertEqual(data, b'')
+                self.assertEqual(fin.read(), b'')
+                # a subsequent read does not call _open_body
+                self.assertEqual(fin.read(), b'')
 
 
 @mock_s3
