@@ -589,8 +589,8 @@ class _SeekableRawReader(object):
             if start >= actual_object_size:  # empty file or start is past end of file
                 self._position = self._content_length = actual_object_size
                 self._body = io.BytesIO()
-            else:
-                self._open_body(start=start, stop=actual_object_size)
+            else:  # stop is past end of file: request the correct remainder instead
+                self._open_body(start=start, stop=actual_object_size - 1)
             return
 
         #
