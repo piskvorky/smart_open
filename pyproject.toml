@@ -48,6 +48,7 @@ test = [
     "pytest",
     "pytest-rerunfailures",
     "pytest_benchmark",
+    "pytest-timeout",
     "awscli",
     "pyopenssl",
     "numpy",

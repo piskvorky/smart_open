@@ -10,6 +10,7 @@ concurrency:  # https://stackoverflow.com/questions/66335225#comment133398800_72
 jobs:
   linters:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
         with:
@@ -35,6 +36,7 @@ jobs:
   unit_tests:
     needs: [linters]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       matrix:
         include:
@@ -70,11 +72,12 @@ jobs:
         run: pip install -e .[test]
 
       - name: Run unit tests
-        run: pytest tests -v -rfxECs --durations=20
+        run: pytest tests -v -rfxECs --durations=20 --timeout=60 --timeout-method=thread
 
   doctest:
     needs: [linters,unit_tests]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       matrix:
         include:
@@ -117,6 +120,7 @@ jobs:
   integration:
     needs: [linters,unit_tests]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       matrix:
         include:
@@ -171,6 +175,7 @@ jobs:
   benchmarks:
     needs: [linters,unit_tests]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       matrix:
         include:
