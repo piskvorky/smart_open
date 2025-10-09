@@ -336,7 +336,7 @@ FUNCTIONS
 
         >>> # stream from HTTP
         >>> for line in open('http://example.com/index.html'):
-        ...     print(repr(line))
+        ...     print(repr(line[:15]))
         ...     break
 
         This function also supports transparent compression and decompression

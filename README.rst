@@ -80,9 +80,9 @@ How?
 
   >>> # stream from HTTP
   >>> for line in open('http://example.com/index.html'):
-  ...     print(repr(line))
+  ...     print(repr(line[:15]))
   ...     break
-  '<!doctype html>\n'
+  '<!doctype html>'
 
 .. _doctools_after_examples:
 

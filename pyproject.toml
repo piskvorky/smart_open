@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-fallback_version = "0.1.dev1+gitnotfound"
+fallback_version = "0.1.dev0+gitnotfound"
 
 [project]
 name = "smart_open"

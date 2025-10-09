@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
       - name: Setup up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -58,7 +58,7 @@ jobs:
         with:
           fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -104,7 +104,7 @@ jobs:
         with:
           fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -145,7 +145,7 @@ jobs:
         with:
           fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -198,7 +198,7 @@ jobs:
         with:
           fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
