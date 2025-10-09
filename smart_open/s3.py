@@ -629,6 +629,8 @@ class _SeekableRawReader(object):
                 expected_position = min(self._content_length, start)
             elif start is None and stop is not None:
                 expected_position = max(0, self._content_length - stop)
+            else:
+                expected_position = 0
             if expected_position > 0:
                 logger.debug(
                     '%s: discarding %d bytes to reach expected position',
