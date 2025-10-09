@@ -179,7 +179,7 @@ class CrapClient:
                     end = min(int(m.group(2)) + 1, self._datasize)
                 else:
                     end = self._datasize
-                
+
         self._body.seek(start)
         return {
             'ActualObjectSize': self._datasize,
@@ -466,7 +466,7 @@ class ReaderTest(BaseTest):
     def test_read_empty_file_no_actual_size(self):
         _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'')
 
-        with self.assertApiCalls(GetObject=2), patch_invalid_range_response(None):
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response(None):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
                 data = fin.read()
 
@@ -1234,6 +1234,78 @@ class RetryIfFailedTest(unittest.TestCase):
         self.assertEqual(partial.call_count, 3)
 
 
+class AdversarialClient:
+    def __init__(self, body):
+        self.body = body
+        self.call_count = 0
+
+    def get_object(self, **kwargs):
+        self.call_count += 1
+        range_header = kwargs.get('Range', '')
+
+        # Parse the requested range to check if it's out of bounds
+        requested_start = None
+        if range_header and range_header.startswith('bytes='):
+            parts = range_header[6:].split('-')
+            if parts[0] and not parts[0].startswith('-'):
+                requested_start = int(parts[0])
+
+        # Randomly decide behavior
+        behavior = random.random()
+
+        if behavior < 0.15:
+            # 15% chance
+            raise botocore.exceptions.BotoCoreError()
+        elif behavior < 0.18:
+            # 3% chance: return OUT_OF_RANGE without ActualObjectSize, which triggers a full request
+            error = botocore.exceptions.ClientError(
+                {'Error': {'Code': 'InvalidRange'}},
+                'GetObject'
+            )
+            raise IOError(str(error))
+        elif behavior < 0.20 and requested_start is not None and requested_start >= len(self.body):
+            # 20% chance: return OUT_OF_RANGE with ActualObjectSize
+            # Only do this if the requested range is actually past EOF
+            error = {
+                'Error': {
+                    'Code': 'InvalidRange',
+                    'ActualObjectSize': str(len(self.body))
+                }
+            }
+            raise IOError(str(botocore.exceptions.ClientError(error, 'GetObject')))
+        elif behavior < 0.40:
+            # 20% chance: ignore range headers, return full response
+            return {
+                'Body': io.BytesIO(self.body),
+                'ContentLength': len(self.body),
+                'ResponseMetadata': {'HTTPStatusCode': 200, 'RetryAttempts': 0}
+            }
+        elif range_header and range_header.startswith('bytes='):
+            # 206 always returns the exact requested range
+            parts = range_header[6:].split('-')
+            if parts[0] == '' and parts[1]:
+                # Suffix range
+                suffix_length = int(parts[1])
+                start = max(0, len(self.body) - suffix_length)
+                end = len(self.body) - 1
+            else:
+                start = int(parts[0]) if parts[0] else 0
+                end = int(parts[1]) if parts[1] else len(self.body) - 1
+            return {
+                'Body': io.BytesIO(self.body[start:end+1]),
+                'ContentLength': end - start + 1,
+                'ContentRange': f'bytes {start}-{end}/{len(self.body)}',
+                'ResponseMetadata': {'HTTPStatusCode': 206, 'RetryAttempts': 0}
+            }
+        else:
+            # 200 always returns the full body
+            return {
+                'Body': io.BytesIO(self.body),
+                'ContentLength': len(self.body),
+                'ResponseMetadata': {'HTTPStatusCode': 200, 'RetryAttempts': 0}
+            }
+
+
 class AdversarialRetryTest(unittest.TestCase):
     """Test retry logic with adversarial client behavior."""
 
@@ -1250,74 +1322,6 @@ class AdversarialRetryTest(unittest.TestCase):
 
             # Randomize chunk size (None or 3)
             chunk_size = None if random.random() < 0.5 else 3
-
-            class AdversarialClient:
-                def __init__(self, body):
-                    self.body = body
-                    self.call_count = 0
-
-                def get_object(self, **kwargs):
-                    self.call_count += 1
-                    range_header = kwargs.get('Range', '')
-
-                    # Parse the requested range to check if it's out of bounds
-                    requested_start = None
-                    if range_header and range_header.startswith('bytes='):
-                        parts = range_header[6:].split('-')
-                        if parts[0] and not parts[0].startswith('-'):
-                            requested_start = int(parts[0])
-
-                    # Randomly decide behavior
-                    behavior = random.random()
-
-                    if behavior < 0.15:
-                        # 15% chance
-                        raise botocore.exceptions.BotoCoreError()
-                    elif behavior < 0.18:
-                        # 3% chance: return OUT_OF_RANGE without ActualObjectSize, which triggers a full request
-                        error = botocore.exceptions.ClientError(
-                            {'Error': {'Code': 'InvalidRange'}},
-                            'GetObject'
-                        )
-                        raise IOError(str(error))
-                    elif behavior < 0.20 and requested_start is not None and requested_start >= len(self.body):
-                        # 2% chance: return OUT_OF_RANGE with ActualObjectSize
-                        # Only do this if the requested range is actually past EOF
-                        error = {
-                            'Error': {
-                                'Code': 'InvalidRange',
-                                'ActualObjectSize': str(len(self.body))
-                            }
-                        }
-                        raise IOError(str(botocore.exceptions.ClientError(error, 'GetObject')))
-                    elif behavior < 0.40:
-                        # 20% chance: ignore range headers, return full response
-                        return {
-                            'Body': io.BytesIO(self.body),
-                            'ContentLength': len(self.body),
-                            'ResponseMetadata': {'HTTPStatusCode': 200, 'RetryAttempts': 0}
-                        }
-                    else:
-                        # 60% chance: properly handle range request
-                        if range_header and range_header.startswith('bytes='):
-                            parts = range_header[6:].split('-')
-                            if parts[0] == '' and parts[1]:
-                                # Suffix range
-                                suffix_length = int(parts[1])
-                                start = max(0, len(self.body) - suffix_length)
-                                end = len(self.body) - 1
-                            else:
-                                start = int(parts[0]) if parts[0] else 0
-                                end = int(parts[1]) if parts[1] else len(self.body) - 1
-                        else:
-                            start, end = 0, len(self.body) - 1
-
-                        return {
-                            'Body': io.BytesIO(self.body[start:end+1]),
-                            'ContentLength': end - start + 1,
-                            'ContentRange': f'bytes {start}-{end}/{len(self.body)}',
-                            'ResponseMetadata': {'HTTPStatusCode': 206, 'RetryAttempts': 0}
-                        }
 
             client = AdversarialClient(test_body)
 
