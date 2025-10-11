@@ -332,7 +332,12 @@ def open(
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
     buffer_size: int, optional
-        The buffer size to use when performing I/O.
+        Default: 128KB
+        The buffer size in bytes for reading. Controls memory usage. Data is streamed
+        from a S3 network stream in buffer_size chunks. Forward seeks within
+        the current buffer are satisfied without additional GET requests. Backward
+        seeks always open a new GET request. For forward seek-intensive workloads,
+        increase buffer_size to reduce GET requests at the cost of higher memory usage.
     min_part_size: int, optional
         The minimum part size for multipart uploads, in bytes.
         When the writebuffer contains this many bytes, smart_open will upload
@@ -822,11 +827,19 @@ class Reader(io.BufferedIOBase):
             whence = constants.WHENCE_START
             offset += self._current_pos
 
+        # Check if we can satisfy seek from buffer
+        if whence == constants.WHENCE_START and offset > self._current_pos:
+            buffer_end = self._current_pos + len(self._buffer)
+            if offset <= buffer_end:
+                # Forward seek within buffered data - avoid S3 request
+                self._buffer.read(offset - self._current_pos)
+                self._current_pos = offset
+                return self._current_pos
+
         if not self._seek_initialized or not (
             whence == constants.WHENCE_START and offset == self._current_pos
         ):
             self._current_pos = self._raw_reader.seek(offset, whence)
-
             self._buffer.empty()
 
         self._eof = self._current_pos == self._raw_reader._content_length
