@@ -552,8 +552,8 @@ class _SeekableRawReader(object):
         start and stop follow the semantics of the http range header,
         so a stop without a start will read bytes beginning at stop.
 
-        If range_chunk_size is set, the S3 server is protected from open range
-        headers and stop will be set such that at mosed range_chunk_size bytes
+        If self._range_chunk_size is set, the S3 server is protected from open range
+        headers and stop will be set such that at most self._range_chunk_size bytes
         are returned in a single GET request.
 
         As a side effect, set self._content_length. Set self._position
