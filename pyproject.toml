@@ -52,6 +52,7 @@ test = [
     "awscli",
     "pyopenssl",
     "numpy",
+    "flake8",
 ]
 
 [tool.setuptools.packages.find]

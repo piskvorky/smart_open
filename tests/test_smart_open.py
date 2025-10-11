@@ -1131,7 +1131,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.client')
     def test_no_kwargs(self, mock_client):
         smart_open.open('s3://mybucket/mykey', transport_params=dict(defer_seek=True))
-        mock_client.assert_called_with('s3')
+        mock_client.assert_called_with('s3', config=mock_client.call_args.kwargs['config'])
 
     @mock.patch('boto3.client')
     def test_credentials(self, mock_client):
@@ -1140,6 +1140,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             's3',
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret',
+            config=mock_client.call_args.kwargs['config'],
         )
 
     @mock.patch('boto3.client')
@@ -1156,6 +1157,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret',
             endpoint_url='http://aa.domain.com',
+            config=mock_client.call_args.kwargs['config'],
         )
 
     @mock.patch('boto3.client')
@@ -1288,7 +1290,11 @@ class SmartOpenTest(unittest.TestCase):
             }
         }
         smart_open.open("s3://mybucket/mykey", "w", transport_params=transport_params)
-        mock_client.assert_called_with('s3', endpoint_url='http://s3.amazonaws.com')
+        mock_client.assert_called_with(
+            's3',
+            endpoint_url='http://s3.amazonaws.com',
+            config=mock_client.call_args.kwargs['config'],
+        )
 
     @mock.patch('smart_open.hdfs.subprocess')
     def test_hdfs(self, mock_subprocess):
