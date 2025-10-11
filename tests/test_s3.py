@@ -290,6 +290,14 @@ class ReaderTest(BaseTest):
             seek = fin.seek(60)
             self.assertEqual(seek, len(self.body))
 
+    def test_seek_past_end_from_end(self):
+        """Test seeking from end with offset larger than file size."""
+        body_len = len(self.body)
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response(str(body_len)):
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            seek = fin.seek(-(body_len + 10), whence=smart_open.constants.WHENCE_END)
+            self.assertEqual(seek, 0)  # Should clamp to start of file
+
     def test_detect_eof(self):
         with self.assertApiCalls(GetObject=1):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
@@ -430,19 +438,24 @@ class ReaderTest(BaseTest):
 
         with self.assertApiCalls(GetObject=1), patch_invalid_range_response('0'):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
-                data = fin.read()
-
-        self.assertEqual(data, b'')
+                self.assertEqual(fin.read(), b'')
 
     def test_read_empty_file_no_actual_size(self):
         _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'')
 
-        with self.assertApiCalls(GetObject=2), patch_invalid_range_response(None):
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response(None):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
-                data = fin.read()
+                self.assertEqual(fin.read(), b'')
+                # a subsequent read does not call _open_body
+                self.assertEqual(fin.read(), b'')
 
-        self.assertEqual(data, b'')
-
+    def test_seek_empty_file_from_end(self):
+        """Test seeking from end on an empty file."""
+        _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'')
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response('0'):
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
+                seek = fin.seek(-10, whence=smart_open.constants.WHENCE_END)
+                self.assertEqual(seek, 0)  # Should be at position 0 for empty file
 
 @mock_s3
 class MultipartWriterTest(unittest.TestCase):
