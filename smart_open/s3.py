@@ -722,6 +722,16 @@ def _initialize_boto3(rw, client, client_kwargs, bucket, key):
 
     if client is None:
         init_kwargs = client_kwargs.get('S3.Client', {})
+        if 'config' not in init_kwargs:
+            init_kwargs['config'] = botocore.client.Config(
+                max_pool_connections=64,
+                tcp_keepalive=True,
+                retries={"max_attempts": 6, "mode": "adaptive"}
+            )
+        # boto3.client re-uses the default session which is not thread-safe when this is called
+        # from within a thread. when using smart_open with multithreading, create a thread-safe
+        # client with the config above and share it between threads using transport_params
+        # https://github.com/boto/boto3/blob/1.38.41/docs/source/guide/clients.rst?plain=1#L111
         client = boto3.client('s3', **init_kwargs)
     assert client
 

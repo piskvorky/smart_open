@@ -4,208 +4,82 @@ on:
   push:
     branches: [master, develop]
   workflow_dispatch:  # allows running CI manually from the Actions tab
+
 concurrency:  # https://stackoverflow.com/questions/66335225#comment133398800_72408109
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  linters:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
-
-      - name: Setup up Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: pip install flake8 -e .[all]
-
-      - name: Run flake8 linter (source)
-        run: flake8 --show-source smart_open
-
-      - name: "Check whether help.txt update was forgotten"
-        if: github.event_name == 'pull_request'
-        run: |
-          python update_helptext.py
-          test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
-
-  unit_tests:
-    needs: [linters]
+  ci:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
       matrix:
         include:
+          # sync with linting steps below
           - {python-version: '3.8', os: ubuntu-24.04}
-          - {python-version: '3.9', os: ubuntu-24.04}
-          - {python-version: '3.10', os: ubuntu-24.04}
-          - {python-version: '3.11', os: ubuntu-24.04}
-          - {python-version: '3.12', os: ubuntu-24.04}
           - {python-version: '3.13', os: ubuntu-24.04}
 
           - {python-version: '3.8', os: windows-2025}
-          - {python-version: '3.9', os: windows-2025}
-          - {python-version: '3.10', os: windows-2025}
-          - {python-version: '3.11', os: windows-2025}
-          - {python-version: '3.12', os: windows-2025}
           - {python-version: '3.13', os: windows-2025}
+
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
 
       - name: Install smart_open without dependencies
-        run: pip install -e .
+        run: uv pip install -e .
 
       - name: Check that smart_open imports without dependencies
         run: python -c 'import smart_open'
 
       - name: Install smart_open and its dependencies
-        run: pip install -e .[test]
+        run: uv pip install -e .[test]
+
+      - name: Run flake8 linter (source)
+        if: matrix.python-version == '3.8' # sync with matrix above
+        run: flake8 --show-source smart_open
+
+      - name: "Check whether help.txt update was forgotten"
+        if: matrix.python-version == '3.8' && github.event_name == 'pull_request' # sync with matrix above
+        run: |
+          python update_helptext.py
+          test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
 
       - name: Run unit tests
         run: pytest tests -v -rfxECs --durations=20 --timeout=60 --timeout-method=thread
 
-  doctest:
-    needs: [linters,unit_tests]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-    strategy:
-      matrix:
-        include:
-          - {python-version: '3.8', os: ubuntu-24.04}
-          - {python-version: '3.9', os: ubuntu-24.04}
-          - {python-version: '3.10', os: ubuntu-24.04}
-          - {python-version: '3.11', os: ubuntu-24.04}
-          - {python-version: '3.12', os: ubuntu-24.04}
-          - {python-version: '3.13', os: ubuntu-24.04}
-
-          #
-          # Some of the doctests don't pass on Windows because of Windows-specific
-          # character encoding issues.
-          #
-          # - {python-version: '3.8', os: windows-2025}
-          # - {python-version: '3.9', os: windows-2025}
-          # - {python-version: '3.10', os: windows-2025}
-          # - {python-version: '3.11', os: windows-2025}
-          # - {python-version: '3.12', os: windows-2025}
-          # - {python-version: '3.13', os: windows-2025}
-
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install smart_open and its dependencies
-        run: pip install -e .[test]
-
       - name: Run doctests
+        if: startsWith(matrix.os, 'ubuntu')
         run: python ci_helpers/doctest.py
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-  integration:
-    needs: [linters,unit_tests]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-    strategy:
-      matrix:
-        include:
-          - {python-version: '3.8', os: ubuntu-24.04}
-          - {python-version: '3.9', os: ubuntu-24.04}
-          - {python-version: '3.10', os: ubuntu-24.04}
-          - {python-version: '3.11', os: ubuntu-24.04}
-          - {python-version: '3.12', os: ubuntu-24.04}
-          - {python-version: '3.13', os: ubuntu-24.04}
-
-          # Not sure why we exclude these, perhaps for historical reasons?
-          #
-          # - {python-version: '3.8', os: windows-2025}
-          # - {python-version: '3.9', os: windows-2025}
-          # - {python-version: '3.10', os: windows-2025}
-          # - {python-version: '3.11', os: windows-2025}
-          # - {python-version: '3.12', os: windows-2025}
-          # - {python-version: '3.13', os: windows-2025}
-
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install smart_open and its dependencies
-        run: pip install -e .[test]
-
-      - run: bash ci_helpers/helpers.sh enable_moto_server
-        if: ${{ matrix.moto_server }}
-
       - name: Start vsftpd
+        if: startsWith(matrix.os, 'ubuntu')
         timeout-minutes: 2
         run: |
           sudo apt-get install vsftpd
           sudo bash ci_helpers/helpers.sh create_ftp_ftps_servers
 
       - name: Run integration tests
+        if: startsWith(matrix.os, 'ubuntu')
         run: python ci_helpers/run_integration_tests.py
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - run: bash ci_helpers/helpers.sh disable_moto_server
-        if: ${{ matrix.moto_server }}
-
-      - run: sudo bash ci_helpers/helpers.sh delete_ftp_ftps_servers
-
-  benchmarks:
-    needs: [linters,unit_tests]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-    strategy:
-      matrix:
-        include:
-          - {python-version: '3.8', os: ubuntu-24.04}
-          - {python-version: '3.9', os: ubuntu-24.04}
-          - {python-version: '3.10', os: ubuntu-24.04}
-          - {python-version: '3.11', os: ubuntu-24.04}
-          - {python-version: '3.12', os: ubuntu-24.04}
-          - {python-version: '3.13', os: ubuntu-24.04}
-
-          # - {python-version: '3.8', os: windows-2025}
-          # - {python-version: '3.9', os: windows-2025}
-          # - {python-version: '3.10', os: windows-2025}
-          # - {python-version: '3.11', os: windows-2025}
-          # - {python-version: '3.12', os: windows-2025}
-          # - {python-version: '3.13', os: windows-2025}
-
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install smart_open and its dependencies
-        run: pip install -e .[test]
-
       - name: Run benchmarks
+        if: startsWith(matrix.os, 'ubuntu')
         run: python ci_helpers/run_benchmarks.py
         env:
           SO_BUCKET: smart-open
