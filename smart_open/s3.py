@@ -366,21 +366,19 @@ def open(
         Avoids redundant API queries when seeking before reading.
     range_chunk_size: int, optional
         Default: `None`
-        When None (default), only a single get_object request will be made for
-        the whole file during reads, which helps to minimize per-request costs.
-        If set to a positive integer value, S3 reads will be made in chunks
-        of this size in bytes, rather than using a single request for the entire
-        file. This is useful for reading small portions of a large file,
-        and can help prevent S3-compatible storage systems like SeaweedFS/Ceph
-        from moving large amounts of data. However, the tradeoff is that the number
-        or requests to S3 will increase.
-        It's fine to set this to a value larger than the file size - in this case
-        we'll simply read the whole file in a single request.
-        Only `buffer_size` should change the amount of memory that Python uses -
-        `range_chunk_size` only controls the maximum number of bytes we stream from
-        the server for each GET request.
-        Note that this parameter does not affect writes. Note also that seek()
-        is also likely to trigger a new S3 request regardless of the value of this parameter.
+        Maximum byte range per S3 GET request when reading.
+        When None (default), a single GET request is made for the entire file,
+        and data is streamed from that single botocore.response.StreamingBody
+        in buffer_size chunks.
+        When set to a positive integer, multiple GET requests are made, each
+        limited to at most this many bytes via HTTP Range headers. Each GET
+        returns a new StreamingBody that is streamed in buffer_size chunks.
+        Useful for reading small portions of large files without forcing
+        S3-compatible systems like SeaweedFS/Ceph to load the entire file.
+        Larger values mean fewer billable GET requests but higher load on S3
+        servers. Smaller values mean more GET requests but less server load per request.
+        Values larger than the file size result in a single GET for the whole file.
+        Affects reading only. Does not affect memory usage (controlled by buffer_size).
     client: object, optional
         The S3 client to use when working with boto3.
         If you don't specify this, then smart_open will create a new client for you.
