@@ -609,7 +609,6 @@ class _SeekableRawReader(object):
             self,
             response['ResponseMetadata']['RetryAttempts'],
         )
-
         #
         # range request may not always return partial content, see:
         # https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests#partial_request_responses
@@ -622,7 +621,7 @@ class _SeekableRawReader(object):
             self._content_length = length
             self._body = response['Body']
         elif status_code == http.HTTPStatus.OK:
-            # 200 guarantees the response body contains the full file (ignored range header)
+            # 200 guarantees the response body contains the full file (server ignored range header)
             self._position = 0
             self._content_length = response["ContentLength"]
             self._body = response['Body']

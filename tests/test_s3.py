@@ -327,7 +327,6 @@ class ReaderTest(BaseTest):
             seek = fin.seek(-(body_len + 10), whence=smart_open.constants.WHENCE_END)
             self.assertEqual(seek, 0)  # Should clamp to start of file
 
-
     def test_detect_eof(self):
         with self.assertApiCalls(GetObject=1):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
@@ -486,7 +485,6 @@ class ReaderTest(BaseTest):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
                 seek = fin.seek(-10, whence=smart_open.constants.WHENCE_END)
                 self.assertEqual(seek, 0)  # Should be at position 0 for empty file
-
 
 @mock_s3
 class MultipartWriterTest(unittest.TestCase):
