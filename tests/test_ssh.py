@@ -112,6 +112,38 @@ class SSHOpen(unittest.TestCase):
         )
 
     @mock_ssh
+    def test_open_with_openssh_config_override_port2(self, mock_connect, get_transp_mock):
+        smart_open.open("ssh://another-host/", transport_params={"port": 22})
+        mock_connect.assert_called_with(
+            "another-host-domain.com",
+            22,
+            username="another-user",
+            key_filename=["/path/to/key/file"],
+            timeout=20.,
+            compress=True,
+            gss_auth=False,
+            gss_kex=False,
+            gss_deleg_creds=False,
+            gss_trust_dns=False,
+        )
+
+    @mock_ssh
+    def test_open_with_openssh_config_missing_port(self, mock_connect, get_transp_mock):
+        smart_open.open("ssh://another-host-missing-port/")
+        mock_connect.assert_called_with(
+            "another-host-domain.com",
+            22,
+            username="another-user",
+            key_filename=["/path/to/key/file"],
+            timeout=20.,
+            compress=True,
+            gss_auth=False,
+            gss_kex=False,
+            gss_deleg_creds=False,
+            gss_trust_dns=False,
+        )
+
+    @mock_ssh
     def test_open_with_openssh_config_override_user(self, mock_connect, get_transp_mock):
         smart_open.open("ssh://new-user@another-host/")
         mock_connect.assert_called_with(
@@ -126,6 +158,23 @@ class SSHOpen(unittest.TestCase):
             gss_deleg_creds=False,
             gss_trust_dns=False,
         )
+
+    @mock_ssh
+    def test_open_with_prefetch(self, mock_connect, get_transp_mock):
+        smart_open.open(
+            "ssh://user:pass@some-host/",
+            transport_params={"prefetch_kwargs": {"max_concurrent_requests": 3}},
+        )
+        mock_sftp = get_transp_mock().open_sftp_client()
+        mock_fobj = mock_sftp.open()
+        mock_fobj.prefetch.assert_called_with(max_concurrent_requests=3)
+
+    @mock_ssh
+    def test_open_without_prefetch(self, mock_connect, get_transp_mock):
+        smart_open.open("ssh://user:pass@some-host/")
+        mock_sftp = get_transp_mock().open_sftp_client()
+        mock_fobj = mock_sftp.open()
+        mock_fobj.prefetch.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -169,9 +169,9 @@ def safe_urlsplit(url):
     See Also
     --------
     https://bugs.python.org/issue43882
-    https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
-    https://github.com/RaRe-Technologies/smart_open/issues/285
-    https://github.com/RaRe-Technologies/smart_open/issues/458
+    https://github.com/python/cpython/blob/3.13/Lib/urllib/parse.py
+    https://github.com/piskvorky/smart_open/issues/285
+    https://github.com/piskvorky/smart_open/issues/458
     smart_open/utils.py:QUESTION_MARK_PLACEHOLDER
     """
     sr = urllib.parse.urlsplit(url, allow_fragments=False)
@@ -208,6 +208,8 @@ class TextIOWrapper(io.TextIOWrapper):
 
 
 class FileLikeProxy(wrapt.ObjectProxy):
+    __inner = ...  # initialized before wrapt disallows __setattr__ on certain objects
+
     def __init__(self, outer, inner):
         super().__init__(outer)
         self.__inner = inner
@@ -215,6 +217,16 @@ class FileLikeProxy(wrapt.ObjectProxy):
     def __exit__(self, *args, **kwargs):
         """Exit inner after exiting outer."""
         try:
-            super().__exit__(*args, **kwargs)
+            return super().__exit__(*args, **kwargs)
         finally:
             self.__inner.__exit__(*args, **kwargs)
+
+    def __next__(self):
+        return self.__wrapped__.__next__()
+
+    def close(self):
+        try:
+            return self.__wrapped__.close()
+        finally:
+            if self.__inner != self.__wrapped__:  # Don't close again if inner and wrapped are the same
+                self.__inner.close()

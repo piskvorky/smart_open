@@ -6,8 +6,7 @@
 # from the MIT License (MIT).
 #
 
-"""Implements I/O streams over FTP.
-"""
+"""Implements I/O streams over FTP."""
 
 import logging
 import ssl
@@ -86,7 +85,7 @@ def convert_transport_params_to_args(transport_params):
 def _connect(hostname, username, port, password, secure_connection, transport_params):
     kwargs = convert_transport_params_to_args(transport_params)
     if secure_connection:
-        ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
+        ssl_context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
         ftp = FTP_TLS(context=ssl_context, **kwargs)
     else:
         ftp = FTP(**kwargs)

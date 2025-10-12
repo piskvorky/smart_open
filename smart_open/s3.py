@@ -286,7 +286,7 @@ def open_uri(uri, mode, transport_params):
     detected = [k for k in deprecated if k in transport_params]
     if detected:
         doc_url = (
-            'https://github.com/RaRe-Technologies/smart_open/blob/develop/'
+            'https://github.com/piskvorky/smart_open/blob/develop/'
             'MIGRATING_FROM_OLDER_VERSIONS.rst'
         )
         #
@@ -295,7 +295,7 @@ def open_uri(uri, mode, transport_params):
         # 1) Not everyone has logging enabled; and
         # 2) check_kwargs (below) already uses logger.warn with a similar message
         #
-        # https://github.com/RaRe-Technologies/smart_open/issues/614
+        # https://github.com/piskvorky/smart_open/issues/614
         #
         message = (
             'ignoring the following deprecated transport parameters: %r. '
@@ -332,31 +332,31 @@ def open(
     mode: str
         The mode for opening the object.  Must be either "rb" or "wb".
     buffer_size: int, optional
-        The buffer size to use when performing I/O.
+        Default: 128KB
+        The buffer size in bytes for reading. Controls memory usage. Data is streamed
+        from a S3 network stream in buffer_size chunks. Forward seeks within
+        the current buffer are satisfied without additional GET requests. Backward
+        seeks always open a new GET request. For forward seek-intensive workloads,
+        increase buffer_size to reduce GET requests at the cost of higher memory usage.
     min_part_size: int, optional
         The minimum part size for multipart uploads, in bytes.
-
         When the writebuffer contains this many bytes, smart_open will upload
         the bytes to S3 as a single part of a multi-part upload, freeing the
         buffer either partially or entirely.  When you close the writer, it
         will assemble the parts together.
-
         The value determines the upper limit for the writebuffer.  If buffer
         space is short (e.g. you are buffering to memory), then use a smaller
         value for min_part_size, or consider buffering to disk instead (see
         the writebuffer option).
-
         The value must be between 5MB and 5GB.  If you specify a value outside
         of this range, smart_open will adjust it for you, because otherwise the
         upload _will_ fail.
-
         For writing only.  Does not apply if you set multipart_upload=False.
     multipart_upload: bool, optional
         Default: `True`
         If set to `True`, will use multipart upload for writing to S3. If set
         to `False`, S3 upload will use the S3 Single-Part Upload API, which
         is more ideal for small file sizes.
-
         For writing only.
     version_id: str, optional
         Version of the object, used when reading object.
@@ -472,6 +472,15 @@ class _SeekableRawReader(object):
         self._position = 0
         self._body = None
 
+    @property
+    def closed(self):
+        return self._body is None
+
+    def close(self):
+        if not self.closed:
+            self._body.close()
+            self._body = None
+
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
 
@@ -486,11 +495,8 @@ class _SeekableRawReader(object):
 
         #
         # Close old body explicitly.
-        # When first seek() after __init__(), self._body is not exist.
         #
-        if self._body is not None:
-            self._body.close()
-        self._body = None
+        self.close()
 
         start = None
         stop = None
@@ -551,47 +557,70 @@ class _SeekableRawReader(object):
             error_response = _unwrap_ioerror(ioe)
             if error_response is None or error_response.get('Code') != _OUT_OF_RANGE:
                 raise
-            try:
-                self._position = self._content_length = int(error_response['ActualObjectSize'])
+
+            actual_object_size = int(error_response.get('ActualObjectSize', 0))
+            if (
+                # empty file (==) or start is past end of file (>)
+                (start is not None and start >= actual_object_size)
+                # negative seek requested more bytes than file has
+                or (start is None and stop is not None and stop >= actual_object_size)
+            ):
+                self._position = self._content_length = actual_object_size
                 self._body = io.BytesIO()
-            except KeyError:
-                response = _get(
-                    self._client,
-                    self._bucket,
-                    self._key,
-                    self._version_id,
-                    None,
-                )
-                self._position = self._content_length = response["ContentLength"]
-                self._body = response["Body"]
-        else:
-            #
-            # Keep track of how many times boto3's built-in retry mechanism
-            # activated.
-            #
-            # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html#checking-retry-attempts-in-an-aws-service-response
-            #
-            logger.debug(
-                '%s: RetryAttempts: %d',
-                self,
-                response['ResponseMetadata']['RetryAttempts'],
-            )
-            #
-            # range request may not always return partial content, see:
-            # https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests#partial_request_responses
-            #
-            status_code = response['ResponseMetadata']['HTTPStatusCode']
-            if status_code == http.HTTPStatus.PARTIAL_CONTENT:
-                _, start, stop, length = smart_open.utils.parse_content_range(response['ContentRange'])
-                self._position = start
-            elif status_code == http.HTTPStatus.OK:
-                length = response["ContentLength"]
+            else:  # stop is past end of file: request the correct remainder instead
+                self._open_body(start=start, stop=actual_object_size - 1)
+            return
+
+        #
+        # Keep track of how many times boto3's built-in retry mechanism
+        # activated.
+        #
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html#checking-retry-attempts-in-an-aws-service-response
+        #
+        logger.debug(
+            '%s: RetryAttempts: %d',
+            self,
+            response['ResponseMetadata']['RetryAttempts'],
+        )
+        #
+        # range request may not always return partial content, see:
+        # https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests#partial_request_responses
+        #
+        status_code = response['ResponseMetadata']['HTTPStatusCode']
+        if status_code == http.HTTPStatus.PARTIAL_CONTENT:
+            # 206 guarantees that the response body only contains the requested byte range
+            _, resp_start, _, length = smart_open.utils.parse_content_range(response['ContentRange'])
+            self._position = resp_start
             self._content_length = length
             self._body = response['Body']
+        elif status_code == http.HTTPStatus.OK:
+            # 200 guarantees the response body contains the full file (server ignored range header)
+            self._position = 0
+            self._content_length = response["ContentLength"]
+            self._body = response['Body']
+            #
+            # If we got a full request when we were actually expecting a range, we need to
+            # read some data to ensure that the body starts in the place that the caller expects
+            #
+            if start is not None:
+                expected_position = min(self._content_length, start)
+            elif start is None and stop is not None:
+                expected_position = max(0, self._content_length - stop)
+            else:
+                expected_position = 0
+            if expected_position > 0:
+                logger.debug(
+                    '%s: discarding %d bytes to reach expected position',
+                    self,
+                    expected_position,
+                )
+                self._position = len(self._body.read(expected_position))
+        else:
+            raise ValueError("Unexpected status code %r" % status_code)
 
     def read(self, size=-1):
         """Read from the continuous connection with the remote peer."""
-        if self._body is None:
+        if self.closed:
             # This is necessary for the very first read() after __init__().
             self._open_body()
         if self._position >= self._content_length:
@@ -648,6 +677,16 @@ def _initialize_boto3(rw, client, client_kwargs, bucket, key):
 
     if client is None:
         init_kwargs = client_kwargs.get('S3.Client', {})
+        if 'config' not in init_kwargs:
+            init_kwargs['config'] = botocore.client.Config(
+                max_pool_connections=64,
+                tcp_keepalive=True,
+                retries={"max_attempts": 6, "mode": "adaptive"}
+            )
+        # boto3.client re-uses the default session which is not thread-safe when this is called
+        # from within a thread. when using smart_open with multithreading, create a thread-safe
+        # client with the config above and share it between threads using transport_params
+        # https://github.com/boto/boto3/blob/1.38.41/docs/source/guide/clients.rst?plain=1#L111
         client = boto3.client('s3', **init_kwargs)
     assert client
 
@@ -703,6 +742,7 @@ class Reader(io.BufferedIOBase):
 
     def close(self):
         """Flush and close this stream."""
+        logger.debug("close: called")
         pass
 
     def readable(self):
@@ -787,11 +827,19 @@ class Reader(io.BufferedIOBase):
             whence = constants.WHENCE_START
             offset += self._current_pos
 
+        # Check if we can satisfy seek from buffer
+        if whence == constants.WHENCE_START and offset > self._current_pos:
+            buffer_end = self._current_pos + len(self._buffer)
+            if offset <= buffer_end:
+                # Forward seek within buffered data - avoid S3 request
+                self._buffer.read(offset - self._current_pos)
+                self._current_pos = offset
+                return self._current_pos
+
         if not self._seek_initialized or not (
             whence == constants.WHENCE_START and offset == self._current_pos
         ):
             self._current_pos = self._raw_reader.seek(offset, whence)
-
             self._buffer.empty()
 
         self._eof = self._current_pos == self._raw_reader._content_length
@@ -869,6 +917,7 @@ class MultipartWriter(io.BufferedIOBase):
     """Writes bytes to S3 using the multi part API.
 
     Implements the io.BufferedIOBase interface of the standard library."""
+    _upload_id = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(
         self,
@@ -925,6 +974,10 @@ class MultipartWriter(io.BufferedIOBase):
     # Override some methods from io.IOBase.
     #
     def close(self):
+        logger.debug("close: called")
+        if self.closed:
+            return
+
         if self._buf.tell():
             self._upload_next_part()
 
@@ -1027,7 +1080,7 @@ class MultipartWriter(io.BufferedIOBase):
 
     def terminate(self):
         """Cancel the underlying multipart upload."""
-        if self._upload_id is None:
+        if self.closed:
             return
         logger.debug('%s: terminating multipart upload', self)
         self._client.abort_multipart_upload(
@@ -1112,6 +1165,7 @@ class SinglepartWriter(io.BufferedIOBase):
 
     This class buffers all of its input in memory until its `close` method is called. Only then will
     the data be written to S3 and the buffer is released."""
+    _buf = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(
         self,
@@ -1123,22 +1177,12 @@ class SinglepartWriter(io.BufferedIOBase):
     ):
         _initialize_boto3(self, client, client_kwargs, bucket, key)
 
-        try:
-            self._client.head_bucket(Bucket=bucket)
-        except botocore.client.ClientError as e:
-            raise ValueError('the bucket %r does not exist, or is forbidden for access' % bucket) from e
-
         if writebuffer is None:
             self._buf = io.BytesIO()
+        elif not writebuffer.seekable():
+            raise ValueError('writebuffer needs to be seekable')
         else:
             self._buf = writebuffer
-
-        self._total_bytes = 0
-
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
 
     def flush(self):
         pass
@@ -1147,10 +1191,11 @@ class SinglepartWriter(io.BufferedIOBase):
     # Override some methods from io.IOBase.
     #
     def close(self):
-        if self._buf is None:
+        logger.debug("close: called")
+        if self.closed:
             return
 
-        self._buf.seek(0)
+        self.seek(0)
 
         try:
             self._client.put_object(
@@ -1163,39 +1208,35 @@ class SinglepartWriter(io.BufferedIOBase):
                 'the bucket %r does not exist, or is forbidden for access' % self._bucket) from e
 
         logger.debug("%s: direct upload finished", self)
-        self._buf = None
+        self._buf.close()
 
     @property
     def closed(self):
-        return self._buf is None
+        return self._buf is None or self._buf.closed
+
+    def readable(self):
+        """Propagate."""
+        return self._buf.readable()
 
     def writable(self):
-        """Return True if the stream supports writing."""
-        return True
+        """Propagate."""
+        return self._buf.writable()
 
     def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError.
-
-        We offer only tell support, and no seek or truncate support."""
-        return True
+        """Propagate."""
+        return self._buf.seekable()
 
     def seek(self, offset, whence=constants.WHENCE_START):
-        """Unsupported."""
-        raise io.UnsupportedOperation
+        """Propagate."""
+        return self._buf.seek(offset, whence)
 
     def truncate(self, size=None):
-        """Unsupported."""
-        raise io.UnsupportedOperation
+        """Propagate."""
+        return self._buf.truncate(size)
 
     def tell(self):
-        """Return the current stream position."""
-        return self._total_bytes
-
-    #
-    # io.BufferedIOBase methods.
-    #
-    def detach(self):
-        raise io.UnsupportedOperation("detach() not supported")
+        """Propagate."""
+        return self._buf.tell()
 
     def write(self, b):
         """Write the given buffer (bytes, bytearray, memoryview or any buffer
@@ -1203,14 +1244,20 @@ class SinglepartWriter(io.BufferedIOBase):
         written to S3 on close as a single-part upload.
 
         For more information about buffers, see https://docs.python.org/3/c-api/buffer.html"""
+        return self._buf.write(b)
 
-        length = self._buf.write(b)
-        self._total_bytes += length
-        return length
+    def read(self, size=-1):
+        """Propagate."""
+        return self._buf.read(size)
+
+    def read1(self, size=-1):
+        """Propagate."""
+        return self._buf.read1(size)
 
     def terminate(self):
-        """Nothing to cancel in single-part uploads."""
-        return
+        """Close buffer and skip upload."""
+        self._buf.close()
+        logger.debug('%s: terminated singlepart upload', self)
 
     #
     # Internal methods.

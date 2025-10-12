@@ -50,7 +50,7 @@ def open_uri(uri, mode, transport_params):
 
 
 def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
-         headers=None, timeout=None, buffer_size=DEFAULT_BUFFER_SIZE):
+         headers=None, timeout=None, session=None, buffer_size=DEFAULT_BUFFER_SIZE):
     """Implement streamed reader from a web site.
 
     Supports Kerberos and Basic HTTP authentication.
@@ -73,6 +73,9 @@ def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
         Any headers to send in the request. If ``None``, the default headers are sent:
         ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
         set this variable to an empty dict, ``{}``.
+    session: object, optional
+        The requests Session object to use with http get requests.
+        Can be used for OAuth2 clients.
     buffer_size: int, optional
         The buffer size to use when performing I/O.
 
@@ -86,7 +89,7 @@ def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
         fobj = SeekableBufferedInputBase(
             uri, mode, buffer_size=buffer_size, kerberos=kerberos,
             user=user, password=password, cert=cert,
-            headers=headers, timeout=timeout,
+            headers=headers, session=session, timeout=timeout,
         )
         fobj.name = os.path.basename(urllib.parse.urlparse(uri).path)
         return fobj
@@ -95,9 +98,14 @@ def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
 
 
 class BufferedInputBase(io.BufferedIOBase):
+    response = None  # so `closed` property works in case __init__ fails and __del__ is called
+
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
                  kerberos=False, user=None, password=None, cert=None,
-                 headers=None, timeout=None):
+                 headers=None, session=None, timeout=None):
+
+        self.session = session or requests
+
         if kerberos:
             import requests_kerberos
             auth = requests_kerberos.HTTPKerberosAuth()
@@ -116,7 +124,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
         self.timeout = timeout
 
-        self.response = requests.get(
+        self.response = self.session.get(
             url,
             auth=auth,
             cert=cert,
@@ -143,8 +151,13 @@ class BufferedInputBase(io.BufferedIOBase):
     def close(self):
         """Flush and close this stream."""
         logger.debug("close: called")
-        self.response = None
-        self._read_iter = None
+        if not self.closed:
+            self.response = None
+            self._read_iter = None
+
+    @property
+    def closed(self):
+        return self.response is None
 
     def readable(self):
         """Return True if the stream can be read from."""
@@ -217,7 +230,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
     def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
                  kerberos=False, user=None, password=None, cert=None,
-                 headers=None, timeout=None):
+                 headers=None, session=None, timeout=None):
         """
         If Kerberos is True, will attempt to use the local Kerberos credentials.
         If cert is set, will try to use a client certificate
@@ -226,6 +239,8 @@ class SeekableBufferedInputBase(BufferedInputBase):
         If none of those are set, will connect unauthenticated.
         """
         self.url = url
+
+        self.session = session or requests
 
         if kerberos:
             import requests_kerberos
@@ -332,7 +347,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         if start_pos is not None:
             self.headers.update({"range": smart_open.utils.make_range_string(start_pos)})
 
-        response = requests.get(
+        response = self.session.get(
             self.url,
             auth=self.auth,
             stream=True,

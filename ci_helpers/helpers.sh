@@ -20,6 +20,9 @@ create_ftp_ftps_servers(){
   mkdir $home_dir
   useradd -p $(echo $pass | openssl passwd -1 -stdin) -d $home_dir $user
   chown $user:$user $home_dir
+  openssl req -x509 -nodes -new -sha256 -days 10240 -newkey rsa:2048 -keyout /etc/vsftpd.key -out /etc/vsftpd.pem -subj "/C=ZA/CN=localhost"
+  chmod 755 /etc/vsftpd.key
+  chmod 755 /etc/vsftpd.pem
 
   server_setup='''
 listen=YES
@@ -32,6 +35,8 @@ chroot_local_user=YES
 allow_writeable_chroot=YES'''
 
   additional_ssl_setup='''
+rsa_cert_file=/etc/vsftpd.pem
+rsa_private_key_file=/etc/vsftpd.key
 ssl_enable=YES
 allow_anon_ssl=NO
 force_local_data_ssl=NO

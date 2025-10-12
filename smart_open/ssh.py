@@ -112,19 +112,19 @@ def parse_uri(uri_as_string):
 
 
 def open_uri(uri, mode, transport_params):
-    smart_open.utils.check_kwargs(open, transport_params)
+    kwargs = smart_open.utils.check_kwargs(open, transport_params)
     parsed_uri = parse_uri(uri)
     uri_path = parsed_uri.pop('uri_path')
     parsed_uri.pop('scheme')
-    connect_kwargs = transport_params.get('connect_kwargs')
-    return open(uri_path, mode, connect_kwargs=connect_kwargs, **parsed_uri)
+    final_params = {**parsed_uri, **kwargs}  # transport_params takes precedence over uri
+    return open(uri_path, mode, **final_params)
 
 
 def _connect_ssh(hostname, username, port, password, connect_kwargs):
     ssh = paramiko.SSHClient()
     ssh.load_system_host_keys()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    kwargs = connect_kwargs.copy()
+    kwargs = (connect_kwargs or {}).copy()
     if 'key_filename' not in kwargs:
         kwargs.setdefault('password', password)
     kwargs.setdefault('username', username)
@@ -155,6 +155,7 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
     # - compression selection
     # - GSS configuration
     #
+    connect_params = (connect_kwargs or {}).copy()
     config_files = [f for f in _SSH_CONFIG_FILES if os.path.exists(f)]
     #
     # This is the actual name of the host.  The input host may actually be an
@@ -189,7 +190,7 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
         if port is None:
             try:
                 port = int(cfg["port"])
-            except (IndexError, ValueError):
+            except (KeyError, ValueError):
                 #
                 # Nb. ignore missing/invalid port numbers
                 #
@@ -223,10 +224,20 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
     if actual_hostname:
         host = actual_hostname
 
-    return host, username, password, port, connect_kwargs
+    return host, username, password, port, connect_params
 
 
-def open(path, mode='r', host=None, user=None, password=None, port=None, connect_kwargs=None):
+def open(
+    path,
+    mode="r",
+    host=None,
+    user=None,
+    password=None,
+    port=None,
+    connect_kwargs=None,
+    prefetch_kwargs=None,
+    buffer_size=-1,
+):
     """Open a file on a remote machine over SSH.
 
     Expects authentication to be already set up via existing keys on the local machine.
@@ -238,7 +249,7 @@ def open(path, mode='r', host=None, user=None, password=None, port=None, connect
     mode: str, optional
         The mode to use for opening the file.
     host: str, optional
-        The hostname of the remote machine.  May not be None.
+        The hostname of the remote machine. May not be None.
     user: str, optional
         The username to use to login to the remote machine.
         If None, defaults to the name of the current user.
@@ -247,7 +258,12 @@ def open(path, mode='r', host=None, user=None, password=None, port=None, connect
     port: int, optional
         The port to connect to.
     connect_kwargs: dict, optional
-        Any additional settings to be passed to paramiko.SSHClient.connect
+        Any additional settings to be passed to paramiko.SSHClient.connect.
+    prefetch_kwargs: dict, optional
+        Any additional settings to be passed to paramiko.SFTPFile.prefetch.
+        The presence of this dict (even if empty) triggers prefetching.
+    buffer_size: int, optional
+        Passed to the bufsize argument of paramiko.SFTPClient.open.
 
     Returns
     -------
@@ -294,6 +310,8 @@ def open(path, mode='r', host=None, user=None, password=None, port=None, connect
             #
             del _SSH[key]
 
-    fobj = sftp_client.open(path, mode)
+    fobj = sftp_client.open(path, mode=mode, bufsize=buffer_size)
     fobj.name = path
+    if prefetch_kwargs is not None:
+        fobj.prefetch(**prefetch_kwargs)
     return fobj

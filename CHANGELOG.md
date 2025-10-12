@@ -1,3 +1,62 @@
+# 7.3.1, 2025-09-08
+
+- Fix release.sh for the final merge back into develop (PR [#872](https://github.com/piskvorky/smart_open/pull/872), [@ddelange](https://github.com/ddelange))
+- Bump actions/checkout from 4 to 5 in the github-actions group (PR [#877](https://github.com/piskvorky/smart_open/pull/877), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Bump pypa/gh-action-pypi-publish from 1.12.4 to 1.13.0 in /.github/workflows (PR [#878](https://github.com/piskvorky/smart_open/pull/878), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Add .xz and increase performance of compression module (PR [#875](https://github.com/piskvorky/smart_open/pull/875), [@ddelange](https://github.com/ddelange))
+
+# 7.3.0.post1, 2025-07-03
+
+- Fix release.sh merge message and final merge (PR [#868](https://github.com/piskvorky/smart_open/pull/868), [@ddelange](https://github.com/ddelange))
+- Bump softprops/action-gh-release from 2.2.1 to 2.3.2 in the github-actions group (PR [#867](https://github.com/piskvorky/smart_open/pull/867), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Fix CI badge (PR [#869](https://github.com/piskvorky/smart_open/pull/869), [@ddelange](https://github.com/ddelange))
+- Drop 3.7 support in pyproject.toml (PR [#871](https://github.com/piskvorky/smart_open/pull/871), [@ddelange](https://github.com/ddelange))
+
+# 7.3.0, 2025-07-01
+
+- Remove head_bucket call from s3.SinglepartWriter (PR [#857](https://github.com/piskvorky/smart_open/pull/857), [@ddelange](https://github.com/ddelange))
+- Add help.txt linting step (PR [#853](https://github.com/piskvorky/smart_open/pull/853), [@ddelange](https://github.com/ddelange))
+- Add buffer_size transport param to ssh.py (PR [#861](https://github.com/piskvorky/smart_open/pull/861), [@ddelange](https://github.com/ddelange))
+- Fix integration test CI rot (PR [#864](https://github.com/piskvorky/smart_open/pull/864), [@ddelange](https://github.com/ddelange))
+- Fix try-except in ssh.py for missing port in ssh config (PR [#863](https://github.com/piskvorky/smart_open/pull/863), [@ddelange](https://github.com/ddelange))
+- Make s3.SinglepartWriter seekable (PR [#854](https://github.com/piskvorky/smart_open/pull/854), [@ddelange](https://github.com/ddelange))
+- Modernize python packaging (PR [#851](https://github.com/piskvorky/smart_open/pull/851), [@ddelange](https://github.com/ddelange))
+
+# 7.2.0, 2025-03-06
+
+- Add support for prefetching to sftp transport (PR [#849](https://github.com/piskvorky/smart_open/pull/849), [@davidszotten](https://github.com/davidszotten))
+
+# 7.1.0, 2024-12-17
+
+- Add support for python 3.13 (PR [#847](https://github.com/piskvorky/smart_open/pull/847), [@ddelange](https://github.com/ddelange))
+- Propagate uri to compression_wrapper (PR [#842](https://github.com/piskvorky/smart_open/pull/842), [@ddelange](https://github.com/ddelange))
+
+# 7.0.5, 2024-10-04
+
+- Fix zstd compression in ab mode (PR [#833](https://github.com/piskvorky/smart_open/pull/833), [@ddelange](https://github.com/ddelange))
+- Fix close function not neing able to upload a compressed S3 (PR [#838](https://github.com/piskvorky/smart_open/pull/838), [@jbarragan-bridge](https://github.com/jbarragan-bridge))
+- Fix test_http.request_callback (PR [#828](https://github.com/piskvorky/smart_open/pull/828), [@ddelange](https://github.com/ddelange))
+- Update readline logic for azure to match s3 (PR [#826](https://github.com/piskvorky/smart_open/pull/826), [@quantumfusion](https://github.com/quantumfusion))
+- Make http handler take an optional requests.Session (PR [#825](https://github.com/piskvorky/smart_open/pull/825), [@arondaniel](https://github.com/arondaniel))
+- Ensure no side effects on SinglepartWriter exception (PR [#820](https://github.com/piskvorky/smart_open/pull/820), [@donsokolone](https://github.com/donsokolone))
+- Add support for `get_blob_kwargs` to GCS blob read operations (PR [#817](https://github.com/piskvorky/smart_open/pull/817), [@thejcannon](https://github.com/thejcannon))
+
+# 7.0.4, 2024-03-26
+
+* Fix wb mode with zstd compression (PR [#815](https://github.com/piskvorky/smart_open/pull/815), [@djudd](https://github.com/djudd))
+* Remove GCS bucket.exists call to avoid storage.buckets.get permission (PR [#813](https://github.com/piskvorky/smart_open/pull/813), [@ddelange](https://github.com/ddelange))
+
+# 7.0.3, 2024-03-21
+
+* add support for zst writing (PR [#812](https://github.com/piskvorky/smart_open/pull/812), [@mpenkov](https://github.com/mpenkov))
+* roll back PR [#812](https://github.com/piskvorky/smart_open/pull/788), restore compatibility with built-in open function ([@mpenkov](https://github.com/mpenkov))
+
+# 7.0.2, 2024-03-21
+
+* Add `__next__` method to FileLikeProxy (PR [#811](https://github.com/piskvorky/smart_open/pull/811), [@ddelange](https://github.com/ddelange))
+* Fix python_requires minimum python version in setup.py (PR [#807](https://github.com/piskvorky/smart_open/pull/807), [@pressler-vsc](https://github.com/pressler-vsc))
+* Add activity check to cached sftp connections (PR [#808](https://github.com/piskvorky/smart_open/pull/808), [@greg-offerfit](https://github.com/greg-offerfit))
+
 # 7.0.1, 2024-02-26
 
 * Do not touch botocore unless it is installed (PR [#803](https://github.com/piskvorky/smart_open/pull/803), [@ddelange](https://github.com/ddelange))

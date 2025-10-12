@@ -271,7 +271,7 @@ class ReaderTest(BaseTest):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
             self.assertEqual(fin.read(5), b'hello')
 
-        with self.assertApiCalls(GetObject=1):
+        with self.assertApiCalls():
             seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
             self.assertEqual(seek, 6)
             self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
@@ -289,6 +289,30 @@ class ReaderTest(BaseTest):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
             seek = fin.seek(60)
             self.assertEqual(seek, len(self.body))
+
+    def test_seek_past_end_from_end(self):
+        """Test seeking from end with offset larger than file size."""
+        body_len = len(self.body)
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response(str(body_len)):
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            seek = fin.seek(-(body_len + 10), whence=smart_open.constants.WHENCE_END)
+            self.assertEqual(seek, 0)  # Should clamp to start of file
+
+    def test_seek_forward_within_buffer(self):
+        """Does forward seeking within buffered data avoid additional GET requests?"""
+        with self.assertApiCalls(GetObject=1):
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, buffer_size=32)
+            self.assertEqual(fin.read(5), b'hello')
+
+            # Forward seek within buffer using WHENCE_CURRENT - should NOT make a new GET request
+            seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
+            self.assertEqual(seek, 6)
+            self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
+
+            # Forward seek within buffer using WHENCE_START - should NOT make a new GET request
+            seek = fin.seek(13, whence=smart_open.constants.WHENCE_START)
+            self.assertEqual(seek, 13)
+            self.assertEqual(fin.read(3), b'how')
 
     def test_detect_eof(self):
         with self.assertApiCalls(GetObject=1):
@@ -379,10 +403,36 @@ class ReaderTest(BaseTest):
         expected = u"выйду ночью в поле с конём".encode('utf-8').split(b' ')
         _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'\n'.join(expected))
 
+        # test the __iter__ method
         with self.assertApiCalls(GetObject=1):
             with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'rb') as fin:
                 actual = [line.rstrip() for line in fin]
         self.assertEqual(expected, actual)
+
+        # test the __next__ method
+        with self.assertApiCalls(GetObject=1):
+            with smart_open.s3.open(BUCKET_NAME, KEY_NAME, 'rb') as fin:
+                first = next(fin).rstrip()
+        self.assertEqual(expected[0], first)
+
+    def test_text_iterator(self):
+        expected = u"выйду ночью в поле с конём".split(' ')
+        uri = f's3://{BUCKET_NAME}/{KEY_NAME}.gz'
+
+        with smart_open.open(uri, 'w', encoding='utf-8') as fout:
+            fout.write('\n'.join(expected))
+
+        # test the __iter__ method
+        with self.assertApiCalls(GetObject=1):
+            with smart_open.open(uri, 'r', encoding='utf-8') as fin:
+                actual = [line.rstrip() for line in fin]
+        self.assertEqual(expected, actual)
+
+        # test the __next__ method
+        with self.assertApiCalls(GetObject=1):
+            with smart_open.open(uri, 'r', encoding='utf-8') as fin:
+                first = next(fin).rstrip()
+        self.assertEqual(expected[0], first)
 
     def test_defer_seek(self):
         content = b'englishman\nin\nnew\nyork\n'
@@ -404,19 +454,24 @@ class ReaderTest(BaseTest):
 
         with self.assertApiCalls(GetObject=1), patch_invalid_range_response('0'):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
-                data = fin.read()
-
-        self.assertEqual(data, b'')
+                self.assertEqual(fin.read(), b'')
 
     def test_read_empty_file_no_actual_size(self):
         _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'')
 
-        with self.assertApiCalls(GetObject=2), patch_invalid_range_response(None):
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response(None):
             with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
-                data = fin.read()
+                self.assertEqual(fin.read(), b'')
+                # a subsequent read does not call _open_body
+                self.assertEqual(fin.read(), b'')
 
-        self.assertEqual(data, b'')
-
+    def test_seek_empty_file_from_end(self):
+        """Test seeking from end on an empty file."""
+        _resource('s3').Object(BUCKET_NAME, KEY_NAME).put(Body=b'')
+        with self.assertApiCalls(GetObject=1), patch_invalid_range_response('0'):
+            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
+                seek = fin.seek(-10, whence=smart_open.constants.WHENCE_END)
+                self.assertEqual(seek, 0)  # Should be at position 0 for empty file
 
 @mock_s3
 class MultipartWriterTest(unittest.TestCase):
@@ -562,8 +617,12 @@ class MultipartWriterTest(unittest.TestCase):
 
     def test_nonexisting_bucket(self):
         expected = u"выйду ночью в поле с конём".encode('utf-8')
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, "does not exist"):
             with smart_open.s3.open('thisbucketdoesntexist', 'mykey', 'wb') as fout:
+                fout.write(expected)
+
+        with self.assertRaisesRegex(ValueError, "does not exist"):
+            with smart_open.s3.open('thisbucketdoesntexist', 'mykey', 'wb', multipart_upload=False) as fout:
                 fout.write(expected)
 
     def test_read_nonexisting_key(self):
@@ -607,6 +666,43 @@ class MultipartWriterTest(unittest.TestCase):
                 actual = fin.read()
 
             assert actual == contents
+
+    def test_write_gz_using_context_manager(self):
+        """Does s3 multipart upload create a compressed file using context manager?"""
+        contents = b'get ready for a surprise'
+        with smart_open.open(
+                f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz',
+                mode="wb",
+                transport_params={
+                    "multipart_upload": True,
+                    "min_part_size": 10,
+                }
+        ) as fout:
+            fout.write(contents)
+
+        with smart_open.open(f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz', 'rb') as fin:
+            actual = fin.read()
+
+        assert actual == contents
+
+    def test_write_gz_not_using_context_manager(self):
+        """Does s3 multipart upload create a compressed file not using context manager but close()?"""
+        contents = b'get ready for a surprise'
+        fout = smart_open.open(
+            f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz',
+            mode="wb",
+            transport_params={
+                "multipart_upload": True,
+                "min_part_size": 10,
+            }
+        )
+        fout.write(contents)
+        fout.close()
+
+        with smart_open.open(f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}.gz', 'rb') as fin:
+            actual = fin.read()
+
+        assert actual == contents
 
     def test_write_gz_with_error(self):
         """Does s3 multipart upload abort for a failed compressed file upload?"""
@@ -765,9 +861,75 @@ class SinglepartWriterTest(unittest.TestCase):
 
             assert actual == contents
 
+    def test_seekable(self):
+        """Test that SinglepartWriter is seekable."""
+        expected = b'  34'
+
+        with smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+            fout.write(b'1234')
+            self.assertEqual(len(expected), fout.tell())
+            fout.seek(0)
+            self.assertEqual(0, fout.tell())
+            fout.write(b'  ')
+            self.assertEqual(2, fout.tell())
+            fout.seek(0)
+            self.assertEqual(expected, fout.read())
+
+        with self.assertRaises(ValueError, msg='I/O operation on closed file'):
+            fout.seekable()
+
+        with self.assertRaises(io.UnsupportedOperation, msg='SinglepartWriter.detach() not supported'):
+            fout.detach()
+
+        with self.assertRaises(ValueError, msg='read from closed file'):
+            fout.read()
+
+        with self.assertRaises(ValueError, msg='write to closed file'):
+            fout.write(b' ')
+
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
+            actual = fin.read()
+
+        self.assertEqual(expected, actual)
+
+    def test_truncate(self):
+        """Test that SinglepartWriter.truncate works."""
+        expected = u'не думай о секундах свысока'
+
+        with smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
+            fout.write(expected.encode('utf-8'))
+            fout.write(b'42')
+            fout.truncate(len(expected.encode('utf-8')))
+
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb') as fin:
+            with io.TextIOWrapper(fin, encoding='utf-8') as text:
+                actual = text.read()
+
+        self.assertEqual(expected, actual)
+
     def test_str(self):
         with smart_open.s3.open(BUCKET_NAME, 'key', 'wb', multipart_upload=False) as fout:
             assert str(fout) == "smart_open.s3.SinglepartWriter('test-smartopen', 'key')"
+
+    def test_ensure_no_side_effects_on_exception(self):
+        class WriteError(Exception):
+            pass
+
+        s3_resource = _resource("s3")
+        obj = s3_resource.Object(BUCKET_NAME, KEY_NAME)
+
+        # wrap in closure to ease writer dereferencing
+        def _run():
+            with smart_open.s3.open(BUCKET_NAME, obj.key, "wb", multipart_upload=False) as fout:
+                fout.write(b"this should not be written")
+                raise WriteError
+
+        try:
+            _run()
+        except WriteError:
+            pass
+        finally:
+            self.assertRaises(s3_resource.meta.client.exceptions.NoSuchKey, obj.get)
 
 
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name='bar')

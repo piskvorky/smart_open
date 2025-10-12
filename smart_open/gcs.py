@@ -59,6 +59,7 @@ def open(
     buffer_size=None,
     min_part_size=_DEFAULT_MIN_PART_SIZE,
     client=None,  # type: google.cloud.storage.Client
+    get_blob_kwargs=None,
     blob_properties=None,
     blob_open_kwargs=None,
 ):
@@ -78,6 +79,9 @@ def open(
         The minimum part size for multipart uploads. For writing only.
     client: google.cloud.storage.Client, optional
         The GCS client to use when working with google-cloud-storage.
+    get_blob_kwargs: dict, optional
+        Additional keyword arguments to propagate to the bucket.get_blob
+        method of the google-cloud-storage library. For reading only.
     blob_properties: dict, optional
         Set properties on blob before writing. For writing only.
     blob_open_kwargs: dict, optional
@@ -95,6 +99,7 @@ def open(
         _blob = Reader(bucket=bucket_id,
                        key=blob_id,
                        client=client,
+                       get_blob_kwargs=get_blob_kwargs,
                        blob_open_kwargs=blob_open_kwargs)
 
     elif mode in (constants.WRITE_BINARY, 'w', 'wt'):
@@ -116,8 +121,11 @@ def Reader(bucket,
            buffer_size=None,
            line_terminator=None,
            client=None,
+           get_blob_kwargs=None,
            blob_open_kwargs=None):
 
+    if get_blob_kwargs is None:
+        get_blob_kwargs = {}
     if blob_open_kwargs is None:
         blob_open_kwargs = {}
     if client is None:
@@ -128,7 +136,10 @@ def Reader(bucket,
         warn_deprecated('line_terminator')
 
     bkt = client.bucket(bucket)
-    blob = bkt.blob(key)
+    blob = bkt.get_blob(key, **get_blob_kwargs)
+
+    if blob is None:
+        raise google.cloud.exceptions.NotFound(f'blob {key} not found in {bucket}')
 
     return blob.open('rb', **blob_open_kwargs)
 
@@ -149,11 +160,7 @@ def Writer(bucket,
 
     blob_open_kwargs = {**_DEFAULT_WRITE_OPEN_KWARGS, **blob_open_kwargs}
 
-    g_bucket = client.bucket(bucket)
-    if not g_bucket.exists():
-        raise google.cloud.exceptions.NotFound(f'bucket {bucket} not found')
-
-    g_blob = g_bucket.blob(
+    g_blob = client.bucket(bucket).blob(
         blob,
         chunk_size=min_part_size,
     )

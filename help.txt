@@ -6,12 +6,12 @@ NAME
 DESCRIPTION
     Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
     filesystem / compressed files, and many more, using a simple, Pythonic API.
-    
+
     The streaming makes heavy use of generators and pipes, to avoid loading
     full file contents into memory, allowing work with arbitrarily large files.
-    
+
     The main functions are:
-    
+
     * `open()`, which opens the given file for reading/writing
     * `parse_uri()`
     * `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
@@ -24,6 +24,7 @@ PACKAGE CONTENTS
     concurrency
     constants
     doctools
+    ftp
     gcs
     hdfs
     http
@@ -31,24 +32,22 @@ PACKAGE CONTENTS
     s3
     smart_open_lib
     ssh
-    tests (package)
     transport
     utils
-    version
     webhdfs
 
 FUNCTIONS
-    open(uri, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, ignore_ext=False, transport_params=None)
+    open(uri, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, compression='infer_from_extension', transport_params=None)
         Open the URI object, returning a file-like object.
-        
+
         The URI is usually a string in a variety of formats.
         For a full list of examples, see the :func:`parse_uri` function.
-        
+
         The URI may also be one of:
-        
+
         - an instance of the pathlib.Path class
         - a stream (anything that implements io.IOBase-like functionality)
-        
+
         Parameters
         ----------
         uri: str or object
@@ -67,15 +66,15 @@ FUNCTIONS
             Mimicks built-in open parameter of the same name.  Ignored.
         opener: object, optional
             Mimicks built-in open parameter of the same name.  Ignored.
-        ignore_ext: boolean, optional
-            Disable transparent compression/decompression based on the file extension.
+        compression: str, optional (see smart_open.compression.get_supported_compression_types)
+            Explicitly specify the compression/decompression behavior.
         transport_params: dict, optional
             Additional parameters for the transport layer (see notes below).
-        
+
         Returns
         -------
         A file-like object.
-        
+
         Notes
         -----
         smart_open has several implementations for its transport layer (e.g. S3, HTTP).
@@ -83,41 +82,94 @@ FUNCTIONS
         default behavior.  If you specify a keyword argument that is *not* supported
         by the transport layer being used, smart_open will ignore that argument and
         log a warning message.
-        
+
         smart_open supports the following transport mechanisms:
-        
+
         azure (smart_open/azure.py)
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements file-like objects for reading and writing to/from Azure Blob Storage.
-        
+
+        container_id: str
+            The name of the container this object resides in.
+        blob_id: str
+            The name of the blob within the bucket.
+        mode: str
+            The mode for opening the object.  Must be either "rb" or "wb".
+        client: azure.storage.blob.BlobServiceClient, ContainerClient, or BlobClient
+            The Azure Blob Storage client to use when working with azure-storage-blob.
+        blob_kwargs: dict, optional
+            Additional parameters to pass to `BlobClient.commit_block_list`.
+            For writing only.
         buffer_size: int, optional
             The buffer size to use when performing I/O. For reading only.
         min_part_size: int, optional
-            The minimum part size for multipart uploads.  For writing only.
-        
+            The minimum part size for multipart uploads. For writing only.
+        max_concurrency: int, optional
+            The number of parallel connections with which to download. For reading only.
+
         file (smart_open/local_file.py)
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements the transport for the file:// schema.
-        
+
+        ftp/ftps (smart_open/ftp.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements I/O streams over FTP.
+
+        path: str
+            The path on the remote server
+        mode: str
+            Must be "rb" or "wb"
+        host: str
+            The host to connect to
+        user: str
+            The username to use for the connection
+        password: str
+            The password for the specified username
+        port: int
+            The port to connect to
+        secure_connection: bool
+            True for FTPS, False for FTP
+        transport_params: dict
+            Additional parameters for the FTP connection.
+            Currently supported parameters: timeout, source_address, encoding.
+
         gs (smart_open/gcs.py)
         ~~~~~~~~~~~~~~~~~~~~~~
         Implements file-like objects for reading and writing to/from GCS.
-        
-        buffer_size: int, optional
-            The buffer size to use when performing I/O. For reading only.
+
+        bucket_id: str
+            The name of the bucket this object resides in.
+        blob_id: str
+            The name of the blob within the bucket.
+        mode: str
+            The mode for opening the object. Must be either "rb" or "wb".
+        buffer_size:
+            deprecated
         min_part_size: int, optional
-            The minimum part size for multipart uploads.  For writing only.
+            The minimum part size for multipart uploads. For writing only.
         client: google.cloud.storage.Client, optional
             The GCS client to use when working with google-cloud-storage.
-        
-        hdfs (smart_open/hdfs.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~
+        get_blob_kwargs: dict, optional
+            Additional keyword arguments to propagate to the bucket.get_blob
+            method of the google-cloud-storage library. For reading only.
+        blob_properties: dict, optional
+            Set properties on blob before writing. For writing only.
+        blob_open_kwargs: dict, optional
+            Additional keyword arguments to propagate to the blob.open method
+            of the google-cloud-storage library.
+
+        hdfs/viewfs (smart_open/hdfs.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements reading and writing to/from HDFS.
-        
-        http (smart_open/http.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        http/https (smart_open/http.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements file-like objects for reading from http.
-        
+
+        url: str
+            The URL to open.
+        mode: str
+            The mode to open using.
         kerberos: boolean, optional
             If True, will attempt to use the local Kerberos credentials
         user: str, optional
@@ -125,20 +177,48 @@ FUNCTIONS
         password: str, optional
             The password for authenticating over HTTP
         cert: str/tuple, optional
-            If String, path to ssl client cert file (.pem). If Tuple, (‘cert’, ‘key’)
+            if String, path to ssl client cert file (.pem). If Tuple, (‘cert’, ‘key’)
         headers: dict, optional
             Any headers to send in the request. If ``None``, the default headers are sent:
             ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
             set this variable to an empty dict, ``{}``.
-        
-        s3 (smart_open/s3.py)
-        ~~~~~~~~~~~~~~~~~~~~~
-        Implements file-like objects for reading and writing from/to AWS S3.
-        
+        session: object, optional
+            The requests Session object to use with http get requests.
+            Can be used for OAuth2 clients.
         buffer_size: int, optional
             The buffer size to use when performing I/O.
+
+        s3/s3n/s3u/s3a (smart_open/s3.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        Implements file-like objects for reading and writing from/to AWS S3.
+
+        bucket_id: str
+            The name of the bucket this object resides in.
+        key_id: str
+            The name of the key within the bucket.
+        mode: str
+            The mode for opening the object.  Must be either "rb" or "wb".
+        buffer_size: int, optional
+            Default: 128KB
+            The buffer size in bytes for reading. Controls memory usage. Data is streamed
+            from a S3 network stream in buffer_size chunks. Forward seeks within
+            the current buffer are satisfied without additional GET requests. Backward
+            seeks always open a new GET request. For forward seek-intensive workloads,
+            increase buffer_size to reduce GET requests at the cost of higher memory usage.
         min_part_size: int, optional
-            The minimum part size for multipart uploads.  For writing only.
+            The minimum part size for multipart uploads, in bytes.
+            When the writebuffer contains this many bytes, smart_open will upload
+            the bytes to S3 as a single part of a multi-part upload, freeing the
+            buffer either partially or entirely.  When you close the writer, it
+            will assemble the parts together.
+            The value determines the upper limit for the writebuffer.  If buffer
+            space is short (e.g. you are buffering to memory), then use a smaller
+            value for min_part_size, or consider buffering to disk instead (see
+            the writebuffer option).
+            The value must be between 5MB and 5GB.  If you specify a value outside
+            of this range, smart_open will adjust it for you, because otherwise the
+            upload _will_ fail.
+            For writing only.  Does not apply if you set multipart_upload=False.
         multipart_upload: bool, optional
             Default: `True`
             If set to `True`, will use multipart upload for writing to S3. If set
@@ -167,15 +247,17 @@ FUNCTIONS
             of in RAM. Use this to keep RAM usage low at the expense of additional
             disk IO. If you pass in an open file, then you are responsible for
             cleaning it up after writing completes.
-        
-        scp (smart_open/ssh.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~
+
+        ssh/scp/sftp (smart_open/ssh.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements I/O streams over SSH.
-        
+
+        path: str
+            The path to the file to open on the remote machine.
         mode: str, optional
             The mode to use for opening the file.
         host: str, optional
-            The hostname of the remote machine.  May not be None.
+            The hostname of the remote machine. May not be None.
         user: str, optional
             The username to use to login to the remote machine.
             If None, defaults to the name of the current user.
@@ -183,19 +265,26 @@ FUNCTIONS
             The password to use to login to the remote machine.
         port: int, optional
             The port to connect to.
-        transport_params: dict, optional
-            Any additional settings to be passed to paramiko.SSHClient.connect
-        
+        connect_kwargs: dict, optional
+            Any additional settings to be passed to paramiko.SSHClient.connect.
+        prefetch_kwargs: dict, optional
+            Any additional settings to be passed to paramiko.SFTPFile.prefetch.
+            The presence of this dict (even if empty) triggers prefetching.
+        buffer_size: int, optional
+            Passed to the bufsize argument of paramiko.SFTPClient.open.
+
         webhdfs (smart_open/webhdfs.py)
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements reading and writing to/from WebHDFS.
-        
+
+        http_uri: str
+            webhdfs url converted to http REST url
         min_part_size: int, optional
             For writing only.
-        
+
         Examples
         --------
-        
+
         >>> from smart_open import open
         >>>
         >>> # stream lines from an S3 object
@@ -203,21 +292,25 @@ FUNCTIONS
         ...    print(repr(line))
         ...    break
         'User-Agent: *\n'
-        
+
         >>> # stream from/to compressed files, with transparent (de)compression:
-        >>> for line in open('smart_open/tests/test_data/1984.txt.gz', encoding='utf-8'):
+        >>> for line in open('tests/test_data/1984.txt.gz', encoding='utf-8'):
         ...    print(repr(line))
         'It was a bright cold day in April, and the clocks were striking thirteen.\n'
         'Winston Smith, his chin nuzzled into his breast in an effort to escape the vile\n'
         'wind, slipped quickly through the glass doors of Victory Mansions, though not\n'
         'quickly enough to prevent a swirl of gritty dust from entering along with him.\n'
-        
+
         >>> # can use context managers too:
-        >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
-        ...    with open('smart_open/tests/test_data/1984.txt.bz2', 'w') as fout:
+        >>> with open('tests/test_data/1984.txt.gz') as fin:
+        ...    with open('tests/test_data/1984.txt.bz2', 'w') as fout:
         ...        for line in fin:
         ...           fout.write(line)
-        
+        74
+        80
+        78
+        79
+
         >>> # can use any IOBase operations, like seek
         >>> with open('s3://commoncrawl/robots.txt', 'rb') as fin:
         ...     for line in fin:
@@ -227,63 +320,82 @@ FUNCTIONS
         ...     print(fin.read(4))
         'User-Agent: *\n'
         b'User'
-        
+
         >>> # stream from HTTP
         >>> for line in open('http://example.com/index.html'):
-        ...     print(repr(line))
+        ...     print(repr(line[:15]))
         ...     break
-        
-        This function also supports transparent compression and decompression 
+
+        This function also supports transparent compression and decompression
         using the following codecs:
-        
+
         * .bz2
         * .gz
-        
+        * .xz
+        * .zst
+
         The function depends on the file extension to determine the appropriate codec.
-        
-        
+
+
         See Also
         --------
-        - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
+        - `Standard library reference <https://docs.python.org/3.13/library/functions.html#open>`__
         - `smart_open README.rst
-          <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
-    
+          <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
+
     parse_uri(uri_as_string)
         Parse the given URI from a string.
-        
+
         Parameters
         ----------
         uri_as_string: str
             The URI to parse.
-        
+
         Returns
         -------
         collections.namedtuple
             The parsed URI.
-        
+
         Notes
         -----
         Supported URI schemes are:
-        
+
         * azure
         * file
+        * ftp
+        * ftps
         * gs
         * hdfs
+        * viewfs
         * http
+        * https
         * s3
+        * s3n
+        * s3u
+        * s3a
+        * ssh
         * scp
+        * sftp
         * webhdfs
-        
+
         Valid URI examples::
-        
+
         * ./local/path/file
         * ~/local/path/file
         * local/path/file
         * ./local/path/file.gz
         * file:///home/user/file
         * file:///home/user/file.bz2
+        * ftp://username@host/path/file
+        * ftp://username:password@host/path/file
+        * ftp://username:password@host:port/path/file
+        * ftps://username@host/path/file
+        * ftps://username:password@host/path/file
+        * ftps://username:password@host:port/path/file
         * hdfs:///path/file
         * hdfs://path/file
+        * viewfs:///path/file
+        * viewfs://path/file
         * s3://my_bucket/my_key
         * s3://my_key:my_secret@my_bucket/my_key
         * s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
@@ -292,43 +404,37 @@ FUNCTIONS
         * scp://username@host/path/file
         * sftp://username@host/path/file
         * webhdfs://host:port/path/file
-    
+
     register_compressor(ext, callback)
         Register a callback for transparently decompressing files with a specific extension.
-        
+
         Parameters
         ----------
         ext: str
-            The extension.  Must include the leading period, e.g. ``.gz``.
+            The extension.  Must include the leading period, e.g. `.gz`.
         callback: callable
             The callback.  It must accept two position arguments, file_obj and mode.
-            This function will be called when ``smart_open`` is opening a file with
+            This function will be called when `smart_open` is opening a file with
             the specified extension.
-        
+
         Examples
         --------
-        
+
         Instruct smart_open to use the `lzma` module whenever opening a file
         with a .xz extension (see README.rst for the complete example showing I/O):
-        
+
         >>> def _handle_xz(file_obj, mode):
         ...     import lzma
-        ...     return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+        ...     return lzma.LZMAFile(filename=file_obj, mode=mode)
         >>>
         >>> register_compressor('.xz', _handle_xz)
-    
+
+        This is just an example: `lzma` is in the standard library and is registered by default.
+
     s3_iter_bucket(bucket_name, prefix='', accept_key=None, key_limit=None, workers=16, retries=3, **session_kwargs)
         Deprecated.  Use smart_open.s3.iter_bucket instead.
-    
+
     smart_open(uri, mode='rb', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, ignore_extension=False, **kwargs)
 
 DATA
     __all__ = ['open', 'parse_uri', 'register_compressor', 's3_iter_bucket...
-
-VERSION
-    4.1.2.dev0
-
-FILE
-    /Users/misha/git/smart_open/smart_open/__init__.py
-
-

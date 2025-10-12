@@ -6,14 +6,7 @@
 # from the MIT License (MIT).
 #
 
-"""Implements the majority of smart_open's top-level API.
-
-The main functions are:
-
-  * ``parse_uri()``
-  * ``open()``
-
-"""
+"""Implements the majority of smart_open's top-level API."""
 
 import collections
 import locale
@@ -158,9 +151,9 @@ def open(
 
     See Also
     --------
-    - `Standard library reference <https://docs.python.org/3.7/library/functions.html#open>`__
+    - `Standard library reference <https://docs.python.org/3.13/library/functions.html#open>`__
     - `smart_open README.rst
-      <https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst>`__
+      <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
 
     """
     logger.debug('%r', locals())
@@ -222,7 +215,19 @@ def open(
         raise NotImplementedError(ve.args[0])
 
     binary = _open_binary_stream(uri, binary_mode, transport_params)
-    decompressed = so_compression.compression_wrapper(binary, binary_mode, compression)
+    filename = (
+        binary.name
+        # if name attribute is not string-like (e.g. ftp socket fileno)...
+        if isinstance(getattr(binary, "name", None), (str, bytes))
+        # ...fall back to uri
+        else uri
+    )
+    decompressed = so_compression.compression_wrapper(
+        binary,
+        binary_mode,
+        compression,
+        filename=filename,
+    )
 
     if 'b' not in mode or explicit_encoding is not None:
         decoded = _encoding_wrapper(
@@ -486,7 +491,7 @@ def smart_open(
     # 2. compression parameter was called ignore_extension
     # 3. Transport parameters were passed directly as kwargs
     #
-    url = 'https://github.com/RaRe-Technologies/smart_open/blob/develop/MIGRATING_FROM_OLDER_VERSIONS.rst'
+    url = 'https://github.com/piskvorky/smart_open/blob/develop/MIGRATING_FROM_OLDER_VERSIONS.rst'
     if kwargs:
         raise DeprecationWarning(
             'The following keyword parameters are not supported: %r. '
@@ -516,6 +521,6 @@ except Exception as ex:
         'Encountered a non-fatal error while building docstrings (see below). '
         'help(smart_open) will provide incomplete information as a result. '
         'For full help text, see '
-        '<https://github.com/RaRe-Technologies/smart_open/blob/master/help.txt>.'
+        '<https://github.com/piskvorky/smart_open/blob/master/help.txt>.'
     )
     logger.exception(ex)

@@ -3,14 +3,14 @@ smart_open — utils for streaming large files in Python
 ======================================================
 
 
-|License|_ |GHA|_ |Coveralls|_ |Downloads|_
+|License|_ |CI|_ |Coveralls|_ |Downloads|_
 
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
-.. |GHA| image:: https://github.com/RaRe-Technologies/smart_open/workflows/Test/badge.svg
+.. |CI| image:: https://github.com/piskvorky/smart_open/actions/workflows/python-package.yml/badge.svg?branch=develop&event=push
 .. |Coveralls| image:: https://coveralls.io/repos/github/RaRe-Technologies/smart_open/badge.svg?branch=develop
 .. |Downloads| image:: https://pepy.tech/badge/smart-open/month
-.. _License: https://github.com/RaRe-Technologies/smart_open/blob/master/LICENSE
-.. _GHA: https://github.com/RaRe-Technologies/smart_open/actions?query=workflow%3ATest
+.. _License: https://github.com/piskvorky/smart_open/blob/master/LICENSE
+.. _CI: https://github.com/piskvorky/smart_open/actions/workflows/python-package.yml
 .. _Coveralls: https://coveralls.io/github/RaRe-Technologies/smart_open?branch=HEAD
 .. _Downloads: https://pypi.org/project/smart-open/
 
@@ -22,7 +22,7 @@ What?
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
 
-**Python 2.7 is no longer supported. If you need Python 2.7, please use** `smart_open 1.10.1 <https://github.com/RaRe-Technologies/smart_open/releases/tag/1.10.0>`_, **the last version to support Python 2.**
+**Python 2.7 is no longer supported. If you need Python 2.7, please use** `smart_open 1.10.1 <https://github.com/piskvorky/smart_open/releases/tag/1.10.0>`_, **the last version to support Python 2.**
 
 Why?
 ====
@@ -51,7 +51,7 @@ How?
   'User-Agent: *\n'
 
   >>> # stream from/to compressed files, with transparent (de)compression:
-  >>> for line in open('smart_open/tests/test_data/1984.txt.gz', encoding='utf-8'):
+  >>> for line in open('tests/test_data/1984.txt.gz', encoding='utf-8'):
   ...    print(repr(line))
   'It was a bright cold day in April, and the clocks were striking thirteen.\n'
   'Winston Smith, his chin nuzzled into his breast in an effort to escape the vile\n'
@@ -59,8 +59,8 @@ How?
   'quickly enough to prevent a swirl of gritty dust from entering along with him.\n'
 
   >>> # can use context managers too:
-  >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
-  ...    with open('smart_open/tests/test_data/1984.txt.bz2', 'w') as fout:
+  >>> with open('tests/test_data/1984.txt.gz') as fin:
+  ...    with open('tests/test_data/1984.txt.bz2', 'w') as fout:
   ...        for line in fin:
   ...           fout.write(line)
   74
@@ -80,19 +80,19 @@ How?
 
   >>> # stream from HTTP
   >>> for line in open('http://example.com/index.html'):
-  ...     print(repr(line))
+  ...     print(repr(line[:15]))
   ...     break
-  '<!doctype html>\n'
+  '<!doctype html>'
 
 .. _doctools_after_examples:
 
-Other examples of URLs that ``smart_open`` accepts::
+Other examples of URIs that ``smart_open`` accepts::
 
-    s3://my_bucket/my_key
-    s3://my_key:my_secret@my_bucket/my_key
-    s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
-    gs://my_bucket/my_blob
-    azure://my_bucket/my_blob
+    s3://bucket/key
+    s3://access_key_id:secret_access_key@bucket/key
+    s3://access_key_id:secret_access_key@server:port@bucket/key
+    gs://bucket/blob
+    azure://bucket/blob
     hdfs:///path/file
     hdfs://path/file
     webhdfs://host:port/path/file
@@ -110,17 +110,17 @@ Other examples of URLs that ``smart_open`` accepts::
 Documentation
 =============
 
+The API reference can be viewed at `help.txt <https://github.com/piskvorky/smart_open/blob/master/help.txt>`__
+
 Installation
 ------------
 
-``smart_open`` supports a wide range of storage solutions, including AWS S3, Google Cloud and Azure.
+``smart_open`` supports a wide range of storage solutions. For all options, see the API reference.
 Each individual solution has its own dependencies.
 By default, ``smart_open`` does not install any dependencies, in order to keep the installation size small.
-You can install these dependencies explicitly using::
+You can install one or more of these dependencies explicitly using optional dependencies:
 
-    pip install smart_open[azure] # Install Azure deps
-    pip install smart_open[gcs] # Install GCS deps
-    pip install smart_open[s3] # Install S3 deps
+    pip install smart_open[s3,gcs,azure,http,webhdfs,ssh,zst]
 
 Or, if you don't mind installing a large number of third party libraries, you can install all dependencies using::
 
@@ -133,13 +133,13 @@ If you're upgrading from ``smart_open`` versions 2.x and below, please check out
 Built-in help
 -------------
 
-For detailed API info, see the online help:
+To view the API reference, use the ``help`` python builtin:
 
 .. code-block:: python
 
     help('smart_open')
 
-or click `here <https://github.com/RaRe-Technologies/smart_open/blob/master/help.txt>`__ to view the help in your browser.
+or view `help.txt <https://github.com/piskvorky/smart_open/blob/master/help.txt>`__ in your browser.
 
 More examples
 -------------
@@ -150,21 +150,33 @@ For the sake of simplicity, the examples below assume you have all the dependenc
 
 .. code-block:: python
 
-    >>> import os, boto3
-    >>> from smart_open import open
-    >>>
-    >>> # stream content *into* S3 (write mode) using a custom session
-    >>> session = boto3.Session(
-    ...     aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-    ...     aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
-    ... )
-    >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-    >>> with open(url, 'wb', transport_params={'client': session.client('s3')}) as fout:
-    ...     bytes_written = fout.write(b'hello world!')
-    ...     print(bytes_written)
-    12
+    import os, boto3, botocore
+    from smart_open import open
 
-.. code-block:: python
+    # stream content *into* S3 (write mode) using a custom client
+    # this client is thread-safe ref https://github.com/boto/boto3/blob/1.38.41/docs/source/guide/clients.rst?plain=1#L111
+    config = botocore.client.Config(
+        max_pool_connections=64,
+        tcp_keepalive=True,
+        retries={"max_attempts": 6, "mode": "adaptive"},
+    )
+    client = boto3.Session(
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    ).client("s3", config=config)
+    with open('s3://smart-open-py37-benchmark-results/test.txt', 'wb', transport_params={'client': client}) as fout:
+        bytes_written = fout.write(b'hello world!')
+        print(bytes_written)
+
+    # perform a single-part upload to S3 (saves billable API requests, and allows seek() before upload)
+    with open('s3://smart-open-py37-benchmark-results/test.txt', 'wb', transport_params={'multipart_upload': False}) as fout:
+        bytes_written = fout.write(b'hello world!')
+        print(bytes_written)
+    # now with tempfile.TemporaryFile instead of the default io.BytesIO (to reduce memory footprint)
+    import tempfile
+    with tempfile.TemporaryFile() as tmp, open('s3://smart-open-py37-benchmark-results/test.txt', 'wb', transport_params={'multipart_upload': False, 'writebuffer': tmp}) as fout:
+        bytes_written = fout.write(b'hello world!')
+        print(bytes_written)
 
     # stream from HDFS
     for line in open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):
@@ -227,13 +239,14 @@ The supported values for this parameter are:
 - ``disable``
 - ``.gz``
 - ``.bz2``
+- ``.zst``
 
 By default, ``smart_open`` determines the compression algorithm to use based on the file extension.
 
 .. code-block:: python
 
-    >>> from smart_open import open, register_compressor
-    >>> with open('smart_open/tests/test_data/1984.txt.gz') as fin:
+    >>> from smart_open import open
+    >>> with open('tests/test_data/1984.txt.gz') as fin:
     ...     print(fin.read(32))
     It was a bright cold day in Apri
 
@@ -242,8 +255,8 @@ To disable compression:
 
 .. code-block:: python
 
-    >>> from smart_open import open, register_compressor
-    >>> with open('smart_open/tests/test_data/1984.txt.gz', 'rb', compression='disable') as fin:
+    >>> from smart_open import open
+    >>> with open('tests/test_data/1984.txt.gz', 'rb', compression='disable') as fin:
     ...     print(fin.read(32))
     b'\x1f\x8b\x08\x08\x85F\x94\\\x00\x031984.txt\x005\x8f=r\xc3@\x08\x85{\x9d\xe2\x1d@'
 
@@ -252,8 +265,8 @@ To specify the algorithm explicitly (e.g. for non-standard file extensions):
 
 .. code-block:: python
 
-    >>> from smart_open import open, register_compressor
-    >>> with open('smart_open/tests/test_data/1984.txt.gzip', compression='.gz') as fin:
+    >>> from smart_open import open
+    >>> with open('tests/test_data/1984.txt.gzip', compression='.gz') as fin:
     ...     print(fin.read(32))
     It was a bright cold day in Apri
 
@@ -266,18 +279,15 @@ For example, to open xz-compressed files:
     >>> from smart_open import open, register_compressor
 
     >>> def _handle_xz(file_obj, mode):
-    ...      return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+    ...      return lzma.LZMAFile(filename=file_obj, mode=mode)
 
     >>> register_compressor('.xz', _handle_xz)
 
-    >>> with open('smart_open/tests/test_data/1984.txt.xz') as fin:
+    >>> with open('tests/test_data/1984.txt.xz') as fin:
     ...     print(fin.read(32))
     It was a bright cold day in Apri
 
-``lzma`` is in the standard library in Python 3.3 and greater.
-For 2.7, use `backports.lzma`_.
-
-.. _backports.lzma: https://pypi.org/project/backports.lzma/
+This is just an example: ``lzma`` is in the standard library and is registered by default.
 
 Transport-specific Options
 --------------------------
@@ -411,6 +421,8 @@ GCS Advanced Usage
 
 Additional keyword arguments can be propagated to the GCS open method (`docs <https://cloud.google.com/python/docs/reference/storage/latest/google.cloud.storage.blob.Blob#google_cloud_storage_blob_Blob_open>`__), which is used by ``smart_open`` under the hood, using the ``blob_open_kwargs`` transport parameter.
 
+Additionally keyword arguments can be propagated to the GCS ``get_blob`` method (`docs <https://cloud.google.com/python/docs/reference/storage/latest/google.cloud.storage.bucket.Bucket#google_cloud_storage_bucket_Bucket_get_blob>`__) when in a read-mode, using the ``get_blob_kwargs`` transport parameter.
+
 Additional blob properties (`docs <https://cloud.google.com/python/docs/reference/storage/latest/google.cloud.storage.blob.Blob#properties>`__) can be set before an upload, as long as they are not read-only, using the ``blob_properties`` transport parameter.
 
 .. code-block:: python
@@ -467,7 +479,7 @@ This can be helpful when e.g. working with compressed files.
     >>>
     >>> _ = patch_pathlib()  # replace `Path.open` with `smart_open.open`
     >>>
-    >>> path = Path("smart_open/tests/test_data/crime-and-punishment.txt.gz")
+    >>> path = Path("tests/test_data/crime-and-punishment.txt.gz")
     >>>
     >>> with path.open("r") as infile:
     ...     print(infile.readline()[:41])
@@ -493,18 +505,17 @@ Before you can run the test suite, install the test dependencies::
 
 Now, you can run the unit tests::
 
-    pytest smart_open
+    pytest tests
 
-The tests are also run automatically with `Travis CI <https://travis-ci.org/RaRe-Technologies/smart_open>`_ on every commit push & pull request.
+The tests are also run automatically with `GitHub Actions <https://github.com/piskvorky/smart_open/actions/workflows/python-package.yml>`_ on every commit push & pull request.
 
 Comments, bug reports
 =====================
 
-``smart_open`` lives on `Github <https://github.com/RaRe-Technologies/smart_open>`_. You can file
+``smart_open`` lives on `Github <https://github.com/piskvorky/smart_open>`_. You can file
 issues or pull requests there. Suggestions, pull requests and improvements welcome!
 
 ----------------
 
 ``smart_open`` is open source software released under the `MIT license <https://github.com/piskvorky/smart_open/blob/master/LICENSE>`_.
 Copyright (c) 2015-now `Radim Řehůřek <https://radimrehurek.com>`_.
-

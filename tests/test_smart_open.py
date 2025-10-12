@@ -36,7 +36,8 @@ import smart_open
 from smart_open import smart_open_lib
 from smart_open import webhdfs
 from smart_open.smart_open_lib import patch_pathlib, _patch_pathlib
-from smart_open.tests.test_s3 import patch_invalid_range_response
+
+from .test_s3 import patch_invalid_range_response
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,39 @@ def named_temporary_file(mode='w+b', prefix=None, suffix=None, delete=True):
             # This can happen on Windows for unknown reasons.
             #
             logger.error(e)
+
+
+def test_compression_extensions():
+    for extension in smart_open.compression.get_supported_extensions():
+        with named_temporary_file(suffix=extension) as tmp:
+            with smart_open.open(tmp.name, "wt") as fout:
+                print("hello world", file=fout)
+                print("this is a test", file=fout)
+
+            with smart_open.open(tmp.name, "rt") as fin:
+                got = list(fin)
+
+        assert got == ["hello world\n", "this is a test\n"], f"Error for {extension=}, mode='wt'"
+
+        with named_temporary_file(suffix=extension) as tmp:
+            with smart_open.open(tmp.name, "w") as fout:
+                fout.write("hello world\n")
+                fout.write("this is a test\n")
+
+            with smart_open.open(tmp.name, "r") as fin:
+                got = list(fin)
+
+        assert got == ["hello world\n", "this is a test\n"], f"Error for {extension=}, mode='w'"
+
+        with named_temporary_file(suffix=extension) as tmp:
+            with smart_open.open(tmp.name, "wb") as fout:
+                fout.write(b"hello world\n")
+                fout.write(b"this is a test\n")
+
+            with smart_open.open(tmp.name, "rb") as fin:
+                got = list(fin)
+
+        assert got == [b"hello world\n", b"this is a test\n"], f"Error for {extension=}, mode='wb'"
 
 
 class ParseUriTest(unittest.TestCase):
@@ -450,14 +484,13 @@ class SmartOpenHttpTest(unittest.TestCase):
             user='ubuntu',
             password='pass',
             port=1022,
-            connect_kwargs={'hello': 'world'},
         )
 
     @responses.activate
     def test_http_read(self):
         """Does http read method work correctly"""
         responses.add(responses.GET, "http://127.0.0.1/index.html",
-                      body='line1\nline2', stream=True)
+                      body='line1\nline2')
         smart_open_object = smart_open.open("http://127.0.0.1/index.html", 'rb')
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
@@ -465,7 +498,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_https_readline(self):
         """Does https readline method work correctly"""
         responses.add(responses.GET, "https://127.0.0.1/index.html",
-                      body=u'line1\u2028still line1\nline2', stream=True)
+                      body=u'line1\u2028still line1\nline2')
         smart_open_object = smart_open.open("https://127.0.0.1/index.html", 'rb')
         self.assertEqual(smart_open_object.readline().decode("utf-8"), u"line1\u2028still line1\n")
         smart_open_object = smart_open.open("https://127.0.0.1/index.html", 'r', encoding='utf-8')
@@ -475,7 +508,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_http_pass(self):
         """Does http authentication work correctly"""
         responses.add(responses.GET, "http://127.0.0.1/index.html",
-                      body='line1\nline2', stream=True)
+                      body='line1\nline2')
         tp = dict(user='me', password='pass')
         smart_open.open("http://127.0.0.1/index.html", transport_params=tp)
         self.assertEqual(len(responses.calls), 1)
@@ -487,7 +520,7 @@ class SmartOpenHttpTest(unittest.TestCase):
     def test_http_cert(self):
         """Does cert parameter get passed to requests"""
         responses.add(responses.GET, "http://127.0.0.1/index.html",
-                      body='line1\nline2', stream=True)
+                      body='line1\nline2')
         cert_path = '/path/to/my/cert.pem'
         tp = dict(cert=cert_path)
         smart_open.open("http://127.0.0.1/index.html", transport_params=tp)
@@ -503,7 +536,7 @@ class SmartOpenHttpTest(unittest.TestCase):
         raw_data = b'Hello World Compressed.' * 10000
         compressed_data = gzip_compress(raw_data) if suffix == '.gz' else bz2.compress(raw_data)
 
-        responses.add(responses.GET, 'http://127.0.0.1/data' + suffix, body=compressed_data, stream=True)
+        responses.add(responses.GET, 'http://127.0.0.1/data' + suffix, body=compressed_data)
         url = 'http://127.0.0.1/data%s%s' % (suffix, '?some_param=some_val' if query else '')
         smart_open_object = smart_open.open(url, 'rb')
 
@@ -581,6 +614,22 @@ class RealFileSystemTests(unittest.TestCase):
         with smart_open.open(self.temp_file, 'rt') as fin:
             text = fin.read()
         self.assertEqual(text, SAMPLE_TEXT * 2)
+
+
+class CompressionRealFileSystemTests(RealFileSystemTests):
+    """Same as RealFileSystemTests but with a compressed file."""
+
+    def setUp(self):
+        with named_temporary_file(prefix='test', suffix='.zst', delete=False) as fout:
+            self.temp_file = fout.name
+        with smart_open.open(self.temp_file, 'wb') as fout:
+            fout.write(SAMPLE_BYTES)
+
+    def test_aplus(self):
+        pass  # transparent (de)compression unsupported for mode 'ab+'
+
+    def test_atplus(self):
+        pass  # transparent (de)compression unsupported for mode 'ab+'
 
 
 #
@@ -969,7 +1018,7 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_webhdfs(self):
         """Is webhdfs line iterator called correctly"""
         responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file",
-                      body='line1\nline2', stream=True)
+                      body='line1\nline2')
         smart_open_object = smart_open.open("webhdfs://127.0.0.1:8440/path/file", 'rb')
         iterator = iter(smart_open_object)
         self.assertEqual(next(iterator).decode("utf-8"), "line1\n")
@@ -982,7 +1031,7 @@ class SmartOpenReadTest(unittest.TestCase):
         actual_url = 'http://127.0.0.1:8440/webhdfs/v1/path/file'
         text = u'не для меня прийдёт весна, не для меня дон разольётся'
         body = text.encode('utf-8')
-        responses.add(responses.GET, actual_url, body=body, stream=True)
+        responses.add(responses.GET, actual_url, body=body)
 
         actual = smart_open.open(input_url, encoding='utf-8').read()
         self.assertEqual(text, actual)
@@ -991,7 +1040,7 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_webhdfs_read(self):
         """Does webhdfs read method work correctly"""
         responses.add(responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file",
-                      body='line1\nline2', stream=True)
+                      body='line1\nline2')
         smart_open_object = smart_open.open("webhdfs://127.0.0.1:8440/path/file", 'rb')
         self.assertEqual(smart_open_object.read().decode("utf-8"), "line1\nline2")
 
@@ -1082,7 +1131,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.client')
     def test_no_kwargs(self, mock_client):
         smart_open.open('s3://mybucket/mykey', transport_params=dict(defer_seek=True))
-        mock_client.assert_called_with('s3')
+        mock_client.assert_called_with('s3', config=mock_client.call_args.kwargs['config'])
 
     @mock.patch('boto3.client')
     def test_credentials(self, mock_client):
@@ -1091,6 +1140,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             's3',
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret',
+            config=mock_client.call_args.kwargs['config'],
         )
 
     @mock.patch('boto3.client')
@@ -1107,6 +1157,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret',
             endpoint_url='http://aa.domain.com',
+            config=mock_client.call_args.kwargs['config'],
         )
 
     @mock.patch('boto3.client')
@@ -1209,7 +1260,7 @@ class SmartOpenTest(unittest.TestCase):
 
     def test_newline_csv(self):
         #
-        # See https://github.com/RaRe-Technologies/smart_open/issues/477
+        # See https://github.com/piskvorky/smart_open/issues/477
         #
         rows = [{'name': 'alice\u2028beatrice', 'color': 'aqua'}, {'name': 'bob', 'color': 'blue'}]
         expected = 'name,color\r\nalice\u2028beatrice,aqua\r\nbob,blue\r\n'
@@ -1239,7 +1290,11 @@ class SmartOpenTest(unittest.TestCase):
             }
         }
         smart_open.open("s3://mybucket/mykey", "w", transport_params=transport_params)
-        mock_client.assert_called_with('s3', endpoint_url='http://s3.amazonaws.com')
+        mock_client.assert_called_with(
+            's3',
+            endpoint_url='http://s3.amazonaws.com',
+            config=mock_client.call_args.kwargs['config'],
+        )
 
     @mock.patch('smart_open.hdfs.subprocess')
     def test_hdfs(self, mock_subprocess):
@@ -1417,7 +1472,8 @@ def gzip_compress(data, filename=None):
     buf = io.BytesIO()
     buf.name = filename
     with mock.patch('time.time', _MOCK_TIME):
-        gzip.GzipFile(fileobj=buf, mode='w').write(data)
+        with gzip.GzipFile(fileobj=buf, mode='w') as gz:
+            gz.write(data)
     return buf.getvalue()
 
 

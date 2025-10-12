@@ -5,7 +5,8 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-"""Implements the compression layer of the ``smart_open`` library."""
+"""Implements the compression layer of the `smart_open` library."""
+import io
 import logging
 import os.path
 
@@ -41,10 +42,10 @@ def register_compressor(ext, callback):
     Parameters
     ----------
     ext: str
-        The extension.  Must include the leading period, e.g. ``.gz``.
+        The extension.  Must include the leading period, e.g. `.gz`.
     callback: callable
         The callback.  It must accept two position arguments, file_obj and mode.
-        This function will be called when ``smart_open`` is opening a file with
+        This function will be called when `smart_open` is opening a file with
         the specified extension.
 
     Examples
@@ -55,9 +56,11 @@ def register_compressor(ext, callback):
 
     >>> def _handle_xz(file_obj, mode):
     ...     import lzma
-    ...     return lzma.LZMAFile(filename=file_obj, mode=mode, format=lzma.FORMAT_XZ)
+    ...     return lzma.LZMAFile(filename=file_obj, mode=mode)
     >>>
     >>> register_compressor('.xz', _handle_xz)
+
+    This is just an example: `lzma` is in the standard library and is registered by default.
 
     """
     if not (ext and ext[0] == '.'):
@@ -71,12 +74,12 @@ def register_compressor(ext, callback):
 def tweak_close(outer, inner):
     """Ensure that closing the `outer` stream closes the `inner` stream as well.
 
-    Deprecated: smart_open.open().__exit__ now always calls __exit__ on the
+    Deprecated: `smart_open.open().__exit__` now always calls `__exit__` on the
     underlying filestream.
 
     Use this when your compression library's `close` method does not
     automatically close the underlying filestream.  See
-    https://github.com/RaRe-Technologies/smart_open/issues/630 for an
+    https://github.com/piskvorky/smart_open/issues/630 for an
     explanation why that is a problem for smart_open.
     """
     outer_close = outer.close
@@ -93,22 +96,38 @@ def tweak_close(outer, inner):
     outer.close = close_both
 
 
-def _handle_bz2(file_obj, mode):
-    from bz2 import BZ2File
-    result = BZ2File(file_obj, mode)
+def _maybe_wrap_buffered(file_obj, mode):
+    # https://github.com/piskvorky/smart_open/issues/760#issuecomment-1553971657
+    result = file_obj
+    if "b" in mode and "w" in mode:
+        result = io.BufferedWriter(result)
+    elif "b" in mode and "r" in mode:
+        result = io.BufferedReader(result)
     return result
+
+
+def _handle_bz2(file_obj, mode):
+    import bz2
+    result = bz2.open(filename=file_obj, mode=mode)
+    return _maybe_wrap_buffered(result, mode)
 
 
 def _handle_gzip(file_obj, mode):
     import gzip
-    result = gzip.GzipFile(fileobj=file_obj, mode=mode)
-    return result
+    result = gzip.open(filename=file_obj, mode=mode)
+    return _maybe_wrap_buffered(result, mode)
 
 
 def _handle_zstd(file_obj, mode):
-    import zstandard as zstd
-    result = zstd.ZstdDecompressor().stream_reader(file_obj, closefd=True)
-    return result
+    import zstandard
+    result = zstandard.open(filename=file_obj, mode=mode)
+    return _maybe_wrap_buffered(result, mode)
+
+
+def _handle_xz(file_obj, mode):
+    import lzma
+    result = lzma.open(filename=file_obj, mode=mode)
+    return _maybe_wrap_buffered(result, mode)
 
 
 def compression_wrapper(file_obj, mode, compression=INFER_FROM_EXTENSION, filename=None):
@@ -153,3 +172,4 @@ def compression_wrapper(file_obj, mode, compression=INFER_FROM_EXTENSION, filena
 register_compressor('.bz2', _handle_bz2)
 register_compressor('.gz', _handle_gzip)
 register_compressor('.zst', _handle_zstd)
+register_compressor('.xz', _handle_xz)

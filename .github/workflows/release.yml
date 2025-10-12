@@ -1,45 +1,47 @@
 name: Release to PyPI
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  release:
+    types: [prereleased, released]
+
 jobs:
-  tarball:
-    if: github.event_name == 'push'
-    timeout-minutes: 1
-    runs-on: ubuntu-20.04
-    env:
-      PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
-      PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # softprops/action-gh-release
+      id-token: write  # pypa/gh-action-pypi-publish
+      issues: write # apexskier/github-release-commenter
+      pull-requests: write # apexskier/github-release-commenter
+
     steps:
-      - uses: actions/checkout@v1
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: actions/setup-python@v1
-        with:
-          python-version: "3.8.x"
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: 3.x
 
-      # https://github.community/t/how-to-get-just-the-tag-name/16241/4
-      - name: Extract the version number
-        id: get_version
-        run: |
-          echo ::set-output name=V::$(python smart_open/version.py)
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip setuptools wheel build
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m venv venv
-          . venv/bin/activate
-          pip install twine wheel
+    - name: Build package distributions
+      run: |
+        python -m build
 
-      - name: Build and upload tarball to PyPI
-        run: |
-          . venv/bin/activate
-          python setup.py sdist
-          twine upload dist/smart_open-${{ steps.get_version.outputs.V }}.tar.gz -u ${{ env.PYPI_USERNAME }} -p ${{ env.PYPI_PASSWORD }}
+    - name: Upload package distributions as release assets
+      uses: softprops/action-gh-release@v2.3.3
+      with:
+        files: dist/*
 
-      - name: Build and upload wheel to PyPI
-        run: |
-          . venv/bin/activate
-          python setup.py bdist_wheel
-          twine upload dist/smart_open-${{ steps.get_version.outputs.V }}-py3-none-any.whl -u ${{ env.PYPI_USERNAME }} -p ${{ env.PYPI_PASSWORD }}
+    # https://github.com/pypa/gh-action-pypi-publish#trusted-publishing
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@v1.13.0
+
+    - uses: apexskier/github-release-commenter@v1.3.6
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        comment-template: |
+          Released {release_link}
