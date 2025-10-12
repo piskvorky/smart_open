@@ -61,7 +61,8 @@ jobs:
           test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
 
       - name: Run unit tests
-        run: pytest tests -v -rfxECs --durations=20 --timeout=60 --timeout-method=thread
+        # configuration in pyproject.toml
+        run: pytest tests -v
 
       - name: Run doctests
         if: startsWith(matrix.os, 'ubuntu')

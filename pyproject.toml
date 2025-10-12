@@ -42,18 +42,32 @@ ssh = ["paramiko"]
 zst = ["zstandard"]
 all = ["smart_open[s3,gcs,azure,http,webhdfs,ssh,zst]"]
 test = [
-    "smart_open[all]",
-    "moto[server]",
-    "responses",
-    "pytest",
-    "pytest-rerunfailures",
-    "pytest_benchmark",
-    "pytest-timeout",
-    "awscli",
-    "pyopenssl",
-    "numpy",
-    "flake8",
+  "smart_open[all]",
+  "moto[server]",
+  "responses",
+  "pytest",
+  "pytest-rerunfailures",
+  "pytest_benchmark",
+  "pytest-timeout",
+  "pytest-xdist[psutil]",
+  "awscli",
+  "pyopenssl",
+  "numpy",
+  "flake8",
 ]
 
 [tool.setuptools.packages.find]
 include = ["smart_open"]
+
+[tool.pytest.ini_options]
+addopts = [
+  # extra test summary info: all except passed
+  "-r=a",
+  # https://pytest-xdist.readthedocs.io/en/latest/distribution.html
+  "--numprocesses=logical",
+  "--dist=worksteal",
+  "--max-worker-restart=8",
+  # https://github.com/pytest-dev/pytest-timeout
+  "--timeout=60",
+  "--timeout-method=thread",
+]
