@@ -569,6 +569,9 @@ class _SeekableRawReader(object):
         # Apply chunking: limit the stop position if range_chunk_size is set
         if stop is None and self._range_chunk_size is not None:
             stop = start + self._range_chunk_size - 1
+            # Don't request beyond known content length
+            if self._content_length is not None:
+                stop = min(stop, self._content_length - 1)
 
         range_string = smart_open.utils.make_range_string(start, stop)
 

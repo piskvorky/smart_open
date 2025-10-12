@@ -1507,6 +1507,25 @@ class RangeChunkSizeTest(unittest.TestCase):
         # When seeking from end, we use "bytes=-50" format, not absolute positions
         self.assertEqual(client.calls[-1]['Range'], 'bytes=-50')
 
+    def test_no_request_beyond_eof_when_length_known(self):
+        """Test that we don't request beyond EOF when content_length is known."""
+        body = b'0123456789' * 10  # 100 bytes
+        client = self._make_mock_client(body)
+        reader = smart_open.s3._SeekableRawReader(client, 'b', 'k', range_chunk_size=50)
+
+        # First read establishes content_length
+        self.assertEqual(reader.read(10), body[:10])
+        self.assertEqual(client.calls[-1]['Range'], 'bytes=0-49')
+        self.assertIsNotNone(reader._content_length)
+
+        # Seek near end and read - should not request beyond EOF
+        reader.seek(80)
+        self.assertEqual(reader.read(30), body[80:])
+        # Should request bytes=80-99 (20 bytes), not bytes=80-129 (which would be 50 bytes)
+        self.assertEqual(client.calls[-1]['Range'], 'bytes=80-99')
+        # Verify we only made 2 requests total
+        self.assertEqual(len(client.calls), 2)
+
 
 @mock_s3
 def test_client_propagation_singlepart():
