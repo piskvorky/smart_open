@@ -53,19 +53,19 @@ FUNCTIONS
         uri: str or object
             The object to open.
         mode: str, optional
-            Mimicks built-in open parameter of the same name.
+            Mimics built-in open parameter of the same name.
         buffering: int, optional
-            Mimicks built-in open parameter of the same name.
+            Mimics built-in open parameter of the same name.
         encoding: str, optional
-            Mimicks built-in open parameter of the same name.
+            Mimics built-in open parameter of the same name.
         errors: str, optional
-            Mimicks built-in open parameter of the same name.
+            Mimics built-in open parameter of the same name.
         newline: str, optional
-            Mimicks built-in open parameter of the same name.
+            Mimics built-in open parameter of the same name.
         closefd: boolean, optional
-            Mimicks built-in open parameter of the same name.  Ignored.
+            Mimics built-in open parameter of the same name.  Ignored.
         opener: object, optional
-            Mimicks built-in open parameter of the same name.  Ignored.
+            Mimics built-in open parameter of the same name.  Ignored.
         compression: str, optional (see smart_open.compression.get_supported_compression_types)
             Explicitly specify the compression/decompression behavior.
         transport_params: dict, optional
