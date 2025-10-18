@@ -39,7 +39,7 @@ azure = ["azure-storage-blob", "azure-common", "azure-core"]
 http = ["requests"]
 webhdfs = ["requests"]
 ssh = ["paramiko"]
-zst = ["zstandard"]
+zst = ["backports.zstd>=1.0.0;python_version<'3.14'"]
 all = ["smart_open[s3,gcs,azure,http,webhdfs,ssh,zst]"]
 test = [
   "smart_open[all]",
