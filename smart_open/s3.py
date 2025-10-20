@@ -1258,9 +1258,10 @@ class SinglepartWriter(io.BufferedIOBase):
         except botocore.client.ClientError as e:
             raise ValueError(
                 'the bucket %r does not exist, or is forbidden for access' % self._bucket) from e
-
-        logger.debug("%s: direct upload finished", self)
-        self._buf.close()
+        else:
+            logger.debug("%s: direct upload finished", self)
+        finally:
+            self._buf.close()
 
     @property
     def closed(self):
