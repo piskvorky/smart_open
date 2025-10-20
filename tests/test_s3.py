@@ -968,44 +968,31 @@ ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operatio
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
-        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
+        s3 = _resource('s3')
+        s3.create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
+        self.client = s3.meta.client
 
-    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
-    @pytest.mark.xfail(
-        condition=sys.platform == 'darwin',
-        reason="MacOS uses spawn rather than fork for multiprocessing",
-    )
     def test_iter_bucket(self):
         populate_bucket()
         results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
         self.assertEqual(len(results), 10)
 
-    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
-    @pytest.mark.xfail(
-        condition=sys.platform == 'darwin',
-        reason="MacOS uses spawn rather than fork for multiprocessing",
-    )
     def test_iter_bucket_404(self):
         populate_bucket()
 
-        def throw_404_error_for_key_4(*args):
-            if args[1] == "key_4":
+        def throw_404_error_for_key_4(*args, **kwargs):
+            if kwargs["key_name"] == "key_4":
                 raise botocore.exceptions.ClientError(
                     error_response={"Error": {"Code": "404", "Message": "Not Found"}},
                     operation_name="HeadObject",
                 )
             else:
-                return [0]
+                return b"bytes"
 
         with mock.patch("smart_open.s3._download_fileobj", side_effect=throw_404_error_for_key_4):
             results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
             self.assertEqual(len(results), 9)
 
-    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
-    @pytest.mark.xfail(
-        condition=sys.platform == 'darwin',
-        reason="MacOS uses spawn rather than fork for multiprocessing",
-    )
     def test_iter_bucket_non_404(self):
         populate_bucket()
         with mock.patch("smart_open.s3._download_fileobj", side_effect=ARBITRARY_CLIENT_ERROR):
@@ -1024,11 +1011,6 @@ class IterBucketTest(unittest.TestCase):
             # verify the suggested new import is in the warning
             assert "from smart_open.s3 import iter_bucket as s3_iter_bucket" in cm.output[0]
 
-    @pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
-    @pytest.mark.xfail(
-        condition=sys.platform == 'darwin',
-        reason="MacOS uses spawn rather than fork for multiprocessing",
-    )
     def test_accepts_boto3_bucket(self):
         populate_bucket()
         bucket = _resource('s3').Bucket(BUCKET_NAME)
@@ -1038,7 +1020,7 @@ class IterBucketTest(unittest.TestCase):
     def test_list_bucket(self):
         num_keys = 10
         populate_bucket()
-        keys = list(smart_open.s3._list_bucket(BUCKET_NAME))
+        keys = list(smart_open.s3._list_bucket(bucket_name=BUCKET_NAME, client=self.client))
         self.assertEqual(len(keys), num_keys)
 
         expected = ['key_%d' % x for x in range(num_keys)]
@@ -1047,100 +1029,11 @@ class IterBucketTest(unittest.TestCase):
     def test_list_bucket_long(self):
         num_keys = 1010
         populate_bucket(num_keys=num_keys)
-        keys = list(smart_open.s3._list_bucket(BUCKET_NAME))
+        keys = list(smart_open.s3._list_bucket(bucket_name=BUCKET_NAME, client=self.client))
         self.assertEqual(len(keys), num_keys)
 
         expected = ['key_%d' % x for x in range(num_keys)]
         self.assertEqual(sorted(keys), sorted(expected))
-
-
-@mock_s3
-@pytest.mark.skipif(
-    condition=not smart_open.concurrency._CONCURRENT_FUTURES,
-    reason='concurrent.futures unavailable',
-)
-@pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
-@pytest.mark.xfail(
-    condition=sys.platform == 'darwin',
-    reason="MacOS uses spawn rather than fork for multiprocessing",
-)
-class IterBucketConcurrentFuturesTest(unittest.TestCase):
-    def setUp(self):
-        self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
-        smart_open.concurrency._MULTIPROCESSING = False
-        ignore_resource_warnings()
-
-        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
-
-    def tearDown(self):
-        smart_open.concurrency._MULTIPROCESSING = self.old_flag_multi
-
-    def test(self):
-        num_keys = 101
-        populate_bucket(num_keys=num_keys)
-        keys = list(smart_open.s3.iter_bucket(BUCKET_NAME))
-        self.assertEqual(len(keys), num_keys)
-
-        expected = [('key_%d' % x, b'%d' % x) for x in range(num_keys)]
-        self.assertEqual(sorted(keys), sorted(expected))
-
-
-@mock_s3
-@pytest.mark.skipif(
-    condition=not smart_open.concurrency._MULTIPROCESSING,
-    reason='multiprocessing unavailable',
-)
-@pytest.mark.skipif(condition=sys.platform == 'win32', reason="does not run on windows")
-@pytest.mark.xfail(
-    condition=sys.platform == 'darwin',
-    reason="MacOS uses spawn rather than fork for multiprocessing",
-)
-class IterBucketMultiprocessingTest(unittest.TestCase):
-    def setUp(self):
-        self.old_flag_concurrent = smart_open.concurrency._CONCURRENT_FUTURES
-        smart_open.concurrency._CONCURRENT_FUTURES = False
-        ignore_resource_warnings()
-
-        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
-
-    def tearDown(self):
-        smart_open.concurrency._CONCURRENT_FUTURES = self.old_flag_concurrent
-
-    def test(self):
-        num_keys = 101
-        populate_bucket(num_keys=num_keys)
-        keys = list(smart_open.s3.iter_bucket(BUCKET_NAME))
-        self.assertEqual(len(keys), num_keys)
-
-        expected = [('key_%d' % x, b'%d' % x) for x in range(num_keys)]
-        self.assertEqual(sorted(keys), sorted(expected))
-
-
-@mock_s3
-class IterBucketSingleProcessTest(unittest.TestCase):
-    def setUp(self):
-        self.old_flag_multi = smart_open.concurrency._MULTIPROCESSING
-        self.old_flag_concurrent = smart_open.concurrency._CONCURRENT_FUTURES
-        smart_open.concurrency._MULTIPROCESSING = False
-        smart_open.concurrency._CONCURRENT_FUTURES = False
-
-        ignore_resource_warnings()
-
-        _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
-
-    def tearDown(self):
-        smart_open.concurrency._MULTIPROCESSING = self.old_flag_multi
-        smart_open.concurrency._CONCURRENT_FUTURES = self.old_flag_concurrent
-
-    def test(self):
-        num_keys = 101
-        populate_bucket(num_keys=num_keys)
-        keys = list(smart_open.s3.iter_bucket(BUCKET_NAME))
-        self.assertEqual(len(keys), num_keys)
-
-        expected = [('key_%d' % x, b'%d' % x) for x in range(num_keys)]
-        self.assertEqual(sorted(keys), sorted(expected))
-
 
 #
 # This has to be a separate test because we cannot run it against real S3
@@ -1155,7 +1048,7 @@ class IterBucketCredentialsTest(unittest.TestCase):
         result = list(
             smart_open.s3.iter_bucket(
                 BUCKET_NAME,
-                workers=None,
+                workers=1,
                 aws_access_key_id='access_id',
                 aws_secret_access_key='access_secret'
             )
@@ -1175,37 +1068,72 @@ class DownloadKeyTest(unittest.TestCase):
         self.body = b'hello'
         s3.Object(BUCKET_NAME, KEY_NAME).put(Body=self.body)
 
+        self.client = s3.meta.client
+        self.transfer_config = boto3.s3.transfer.TransferConfig()
+
     def test_happy(self):
         expected = (KEY_NAME, self.body)
-        actual = smart_open.s3._download_key(KEY_NAME, bucket_name=BUCKET_NAME)
+        actual = smart_open.s3._download_key(
+            key_name=KEY_NAME,
+            bucket_name=BUCKET_NAME,
+            retries=3,
+            client=self.client,
+            transfer_config=self.transfer_config,
+        )
         self.assertEqual(expected, actual)
 
     def test_intermittent_error(self):
         expected = (KEY_NAME, self.body)
         side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, self.body]
         with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
-            actual = smart_open.s3._download_key(KEY_NAME, bucket_name=BUCKET_NAME)
+            actual = smart_open.s3._download_key(
+                key_name=KEY_NAME,
+                bucket_name=BUCKET_NAME,
+                retries=3,
+                client=self.client,
+                transfer_config=self.transfer_config,
+            )
         self.assertEqual(expected, actual)
 
     def test_persistent_error(self):
         side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR,
                        ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR]
         with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
-            self.assertRaises(botocore.client.ClientError, smart_open.s3._download_key,
-                              KEY_NAME, bucket_name=BUCKET_NAME)
+            self.assertRaises(
+                botocore.client.ClientError,
+                smart_open.s3._download_key,
+                key_name=KEY_NAME,
+                bucket_name=BUCKET_NAME,
+                retries=3,
+                client=self.client,
+                transfer_config=self.transfer_config
+            )
 
     def test_intermittent_error_retries(self):
         expected = (KEY_NAME, self.body)
         side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR,
                        ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, self.body]
         with mock.patch('smart_open.s3._download_fileobj', side_effect=side_effect):
-            actual = smart_open.s3._download_key(KEY_NAME, bucket_name=BUCKET_NAME, retries=4)
+            actual = smart_open.s3._download_key(
+                key_name=KEY_NAME,
+                bucket_name=BUCKET_NAME,
+                retries=4,
+                client=self.client,
+                transfer_config=self.transfer_config,
+            )
         self.assertEqual(expected, actual)
 
     def test_propagates_other_exception(self):
         with mock.patch('smart_open.s3._download_fileobj', side_effect=ValueError):
-            self.assertRaises(ValueError, smart_open.s3._download_key,
-                              KEY_NAME, bucket_name=BUCKET_NAME)
+            self.assertRaises(
+                ValueError,
+                smart_open.s3._download_key,
+                key_name=KEY_NAME,
+                bucket_name=BUCKET_NAME,
+                retries=3,
+                client=self.client,
+                transfer_config=self.transfer_config
+            )
 
 
 @mock_s3
