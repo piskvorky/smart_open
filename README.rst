@@ -80,19 +80,19 @@ How?
 
   >>> # stream from HTTP
   >>> for line in open('http://example.com/index.html'):
-  ...     print(repr(line))
+  ...     print(repr(line[:15]))
   ...     break
-  '<!doctype html>\n'
+  '<!doctype html>'
 
 .. _doctools_after_examples:
 
-Other examples of URLs that ``smart_open`` accepts::
+Other examples of URIs that ``smart_open`` accepts::
 
-    s3://my_bucket/my_key
-    s3://my_key:my_secret@my_bucket/my_key
-    s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
-    gs://my_bucket/my_blob
-    azure://my_bucket/my_blob
+    s3://bucket/key
+    s3://access_key_id:secret_access_key@bucket/key
+    s3://access_key_id:secret_access_key@server:port@bucket/key
+    gs://bucket/blob
+    azure://bucket/blob
     hdfs:///path/file
     hdfs://path/file
     webhdfs://host:port/path/file
