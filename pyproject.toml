@@ -64,7 +64,8 @@ addopts = [
   # extra test summary info: all except passed
   "-r=a",
   # https://pytest-xdist.readthedocs.io/en/latest/distribution.html
-  "--numprocesses=logical",
+  # "--numprocesses=logical",
+  "--numprocesses=0",  # disabled for now, it was flaky
   "--dist=worksteal",
   "--max-worker-restart=8",
   # https://github.com/pytest-dev/pytest-timeout
