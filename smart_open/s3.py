@@ -14,6 +14,7 @@ import functools
 import logging
 import time
 import warnings
+from math import inf
 
 from typing import (
     Callable,
@@ -320,6 +321,7 @@ def open(
     client=None,
     client_kwargs=None,
     writebuffer=None,
+    range_chunk_size=None,
 ):
     """Open an S3 object for reading or writing.
 
@@ -366,6 +368,21 @@ def open(
         If set to `True` on a file opened for reading, GetObject will not be
         called until the first seek() or read().
         Avoids redundant API queries when seeking before reading.
+    range_chunk_size: int, optional
+        Default: `None`
+        Maximum byte range per S3 GET request when reading.
+        When None (default), a single GET request is made for the entire file,
+        and data is streamed from that single botocore.response.StreamingBody
+        in buffer_size chunks.
+        When set to a positive integer, multiple GET requests are made, each
+        limited to at most this many bytes via HTTP Range headers. Each GET
+        returns a new StreamingBody that is streamed in buffer_size chunks.
+        Useful for reading small portions of large files without forcing
+        S3-compatible systems like SeaweedFS/Ceph to load the entire file.
+        Larger values mean fewer billable GET requests but higher load on S3
+        servers. Smaller values mean more GET requests but less server load per request.
+        Values larger than the file size result in a single GET for the whole file.
+        Affects reading only. Does not affect memory usage (controlled by buffer_size).
     client: object, optional
         The S3 client to use when working with boto3.
         If you don't specify this, then smart_open will create a new client for you.
@@ -397,6 +414,7 @@ def open(
             defer_seek=defer_seek,
             client=client,
             client_kwargs=client_kwargs,
+            range_chunk_size=range_chunk_size,
         )
     elif mode == constants.WRITE_BINARY:
         if multipart_upload:
@@ -462,11 +480,13 @@ class _SeekableRawReader(object):
         bucket,
         key,
         version_id=None,
+        range_chunk_size=None,
     ):
         self._client = client
         self._bucket = bucket
         self._key = key
         self._version_id = version_id
+        self._range_chunk_size = range_chunk_size
 
         self._content_length = None
         self._position = 0
@@ -536,11 +556,23 @@ class _SeekableRawReader(object):
         start and stop follow the semantics of the http range header,
         so a stop without a start will read bytes beginning at stop.
 
+        If self._range_chunk_size is set, the S3 server is protected from open range
+        headers and stop will be set such that at most self._range_chunk_size bytes
+        are returned in a single GET request.
+
         As a side effect, set self._content_length. Set self._position
         to self._content_length if start is past end of file.
         """
         if start is None and stop is None:
             start = self._position
+
+        # Apply chunking: limit the stop position if range_chunk_size is set
+        if stop is None and self._range_chunk_size is not None:
+            stop = start + self._range_chunk_size - 1
+            # Don't request beyond known content length
+            if self._content_length is not None:
+                stop = min(stop, self._content_length - 1)
+
         range_string = smart_open.utils.make_range_string(start, stop)
 
         try:
@@ -620,11 +652,13 @@ class _SeekableRawReader(object):
 
     def read(self, size=-1):
         """Read from the continuous connection with the remote peer."""
-        if self.closed:
-            # This is necessary for the very first read() after __init__().
-            self._open_body()
-        if self._position >= self._content_length:
-            return b''
+        if size < -1:
+            raise ValueError(f'size must be >= -1, got {size}')
+
+        if size == -1:
+            size = inf  # makes for a simple while-condition below
+
+        binary_collected = io.BytesIO()
 
         #
         # Boto3 has built-in error handling and retry mechanisms:
@@ -639,31 +673,47 @@ class _SeekableRawReader(object):
         # HTTP connection and try again.  Usually, a single retry attempt is
         # enough to recover, but we try multiple times "just in case".
         #
-        for attempt, seconds in enumerate([1, 2, 4, 8, 16], 1):
-            try:
-                if size == -1:
-                    binary = self._body.read()
-                else:
-                    binary = self._body.read(size)
-            except (
-                ConnectionResetError,
-                botocore.exceptions.BotoCoreError,
-                urllib3.exceptions.HTTPError,
-            ) as err:
-                logger.warning(
-                    '%s: caught %r while reading %d bytes, sleeping %ds before retry',
-                    self,
-                    err,
-                    size,
-                    seconds,
-                )
-                time.sleep(seconds)
-                self._open_body()
-            else:
-                self._position += len(binary)
-                return binary
+        def retry_read(attempts=(1, 2, 4, 8, 16)) -> bytes:
+            for seconds in attempts:
+                if self.closed:
+                    self._open_body()
+                try:
+                    if size == inf:
+                        return self._body.read()
+                    return self._body.read(size - binary_collected.tell())
+                except (
+                    ConnectionResetError,
+                    botocore.exceptions.BotoCoreError,
+                    urllib3.exceptions.HTTPError,
+                ) as err:
+                    logger.warning(
+                        '%s: caught %r while reading %d bytes, sleeping %ds before retry',
+                        self,
+                        err,
+                        -1 if size == inf else size,
+                        seconds,
+                    )
+                    self.close()
+                    time.sleep(seconds)
+            raise IOError(
+                '%s: failed to read %d bytes after %d attempts' %
+                (self, -1 if size == inf else size, len(attempts)),
+            )
 
-        raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, attempt))
+        while (
+            self._content_length is None  # very first read call
+            or (
+                self._position < self._content_length  # not yet end of file
+                and binary_collected.tell() < size  # not yet read enough
+            )
+        ):
+            binary = retry_read()
+            self._position += len(binary)
+            binary_collected.write(binary)
+            if not binary:  # end of stream
+                self.close()
+
+        return binary_collected.getvalue()
 
     def __str__(self):
         return 'smart_open.s3._SeekableReader(%r, %r)' % (self._bucket, self._key)
@@ -710,6 +760,7 @@ class Reader(io.BufferedIOBase):
         defer_seek=False,
         client=None,
         client_kwargs=None,
+        range_chunk_size=None,
     ):
         self._version_id = version_id
         self._buffer_size = buffer_size
@@ -721,6 +772,7 @@ class Reader(io.BufferedIOBase):
             bucket,
             key,
             self._version_id,
+            range_chunk_size=range_chunk_size,
         )
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
@@ -1206,9 +1258,10 @@ class SinglepartWriter(io.BufferedIOBase):
         except botocore.client.ClientError as e:
             raise ValueError(
                 'the bucket %r does not exist, or is forbidden for access' % self._bucket) from e
-
-        logger.debug("%s: direct upload finished", self)
-        self._buf.close()
+        else:
+            logger.debug("%s: direct upload finished", self)
+        finally:
+            self._buf.close()
 
     @property
     def closed(self):
@@ -1289,6 +1342,7 @@ def iter_bucket(
         key_limit=None,
         workers=16,
         retries=3,
+        max_threads_per_fileobj=4,
         **session_kwargs):
     """
     Iterate and download all S3 objects under `s3://bucket_name/prefix`.
@@ -1306,9 +1360,13 @@ def iter_bucket(
     key_limit: int, optional
         If specified, the iterator will stop after yielding this many results.
     workers: int, optional
-        The number of subprocesses to use.
+        The number of objects to download concurrently. The entire operation uses
+        a single ThreadPoolExecutor and shared thread-safe boto3 S3.Client. Default: 16
     retries: int, optional
-        The number of time to retry a failed download.
+        The number of time to retry a failed download. Default: 3
+    max_threads_per_fileobj: int, optional
+        The maximum number of download threads per worker. The maximum size of the
+        connection pool will be `workers * max_threads_per_fileobj + 1`. Default: 4
     session_kwargs: dict, optional
         Keyword arguments to pass when creating a new session.
         For a list of available names and values, see:
@@ -1353,55 +1411,69 @@ def iter_bucket(
     except AttributeError:
         pass
 
+    if bucket_name is None:
+        raise ValueError('bucket_name may not be None')
+
     total_size, key_no = 0, -1
+
+    # thread-safe client to share across _list_bucket and _download_key calls
+    # https://github.com/boto/boto3/blob/1.38.41/docs/source/guide/clients.rst?plain=1#L111
+    session = boto3.session.Session(**session_kwargs)
+    config = botocore.client.Config(
+        max_pool_connections=workers * max_threads_per_fileobj + 1,  # 1 thread for _list_bucket
+        tcp_keepalive=True,
+        retries={"max_attempts": retries * 2, "mode": "adaptive"},
+    )
+    client = session.client('s3', config=config)
+
+    transfer_config = boto3.s3.transfer.TransferConfig(max_concurrency=max_threads_per_fileobj)
+
     key_iterator = _list_bucket(
-        bucket_name,
+        bucket_name=bucket_name,
         prefix=prefix,
         accept_key=accept_key,
-        **session_kwargs)
+        client=client,
+    )
     download_key = functools.partial(
         _download_key,
         bucket_name=bucket_name,
         retries=retries,
-        **session_kwargs)
+        client=client,
+        transfer_config=transfer_config,
+    )
 
-    with smart_open.concurrency.create_pool(processes=workers) as pool:
+    with smart_open.concurrency.create_pool(workers) as pool:
         result_iterator = pool.imap_unordered(download_key, key_iterator)
         key_no = 0
         while True:
             try:
                 (key, content) = result_iterator.__next__()
-                if key_no % 1000 == 0:
-                    logger.info(
-                        "yielding key #%i: %s, size %i (total %.1fMB)",
-                        key_no, key, len(content), total_size / 1024.0 ** 2
-                    )
-                yield key, content
-                total_size += len(content)
-                if key_limit is not None and key_no + 1 >= key_limit:
-                    # we were asked to output only a limited number of keys => we're done
-                    break
-            except botocore.exceptions.ClientError as err:
-                #
-                # ignore 404 not found errors: they mean the object was deleted
-                # after we listed the contents of the bucket, but before we
-                # downloaded the object.
-                #
-                if not ('Error' in err.response and err.response['Error'].get('Code') == '404'):
-                    raise err
             except StopIteration:
+                break
+            # Skip deleted objects (404 responses)
+            if key is None:
+                continue
+            if key_no % 1000 == 0:
+                logger.info(
+                    "yielding key #%i: %s, size %i (total %.1fMB)",
+                    key_no, key, len(content), total_size / 1024.0 ** 2
+                )
+            yield key, content
+            total_size += len(content)
+            if key_limit is not None and key_no + 1 >= key_limit:
+                # we were asked to output only a limited number of keys => we're done
                 break
             key_no += 1
     logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
 
 
 def _list_bucket(
-        bucket_name,
-        prefix='',
-        accept_key=lambda k: True,
-        **session_kwargs):
-    session = boto3.session.Session(**session_kwargs)
-    client = session.client('s3')
+    *,
+    bucket_name,
+    client,
+    prefix='',
+    accept_key=lambda k: True,
+):
     ctoken = None
 
     while True:
@@ -1426,38 +1498,44 @@ def _list_bucket(
             break
 
 
-def _download_key(key_name, bucket_name=None, retries=3, **session_kwargs):
-    if bucket_name is None:
-        raise ValueError('bucket_name may not be None')
-
-    #
-    # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/resources.html#multithreading-or-multiprocessing-with-resources
-    #
-    session = boto3.session.Session(**session_kwargs)
-    s3 = session.resource('s3')
-    bucket = s3.Bucket(bucket_name)
-
+def _download_key(key_name, *, client, bucket_name, retries, transfer_config):
     # Sometimes, https://github.com/boto/boto/issues/2409 can happen
     # because of network issues on either side.
     # Retry up to 3 times to ensure its not a transient issue.
     for x in range(retries + 1):
         try:
-            content_bytes = _download_fileobj(bucket, key_name)
-        except botocore.client.ClientError:
+            content_bytes = _download_fileobj(
+                client=client,
+                bucket_name=bucket_name,
+                key_name=key_name,
+                transfer_config=transfer_config,
+            )
+        except botocore.exceptions.ClientError as err:
+            #
+            # ignore 404 not found errors: they mean the object was deleted
+            # after we listed the contents of the bucket, but before we
+            # downloaded the object.
+            #
+            if 'Error' in err.response and err.response['Error'].get('Code') == '404':
+                return None, None
             # Actually fail on last pass through the loop
             if x == retries:
                 raise
             # Otherwise, try again, as this might be a transient timeout
-            pass
-        else:
-            return key_name, content_bytes
+            continue
+        return key_name, content_bytes
 
 
-def _download_fileobj(bucket, key_name):
+def _download_fileobj(*, client, bucket_name, key_name, transfer_config):
     #
     # This is a separate function only because it makes it easier to inject
     # exceptions during tests.
     #
     buf = io.BytesIO()
-    bucket.download_fileobj(key_name, buf)
+    client.download_fileobj(
+        Bucket=bucket_name,
+        Key=key_name,
+        Fileobj=buf,
+        Config=transfer_config,
+    )
     return buf.getvalue()

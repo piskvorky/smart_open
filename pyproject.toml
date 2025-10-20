@@ -11,7 +11,7 @@ description = "Utils for streaming large files (S3, HDFS, GCS, SFTP, Azure Blob 
 readme = "README.rst"
 urls = {Repository = "https://github.com/piskvorky/smart_open"}
 authors = [{name = "Radim Rehurek", email = "me@radimrehurek.com"}]
-requires-python = ">=3.8,<4.0" # sync with classifiers below
+requires-python = ">=3.9,<4.0" # sync with classifiers below
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
@@ -20,12 +20,12 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: System :: Distributed Computing",
   "Topic :: Database :: Front-Ends",
 ]
@@ -64,7 +64,8 @@ addopts = [
   # extra test summary info: all except passed
   "-r=a",
   # https://pytest-xdist.readthedocs.io/en/latest/distribution.html
-  "--numprocesses=logical",
+  # "--numprocesses=logical",
+  "--numprocesses=0",  # disabled for now, it was flaky
   "--dist=worksteal",
   "--max-worker-restart=8",
   # https://github.com/pytest-dev/pytest-timeout
