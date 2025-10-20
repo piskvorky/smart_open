@@ -52,7 +52,7 @@ _resource = functools.partial(boto3.resource, region_name='us-east-1')
 # For Windows platforms, under which tempfile.NamedTemporaryFile has some
 # unwanted quirks.
 #
-# https://docs.python.org/3.8/library/tempfile.html#tempfile.NamedTemporaryFile
+# https://docs.python.org/3.14/library/tempfile.html#tempfile.NamedTemporaryFile
 # https://stackoverflow.com/a/58955530
 #
 @contextlib.contextmanager
