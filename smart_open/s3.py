@@ -14,6 +14,7 @@ import functools
 import logging
 import time
 import warnings
+from math import inf
 
 from typing import (
     Callable,
@@ -320,6 +321,7 @@ def open(
     client=None,
     client_kwargs=None,
     writebuffer=None,
+    range_chunk_size=None,
 ):
     """Open an S3 object for reading or writing.
 
@@ -366,6 +368,21 @@ def open(
         If set to `True` on a file opened for reading, GetObject will not be
         called until the first seek() or read().
         Avoids redundant API queries when seeking before reading.
+    range_chunk_size: int, optional
+        Default: `None`
+        Maximum byte range per S3 GET request when reading.
+        When None (default), a single GET request is made for the entire file,
+        and data is streamed from that single botocore.response.StreamingBody
+        in buffer_size chunks.
+        When set to a positive integer, multiple GET requests are made, each
+        limited to at most this many bytes via HTTP Range headers. Each GET
+        returns a new StreamingBody that is streamed in buffer_size chunks.
+        Useful for reading small portions of large files without forcing
+        S3-compatible systems like SeaweedFS/Ceph to load the entire file.
+        Larger values mean fewer billable GET requests but higher load on S3
+        servers. Smaller values mean more GET requests but less server load per request.
+        Values larger than the file size result in a single GET for the whole file.
+        Affects reading only. Does not affect memory usage (controlled by buffer_size).
     client: object, optional
         The S3 client to use when working with boto3.
         If you don't specify this, then smart_open will create a new client for you.
@@ -397,6 +414,7 @@ def open(
             defer_seek=defer_seek,
             client=client,
             client_kwargs=client_kwargs,
+            range_chunk_size=range_chunk_size,
         )
     elif mode == constants.WRITE_BINARY:
         if multipart_upload:
@@ -462,11 +480,13 @@ class _SeekableRawReader(object):
         bucket,
         key,
         version_id=None,
+        range_chunk_size=None,
     ):
         self._client = client
         self._bucket = bucket
         self._key = key
         self._version_id = version_id
+        self._range_chunk_size = range_chunk_size
 
         self._content_length = None
         self._position = 0
@@ -536,11 +556,23 @@ class _SeekableRawReader(object):
         start and stop follow the semantics of the http range header,
         so a stop without a start will read bytes beginning at stop.
 
+        If self._range_chunk_size is set, the S3 server is protected from open range
+        headers and stop will be set such that at most self._range_chunk_size bytes
+        are returned in a single GET request.
+
         As a side effect, set self._content_length. Set self._position
         to self._content_length if start is past end of file.
         """
         if start is None and stop is None:
             start = self._position
+
+        # Apply chunking: limit the stop position if range_chunk_size is set
+        if stop is None and self._range_chunk_size is not None:
+            stop = start + self._range_chunk_size - 1
+            # Don't request beyond known content length
+            if self._content_length is not None:
+                stop = min(stop, self._content_length - 1)
+
         range_string = smart_open.utils.make_range_string(start, stop)
 
         try:
@@ -620,11 +652,13 @@ class _SeekableRawReader(object):
 
     def read(self, size=-1):
         """Read from the continuous connection with the remote peer."""
-        if self.closed:
-            # This is necessary for the very first read() after __init__().
-            self._open_body()
-        if self._position >= self._content_length:
-            return b''
+        if size < -1:
+            raise ValueError(f'size must be >= -1, got {size}')
+
+        if size == -1:
+            size = inf  # makes for a simple while-condition below
+
+        binary_collected = io.BytesIO()
 
         #
         # Boto3 has built-in error handling and retry mechanisms:
@@ -639,31 +673,47 @@ class _SeekableRawReader(object):
         # HTTP connection and try again.  Usually, a single retry attempt is
         # enough to recover, but we try multiple times "just in case".
         #
-        for attempt, seconds in enumerate([1, 2, 4, 8, 16], 1):
-            try:
-                if size == -1:
-                    binary = self._body.read()
-                else:
-                    binary = self._body.read(size)
-            except (
-                ConnectionResetError,
-                botocore.exceptions.BotoCoreError,
-                urllib3.exceptions.HTTPError,
-            ) as err:
-                logger.warning(
-                    '%s: caught %r while reading %d bytes, sleeping %ds before retry',
-                    self,
-                    err,
-                    size,
-                    seconds,
-                )
-                time.sleep(seconds)
-                self._open_body()
-            else:
-                self._position += len(binary)
-                return binary
+        def retry_read(attempts=(1, 2, 4, 8, 16)) -> bytes:
+            for seconds in attempts:
+                if self.closed:
+                    self._open_body()
+                try:
+                    if size == inf:
+                        return self._body.read()
+                    return self._body.read(size - binary_collected.tell())
+                except (
+                    ConnectionResetError,
+                    botocore.exceptions.BotoCoreError,
+                    urllib3.exceptions.HTTPError,
+                ) as err:
+                    logger.warning(
+                        '%s: caught %r while reading %d bytes, sleeping %ds before retry',
+                        self,
+                        err,
+                        -1 if size == inf else size,
+                        seconds,
+                    )
+                    self.close()
+                    time.sleep(seconds)
+            raise IOError(
+                '%s: failed to read %d bytes after %d attempts' %
+                (self, -1 if size == inf else size, len(attempts)),
+            )
 
-        raise IOError('%s: failed to read %d bytes after %d attempts' % (self, size, attempt))
+        while (
+            self._content_length is None  # very first read call
+            or (
+                self._position < self._content_length  # not yet end of file
+                and binary_collected.tell() < size  # not yet read enough
+            )
+        ):
+            binary = retry_read()
+            self._position += len(binary)
+            binary_collected.write(binary)
+            if not binary:  # end of stream
+                self.close()
+
+        return binary_collected.getvalue()
 
     def __str__(self):
         return 'smart_open.s3._SeekableReader(%r, %r)' % (self._bucket, self._key)
@@ -710,6 +760,7 @@ class Reader(io.BufferedIOBase):
         defer_seek=False,
         client=None,
         client_kwargs=None,
+        range_chunk_size=None,
     ):
         self._version_id = version_id
         self._buffer_size = buffer_size
@@ -721,6 +772,7 @@ class Reader(io.BufferedIOBase):
             bucket,
             key,
             self._version_id,
+            range_chunk_size=range_chunk_size,
         )
         self._current_pos = 0
         self._buffer = smart_open.bytebuffer.ByteBuffer(buffer_size)
