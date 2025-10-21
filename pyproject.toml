@@ -33,7 +33,7 @@ dynamic = ["version"]
 dependencies = ["wrapt"]
 
 [project.optional-dependencies]
-s3 = ["boto3"]
+s3 = ["boto3>=1.9.17"]
 gcs = ["google-cloud-storage>=2.6.0"]
 azure = ["azure-storage-blob", "azure-common", "azure-core"]
 http = ["requests"]
