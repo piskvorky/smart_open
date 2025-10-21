@@ -1,3 +1,8 @@
+# 7.4.1, 2025-10-21
+
+- Prefill target branch and new tag on the new GitHub release page (PR [#897](https://github.com/piskvorky/smart_open/pull/897), [@ddelange](https://github.com/ddelange))
+- [s3] Add lower version to boto3 requirement for tcp_keepalive (PR [#899](https://github.com/piskvorky/smart_open/pull/899), [@ddelange](https://github.com/ddelange))
+
 # 7.4.0, 2025-10-20
 
 - Disambiguate URI examples in README.rst (PR [#879](https://github.com/piskvorky/smart_open/pull/879), [@ddelange](https://github.com/ddelange))

@@ -22,7 +22,7 @@ All of the above are generally freely available, e.g. installable via apt in Ubu
 
 - Check that the [latest commit](https://github.com/piskvorky/smart_open/commits/develop) on `develop` passed all CI.
 - Run `bash release/release.sh` to update `CHANGELOG.md` and then update `master` branch.
-- Create a [new GitHub Release](https://github.com/piskvorky/smart_open/releases/new).
+- Create a [new GitHub Release](https://github.com/piskvorky/smart_open/releases/new?target=master).
     - Fill in the new version including a `v` prefix and press enter.
     - Confirm that it reads "Excellent! This tag will be created from the target when you publish this release.".
     - Select target branch `master`.
