@@ -34,7 +34,7 @@ dependencies = ["wrapt"]
 
 [project.optional-dependencies]
 s3 = ["boto3>=1.9.17"]
-gcs = ["google-cloud-storage>=2.6.0"]
+gcs = ["google-cloud-storage>=2.6.0", "google-api-core<2.28;python_version<'3.10'"] # https://github.com/googleapis/python-api-core/pull/832#issuecomment-3470137771
 azure = ["azure-storage-blob", "azure-common", "azure-core"]
 http = ["requests"]
 webhdfs = ["requests"]

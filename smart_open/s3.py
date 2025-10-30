@@ -531,7 +531,12 @@ class _SeekableRawReader(object):
         # If we can figure out that we've read past the EOF, then we can save
         # an extra API call.
         #
-        if self._content_length is None:
+        if start is None and stop == 0 and self._content_length is None:
+            # seek(0, WHENCE_END) seeks straight to EOF: make a minimal request to populate _content_length
+            self._open_body(start=0, stop=0)
+            self.close()
+            reached_eof = True
+        elif self._content_length is None:
             reached_eof = False
         elif start is not None and start >= self._content_length:
             reached_eof = True
