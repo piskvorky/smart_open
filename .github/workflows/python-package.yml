@@ -23,10 +23,7 @@ jobs:
           - {python-version: '3.9', os: windows-2025}
           - {python-version: '3.14', os: windows-2025}
 
-          # deprecate macos-15-intel when python 3.9 becomes the minimum supported version
-          # ref https://github.blog/changelog/2025-09-19-github-actions-macos-13-runner-image-is-closing-down/
-          # ref  https://github.com/actions/python-versions/blob/d026dedcb/versions-manifest.json#L9969-L10016
-          - {python-version: '3.9', os: macos-15-intel}
+          - {python-version: '3.9', os: macos-15}
           - {python-version: '3.14', os: macos-15}
 
     steps:
@@ -51,11 +48,11 @@ jobs:
         run: uv pip install -e .[test]
 
       - name: Run flake8 linter (source)
-        if: matrix.python-version == '3.9' # sync with matrix above
+        if: matrix.python-version == '3.14' # sync with matrix above
         run: flake8 --show-source smart_open
 
       # - name: "Check whether help.txt update was forgotten"
-      #   if: matrix.python-version == '3.9' && github.event_name == 'pull_request' # sync with matrix above
+      #   if: matrix.python-version == '3.14' && github.event_name == 'pull_request' # sync with matrix above
       #   run: |
       #     python update_helptext.py
       #     test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
