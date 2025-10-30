@@ -1,3 +1,7 @@
+# 7.4.2, 2025-10-30
+
+- Add test for seek to end + defer_seek (PR [#901](https://github.com/piskvorky/smart_open/pull/901), [@ddelange](https://github.com/ddelange))
+
 # 7.4.1, 2025-10-21
 
 - Prefill target branch and new tag on the new GitHub release page (PR [#897](https://github.com/piskvorky/smart_open/pull/897), [@ddelange](https://github.com/ddelange))

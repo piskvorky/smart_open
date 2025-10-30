@@ -313,6 +313,22 @@ class ReaderTest(BaseTest):
             self.assertEqual(seek, len(self.body) - 4)
             self.assertEqual(fin.read(), b'you?')
 
+    def test_seek_end_tell_without_defer_seek(self):
+        """Does seek(0, SEEK_END) + tell() work correctly without defer_seek?"""
+        with self.assertApiCalls(GetObject=1):  # One call during __init__
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=False)
+            pos = fin.seek(0, whence=smart_open.constants.WHENCE_END)
+            self.assertEqual(pos, len(self.body))
+            self.assertEqual(fin.tell(), len(self.body))
+
+    def test_seek_end_tell_with_defer_seek(self):
+        """Does seek(0, SEEK_END) + tell() work correctly with defer_seek=True?"""
+        with self.assertApiCalls(GetObject=1):  # One call on first seek
+            fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
+            pos = fin.seek(0, whence=smart_open.constants.WHENCE_END)
+            self.assertEqual(pos, len(self.body))
+            self.assertEqual(fin.tell(), len(self.body))
+
     def test_seek_past_end(self):
         with self.assertApiCalls(GetObject=1), patch_invalid_range_response(str(len(self.body))):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
