@@ -524,20 +524,22 @@ class _SeekableRawReader(object):
             start = max(0, offset)
         elif whence == constants.WHENCE_CURRENT:
             start = max(0, offset + self._position)
-        else:
+        elif whence == constants.WHENCE_END:
             stop = max(0, -offset)
 
         #
         # If we can figure out that we've read past the EOF, then we can save
         # an extra API call.
         #
-        if start is None and stop == 0 and self._content_length is None:
-            # seek(0, WHENCE_END) seeks straight to EOF: make a minimal request to populate _content_length
-            self._open_body(start=0, stop=0)
-            self.close()
-            reached_eof = True
-        elif self._content_length is None:
-            reached_eof = False
+        if self._content_length is None:  # _open_body has not been called yet
+            if start is None and stop == 0:
+                # seek(0, WHENCE_END) seeks straight to EOF:
+                # make a minimal request to populate _content_length
+                self._open_body(start=0, stop=0)
+                self.close()
+                reached_eof = True
+            else:
+                reached_eof = False
         elif start is not None and start >= self._content_length:
             reached_eof = True
         elif stop == 0:
