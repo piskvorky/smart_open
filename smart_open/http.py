@@ -104,15 +104,17 @@ class BufferedInputBase(io.BufferedIOBase):
                  kerberos=False, user=None, password=None, cert=None,
                  headers=None, session=None, timeout=None):
 
+        self.url = url
+        self.cert = cert
         self.session = session or requests
 
         if kerberos:
             import requests_kerberos
-            auth = requests_kerberos.HTTPKerberosAuth()
+            self.auth = requests_kerberos.HTTPKerberosAuth()
         elif user is not None and password is not None:
-            auth = (user, password)
+            self.auth = (user, password)
         else:
-            auth = None
+            self.auth = None
 
         self.buffer_size = buffer_size
         self.mode = mode
@@ -125,9 +127,9 @@ class BufferedInputBase(io.BufferedIOBase):
         self.timeout = timeout
 
         self.response = self.session.get(
-            url,
-            auth=auth,
-            cert=cert,
+            self.url,
+            auth=self.auth,
+            cert=self.cert,
             stream=True,
             headers=self.headers,
             timeout=self.timeout,
@@ -136,7 +138,7 @@ class BufferedInputBase(io.BufferedIOBase):
         if not self.response.ok:
             self.response.raise_for_status()
 
-        self._read_iter = self.response.iter_content(self.buffer_size)
+        self._read_iter = iter(lambda: self.response.raw.read(self.buffer_size), b"")
         self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
         self._current_pos = 0
 
@@ -238,35 +240,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         If none of those are set, will connect unauthenticated.
         """
-        self.url = url
-
-        self.session = session or requests
-
-        if kerberos:
-            import requests_kerberos
-            self.auth = requests_kerberos.HTTPKerberosAuth()
-        elif user is not None and password is not None:
-            self.auth = (user, password)
-        else:
-            self.auth = None
-
-        if headers is None:
-            self.headers = _HEADERS.copy()
-        else:
-            self.headers = headers
-
-        self.cert = cert
-        self.timeout = timeout
-
-        self.buffer_size = buffer_size
-        self.mode = mode
-        self.response = self._partial_request()
-
-        if not self.response.ok:
-            self.response.raise_for_status()
-
-        logger.debug('self.response: %r, raw: %r', self.response, self.response.raw)
-
+        super().__init__(url, mode, buffer_size, kerberos, user, password, cert, headers, session, timeout)
         self.content_length = int(self.response.headers.get("Content-Length", -1))
         #
         # We assume the HTTP stream is seekable unless the server explicitly
@@ -275,15 +249,6 @@ class SeekableBufferedInputBase(BufferedInputBase):
         # does not appear to be seekable but really is.
         #
         self._seekable = self.response.headers.get("Accept-Ranges", "").lower() != "none"
-
-        self._read_iter = self.response.iter_content(self.buffer_size)
-        self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
-        self._current_pos = 0
-
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
 
     def seek(self, offset, whence=0):
         """Seek to the specified position.
@@ -326,7 +291,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             response = self._partial_request(new_pos)
             if response.ok:
                 self.response = response
-                self._read_iter = self.response.iter_content(self.buffer_size)
+                self._read_iter = iter(lambda: self.response.raw.read(self.buffer_size), b"")
                 self._read_buffer.empty()
             else:
                 self.response = None
@@ -344,15 +309,16 @@ class SeekableBufferedInputBase(BufferedInputBase):
         raise io.UnsupportedOperation
 
     def _partial_request(self, start_pos=None):
+        headers = self.headers.copy()
         if start_pos is not None:
-            self.headers.update({"range": smart_open.utils.make_range_string(start_pos)})
+            headers["range"] = smart_open.utils.make_range_string(start_pos)
 
         response = self.session.get(
             self.url,
             auth=self.auth,
             stream=True,
             cert=self.cert,
-            headers=self.headers,
+            headers=headers,
             timeout=self.timeout,
         )
         return response
