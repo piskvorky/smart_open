@@ -138,7 +138,6 @@ class BufferedInputBase(io.BufferedIOBase):
         if not self.response.ok:
             self.response.raise_for_status()
 
-        self._read_iter = iter(lambda: self.response.raw.read(self.buffer_size), b"")
         self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
         self._current_pos = 0
 
@@ -150,7 +149,6 @@ class BufferedInputBase(io.BufferedIOBase):
         logger.debug("close: called")
         if not self.closed:
             self.response = None
-            self._read_iter = None
             self._read_buffer = None
 
     @property
@@ -175,32 +173,20 @@ class BufferedInputBase(io.BufferedIOBase):
         """
         Mimics the read call to a filehandle object.
         """
-        logger.debug("reading with size: %d", size)
-        if self.response is None:
-            return b''
+        if size < -1:
+            raise ValueError(f'size must be >= -1, got {size}')
 
-        if size == 0:
-            return b''
-        elif size < 0 and len(self._read_buffer) == 0:
-            retval = self.response.raw.read()
-        elif size < 0:
+        logger.debug("reading with size: %d", size)
+        if self.closed or size == 0:
+            return b""
+
+        if size == -1:
             retval = self._read_buffer.read() + self.response.raw.read()
         else:
+            # Fill _read_buffer until it contains enough bytes
             while len(self._read_buffer) < size:
-                logger.debug(
-                    "http reading more content at current_pos: %d with size: %d",
-                    self._current_pos, size,
-                )
-                bytes_read = self._read_buffer.fill(self._read_iter)
-                if bytes_read == 0:
-                    # Oops, ran out of data early.
-                    retval = self._read_buffer.read()
-                    self._current_pos += len(retval)
-
-                    return retval
-
-            # If we got here, it means we have enough data in the buffer
-            # to return to the caller.
+                if self._read_buffer.fill(self.response.raw) == 0:
+                    break  # EOF reached
             retval = self._read_buffer.read(size)
 
         self._current_pos += len(retval)
@@ -281,13 +267,11 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         if new_pos == self.content_length:
             self.response = None
-            self._read_iter = None
             self._read_buffer.empty()
         else:
             response = self._partial_request(new_pos)
             if response.ok:
                 self.response = response
-                self._read_iter = iter(lambda: self.response.raw.read(self.buffer_size), b"")
                 self._read_buffer.empty()
             else:
                 self.response = None
