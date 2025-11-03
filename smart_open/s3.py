@@ -787,11 +787,6 @@ class Reader(io.BufferedIOBase):
         self._line_terminator = line_terminator
         self._seek_initialized = False
 
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
-
         if not defer_seek:
             self.seek(0)
 
@@ -1020,11 +1015,6 @@ class MultipartWriter(io.BufferedIOBase):
         self._total_bytes = 0
         self._total_parts = 0
         self._parts: list[dict[str, object]] = []
-
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None  # type: ignore[assignment]
 
     def flush(self):
         pass

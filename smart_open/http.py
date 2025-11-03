@@ -142,11 +142,6 @@ class BufferedInputBase(io.BufferedIOBase):
         self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
         self._current_pos = 0
 
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
-
     #
     # Override some methods from io.IOBase.
     #
@@ -156,6 +151,7 @@ class BufferedInputBase(io.BufferedIOBase):
         if not self.closed:
             self.response = None
             self._read_iter = None
+            self._read_buffer = None
 
     @property
     def closed(self):
