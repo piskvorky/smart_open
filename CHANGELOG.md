@@ -1,3 +1,10 @@
+# 7.4.3, 2025-11-03
+
+- Simplify WHENCE_END logic (PR [#902](https://github.com/piskvorky/smart_open/pull/902), [@ddelange](https://github.com/ddelange))
+- Bump the github-actions group with 2 updates (PR [#903](https://github.com/piskvorky/smart_open/pull/903), [@dependabot[bot]](https://github.com/apps/dependabot))
+- [docs] Readability fixes in release instructions (PR [#904](https://github.com/piskvorky/smart_open/pull/904), [@ddelange](https://github.com/ddelange))
+- [http] Avoid using response.iter_content (PR [#905](https://github.com/piskvorky/smart_open/pull/905), [@ddelange](https://github.com/ddelange))
+
 # 7.4.2, 2025-10-30
 
 - Add test for seek to end + defer_seek (PR [#901](https://github.com/piskvorky/smart_open/pull/901), [@ddelange](https://github.com/ddelange))
