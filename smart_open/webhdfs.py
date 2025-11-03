@@ -213,11 +213,6 @@ class BufferedOutputBase(io.BufferedIOBase):
         self.chunk_bytes = 0
         self.total_size = 0
 
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
-
     #
     # Override some methods from io.IOBase.
     #
