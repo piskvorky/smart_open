@@ -1,3 +1,8 @@
+# 7.4.4, 2025-11-04
+
+- [http] Eliminate _read_iter and simplify read (PR [#906](https://github.com/piskvorky/smart_open/pull/906), [@ddelange](https://github.com/ddelange))
+- [http] Re-introduce read optimization when buffer is empty (PR [#907](https://github.com/piskvorky/smart_open/pull/907), [@ddelange](https://github.com/ddelange))
+
 # 7.4.3, 2025-11-03
 
 - Simplify WHENCE_END logic (PR [#902](https://github.com/piskvorky/smart_open/pull/902), [@ddelange](https://github.com/ddelange))

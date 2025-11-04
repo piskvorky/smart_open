@@ -226,30 +226,60 @@ def test_gzip_encoding_explicit_request():
 
     responses.add_callback(responses.GET, URL, callback=callback)
     # Explicitly request gzip encoding
-    reader = smart_open.http.SeekableBufferedInputBase(
-        URL, headers={'Accept-Encoding': 'gzip'}
-    )
+    reader = smart_open.http.SeekableBufferedInputBase(URL, headers={'Accept-Encoding': 'gzip'})
     read_bytes = reader.read()
     assert read_bytes == BYTES  # Should be decompressed by requests/urllib3
 
+    # Combining multiple read calls also works
+    reader.seek(0)
+    partial = reader.read(2) + reader.read(1000)
+    assert partial == BYTES
+
 
 @responses.activate
-def test_gzip_consistency_between_read_methods():
-    """Regression test: read() and read(size) should return same decompressed data."""
-    def callback(request):
-        # Server returns gzipped data when client accepts it
-        if 'gzip' in request.headers.get('Accept-Encoding', ''):
-            headers = HEADERS.copy()
-            headers['Content-Encoding'] = 'gzip'
-            headers['Content-Length'] = str(len(GZIPPED_BYTES))
-            return (200, headers, GZIPPED_BYTES)
-        else:
-            headers = HEADERS.copy()
-            headers['Content-Length'] = str(len(BYTES))
-            return (200, headers, BYTES)
+def test_read_after_read_to_eof():
+    """Reading after reading to EOF should return empty bytes."""
+    responses.add_callback(responses.GET, URL, callback=request_callback)
+    reader = smart_open.http.SeekableBufferedInputBase(URL)
 
-    responses.add_callback(responses.GET, URL, callback=callback)
-    reader = smart_open.http.SeekableBufferedInputBase(URL, headers={'Accept-Encoding': 'gzip'})
-    partial = reader.read(2) + reader.read()
-    assert len(partial) == len(BYTES), f"Expected {len(BYTES)} bytes, got {len(partial)}"
-    assert partial == BYTES
+    # Read to EOF
+    result = reader.read(-1)
+    assert len(result) == len(BYTES)
+    assert reader.tell() == len(BYTES)
+
+    # Read should return empty bytes
+    result = reader.read()
+    assert result == b""
+
+    # Read with size should also return empty bytes
+    result = reader.read(10)
+    assert result == b""
+
+
+@responses.activate
+def test_read_after_seek_to_eof():
+    """Reading after seeking to EOF should return empty bytes."""
+    responses.add_callback(responses.GET, URL, callback=request_callback)
+    reader = smart_open.http.SeekableBufferedInputBase(URL)
+
+    # Seek to EOF
+    reader.seek(0, whence=smart_open.constants.WHENCE_END)
+    assert reader.tell() == len(BYTES)
+
+    # Read should return empty bytes
+    result = reader.read()
+    assert result == b""
+
+    # Read with size should also return empty bytes
+    result = reader.read(10)
+    assert result == b""
+
+
+@responses.activate
+def test_read_with_invalid_size():
+    """Read with size < -1 should raise ValueError."""
+    responses.add_callback(responses.GET, URL, callback=request_callback)
+    reader = smart_open.http.SeekableBufferedInputBase(URL)
+
+    with pytest.raises(ValueError, match='size must be >= -1'):
+        reader.read(-2)
