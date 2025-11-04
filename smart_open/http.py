@@ -181,7 +181,10 @@ class BufferedInputBase(io.BufferedIOBase):
             return b""
 
         if size == -1:
-            retval = self._read_buffer.read() + self.response.raw.read()
+            if len(self._read_buffer):
+                retval = self._read_buffer.read() + self.response.raw.read()
+            else:  # Avoid unnecessary +
+                retval = self.response.raw.read()
         else:
             # Fill _read_buffer until it contains enough bytes
             while len(self._read_buffer) < size:
