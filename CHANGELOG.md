@@ -1,3 +1,7 @@
+# 7.5.0, 2025-11-08
+
+- [s3] Support very large buckets in iter_bucket, add client_kwars (PR [#908](https://github.com/piskvorky/smart_open/pull/908), [@ddelange](https://github.com/ddelange))
+
 # 7.4.4, 2025-11-04
 
 - [http] Eliminate _read_iter and simplify read (PR [#906](https://github.com/piskvorky/smart_open/pull/906), [@ddelange](https://github.com/ddelange))
