@@ -11,6 +11,7 @@ from __future__ import annotations
 import http
 import io
 import functools
+import itertools
 import logging
 import time
 import warnings
@@ -1333,14 +1334,16 @@ def _accept_all(key):
 
 
 def iter_bucket(
-        bucket_name,
-        prefix='',
-        accept_key=None,
-        key_limit=None,
-        workers=16,
-        retries=3,
-        max_threads_per_fileobj=4,
-        **session_kwargs):
+    bucket_name,
+    prefix='',
+    accept_key=None,
+    key_limit=None,
+    workers=16,
+    retries=3,
+    max_threads_per_fileobj=4,
+    client_kwargs=None,
+    **session_kwargs,  # double star notation for backwards compatibility
+):
     """
     Iterate and download all S3 objects under `s3://bucket_name/prefix`.
 
@@ -1364,6 +1367,10 @@ def iter_bucket(
     max_threads_per_fileobj: int, optional
         The maximum number of download threads per worker. The maximum size of the
         connection pool will be `workers * max_threads_per_fileobj + 1`. Default: 4
+    client_kwargs: dict, optional
+        Keyword arguments to pass when creating a new session.
+        For a list of available names and values, see:
+        https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html#boto3.session.Session.client
     session_kwargs: dict, optional
         Keyword arguments to pass when creating a new session.
         For a list of available names and values, see:
@@ -1411,17 +1418,20 @@ def iter_bucket(
     if bucket_name is None:
         raise ValueError('bucket_name may not be None')
 
-    total_size, key_no = 0, -1
+    total_size, key_no = 0, 0
 
     # thread-safe client to share across _list_bucket and _download_key calls
     # https://github.com/boto/boto3/blob/1.38.41/docs/source/guide/clients.rst?plain=1#L111
     session = boto3.session.Session(**session_kwargs)
-    config = botocore.client.Config(
-        max_pool_connections=workers * max_threads_per_fileobj + 1,  # 1 thread for _list_bucket
-        tcp_keepalive=True,
-        retries={"max_attempts": retries * 2, "mode": "adaptive"},
-    )
-    client = session.client('s3', config=config)
+    if client_kwargs is None:
+        client_kwargs = {}
+    if 'config' not in client_kwargs:
+        client_kwargs['config'] = botocore.client.Config(
+            max_pool_connections=workers * max_threads_per_fileobj + 1,  # 1 thread for _list_bucket
+            tcp_keepalive=True,
+            retries={'max_attempts': retries * 2, 'mode': 'adaptive'},
+        )
+    client = session.client('s3', **client_kwargs)
 
     transfer_config = boto3.s3.transfer.TransferConfig(max_concurrency=max_threads_per_fileobj)
 
@@ -1439,29 +1449,29 @@ def iter_bucket(
         transfer_config=transfer_config,
     )
 
-    with smart_open.concurrency.create_pool(workers) as pool:
-        result_iterator = pool.imap_unordered(download_key, key_iterator)
-        key_no = 0
-        while True:
-            try:
-                (key, content) = result_iterator.__next__()
-            except StopIteration:
-                break
+    # Limit the iterator ('infinite' iterators are supported, key_limit=None is supported)
+    key_iterator = itertools.islice(key_iterator, key_limit)
+
+    with smart_open.concurrency.ThreadPoolExecutor(workers) as executor:
+        result_iterator = executor.imap(download_key, key_iterator)
+        for key_no, (key, content) in enumerate(result_iterator, start=1):
             # Skip deleted objects (404 responses)
             if key is None:
                 continue
+
             if key_no % 1000 == 0:
                 logger.info(
-                    "yielding key #%i: %s, size %i (total %.1fMB)",
+                    "yielding key #%i: %s, size %i (total %.1f MB)",
                     key_no, key, len(content), total_size / 1024.0 ** 2
                 )
+
             yield key, content
             total_size += len(content)
-            if key_limit is not None and key_no + 1 >= key_limit:
-                # we were asked to output only a limited number of keys => we're done
-                break
-            key_no += 1
-    logger.info("processed %i keys, total size %i" % (key_no + 1, total_size))
+    logger.info(
+        "processed %i keys, total size %.1f MB",
+        key_no,
+        total_size / 1024.0 ** 2,
+    )
 
 
 def _list_bucket(
