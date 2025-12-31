@@ -199,7 +199,12 @@ FUNCTIONS
         mode: str
             The mode for opening the object.  Must be either "rb" or "wb".
         buffer_size: int, optional
-            The buffer size to use when performing I/O.
+            Default: 128KB
+            The buffer size in bytes for reading. Controls memory usage. Data is streamed
+            from a S3 network stream in buffer_size chunks. Forward seeks within
+            the current buffer are satisfied without additional GET requests. Backward
+            seeks always open a new GET request. For forward seek-intensive workloads,
+            increase buffer_size to reduce GET requests at the cost of higher memory usage.
         min_part_size: int, optional
             The minimum part size for multipart uploads, in bytes.
             When the writebuffer contains this many bytes, smart_open will upload
@@ -228,6 +233,21 @@ FUNCTIONS
             If set to `True` on a file opened for reading, GetObject will not be
             called until the first seek() or read().
             Avoids redundant API queries when seeking before reading.
+        range_chunk_size: int, optional
+            Default: `None`
+            Maximum byte range per S3 GET request when reading.
+            When None (default), a single GET request is made for the entire file,
+            and data is streamed from that single botocore.response.StreamingBody
+            in buffer_size chunks.
+            When set to a positive integer, multiple GET requests are made, each
+            limited to at most this many bytes via HTTP Range headers. Each GET
+            returns a new StreamingBody that is streamed in buffer_size chunks.
+            Useful for reading small portions of large files without forcing
+            S3-compatible systems like SeaweedFS/Ceph to load the entire file.
+            Larger values mean fewer billable GET requests but higher load on S3
+            servers. Smaller values mean more GET requests but less server load per request.
+            Values larger than the file size result in a single GET for the whole file.
+            Affects reading only. Does not affect memory usage (controlled by buffer_size).
         client: object, optional
             The S3 client to use when working with boto3.
             If you don't specify this, then smart_open will create a new client for you.
@@ -318,7 +338,7 @@ FUNCTIONS
 
         >>> # stream from HTTP
         >>> for line in open('http://example.com/index.html'):
-        ...     print(repr(line))
+        ...     print(repr(line[:15]))
         ...     break
 
         This function also supports transparent compression and decompression
@@ -334,7 +354,7 @@ FUNCTIONS
 
         See Also
         --------
-        - `Standard library reference <https://docs.python.org/3.13/library/functions.html#open>`__
+        - `Standard library reference <https://docs.python.org/3.14/library/functions.html#open>`__
         - `smart_open README.rst
           <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
 

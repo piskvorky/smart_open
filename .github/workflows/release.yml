@@ -14,12 +14,12 @@ jobs:
       pull-requests: write # apexskier/github-release-commenter
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: 3.x
 
@@ -32,7 +32,7 @@ jobs:
         python -m build
 
     - name: Upload package distributions as release assets
-      uses: softprops/action-gh-release@v2.3.2
+      uses: softprops/action-gh-release@v2.4.2
       with:
         files: dist/*
 

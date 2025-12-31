@@ -119,8 +119,12 @@ def _handle_gzip(file_obj, mode):
 
 
 def _handle_zstd(file_obj, mode):
-    import zstandard
-    result = zstandard.open(filename=file_obj, mode=mode)
+    import sys
+    if sys.version_info >= (3, 14):
+        from compression import zstd
+    else:
+        from backports import zstd
+    result = zstd.open(file_obj, mode=mode)
     return _maybe_wrap_buffered(result, mode)
 
 

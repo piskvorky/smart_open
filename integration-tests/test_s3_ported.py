@@ -297,20 +297,6 @@ class WriterTest(unittest.TestCase):
         self.assertEqual(result, text)
 
 
-@contextlib.contextmanager
-def force(multiprocessing=False, concurrent_futures=False):
-    assert not (multiprocessing and concurrent_futures)
-    old_multiprocessing = smart_open.concurrency._MULTIPROCESSING
-    old_concurrent_futures = smart_open.concurrency._CONCURRENT_FUTURES
-    smart_open.concurrency._MULTIPROCESSING = multiprocessing
-    smart_open.concurrency._CONCURRENT_FUTURES = concurrent_futures
-
-    yield
-
-    smart_open.concurrency._MULTIPROCESSING = old_multiprocessing
-    smart_open.concurrency._CONCURRENT_FUTURES = old_concurrent_futures
-
-
 class IterBucketTest(unittest.TestCase):
     def setUp(self):
         self.expected = [
@@ -320,26 +306,8 @@ class IterBucketTest(unittest.TestCase):
         ]
         self.expected.sort()
 
-    def test_singleprocess(self):
-        with force():
-            actual = list(smart_open.s3.iter_bucket(BUCKET_NAME, prefix='iter_bucket'))
-
-        self.assertEqual(len(self.expected), len(actual))
-        self.assertEqual(self.expected, sorted(actual))
-
-    @unittest.skipIf(not smart_open.concurrency._MULTIPROCESSING, 'multiprocessing unavailable')
-    def test_multiprocess(self):
-        with force(multiprocessing=True):
-            actual = list(smart_open.s3.iter_bucket(BUCKET_NAME, prefix='iter_bucket'))
-
-        self.assertEqual(len(self.expected), len(actual))
-        self.assertEqual(self.expected, sorted(actual))
-
-    @unittest.skipIf(not smart_open.concurrency._CONCURRENT_FUTURES, 'concurrent.futures unavailable')
-    def test_concurrent_futures(self):
-        with force(concurrent_futures=True):
-            actual = list(smart_open.s3.iter_bucket(BUCKET_NAME, prefix='iter_bucket'))
-
+    def test_multithreading(self):
+        actual = list(smart_open.s3.iter_bucket(BUCKET_NAME, prefix='iter_bucket'))
         self.assertEqual(len(self.expected), len(actual))
         self.assertEqual(self.expected, sorted(actual))
 
@@ -366,12 +334,3 @@ def test_workers(workers):
     actual = sorted(smart_open.s3.iter_bucket(BUCKET_NAME, prefix='iter_bucket', workers=workers))
     assert len(expected) == len(actual)
     assert expected == actual
-
-
-class DownloadKeyTest(unittest.TestCase):
-    def test(self):
-        key_name = 'hello.txt'
-        expected = (key_name, CONTENTS[key_name])
-
-        actual = smart_open.s3._download_key(key_name, bucket_name=BUCKET_NAME)
-        self.assertEqual(expected, actual)

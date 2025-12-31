@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-fallback_version = "0.1.dev1+gitnotfound"
+fallback_version = "0.1.dev0+gitnotfound"
 
 [project]
 name = "smart_open"
@@ -11,7 +11,7 @@ description = "Utils for streaming large files (S3, HDFS, GCS, SFTP, Azure Blob 
 readme = "README.rst"
 urls = {Repository = "https://github.com/piskvorky/smart_open"}
 authors = [{name = "Radim Rehurek", email = "me@radimrehurek.com"}]
-requires-python = ">=3.8,<4.0" # sync with classifiers below
+requires-python = ">=3.9,<4.0" # sync with classifiers below
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
@@ -20,12 +20,12 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: System :: Distributed Computing",
   "Topic :: Database :: Front-Ends",
 ]
@@ -33,25 +33,42 @@ dynamic = ["version"]
 dependencies = ["wrapt"]
 
 [project.optional-dependencies]
-s3 = ["boto3"]
-gcs = ["google-cloud-storage>=2.6.0"]
+s3 = ["boto3>=1.9.17"]
+gcs = ["google-cloud-storage>=2.6.0", "google-api-core<2.28;python_version<'3.10'"] # https://github.com/googleapis/python-api-core/pull/832#issuecomment-3470137771
 azure = ["azure-storage-blob", "azure-common", "azure-core"]
 http = ["requests"]
 webhdfs = ["requests"]
 ssh = ["paramiko"]
-zst = ["zstandard"]
+zst = ["backports.zstd>=1.0.0;python_version<'3.14'"]
 all = ["smart_open[s3,gcs,azure,http,webhdfs,ssh,zst]"]
 test = [
-    "smart_open[all]",
-    "moto[server]",
-    "responses",
-    "pytest",
-    "pytest-rerunfailures",
-    "pytest_benchmark",
-    "awscli",
-    "pyopenssl",
-    "numpy",
+  "smart_open[all]",
+  "moto[server]",
+  "responses",
+  "pytest",
+  "pytest-rerunfailures",
+  "pytest_benchmark",
+  "pytest-timeout",
+  "pytest-xdist[psutil]",
+  "awscli",
+  "pyopenssl",
+  "numpy",
+  "flake8",
 ]
 
 [tool.setuptools.packages.find]
 include = ["smart_open"]
+
+[tool.pytest.ini_options]
+addopts = [
+  # extra test summary info: all except passed
+  "-r=a",
+  # https://pytest-xdist.readthedocs.io/en/latest/distribution.html
+  # "--numprocesses=logical",
+  "--numprocesses=0",  # disabled for now, it was flaky
+  "--dist=worksteal",
+  "--max-worker-restart=8",
+  # https://github.com/pytest-dev/pytest-timeout
+  "--timeout=60",
+  "--timeout-method=thread",
+]

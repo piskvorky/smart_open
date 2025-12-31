@@ -9,9 +9,14 @@ import bz2
 import gzip
 import io
 import lzma
+import sys
 
 import pytest
-import zstandard as zstd
+
+if sys.version_info >= (3, 14):
+    from compression import zstd
+else:
+    from backports import zstd
 
 import smart_open.compression
 
@@ -35,10 +40,10 @@ def label(thing, name):
         (io.BytesIO(gzip.compress(plain)), 'infer_from_extension', 'file.GZ'),
         (label(io.BytesIO(gzip.compress(plain)), 'file.gz'), 'infer_from_extension', ''),
         (io.BytesIO(gzip.compress(plain)), '.gz', 'file.gz'),
-        (io.BytesIO(zstd.ZstdCompressor().compress(plain)), 'infer_from_extension', 'file.zst'),
-        (io.BytesIO(zstd.ZstdCompressor().compress(plain)), 'infer_from_extension', 'file.ZST'),
-        (label(io.BytesIO(zstd.ZstdCompressor().compress(plain)), 'file.zst'), 'infer_from_extension', ''),
-        (io.BytesIO(zstd.ZstdCompressor().compress(plain)), '.zst', 'file.zst'),
+        (io.BytesIO(zstd.compress(plain)), 'infer_from_extension', 'file.zst'),
+        (io.BytesIO(zstd.compress(plain)), 'infer_from_extension', 'file.ZST'),
+        (label(io.BytesIO(zstd.compress(plain)), 'file.zst'), 'infer_from_extension', ''),
+        (io.BytesIO(zstd.compress(plain)), '.zst', 'file.zst'),
         (io.BytesIO(lzma.compress(plain)), 'infer_from_extension', 'file.xz'),
         (io.BytesIO(lzma.compress(plain)), 'infer_from_extension', 'file.XZ'),
         (label(io.BytesIO(lzma.compress(plain)), 'file.xz'), 'infer_from_extension', ''),

@@ -1,3 +1,44 @@
+# 7.5.0, 2025-11-08
+
+- [s3] Support very large buckets in iter_bucket, add client_kwars (PR [#908](https://github.com/piskvorky/smart_open/pull/908), [@ddelange](https://github.com/ddelange))
+
+# 7.4.4, 2025-11-04
+
+- [http] Eliminate _read_iter and simplify read (PR [#906](https://github.com/piskvorky/smart_open/pull/906), [@ddelange](https://github.com/ddelange))
+- [http] Re-introduce read optimization when buffer is empty (PR [#907](https://github.com/piskvorky/smart_open/pull/907), [@ddelange](https://github.com/ddelange))
+
+# 7.4.3, 2025-11-03
+
+- Simplify WHENCE_END logic (PR [#902](https://github.com/piskvorky/smart_open/pull/902), [@ddelange](https://github.com/ddelange))
+- Bump the github-actions group with 2 updates (PR [#903](https://github.com/piskvorky/smart_open/pull/903), [@dependabot[bot]](https://github.com/apps/dependabot))
+- [docs] Readability fixes in release instructions (PR [#904](https://github.com/piskvorky/smart_open/pull/904), [@ddelange](https://github.com/ddelange))
+- [http] Avoid using response.iter_content (PR [#905](https://github.com/piskvorky/smart_open/pull/905), [@ddelange](https://github.com/ddelange))
+
+# 7.4.2, 2025-10-30
+
+- Add test for seek to end + defer_seek (PR [#901](https://github.com/piskvorky/smart_open/pull/901), [@ddelange](https://github.com/ddelange))
+
+# 7.4.1, 2025-10-21
+
+- Prefill target branch and new tag on the new GitHub release page (PR [#897](https://github.com/piskvorky/smart_open/pull/897), [@ddelange](https://github.com/ddelange))
+- [s3] Add lower version to boto3 requirement for tcp_keepalive (PR [#899](https://github.com/piskvorky/smart_open/pull/899), [@ddelange](https://github.com/ddelange))
+
+# 7.4.0, 2025-10-20
+
+- Disambiguate URI examples in README.rst (PR [#879](https://github.com/piskvorky/smart_open/pull/879), [@ddelange](https://github.com/ddelange))
+- Remove travis leftover (PR [#881](https://github.com/piskvorky/smart_open/pull/881), [@ddelange](https://github.com/ddelange))
+- build: fix invalid `fallback_version` when builing with `uv` (PR [#884](https://github.com/piskvorky/smart_open/pull/884), [@DeflateAwning](https://github.com/DeflateAwning))
+- Bump the github-actions group with 2 updates (PR [#886](https://github.com/piskvorky/smart_open/pull/886), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Protect against hanging tests (PR [#888](https://github.com/piskvorky/smart_open/pull/888), [@ddelange](https://github.com/ddelange))
+- [s3] Improve handling of InvalidRange and seek on empty file (PR [#889](https://github.com/piskvorky/smart_open/pull/889), [@ddelange](https://github.com/ddelange))
+- Simplify CI, use uv (PR [#890](https://github.com/piskvorky/smart_open/pull/890), [@ddelange](https://github.com/ddelange))
+- Add macos to CI (PR [#891](https://github.com/piskvorky/smart_open/pull/891), [@ddelange](https://github.com/ddelange))
+- [s3] Optimize forward seeks within buffered data to avoid redundant GET (PR [#892](https://github.com/piskvorky/smart_open/pull/892), [@ddelange](https://github.com/ddelange))
+- Run tests in parallel (PR [#893](https://github.com/piskvorky/smart_open/pull/893), [@ddelange](https://github.com/ddelange))
+- [s3] Add range_chunk_size param to read using multiple GET requests (PR [#887](https://github.com/piskvorky/smart_open/pull/887), [@ddelange](https://github.com/ddelange))
+- Drop python 3.8, add python 3.14 (PR [#896](https://github.com/piskvorky/smart_open/pull/896), [@ddelange](https://github.com/ddelange))
+- Use compression.zstd (PEP-784) (PR [#895](https://github.com/piskvorky/smart_open/pull/895), [@Rogdham](https://github.com/Rogdham))
+
 # 7.3.1, 2025-09-08
 
 - Fix release.sh for the final merge back into develop (PR [#872](https://github.com/piskvorky/smart_open/pull/872), [@ddelange](https://github.com/ddelange))
