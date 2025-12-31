@@ -92,7 +92,8 @@ _builtin_open = open
 
 
 @overload
-def open(  # Text modes: 'r' or 'w'
+def open(
+    # Text modes: 'r' or 'w'
     uri: str | pathlib.Path | IO[str],
     mode: Literal["r", "w", 'a'] = "r",
     buffering: int = -1,
@@ -104,8 +105,11 @@ def open(  # Text modes: 'r' or 'w'
     compression: str = ...,
     transport_params: dict[str, Any] | None = ...,
 ) -> TextIO: ...
+
+
 @overload
-def open(  # Binary modes: 'rb' or 'wb'
+def open(
+    # Binary modes: 'rb' or 'wb'
     uri: str | pathlib.Path | IO[bytes],
     mode: Literal["rb", "wb", 'ab', 'rb+', 'wb+', 'ab+'] = "rb",
     buffering: int = -1,

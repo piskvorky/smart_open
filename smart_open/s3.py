@@ -18,7 +18,6 @@ import warnings
 from math import inf
 
 from typing import (
-    IO,
     BinaryIO,
     Callable,
     List,
@@ -324,7 +323,7 @@ def open(
     defer_seek: bool = False,
     client: object | None = None,
     client_kwargs: dict | None = None,
-    writebuffer: IO[bytes] | None = None,
+    writebuffer: BinaryIO | None = None,
     range_chunk_size: int | None = None,
 ) -> BinaryIO:
     """Open an S3 object for reading or writing.
