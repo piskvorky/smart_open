@@ -32,7 +32,7 @@ jobs:
         python -m build
 
     - name: Upload package distributions as release assets
-      uses: softprops/action-gh-release@v2.4.2
+      uses: softprops/action-gh-release@v2.5.0
       with:
         files: dist/*
 
