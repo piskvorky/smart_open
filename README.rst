@@ -79,7 +79,7 @@ How?
   b'User'
 
   >>> # stream from HTTP
-  >>> for line in open('http://example.com/index.html'):
+  >>> for line in open('http://example.com'):
   ...     print(repr(line[:15]))
   ...     break
   '<!doctype html>'
