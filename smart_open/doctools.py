@@ -16,11 +16,21 @@ import inspect
 import io
 import os.path
 import re
+import sys
 
 from . import compression
 from . import transport
 
-PLACEHOLDER = '    smart_open/doctools.py magic goes here'
+#
+# Python 3.13+ automatically trims docstrings (like inspect.cleandoc),
+# so we need to adjust the placeholder and indentation accordingly.
+#
+if sys.version_info >= (3, 13):
+    PLACEHOLDER = 'smart_open/doctools.py magic goes here'
+    LPAD = ''
+else:
+    PLACEHOLDER = '    smart_open/doctools.py magic goes here'
+    LPAD = '    '
 
 
 def extract_kwargs(docstring):
@@ -143,7 +153,7 @@ def to_docstring(kwargs, lpad=''):
     return buf.getvalue()
 
 
-def extract_examples_from_readme_rst(indent='    '):
+def extract_examples_from_readme_rst(indent=None):
     """Extract examples from this project's README.rst file.
 
     Parameters
@@ -160,6 +170,8 @@ def extract_examples_from_readme_rst(indent='    '):
     -----
     Quite fragile, depends on named labels inside the README.rst file.
     """
+    if indent is None:
+        indent = LPAD
     curr_dir = os.path.dirname(os.path.abspath(__file__))
     readme_path = os.path.join(curr_dir, '..', 'README.rst')
     try:
@@ -180,7 +192,7 @@ def tweak_open_docstring(f):
     root_path = os.path.dirname(os.path.dirname(__file__))
 
     with contextlib.redirect_stdout(buf):
-        print('    smart_open supports the following transport mechanisms:')
+        print(f'{LPAD}smart_open supports the following transport mechanisms:')
         print()
         for scheme, submodule in sorted(transport._REGISTRY.items()):
             if scheme == transport.NO_SCHEME or submodule in seen:
@@ -194,27 +206,27 @@ def tweak_open_docstring(f):
 
             relpath = os.path.relpath(submodule.__file__, start=root_path)
             heading = '%s (%s)' % ("/".join(schemes), relpath)
-            print('    %s' % heading)
-            print('    %s' % ('~' * len(heading)))
-            print('    %s' % submodule.__doc__.split('\n')[0])
+            print(f'{LPAD}{heading}')
+            print(f'{LPAD}{"~" * len(heading)}')
+            print(f'{LPAD}{submodule.__doc__.split(chr(10))[0]}')
             print()
 
             kwargs = extract_kwargs(submodule.open.__doc__)
             if kwargs:
-                print(to_docstring(kwargs, lpad=u'    '))
+                print(to_docstring(kwargs, lpad=LPAD))
 
-        print('    Examples')
-        print('    --------')
+        print(f'{LPAD}Examples')
+        print(f'{LPAD}--------')
         print()
-        print(extract_examples_from_readme_rst())
+        print(extract_examples_from_readme_rst(indent=LPAD))
 
-        print('    This function also supports transparent compression and decompression ')
-        print('    using the following codecs:')
+        print(f'{LPAD}This function also supports transparent compression and decompression ')
+        print(f'{LPAD}using the following codecs:')
         print()
         for extension in compression.get_supported_extensions():
-            print('    * %s' % extension)
+            print(f'{LPAD}* {extension}')
         print()
-        print('    The function depends on the file extension to determine the appropriate codec.')
+        print(f'{LPAD}The function depends on the file extension to determine the appropriate codec.')
 
     #
     # The docstring can be None if -OO was passed to the interpreter.
@@ -246,15 +258,15 @@ def tweak_parse_uri_docstring(f):
             schemes.append(scheme)
 
     with contextlib.redirect_stdout(buf):
-        print('    Supported URI schemes are:')
+        print(f'{LPAD}Supported URI schemes are:')
         print()
         for scheme in schemes:
-            print('    * %s' % scheme)
+            print(f'{LPAD}* {scheme}')
         print()
-        print('    Valid URI examples::')
+        print(f'{LPAD}Valid URI examples::')
         print()
         for example in examples:
-            print('    * %s' % example)
+            print(f'{LPAD}* {example}')
 
     if f.__doc__:
         f.__doc__ = f.__doc__.replace(PLACEHOLDER, buf.getvalue())
