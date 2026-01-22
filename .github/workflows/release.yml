@@ -40,8 +40,7 @@ jobs:
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@v1.13.0
 
-    - uses: apexskier/github-release-commenter@v1.3.6
+    - uses: apexskier/github-release-commenter@v1.4.1
       with:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         comment-template: |
           Released {release_link}
