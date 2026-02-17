@@ -40,7 +40,6 @@ https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-bl
 DEFAULT_MAX_CONCURRENCY = 1
 """Default number of parallel connections with which to download."""
 
-
 def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
@@ -57,12 +56,10 @@ def parse_uri(uri_as_string):
 
     return dict(scheme=SCHEME, container_id=container_id, blob_id=blob_id)
 
-
 def open_uri(uri, mode, transport_params):
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     return open(parsed_uri['container_id'], parsed_uri['blob_id'], mode, **kwargs)
-
 
 def open(
         container_id,
@@ -127,7 +124,6 @@ def open(
         )
     else:
         raise NotImplementedError('Azure Blob Storage support for mode %r not implemented' % mode)
-
 
 def _get_blob_client(client, container, blob):
     # type: (Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient], str, str) -> azure.storage.blob.BlobClient  # noqa
@@ -214,7 +210,7 @@ class Reader(io.BufferedIOBase):
             buffer_size=DEFAULT_BUFFER_SIZE,
             line_terminator=smart_open.constants.BINARY_NEWLINE,
             max_concurrency=DEFAULT_MAX_CONCURRENCY,
-    ):
+    ):    
         self._container_name = container
         self._blob_name = blob
 
@@ -277,11 +273,11 @@ class Reader(io.BufferedIOBase):
         :param int offset: The offset in bytes.
         :param int whence: Where the offset is from.
 
-        Returns the position after seeking."""
+        Returns the position after seeking."
         logger.debug('seeking to offset: %r whence: %r', offset, whence)
         if whence not in smart_open.constants.WHENCE_CHOICES:
             raise ValueError('invalid whence %i, expected one of %r' % (whence,
-                                                                       smart_open.constants.WHENCE_CHOICES))
+                                                                        smart_open.constants.WHENCE_CHOICES))
 
         if whence == smart_open.constants.WHENCE_START:
             new_position = offset
@@ -405,15 +401,13 @@ class Writer(io.BufferedIOBase):
     """
     _blob = None  # so `closed` property works in case __init__ fails and __del__ is called
 
-    def __init__(
-            self,
+    def __init__:
             container,
             blob,
             client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
             blob_kwargs=None,
             min_part_size=_DEFAULT_MIN_PART_SIZE,
-    ):
-        self._container_name = container
+    ):        self._container_name = container
         self._blob_name = blob
         self._blob_kwargs = blob_kwargs or {}
         self._min_part_size = min_part_size
@@ -565,29 +559,43 @@ class AppendWriter(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(
-        self,
+    def __init__(self,
         container,
         blob,
         client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
         blob_kwargs=None,
+        min_part_size=_DEFAULT_MIN_PART_SIZE,
     ):
         self._container_name = container
-
-        self._blob = _get_blob_client(client, container, blob)
-        # type: azure.storage.blob.BlobClient
+        self._blob_name = blob
         self._blob_kwargs = blob_kwargs or {}
+        self._min_part_size = min_part_size
+        self._total_size = 0
+        self._current_part = io.BytesIO()
+
+        # type: azure.storage.blob.BlobClient
+        self._blob = _get_blob_client(client, container, blob)
+
+        try:
+            self._initial_size = self._blob.get_blob_properties()['size']
+        except azure.core.exceptions.ResourceNotFoundError:
+            self._initial_size = 0
 
     def flush(self):
         pass
 
     def terminate(self):
         """AppendBlob cannot be aborted, so we do nothing here"""
-        pass
+        if not self.closed:
+            self._current_part = io.BytesIO()
+            self._blob = None
 
     def close(self):
         """No action needed here, as the AppendBlob is automatically committed"""
-        pass
+        if not self.closed:
+            if self._current_part.tell() > 0:
+                self._upload_part()
+            self._blob = None
 
     @property
     def closed(self):
@@ -609,6 +617,10 @@ class AppendWriter(io.BufferedIOBase):
         """Unsupported."""
         raise io.UnsupportedOperation
 
+    def tell(self):
+        """Return the current stream position."""
+        return self._initial_size + self._total_size
+
     def detach(self):
         raise io.UnsupportedOperation("detach() not supported")
 
@@ -618,14 +630,23 @@ class AppendWriter(io.BufferedIOBase):
                 "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b))
             )
 
-        # Uploads data as an AppendBlob type with automatic block chunking.
-        # The AppendBlob will be created at first if it does not exist or append to it if it does already.
-        return self._blob.upload_blob(
-            data=b,
+        self._current_part.write(b)
+        self._total_size += len(b)
+
+        if self._current_part.tell() >= self._min_part_size:
+            self._upload_part()
+
+        return len(b)
+
+    def _upload_part(self):
+        data = self._current_part.getvalue()
+        self._blob.upload_blob(
+            data=data,
             blob_type=azure.storage.blob.BlobType.APPENDBLOB,
             overwrite=False,
             **self._blob_kwargs,
         )
+        self._current_part = io.BytesIO()
 
     def __enter__(self):
         return self
