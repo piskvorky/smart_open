@@ -214,6 +214,10 @@ class FileLikeProxy(wrapt.ObjectProxy):
         super().__init__(outer)
         self.__inner = inner
 
+    def __enter__(self):
+        """This explicit proxy method is only required for pylance ref #916."""
+        return self.__wrapped__.__enter__()
+
     def __exit__(self, *args, **kwargs):
         """Exit inner after exiting outer."""
         try:
