@@ -3,16 +3,20 @@ smart_open — utils for streaming large files in Python
 ======================================================
 
 
-|License|_ |CI|_ |Coveralls|_ |Downloads|_
+|License|_ |CI|_ |Coveralls|_ |Version|_ |Python|_ |Downloads|_
 
 .. |License| image:: https://img.shields.io/pypi/l/smart_open.svg
 .. |CI| image:: https://github.com/piskvorky/smart_open/actions/workflows/python-package.yml/badge.svg?branch=develop&event=push
 .. |Coveralls| image:: https://coveralls.io/repos/github/RaRe-Technologies/smart_open/badge.svg?branch=develop
+.. |Version| image:: https://img.shields.io/pypi/v/smart-open.svg?logo=pypi&logoColor=white
+.. |Python| image:: https://img.shields.io/pypi/pyversions/smart-open.svg?logo=python&logoColor=white
 .. |Downloads| image:: https://pepy.tech/badge/smart-open/month
 .. _License: https://github.com/piskvorky/smart_open/blob/master/LICENSE
 .. _CI: https://github.com/piskvorky/smart_open/actions/workflows/python-package.yml
 .. _Coveralls: https://coveralls.io/github/RaRe-Technologies/smart_open?branch=HEAD
-.. _Downloads: https://pypi.org/project/smart-open/
+.. _Version: https://pypi.org/project/smart-open/
+.. _Python: https://pypi.org/project/smart-open/
+.. _Downloads: https://pypistats.org/packages/smart-open
 
 
 What?
@@ -21,8 +25,6 @@ What?
 ``smart_open`` is a Python 3 library for **efficient streaming of very large files** from/to storages such as S3, GCS, Azure Blob Storage, HDFS, WebHDFS, HTTP, HTTPS, SFTP, or local filesystem. It supports transparent, on-the-fly (de-)compression for a variety of different formats.
 
 ``smart_open`` is a drop-in replacement for Python's built-in ``open()``: it can do anything ``open`` can (100% compatible, falls back to native ``open`` wherever possible), plus lots of nifty extra stuff on top.
-
-**Python 2.7 is no longer supported. If you need Python 2.7, please use** `smart_open 1.10.1 <https://github.com/piskvorky/smart_open/releases/tag/1.10.0>`_, **the last version to support Python 2.**
 
 Why?
 ====
@@ -79,56 +81,49 @@ How?
   b'User'
 
   >>> # stream from HTTP
-  >>> for line in open('http://example.com/index.html'):
+  >>> for line in open('http://example.com'):
   ...     print(repr(line[:15]))
   ...     break
   '<!doctype html>'
 
 .. _doctools_after_examples:
 
-Other examples of URIs that ``smart_open`` accepts::
+For more examples of URIs that ``smart_open`` accepts, see `help.txt <https://github.com/piskvorky/smart_open/blob/master/help.txt>`__ or ``help('smart_open')``.
+Some examples::
 
     s3://bucket/key
     s3://access_key_id:secret_access_key@bucket/key
-    s3://access_key_id:secret_access_key@server:port@bucket/key
     gs://bucket/blob
     azure://bucket/blob
-    hdfs:///path/file
     hdfs://path/file
-    webhdfs://host:port/path/file
-    ./local/path/file
-    ~/local/path/file
-    local/path/file
     ./local/path/file.gz
-    file:///home/user/file
     file:///home/user/file.bz2
-    [ssh|scp|sftp]://username@host//path/file
-    [ssh|scp|sftp]://username@host/path/file
     [ssh|scp|sftp]://username:password@host/path/file
 
 
 Documentation
 =============
 
-The API reference can be viewed at `help.txt <https://github.com/piskvorky/smart_open/blob/master/help.txt>`__
+The API reference can be viewed at `help.txt <https://github.com/piskvorky/smart_open/blob/master/help.txt>`__ or using ``help('smart_open')``.
 
 Installation
 ------------
 
 ``smart_open`` supports a wide range of storage solutions. For all options, see the API reference.
 Each individual solution has its own dependencies.
-By default, ``smart_open`` does not install any dependencies, in order to keep the installation size small.
-You can install one or more of these dependencies explicitly using optional dependencies:
+By default, ``smart_open`` does not install any dependencies in order to keep the installation size small.
+You can install one or more of these dependencies explicitly using optional dependencies defined in
+`pyproject.toml <https://github.com/piskvorky/smart_open/blob/master/pyproject.toml>`__ :
 
-    pip install smart_open[s3,gcs,azure,http,webhdfs,ssh,zst]
+.. code-block:: sh
 
-Or, if you don't mind installing a large number of third party libraries, you can install all dependencies using::
+    pip install 'smart_open[s3,gcs,azure,http,webhdfs,ssh,zst]'
 
-    pip install smart_open[all]
+Or, if you don't mind installing a large number of third party libraries, you can install all dependencies using:
 
-Be warned that this option increases the installation size significantly, e.g. over 100MB.
+.. code-block:: sh
 
-If you're upgrading from ``smart_open`` versions 2.x and below, please check out the `Migration Guide <MIGRATING_FROM_OLDER_VERSIONS.rst>`_.
+    pip install 'smart_open[all]'
 
 Built-in help
 -------------
@@ -144,9 +139,11 @@ or view `help.txt <https://github.com/piskvorky/smart_open/blob/master/help.txt>
 More examples
 -------------
 
-For the sake of simplicity, the examples below assume you have all the dependencies installed, i.e. you have done::
+For the sake of simplicity, the examples below assume you have all the dependencies installed, i.e. you have done:
 
-    pip install smart_open[all]
+.. code-block:: sh
+
+    pip install 'smart_open[all]'
 
 .. code-block:: python
 
@@ -237,11 +234,14 @@ The supported values for this parameter are:
 
 - ``infer_from_extension`` (default behavior)
 - ``disable``
-- ``.gz``
 - ``.bz2``
+- ``.gz``
+- ``.xz``
 - ``.zst``
 
-By default, ``smart_open`` determines the compression algorithm to use based on the file extension.
+By default, ``smart_open`` automatically (de)compresses the file if the filename ends with one of these extensions.
+`See also <https://github.com/piskvorky/smart_open/blob/master/smart_open/compression.py>`__
+``smart_open.compression.get_supported_compression_types`` and ``mart_open.compression.register_compressor``.
 
 .. code-block:: python
 
@@ -292,13 +292,15 @@ This is just an example: ``lzma`` is in the standard library and is registered b
 Transport-specific Options
 --------------------------
 
-``smart_open`` supports a wide range of transport options out of the box, including:
+``smart_open`` supports a wide range of transport options out of the box.
+For the full list of supported URI schemes, see `help.txt <https://github.com/piskvorky/smart_open/blob/master/help.txt>`__ or ``help('smart_open')``.
+Some examples::
 
-- S3
+- AWS S3 (and any S3-Compatible)
 - HTTP, HTTPS (read-only)
 - SSH, SCP and SFTP
-- WebHDFS
-- GCS
+- HDFS / WebHDFS
+- Google Cloud Storage
 - Azure Blob Storage
 
 Each option involves setting up its own set of parameters.
@@ -312,7 +314,7 @@ Here are some examples of using this parameter:
   >>> fin = open('s3://commoncrawl/robots.txt', transport_params=dict(client=boto3.client('s3')))
   >>> fin = open('s3://commoncrawl/robots.txt', transport_params=dict(buffer_size=1024))
 
-For the full list of keyword arguments supported by each transport option, see the documentation:
+For the full list of keyword arguments supported by each transport option, see `help.txt <https://github.com/piskvorky/smart_open/blob/master/help.txt>`__ or ``help('smart_open')``.
 
 .. code-block:: python
 

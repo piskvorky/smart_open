@@ -1,3 +1,13 @@
+# 7.5.1, 2026-02-23
+
+- Bump the github-actions group with 2 updates (PR [#910](https://github.com/piskvorky/smart_open/pull/910), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Bump minimum supported version to Python 3.10 (PR [#911](https://github.com/piskvorky/smart_open/pull/911), [@DeflateAwning](https://github.com/DeflateAwning))
+- Bump softprops/action-gh-release from 2.4.2 to 2.5.0 in the github-actions group (PR [#912](https://github.com/piskvorky/smart_open/pull/912), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Fix doctest (PR [#913](https://github.com/piskvorky/smart_open/pull/913), [@ddelange](https://github.com/ddelange))
+- Pin github-release-commenter (PR [#914](https://github.com/piskvorky/smart_open/pull/914), [@ddelange](https://github.com/ddelange))
+- Add more references to README.rst (PR [#915](https://github.com/piskvorky/smart_open/pull/915), [@ddelange](https://github.com/ddelange))
+- Fix pylance complaint (PR [#917](https://github.com/piskvorky/smart_open/pull/917), [@ddelange](https://github.com/ddelange))
+
 # 7.5.0, 2025-11-08
 
 - [s3] Support very large buckets in iter_bucket, add client_kwars (PR [#908](https://github.com/piskvorky/smart_open/pull/908), [@ddelange](https://github.com/ddelange))
