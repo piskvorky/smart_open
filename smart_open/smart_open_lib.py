@@ -14,6 +14,7 @@ import logging
 import os
 import os.path as P
 import pathlib
+from typing import IO, Any, BinaryIO, Literal, TextIO, overload
 import urllib.parse
 import warnings
 
@@ -90,18 +91,50 @@ _parse_uri = parse_uri
 _builtin_open = open
 
 
+@overload
 def open(
-        uri,
-        mode='r',
-        buffering=-1,
-        encoding=None,
-        errors=None,
-        newline=None,
-        closefd=True,
-        opener=None,
-        compression=so_compression.INFER_FROM_EXTENSION,
-        transport_params=None,
-        ):
+    # Text modes: 'r' or 'w'
+    uri: str | pathlib.Path | IO[str],
+    mode: Literal["r", "w", 'a'] = "r",
+    buffering: int = -1,
+    encoding: str | None = ...,
+    errors: str | None = ...,
+    newline: str | None = ...,
+    closefd: bool = ...,
+    opener: object | None = ...,
+    compression: str = ...,
+    transport_params: dict[str, Any] | None = ...,
+) -> TextIO: ...
+
+
+@overload
+def open(
+    # Binary modes: 'rb' or 'wb'
+    uri: str | pathlib.Path | IO[bytes],
+    mode: Literal["rb", "wb", 'ab', 'rb+', 'wb+', 'ab+'] = "rb",
+    buffering: int = -1,
+    encoding: None = ...,
+    errors: None = ...,
+    newline: None = ...,
+    closefd: bool = ...,
+    opener: object | None = ...,
+    compression: str = ...,
+    transport_params: dict[str, Any] | None = ...,
+) -> BinaryIO: ...
+
+
+def open(
+    uri: str | pathlib.Path | IO,
+    mode: Literal['r', 'rb', 'w', 'wb', 'a', 'ab', 'rb+', 'wb+', 'ab+'] = 'r',
+    buffering: int = -1,
+    encoding: str | None = None,
+    errors: str | None = None,
+    newline: str | None = None,
+    closefd: bool = True,
+    opener: object | None = None,
+    compression: str = so_compression.INFER_FROM_EXTENSION,
+    transport_params: dict[str, Any] | None = None,
+) -> IO:
     r"""Open the URI object, returning a file-like object.
 
     The URI is usually a string in a variety of formats.
@@ -117,19 +150,19 @@ def open(
     uri: str or object
         The object to open.
     mode: str, optional
-        Mimicks built-in open parameter of the same name.
+        Mimics built-in open parameter of the same name.
     buffering: int, optional
-        Mimicks built-in open parameter of the same name.
+        Mimics built-in open parameter of the same name.
     encoding: str, optional
-        Mimicks built-in open parameter of the same name.
+        Mimics built-in open parameter of the same name.
     errors: str, optional
-        Mimicks built-in open parameter of the same name.
+        Mimics built-in open parameter of the same name.
     newline: str, optional
-        Mimicks built-in open parameter of the same name.
+        Mimics built-in open parameter of the same name.
     closefd: boolean, optional
-        Mimicks built-in open parameter of the same name.  Ignored.
+        Mimics built-in open parameter of the same name.  Ignored.
     opener: object, optional
-        Mimicks built-in open parameter of the same name.  Ignored.
+        Mimics built-in open parameter of the same name.  Ignored.
     compression: str, optional (see smart_open.compression.get_supported_compression_types)
         Explicitly specify the compression/decompression behavior.
     transport_params: dict, optional

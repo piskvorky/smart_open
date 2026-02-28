@@ -18,9 +18,11 @@ import warnings
 from math import inf
 
 from typing import (
+    BinaryIO,
     Callable,
     List,
     TYPE_CHECKING,
+    Literal,
 )
 
 try:
@@ -311,19 +313,19 @@ def open_uri(uri, mode, transport_params):
 
 
 def open(
-    bucket_id,
-    key_id,
-    mode,
-    version_id=None,
-    buffer_size=DEFAULT_BUFFER_SIZE,
-    min_part_size=DEFAULT_PART_SIZE,
-    multipart_upload=True,
-    defer_seek=False,
-    client=None,
-    client_kwargs=None,
-    writebuffer=None,
-    range_chunk_size=None,
-):
+    bucket_id: str,
+    key_id: str,
+    mode: Literal["rb", "wb"],
+    version_id: str | None = None,
+    buffer_size: int = DEFAULT_BUFFER_SIZE,
+    min_part_size: int = DEFAULT_PART_SIZE,
+    multipart_upload: bool = True,
+    defer_seek: bool = False,
+    client: object | None = None,
+    client_kwargs: dict | None = None,
+    writebuffer: BinaryIO | None = None,
+    range_chunk_size: int | None = None,
+) -> BinaryIO:
     """Open an S3 object for reading or writing.
 
     Parameters
