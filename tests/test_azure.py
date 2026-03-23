@@ -1009,19 +1009,19 @@ class AppendWriterTest(unittest.TestCase):
         self.assertEqual(output, [test_string])
 
     def test_append_compressed_gzip(self):
-        """
-        Does appending into an Azure Blob file work correctly when the file is compressed?
-        We should be able to append into a compressed file. We will test this with a Gzip file.
-        """
-        expected = u'а не спеть ли мне песню... о любви'.encode('utf-8')
-        blob_name = "test_append_gzip_%s" % BLOB_NAME
+        """Does appending to a gzip-compressed Azure Blob work via smart_open.open?"""
+        expected = "а не спеть ли мне песню... о любви".encode("utf-8")
+        blob_name = "test_append_gzip_%s.gz" % BLOB_NAME
+        uri = "azure://%s/%s" % (CONTAINER_NAME, blob_name)
+        tp = dict(client=CLIENT)
 
-        with smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT) as fout:
-            with gzip.GzipFile(fileobj=fout, mode='w') as zipfile:
-                zipfile.write(expected)
+        with smart_open.open(uri, "ab", transport_params=tp) as fp:
+            fp.write(expected)
 
-        with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
-            with gzip.GzipFile(fileobj=fin) as zipfile:
-                actual = zipfile.read()
+        with smart_open.open(uri, "ab", transport_params=tp) as fp:
+            fp.write(expected)
 
-        self.assertEqual(expected, actual)
+        with smart_open.open(uri, "rb", transport_params=tp) as fp:
+            actual = fp.read()
+
+        self.assertEqual(actual, expected * 2)
