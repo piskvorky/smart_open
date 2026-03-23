@@ -620,13 +620,10 @@ class AppendWriter(io.BufferedIOBase):
             raise TypeError(
                 "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b))
             )
-
         self._current_part.write(b)
         self._total_size += len(b)
-
         if self._current_part.tell() >= self._min_part_size:
             self._upload_part()
-
         return len(b)
 
     def _upload_part(self):
