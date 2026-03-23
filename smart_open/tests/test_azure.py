@@ -51,6 +51,8 @@ class FakeBlobClient(object):
         self.metadata = dict(size=0)
         self.__contents = io.BytesIO()
         self._staged_contents = {}
+        self._blob_type = None
+        self._exists = False
 
     def commit_block_list(self, block_list, metadata=None):
         data = b''.join([self._staged_contents[block_blob['id']] for block_blob in block_list])
@@ -58,6 +60,8 @@ class FakeBlobClient(object):
         metadata = metadata or {}
         metadata.update({"size": len(data)})
         self.set_blob_metadata(metadata)
+        self._blob_type = azure.storage.blob.BlobType.BLOCKBLOB
+        self._exists = True
         self._container_client.register_blob_client(self)
         self._staged_contents = {}
 
@@ -71,6 +75,10 @@ class FakeBlobClient(object):
         return io.BytesIO(self.__contents.read(length))
 
     def get_blob_properties(self):
+        if not self._exists:
+            raise azure.core.exceptions.ResourceNotFoundError(
+                'The specified blob does not exist.'
+            )
         return self.metadata
 
     def get_block_list(self, block_list_type: Literal['all', 'uncommitted', 'committed'] = 'committed'):
@@ -85,10 +93,27 @@ class FakeBlobClient(object):
         self._staged_contents[block_id] = data
 
     def upload_blob(self, data, length=None, metadata=None, **kwargs):
-        if metadata is not None:
-            self.set_blob_metadata(metadata)
-        self.__contents = io.BytesIO(data[:length])
-        self.set_blob_metadata(dict(size=len(data[:length])))
+        blob_type = kwargs.get('blob_type')
+
+        if blob_type == azure.storage.blob.BlobType.APPENDBLOB:
+            if self._exists and self._blob_type != azure.storage.blob.BlobType.APPENDBLOB:
+                raise azure.core.exceptions.ResourceExistsError(
+                    'The blob type is invalid for this operation.'
+                )
+            self._blob_type = azure.storage.blob.BlobType.APPENDBLOB
+            self._exists = True
+            # Append to existing contents
+            existing = self.__contents.getvalue()
+            new_data = data[:length] if length is not None else data
+            self.__contents = io.BytesIO(existing + new_data)
+            self.set_blob_metadata(dict(size=len(existing + new_data)))
+        else:
+            if metadata is not None:
+                self.set_blob_metadata(metadata)
+            self.__contents = io.BytesIO(data[:length])
+            self.set_blob_metadata(dict(size=len(data[:length])))
+            self._blob_type = blob_type
+            self._exists = True
         self._container_client.register_blob_client(self)
 
 
@@ -127,7 +152,7 @@ class FakeContainerClient(object):
     def delete_blob(self, blob):
         del self.__blob_clients[blob.blob_name]
 
-    def delete_blobs(self):
+    def delete_blobs(self, **kwargs):
         self.__blob_clients = OrderedDict()
 
     def delete_container(self):
@@ -924,7 +949,7 @@ class AppendWriterTest(unittest.TestCase):
     def test_append_on_error(self):
         """
         Does appending into an Azure Blob file work correctly when an error occurs?
-        It cannot be aborted, so the file should be written anyway.
+        With buffering, unflushed data is discarded on error (same as Writer).
         """
         test_string = u"žluťoučký koníček".encode('utf8')
         blob_name = "test_append_on_error_%s" % BLOB_NAME
@@ -935,12 +960,15 @@ class AppendWriterTest(unittest.TestCase):
                 raise ValueError
         except ValueError:
             pass
-        output = list(smart_open.open(
-            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
-            "rb",
-            transport_params=dict(client=CLIENT),
-        ))
-        self.assertEqual(output, [test_string])
+        # Small write stays in buffer; terminate() discards it, so the blob
+        # is never created.  Opening a non-existent blob for reading raises
+        # ResourceNotFoundError.
+        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
+            smart_open.open(
+                "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+                "rb",
+                transport_params=dict(client=CLIENT),
+            )
 
     def test_append_multiple(self):
         """Does appending multiple times into an Azure Blob file work correctly?"""
