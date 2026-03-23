@@ -565,29 +565,38 @@ class AppendWriter(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(
-        self,
+    def __init__(self,
         container,
         blob,
         client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
         blob_kwargs=None,
+        min_part_size=_DEFAULT_MIN_PART_SIZE,
     ):
         self._container_name = container
-
-        self._blob = _get_blob_client(client, container, blob)
-        # type: azure.storage.blob.BlobClient
+        self._blob_name = blob
         self._blob_kwargs = blob_kwargs or {}
+        self._min_part_size = min_part_size
+        self._total_size = 0
+        self._current_part = io.BytesIO()
+
+        # type: azure.storage.blob.BlobClient
+        self._blob = _get_blob_client(client, container, blob)
 
     def flush(self):
         pass
 
     def terminate(self):
         """AppendBlob cannot be aborted, so we do nothing here"""
-        pass
+        if not self.closed:
+            self._current_part = io.BytesIO()
+            self._blob = None
 
     def close(self):
         """No action needed here, as the AppendBlob is automatically committed"""
-        pass
+        if not self.closed:
+            if self._current_part.tell() > 0:
+                self._upload_part()
+            self._blob = None
 
     @property
     def closed(self):
@@ -609,6 +618,10 @@ class AppendWriter(io.BufferedIOBase):
         """Unsupported."""
         raise io.UnsupportedOperation
 
+    def tell(self):
+        """Return the current stream position."""
+        return self._total_size
+
     def detach(self):
         raise io.UnsupportedOperation("detach() not supported")
 
@@ -618,14 +631,23 @@ class AppendWriter(io.BufferedIOBase):
                 "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b))
             )
 
-        # Uploads data as an AppendBlob type with automatic block chunking.
-        # The AppendBlob will be created at first if it does not exist or append to it if it does already.
-        return self._blob.upload_blob(
-            data=b,
+        self._current_part.write(b)
+        self._total_size += len(b)
+
+        if self._current_part.tell() >= self._min_part_size:
+            self._upload_part()
+
+        return len(b)
+
+    def _upload_part(self):
+        data = self._current_part.getvalue()
+        self._blob.upload_blob(
+            data=data,
             blob_type=azure.storage.blob.BlobType.APPENDBLOB,
             overwrite=False,
             **self._blob_kwargs,
         )
+        self._current_part = io.BytesIO()
 
     def __enter__(self):
         return self
