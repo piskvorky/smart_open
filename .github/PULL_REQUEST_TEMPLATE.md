@@ -1,6 +1,8 @@
 > Please **pick a concise, informative and complete title** for your PR.
 > 
-> The title is important because it will appear in [our change log](https://github.com/RaRe-Technologies/smart_open/blob/master/CHANGELOG.md).
+> The title is important because it will appear in [`CHANGELOG.md`](/CHANGELOG.md).
+
+
 
 ### Motivation
 
@@ -11,6 +13,8 @@
 > If you're adding a new feature, then consider opening a ticket and discussing it with the maintainers before you actually do the hard work.
 
 Fixes #{issue_number}
+
+
 
 ### Tests
 
@@ -25,9 +29,11 @@ Fixes #{issue_number}
 > Make sure all existing unit tests pass.
 > You can run them locally using:
 > 
->     pytest smart_open
+>     pytest tests
 > 
 > If there are any failures, please fix them before creating the PR (or mark it as WIP, see below).
+
+
 
 ### Work in progress
 
@@ -36,6 +42,8 @@ Fixes #{issue_number}
 > We'll skip reviewing it for the time being.
 > 
 > Once it's ready, mark the PR as "ready for review", and ping one of the maintainers (e.g. mpenkov).
+
+
 
 ### Checklist
 
@@ -47,6 +55,8 @@ Fixes #{issue_number}
 - [ ] Included tests for any new functionality
 - [ ] Run `python update_helptext.py` in case there are API changes
 - [ ] Checked that all unit tests pass
+
+
 
 ### Workflow
 

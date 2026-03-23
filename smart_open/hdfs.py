@@ -68,11 +68,6 @@ class CliRawInputBase(io.RawIOBase):
         self._uri = uri
         self._sub = subprocess.Popen(["hdfs", "dfs", '-cat', self._uri], stdout=subprocess.PIPE)
 
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
-
     #
     # Override some methods from io.IOBase.
     #
@@ -131,11 +126,6 @@ class CliRawOutputBase(io.RawIOBase):
         self._uri = uri
         self._sub = subprocess.Popen(["hdfs", "dfs", '-put', '-f', '-', self._uri],
                                      stdin=subprocess.PIPE)
-
-        #
-        # This member is part of the io.RawIOBase interface.
-        #
-        self.raw = None
 
     def close(self):
         logger.debug("close: called")

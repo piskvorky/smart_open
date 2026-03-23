@@ -169,7 +169,7 @@ def safe_urlsplit(url):
     See Also
     --------
     https://bugs.python.org/issue43882
-    https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
+    https://github.com/python/cpython/blob/3.14/Lib/urllib/parse.py
     https://github.com/piskvorky/smart_open/issues/285
     https://github.com/piskvorky/smart_open/issues/458
     smart_open/utils.py:QUESTION_MARK_PLACEHOLDER
@@ -213,6 +213,10 @@ class FileLikeProxy(wrapt.ObjectProxy):
     def __init__(self, outer, inner):
         super().__init__(outer)
         self.__inner = inner
+
+    def __enter__(self):
+        """This explicit proxy method is only required for pylance ref #916."""
+        return self.__wrapped__.__enter__()
 
     def __exit__(self, *args, **kwargs):
         """Exit inner after exiting outer."""

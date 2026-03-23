@@ -235,11 +235,6 @@ class Reader(io.BufferedIOBase):
         self._current_part = smart_open.bytebuffer.ByteBuffer(buffer_size)
         self._line_terminator = line_terminator
 
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
-
     #
     # Override some methods from io.IOBase.
     #
@@ -425,11 +420,6 @@ class Writer(io.BufferedIOBase):
 
         # type: azure.storage.blob.BlobClient
         self._blob = _get_blob_client(client, container, blob)
-
-        #
-        # This member is part of the io.BufferedIOBase interface.
-        #
-        self.raw = None
 
     def flush(self):
         pass

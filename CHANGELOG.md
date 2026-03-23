@@ -1,3 +1,78 @@
+# 7.5.1, 2026-02-23
+
+- Bump the github-actions group with 2 updates (PR [#910](https://github.com/piskvorky/smart_open/pull/910), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Bump minimum supported version to Python 3.10 (PR [#911](https://github.com/piskvorky/smart_open/pull/911), [@DeflateAwning](https://github.com/DeflateAwning))
+- Bump softprops/action-gh-release from 2.4.2 to 2.5.0 in the github-actions group (PR [#912](https://github.com/piskvorky/smart_open/pull/912), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Fix doctest (PR [#913](https://github.com/piskvorky/smart_open/pull/913), [@ddelange](https://github.com/ddelange))
+- Pin github-release-commenter (PR [#914](https://github.com/piskvorky/smart_open/pull/914), [@ddelange](https://github.com/ddelange))
+- Add more references to README.rst (PR [#915](https://github.com/piskvorky/smart_open/pull/915), [@ddelange](https://github.com/ddelange))
+- Fix pylance complaint (PR [#917](https://github.com/piskvorky/smart_open/pull/917), [@ddelange](https://github.com/ddelange))
+
+# 7.5.0, 2025-11-08
+
+- [s3] Support very large buckets in iter_bucket, add client_kwars (PR [#908](https://github.com/piskvorky/smart_open/pull/908), [@ddelange](https://github.com/ddelange))
+
+# 7.4.4, 2025-11-04
+
+- [http] Eliminate _read_iter and simplify read (PR [#906](https://github.com/piskvorky/smart_open/pull/906), [@ddelange](https://github.com/ddelange))
+- [http] Re-introduce read optimization when buffer is empty (PR [#907](https://github.com/piskvorky/smart_open/pull/907), [@ddelange](https://github.com/ddelange))
+
+# 7.4.3, 2025-11-03
+
+- Simplify WHENCE_END logic (PR [#902](https://github.com/piskvorky/smart_open/pull/902), [@ddelange](https://github.com/ddelange))
+- Bump the github-actions group with 2 updates (PR [#903](https://github.com/piskvorky/smart_open/pull/903), [@dependabot[bot]](https://github.com/apps/dependabot))
+- [docs] Readability fixes in release instructions (PR [#904](https://github.com/piskvorky/smart_open/pull/904), [@ddelange](https://github.com/ddelange))
+- [http] Avoid using response.iter_content (PR [#905](https://github.com/piskvorky/smart_open/pull/905), [@ddelange](https://github.com/ddelange))
+
+# 7.4.2, 2025-10-30
+
+- Add test for seek to end + defer_seek (PR [#901](https://github.com/piskvorky/smart_open/pull/901), [@ddelange](https://github.com/ddelange))
+
+# 7.4.1, 2025-10-21
+
+- Prefill target branch and new tag on the new GitHub release page (PR [#897](https://github.com/piskvorky/smart_open/pull/897), [@ddelange](https://github.com/ddelange))
+- [s3] Add lower version to boto3 requirement for tcp_keepalive (PR [#899](https://github.com/piskvorky/smart_open/pull/899), [@ddelange](https://github.com/ddelange))
+
+# 7.4.0, 2025-10-20
+
+- Disambiguate URI examples in README.rst (PR [#879](https://github.com/piskvorky/smart_open/pull/879), [@ddelange](https://github.com/ddelange))
+- Remove travis leftover (PR [#881](https://github.com/piskvorky/smart_open/pull/881), [@ddelange](https://github.com/ddelange))
+- build: fix invalid `fallback_version` when builing with `uv` (PR [#884](https://github.com/piskvorky/smart_open/pull/884), [@DeflateAwning](https://github.com/DeflateAwning))
+- Bump the github-actions group with 2 updates (PR [#886](https://github.com/piskvorky/smart_open/pull/886), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Protect against hanging tests (PR [#888](https://github.com/piskvorky/smart_open/pull/888), [@ddelange](https://github.com/ddelange))
+- [s3] Improve handling of InvalidRange and seek on empty file (PR [#889](https://github.com/piskvorky/smart_open/pull/889), [@ddelange](https://github.com/ddelange))
+- Simplify CI, use uv (PR [#890](https://github.com/piskvorky/smart_open/pull/890), [@ddelange](https://github.com/ddelange))
+- Add macos to CI (PR [#891](https://github.com/piskvorky/smart_open/pull/891), [@ddelange](https://github.com/ddelange))
+- [s3] Optimize forward seeks within buffered data to avoid redundant GET (PR [#892](https://github.com/piskvorky/smart_open/pull/892), [@ddelange](https://github.com/ddelange))
+- Run tests in parallel (PR [#893](https://github.com/piskvorky/smart_open/pull/893), [@ddelange](https://github.com/ddelange))
+- [s3] Add range_chunk_size param to read using multiple GET requests (PR [#887](https://github.com/piskvorky/smart_open/pull/887), [@ddelange](https://github.com/ddelange))
+- Drop python 3.8, add python 3.14 (PR [#896](https://github.com/piskvorky/smart_open/pull/896), [@ddelange](https://github.com/ddelange))
+- Use compression.zstd (PEP-784) (PR [#895](https://github.com/piskvorky/smart_open/pull/895), [@Rogdham](https://github.com/Rogdham))
+
+# 7.3.1, 2025-09-08
+
+- Fix release.sh for the final merge back into develop (PR [#872](https://github.com/piskvorky/smart_open/pull/872), [@ddelange](https://github.com/ddelange))
+- Bump actions/checkout from 4 to 5 in the github-actions group (PR [#877](https://github.com/piskvorky/smart_open/pull/877), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Bump pypa/gh-action-pypi-publish from 1.12.4 to 1.13.0 in /.github/workflows (PR [#878](https://github.com/piskvorky/smart_open/pull/878), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Add .xz and increase performance of compression module (PR [#875](https://github.com/piskvorky/smart_open/pull/875), [@ddelange](https://github.com/ddelange))
+
+# 7.3.0.post1, 2025-07-03
+
+- Fix release.sh merge message and final merge (PR [#868](https://github.com/piskvorky/smart_open/pull/868), [@ddelange](https://github.com/ddelange))
+- Bump softprops/action-gh-release from 2.2.1 to 2.3.2 in the github-actions group (PR [#867](https://github.com/piskvorky/smart_open/pull/867), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Fix CI badge (PR [#869](https://github.com/piskvorky/smart_open/pull/869), [@ddelange](https://github.com/ddelange))
+- Drop 3.7 support in pyproject.toml (PR [#871](https://github.com/piskvorky/smart_open/pull/871), [@ddelange](https://github.com/ddelange))
+
+# 7.3.0, 2025-07-01
+
+- Remove head_bucket call from s3.SinglepartWriter (PR [#857](https://github.com/piskvorky/smart_open/pull/857), [@ddelange](https://github.com/ddelange))
+- Add help.txt linting step (PR [#853](https://github.com/piskvorky/smart_open/pull/853), [@ddelange](https://github.com/ddelange))
+- Add buffer_size transport param to ssh.py (PR [#861](https://github.com/piskvorky/smart_open/pull/861), [@ddelange](https://github.com/ddelange))
+- Fix integration test CI rot (PR [#864](https://github.com/piskvorky/smart_open/pull/864), [@ddelange](https://github.com/ddelange))
+- Fix try-except in ssh.py for missing port in ssh config (PR [#863](https://github.com/piskvorky/smart_open/pull/863), [@ddelange](https://github.com/ddelange))
+- Make s3.SinglepartWriter seekable (PR [#854](https://github.com/piskvorky/smart_open/pull/854), [@ddelange](https://github.com/ddelange))
+- Modernize python packaging (PR [#851](https://github.com/piskvorky/smart_open/pull/851), [@ddelange](https://github.com/ddelange))
+
 # 7.2.0, 2025-03-06
 
 - Add support for prefetching to sftp transport (PR [#849](https://github.com/piskvorky/smart_open/pull/849), [@davidszotten](https://github.com/davidszotten))
@@ -501,4 +576,3 @@ The old `smart_open.smart_open` function is deprecated, but continues to work as
 
   - support for multistream bzip files (PR #9, @pombredanne)
   - introduce this CHANGELOG
-

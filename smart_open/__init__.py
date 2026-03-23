@@ -22,15 +22,18 @@ The main functions are:
 
 """
 
+import contextlib
 import logging
+from importlib.metadata import PackageNotFoundError, version
 
+with contextlib.suppress(PackageNotFoundError):
+    __version__ = version("smart_open")
 #
 # Prevent regression of #474 and #475
 #
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-from smart_open import version  # noqa: E402
 from .smart_open_lib import open, parse_uri, smart_open, register_compressor  # noqa: E402
 
 _WARNING = """smart_open.s3_iter_bucket is deprecated and will stop functioning
@@ -75,5 +78,3 @@ __all__ = [
     's3_iter_bucket',
     'smart_open',
 ]
-
-__version__ = version.__version__

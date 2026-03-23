@@ -1,4 +1,4 @@
-include LICENSE
-include README.rst
-include MIGRATING_FROM_OLDER_VERSIONS.rst
-include CHANGELOG.md
+global-exclude *
+include pyproject.toml
+graft smart_open
+global-exclude *.pyc

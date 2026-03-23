@@ -21,7 +21,7 @@ Tests should pass:
 pytest
 ```
 
-Thats it! When you're done, deactivate the venv:
+That's it! When you're done, deactivate the venv:
 
 ```sh
 deactivate

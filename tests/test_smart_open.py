@@ -36,7 +36,8 @@ import smart_open
 from smart_open import smart_open_lib
 from smart_open import webhdfs
 from smart_open.smart_open_lib import patch_pathlib, _patch_pathlib
-from smart_open.tests.test_s3 import patch_invalid_range_response
+
+from .test_s3 import patch_invalid_range_response
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ _resource = functools.partial(boto3.resource, region_name='us-east-1')
 # For Windows platforms, under which tempfile.NamedTemporaryFile has some
 # unwanted quirks.
 #
-# https://docs.python.org/3.8/library/tempfile.html#tempfile.NamedTemporaryFile
+# https://docs.python.org/3.14/library/tempfile.html#tempfile.NamedTemporaryFile
 # https://stackoverflow.com/a/58955530
 #
 @contextlib.contextmanager
@@ -77,28 +78,37 @@ def named_temporary_file(mode='w+b', prefix=None, suffix=None, delete=True):
             logger.error(e)
 
 
-def test_zst_write():
-    with named_temporary_file(suffix=".zst") as tmp:
-        with smart_open.open(tmp.name, "wt") as fout:
-            print("hello world", file=fout)
-            print("this is a test", file=fout)
+def test_compression_extensions():
+    for extension in smart_open.compression.get_supported_extensions():
+        with named_temporary_file(suffix=extension) as tmp:
+            with smart_open.open(tmp.name, "wt") as fout:
+                print("hello world", file=fout)
+                print("this is a test", file=fout)
 
-        with smart_open.open(tmp.name, "rt") as fin:
-            got = list(fin)
+            with smart_open.open(tmp.name, "rt") as fin:
+                got = list(fin)
 
-    assert got == ["hello world\n", "this is a test\n"]
+        assert got == ["hello world\n", "this is a test\n"], f"Error for {extension=}, mode='wt'"
 
+        with named_temporary_file(suffix=extension) as tmp:
+            with smart_open.open(tmp.name, "w") as fout:
+                fout.write("hello world\n")
+                fout.write("this is a test\n")
 
-def test_zst_write_binary():
-    with named_temporary_file(suffix=".zst") as tmp:
-        with smart_open.open(tmp.name, "wb") as fout:
-            fout.write(b"hello world\n")
-            fout.write(b"this is a test\n")
+            with smart_open.open(tmp.name, "r") as fin:
+                got = list(fin)
 
-        with smart_open.open(tmp.name, "rb") as fin:
-            got = list(fin)
+        assert got == ["hello world\n", "this is a test\n"], f"Error for {extension=}, mode='w'"
 
-    assert got == [b"hello world\n", b"this is a test\n"]
+        with named_temporary_file(suffix=extension) as tmp:
+            with smart_open.open(tmp.name, "wb") as fout:
+                fout.write(b"hello world\n")
+                fout.write(b"this is a test\n")
+
+            with smart_open.open(tmp.name, "rb") as fin:
+                got = list(fin)
+
+        assert got == [b"hello world\n", b"this is a test\n"], f"Error for {extension=}, mode='wb'"
 
 
 class ParseUriTest(unittest.TestCase):
@@ -1121,7 +1131,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
     @mock.patch('boto3.client')
     def test_no_kwargs(self, mock_client):
         smart_open.open('s3://mybucket/mykey', transport_params=dict(defer_seek=True))
-        mock_client.assert_called_with('s3')
+        mock_client.assert_called_with('s3', config=mock_client.call_args.kwargs['config'])
 
     @mock.patch('boto3.client')
     def test_credentials(self, mock_client):
@@ -1130,6 +1140,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             's3',
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret',
+            config=mock_client.call_args.kwargs['config'],
         )
 
     @mock.patch('boto3.client')
@@ -1146,6 +1157,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             aws_access_key_id='access_id',
             aws_secret_access_key='access_secret',
             endpoint_url='http://aa.domain.com',
+            config=mock_client.call_args.kwargs['config'],
         )
 
     @mock.patch('boto3.client')
@@ -1278,7 +1290,11 @@ class SmartOpenTest(unittest.TestCase):
             }
         }
         smart_open.open("s3://mybucket/mykey", "w", transport_params=transport_params)
-        mock_client.assert_called_with('s3', endpoint_url='http://s3.amazonaws.com')
+        mock_client.assert_called_with(
+            's3',
+            endpoint_url='http://s3.amazonaws.com',
+            config=mock_client.call_args.kwargs['config'],
+        )
 
     @mock.patch('smart_open.hdfs.subprocess')
     def test_hdfs(self, mock_subprocess):
