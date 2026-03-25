@@ -555,7 +555,8 @@ class AppendWriter(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library."""
 
-    def __init__(self,
+    def __init__(
+        self,
         container,
         blob,
         client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
