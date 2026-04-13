@@ -1025,3 +1025,33 @@ class AppendWriterTest(unittest.TestCase):
             actual = fp.read()
 
         self.assertEqual(actual, expected * 2)
+
+    def test_append_min_part_size_buffering(self):
+        """Does the min_part_size buffering mechanic work correctly for AppendWriter?
+
+        A write smaller than min_part_size should stay in the buffer without
+        triggering an upload.  Once the buffer reaches min_part_size, the upload
+        should be triggered.
+        """
+        min_part_size = 256 * 1024
+        blob_name = "test_append_min_part_size_%s" % BLOB_NAME
+
+        with smart_open.azure.AppendWriter(
+            CONTAINER_NAME, blob_name, CLIENT, min_part_size=min_part_size
+        ) as fout:
+            # First write: min_part_size - 1 bytes, should stay in buffer
+            first_part = b"x" * (min_part_size - 1)
+            fout.write(first_part)
+            self.assertEqual(fout._current_part.tell(), min_part_size - 1)
+
+            # Second write: 1 byte reaches min_part_size, triggers upload
+            fout.write(b"y")
+            self.assertEqual(fout._current_part.tell(), 0)
+
+        # Verify the data was written correctly
+        output = list(smart_open.open(
+            "azure://%s/%s" % (CONTAINER_NAME, blob_name),
+            "rb",
+            transport_params=dict(client=CLIENT),
+        ))
+        self.assertEqual(output, [first_part + b"y"])

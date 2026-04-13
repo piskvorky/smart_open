@@ -467,6 +467,8 @@ Additional keyword arguments can be propagated to the ``commit_block_list`` meth
     kwargs = {'metadata': {'version': 2}}
     fout = open('azure://container/key', 'wb', transport_params={'blob_kwargs': kwargs})
 
+``smart_open`` also supports append mode (``mode="ab"``) for Azure Blob Storage using `Append Blobs <https://learn.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs#about-append-blobs>`__. Note that the blob must have been created as an Append Blob and is subject to a maximum size of 195 GiB.
+
 Drop-in replacement of ``pathlib.Path.open``
 --------------------------------------------
 
