@@ -16,8 +16,8 @@ import smart_open.bytebuffer
 import smart_open.constants
 
 try:
-    import azure.storage.blob
     import azure.core.exceptions
+    import azure.storage.blob
 except ImportError:
     MISSING_DEPS = True
 
@@ -83,12 +83,12 @@ def open(
     blob_id: str
         The name of the blob within the bucket.
     mode: str
-        The mode for opening the object.  Must be either "rb" or "wb".
+        The mode for opening the object.  Must be either "rb", "wb", or "ab".
     client: azure.storage.blob.BlobServiceClient, ContainerClient, or BlobClient
         The Azure Blob Storage client to use when working with azure-storage-blob.
     blob_kwargs: dict, optional
-        Additional parameters to pass to `BlobClient.commit_block_list`.
-        For writing only.
+        Additional parameters to pass to `BlobClient.commit_block_list` (for "wb")
+        or `BlobClient.upload_blob` (for "ab"). For writing only.
     buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
     min_part_size: int, optional
@@ -111,6 +111,14 @@ def open(
         )
     elif mode == smart_open.constants.WRITE_BINARY:
         return Writer(
+            container_id,
+            blob_id,
+            client,
+            blob_kwargs=blob_kwargs,
+            min_part_size=min_part_size
+        )
+    elif mode == smart_open.constants.APPEND_BINARY:
+        return AppendWriter(
             container_id,
             blob_id,
             client,
@@ -539,4 +547,118 @@ class Writer(io.BufferedIOBase):
             self._container_name,
             self._blob_name,
             self._min_part_size
+        )
+
+
+class AppendWriter(io.BufferedIOBase):
+    """Append bytes to Azure Blob Storage.
+
+    Implements the io.BufferedIOBase interface of the standard library."""
+    _blob = None  # so `closed` property works in case __init__ fails and __del__ is called
+
+    def __init__(
+        self,
+        container,
+        blob,
+        client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
+        blob_kwargs=None,
+        min_part_size=_DEFAULT_MIN_PART_SIZE,
+    ):
+        self._container_name = container
+        self._blob_name = blob
+        self._blob_kwargs = blob_kwargs or {}
+        self._min_part_size = min_part_size
+        self._total_size = 0
+        self._current_part = io.BytesIO()
+
+        # type: azure.storage.blob.BlobClient
+        self._blob = _get_blob_client(client, container, blob)
+
+    def flush(self):
+        pass
+
+    def terminate(self):
+        """AppendBlob cannot be aborted, so we do nothing here"""
+        if not self.closed:
+            self._current_part = io.BytesIO()
+            self._blob = None
+
+    def close(self):
+        """No action needed here, as the AppendBlob is automatically committed"""
+        if not self.closed:
+            if self._current_part.tell() > 0:
+                self._upload_part()
+            self._blob = None
+
+    @property
+    def closed(self):
+        return self._blob is None
+
+    def writable(self):
+        """Return True if the stream supports writing."""
+        return True
+
+    def seekable(self):
+        """If False, seek(), tell() and truncate() will raise IOError.
+
+        We offer only tell support, and no seek or truncate support."""
+        return True
+
+    def seek(self, offset, whence=smart_open.constants.WHENCE_START):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def truncate(self, size=None):
+        """Unsupported."""
+        raise io.UnsupportedOperation
+
+    def tell(self):
+        """Return the current stream position."""
+        return self._total_size
+
+    def detach(self):
+        raise io.UnsupportedOperation("detach() not supported")
+
+    def write(self, b):
+        if not isinstance(b, _BINARY_TYPES):
+            raise TypeError(
+                "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b))
+            )
+        self._current_part.write(b)
+        self._total_size += len(b)
+        if self._current_part.tell() >= self._min_part_size:
+            self._upload_part()
+        return len(b)
+
+    def _upload_part(self):
+        data = self._current_part.getvalue()
+        self._blob.upload_blob(
+            data=data,
+            blob_type=azure.storage.blob.BlobType.APPENDBLOB,
+            overwrite=False,
+            **self._blob_kwargs,
+        )
+        self._current_part = io.BytesIO()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.terminate()
+        else:
+            self.close()
+
+    def __str__(self):
+        return "(%s, %r, %r)" % (
+            self.__class__.__name__,
+            self._container_name,
+            self._blob_name,
+        )
+
+    def __repr__(self):
+        return "%s(container=%r, blob=%r)" % (
+            self.__class__.__name__,
+            self._container_name,
+            self._blob_name,
         )
