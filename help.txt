@@ -94,12 +94,12 @@ FUNCTIONS
         blob_id: str
             The name of the blob within the bucket.
         mode: str
-            The mode for opening the object.  Must be either "rb" or "wb".
+            The mode for opening the object.  Must be either "rb", "wb", or "ab".
         client: azure.storage.blob.BlobServiceClient, ContainerClient, or BlobClient
             The Azure Blob Storage client to use when working with azure-storage-blob.
         blob_kwargs: dict, optional
-            Additional parameters to pass to `BlobClient.commit_block_list`.
-            For writing only.
+            Additional parameters to pass to `BlobClient.commit_block_list` (for "wb")
+            or `BlobClient.upload_blob` (for "ab"). For writing only.
         buffer_size: int, optional
             The buffer size to use when performing I/O. For reading only.
         min_part_size: int, optional
