@@ -993,7 +993,7 @@ class AppendWriterTest(unittest.TestCase):
         """
         Does appending into an Azure Blob file work correctly when the block size is over the max block size?
         By default, this block size is 4MB. Refer to official Azure documentation for more information:
-        https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.appendblobservice?view=azure-python-previous
+        https://learn.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs#about-append-blobs
         """
         test_string = b"0" * 4 * 1024 * 1024 + b"1" * 1024  # Create file with size over 4MB
         blob_name = "test_append_block_over_max_block_size_%s" % BLOB_NAME
