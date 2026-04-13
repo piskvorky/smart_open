@@ -83,12 +83,12 @@ def open(
     blob_id: str
         The name of the blob within the bucket.
     mode: str
-        The mode for opening the object.  Must be either "rb" or "wb".
+        The mode for opening the object.  Must be either "rb", "wb", or "ab".
     client: azure.storage.blob.BlobServiceClient, ContainerClient, or BlobClient
         The Azure Blob Storage client to use when working with azure-storage-blob.
     blob_kwargs: dict, optional
-        Additional parameters to pass to `BlobClient.commit_block_list`.
-        For writing only.
+        Additional parameters to pass to `BlobClient.commit_block_list` (for "wb")
+        or `BlobClient.upload_blob` (for "ab"). For writing only.
     buffer_size: int, optional
         The buffer size to use when performing I/O. For reading only.
     min_part_size: int, optional
@@ -554,6 +554,7 @@ class AppendWriter(io.BufferedIOBase):
     """Append bytes to Azure Blob Storage.
 
     Implements the io.BufferedIOBase interface of the standard library."""
+    _blob = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(
         self,
@@ -598,8 +599,10 @@ class AppendWriter(io.BufferedIOBase):
         return True
 
     def seekable(self):
-        """Updating or deleting of existing blocks is not supported for AppendBlob."""
-        return False
+        """If False, seek(), tell() and truncate() will raise IOError.
+
+        We offer only tell support, and no seek or truncate support."""
+        return True
 
     def seek(self, offset, whence=smart_open.constants.WHENCE_START):
         """Unsupported."""
@@ -650,12 +653,12 @@ class AppendWriter(io.BufferedIOBase):
         return "(%s, %r, %r)" % (
             self.__class__.__name__,
             self._container_name,
-            self._blob.blob_name
+            self._blob_name,
         )
 
     def __repr__(self):
         return "%s(container=%r, blob=%r)" % (
             self.__class__.__name__,
             self._container_name,
-            self._blob.blob_name,
+            self._blob_name,
         )

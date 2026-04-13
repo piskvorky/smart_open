@@ -15,6 +15,7 @@ WRITE_BINARY = 'wb'
 
 APPEND_BINARY = 'ab'
 
+# APPEND_BINARY intentionally excluded: only Azure supports it, other transports should error.
 BINARY_MODES = (READ_BINARY, WRITE_BINARY)
 
 BINARY_NEWLINE = b'\n'
