@@ -1,3 +1,8 @@
+# 7.6.0, 2026-04-13
+
+- Bump softprops/action-gh-release from 2.5.0 to 2.6.1 in the github-actions group (PR [#918](https://github.com/piskvorky/smart_open/pull/918), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Add support for `append` mode for Azure Blob Storage (PR [#865](https://github.com/piskvorky/smart_open/pull/865), [@geovalexis](https://github.com/geovalexis))
+
 # 7.5.1, 2026-02-23
 
 - Bump the github-actions group with 2 updates (PR [#910](https://github.com/piskvorky/smart_open/pull/910), [@dependabot[bot]](https://github.com/apps/dependabot))
