@@ -110,9 +110,15 @@ def test_write(schema):
     expected = 'мы в ответе за тех, кого приручили'
     mocked_cat = cat()
 
+    payload = expected.encode('utf-8')
     with mock.patch('subprocess.Popen', return_value=mocked_cat):
         with smart_open.hdfs.CliRawOutputBase(f'{schema}://dummy/url') as fout:
-            fout.write(expected.encode('utf-8'))
+            written = fout.write(payload)
+
+    # CliRawOutputBase implements io.RawIOBase, whose write() contract is to
+    # return the number of bytes written. Returning None breaks callers like
+    # ray._private.external_storage that assert on the return value.
+    assert written == len(payload)
 
     actual = mocked_cat.stdout.read().decode('utf-8')
     assert actual == expected

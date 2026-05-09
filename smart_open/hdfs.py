@@ -151,7 +151,17 @@ class CliRawOutputBase(io.RawIOBase):
         return False
 
     def write(self, b):
-        self._sub.stdin.write(b)
+        """Write the given buffer to the underlying raw stream.
+
+        Returns the number of bytes written, as required by
+        :class:`io.RawIOBase`. Without this return value, callers that wrap
+        this stream and rely on the documented ``write`` contract (for
+        example, ``ray._private.external_storage._write_multiple_objects``,
+        which asserts ``written_bytes == payload_len``) fail with an
+        ``AssertionError`` because ``write`` would otherwise implicitly
+        return ``None``.
+        """
+        return self._sub.stdin.write(b)
 
     #
     # io.IOBase methods.
