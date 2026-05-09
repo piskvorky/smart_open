@@ -1,3 +1,8 @@
+# 7.6.1, 2026-05-09
+
+- Bump the github-actions group with 2 updates (PR [#919](https://github.com/piskvorky/smart_open/pull/919), [@dependabot[bot]](https://github.com/apps/dependabot))
+- [hdfs] Make CliRawOutputBase.write return number of bytes written (PR [#920](https://github.com/piskvorky/smart_open/pull/920), [@LiuGuH](https://github.com/LiuGuH))
+
 # 7.6.0, 2026-04-13
 
 - Bump softprops/action-gh-release from 2.5.0 to 2.6.1 in the github-actions group (PR [#918](https://github.com/piskvorky/smart_open/pull/918), [@dependabot[bot]](https://github.com/apps/dependabot))
