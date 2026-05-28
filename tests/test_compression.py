@@ -57,3 +57,18 @@ def label(thing, name):
 def test_compression_wrapper_read(fileobj, compression, filename):
     wrapped = smart_open.compression.compression_wrapper(fileobj, 'rb', compression, filename)
     assert wrapped.read() == plain
+
+
+@pytest.mark.parametrize(
+    'compression,filename',
+    [
+        ('infer_from_extension', 'file.lz4'),
+        ('infer_from_extension', 'file.LZ4'),
+        ('.lz4', 'file.lz4'),
+    ]
+)
+def test_compression_wrapper_read_lz4(compression, filename):
+    lz4_frame = pytest.importorskip('lz4.frame')
+    fileobj = io.BytesIO(lz4_frame.compress(plain))
+    wrapped = smart_open.compression.compression_wrapper(fileobj, 'rb', compression, filename)
+    assert wrapped.read() == plain

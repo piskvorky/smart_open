@@ -117,7 +117,7 @@ You can install one or more of these dependencies explicitly using optional depe
 
 .. code-block:: sh
 
-    pip install 'smart_open[s3,gcs,azure,http,webhdfs,ssh,zst]'
+    pip install 'smart_open[s3,gcs,azure,http,webhdfs,ssh,zst,lz4]'
 
 Or, if you don't mind installing a large number of third party libraries, you can install all dependencies using:
 
@@ -238,6 +238,7 @@ The supported values for this parameter are:
 - ``.gz``
 - ``.xz``
 - ``.zst``
+- ``.lz4``
 
 By default, ``smart_open`` automatically (de)compresses the file if the filename ends with one of these extensions.
 `See also <https://github.com/piskvorky/smart_open/blob/master/smart_open/compression.py>`__
