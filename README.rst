@@ -236,9 +236,9 @@ The supported values for this parameter are:
 - ``disable``
 - ``.bz2``
 - ``.gz``
+- ``.lz4``
 - ``.xz``
 - ``.zst``
-- ``.lz4``
 
 By default, ``smart_open`` automatically (de)compresses the file if the filename ends with one of these extensions.
 `See also <https://github.com/piskvorky/smart_open/blob/master/smart_open/compression.py>`__
