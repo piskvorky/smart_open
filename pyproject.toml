@@ -39,7 +39,8 @@ http = ["requests"]
 webhdfs = ["requests"]
 ssh = ["paramiko"]
 zst = ["backports.zstd>=1.0.0;python_version<'3.14'"]
-all = ["smart_open[s3,gcs,azure,http,webhdfs,ssh,zst]"]
+lz4 = ["lz4"]
+all = ["smart_open[s3,gcs,azure,http,webhdfs,ssh,zst,lz4]"]
 test = [
   "smart_open[all]",
   "moto[server]",

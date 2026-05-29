@@ -346,6 +346,7 @@ FUNCTIONS
 
         * .bz2
         * .gz
+        * .lz4
         * .xz
         * .zst
 

@@ -17,6 +17,7 @@ if sys.version_info >= (3, 14):
     from compression import zstd
 else:
     from backports import zstd
+import lz4.frame
 
 import smart_open.compression
 
@@ -52,6 +53,10 @@ def label(thing, name):
         (io.BytesIO(bz2.compress(plain)), 'infer_from_extension', 'file.BZ2'),
         (label(io.BytesIO(bz2.compress(plain)), 'file.bz2'), 'infer_from_extension', ''),
         (io.BytesIO(bz2.compress(plain)), '.bz2', 'file.bz2'),
+        (io.BytesIO(lz4.frame.compress(plain)), 'infer_from_extension', 'file.lz4'),
+        (io.BytesIO(lz4.frame.compress(plain)), 'infer_from_extension', 'file.LZ4'),
+        (label(io.BytesIO(lz4.frame.compress(plain)), 'file.lz4'), 'infer_from_extension', ''),
+        (io.BytesIO(lz4.frame.compress(plain)), '.lz4', 'file.lz4'),
     ]
 )
 def test_compression_wrapper_read(fileobj, compression, filename):
