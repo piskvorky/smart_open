@@ -527,6 +527,7 @@ class MultipartWriterTest(unittest.TestCase):
     def setUp(self):
         ignore_resource_warnings()
 
+        self.client = boto3.client('s3')
         _resource('s3').create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
 
     def test_write_01(self):
@@ -798,6 +799,55 @@ class MultipartWriterTest(unittest.TestCase):
             smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, 'rb')
 
         assert 'The specified key does not exist.' in cm.exception.args[0]
+
+    @mock.patch('time.sleep')
+    def test_close_multipart_already_in_progress(self, mock_sleep):
+        """
+        Test that an `InternalError` during `CompleteMultipartUpload` triggers a
+        polling loop using `HeadObject`, and recovers successfully.
+        """
+        client_error = botocore.exceptions.ClientError(
+            dict(
+                Error=dict(
+                    Code='InternalError',
+                    Message='This multipart completion is already in progress'
+                )
+            ),
+            'CompleteMultipartUpload',
+        )
+
+        head_error = botocore.exceptions.ClientError(
+            dict(
+                Error=dict(
+                    Code='NoSuchKey',
+                    Message='The specified key does not exist.'
+                )
+            ),
+            'HeadObject',
+        )
+
+        with mock.patch.object(self.client, 'complete_multipart_upload') as mock_complete, \
+             mock.patch.object(self.client, 'head_object') as mock_head:
+
+            # Force the complete call to fail with the specific ClientError
+            mock_complete.side_effect = client_error
+            # Force the polling loop to fail once (NoSuchKey), then succeed (Return metadata)
+            mock_head.side_effect = [
+                head_error,
+                {'ContentLength': 15, 'ContentType': 'application/octet-stream'}
+            ]
+
+            with smart_open.open(
+                f's3://{BUCKET_NAME}/{WRITE_KEY_NAME}',
+                mode="wb",
+                transport_params={"client": self.client}
+            ) as fout:
+                fout.write(b"test")
+
+            # Assertions to verify the polling mechanism worked exactly as intended
+            mock_complete.assert_called_once()
+            self.assertEqual(mock_head.call_count, 2)
+            mock_sleep.assert_called_once_with(5)
 
 
 @mock_s3
