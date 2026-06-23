@@ -1040,7 +1040,37 @@ class MultipartWriter(io.BufferedIOBase):
                 UploadId=self._upload_id,
                 MultipartUpload={'Parts': self._parts},
             )
-            RETRY._do(partial)
+            try:
+                RETRY._do(partial)
+            except botocore.exceptions.ClientError as err:
+                err_code = err.response.get('Error', {}).get('Code', '')
+                err_msg = err.response.get('Error', {}).get('Message', '')
+
+                # Check for S3-compatible 'multipart completion is already in progress'
+                if (
+                    err_code == 'InternalError'
+                    and 'multipart completion is already in progress'
+                    in err_msg.lower()
+                ):
+                    logger.info('%s: Multipart completion is already in progress on the S3 backend.', self)
+
+                    # Poll S3 to verify the object is successfully uploaded
+                    for _ in range(12):
+                        try:
+                            self._client.head_object(Bucket=self._bucket, Key=self._key)
+                            break
+                        except botocore.exceptions.ClientError as head_err:
+                            head_code = head_err.response.get('Error', {}).get('Code', '')
+                            # 404/Not Found usually from Ceph/S3-compatible; NoSuchKey from standard AWS S3
+                            if head_code in ('NoSuchKey', '404') or 'NoSuchKey' in str(head_err):
+                                time.sleep(5)
+                            else:
+                                raise head_err
+                    else:
+                        logger.error('%s: Timed out waiting for multipart completion verification.', self)
+                        raise err
+                else:
+                    raise
             logger.debug('%s: completed multipart upload', self)
         elif self._upload_id:
             #
