@@ -14,7 +14,6 @@ DESCRIPTION
 
     * `open()`, which opens the given file for reading/writing
     * `parse_uri()`
-    * `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
     * `register_compressor()`, which registers callbacks for transparent compressor handling
 
 PACKAGE CONTENTS
@@ -446,8 +445,5 @@ FUNCTIONS
 
         This is just an example: `lzma` is in the standard library and is registered by default.
 
-    s3_iter_bucket(bucket_name, prefix='', accept_key=None, key_limit=None, workers=16, retries=3, **session_kwargs)
-        Deprecated.  Use smart_open.s3.iter_bucket instead.
-
 DATA
-    __all__ = ['open', 'parse_uri', 'register_compressor', 's3_iter_bucket...
+    __all__ = ['open', 'parse_uri', 'register_compressor']
