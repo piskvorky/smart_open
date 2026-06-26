@@ -1,3 +1,8 @@
+# 7.7.1, 2026-06-26
+
+- [http,azure] Optimize forward seeks within buffered data to avoid redundant requests (PR [#923](https://github.com/piskvorky/smart_open/pull/923), [@ddelange](https://github.com/ddelange))
+- [azure] Mark Writer/AppendWriter closed even when close() raises (PR [#924](https://github.com/piskvorky/smart_open/pull/924), [@ddelange](https://github.com/ddelange))
+
 # 7.7.0, 2026-06-26
 
 - Add support for lz4 compression (PR [#921](https://github.com/piskvorky/smart_open/pull/921), [@muxiaofan](https://github.com/muxiaofan))
