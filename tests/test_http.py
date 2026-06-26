@@ -85,6 +85,27 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(BYTES[30:40], read_bytes)
 
     @responses.activate
+    def test_seek_forward_within_buffer(self):
+        """Does forward seeking within buffered data avoid additional GET requests?"""
+        responses.add_callback(responses.GET, URL, callback=request_callback)
+        reader = smart_open.http.SeekableBufferedInputBase(URL, buffer_size=32)
+
+        self.assertEqual(reader.read(5), BYTES[:5])
+        initial_calls = len(responses.calls)
+
+        # Forward seek within buffer using WHENCE_CURRENT - no new GET request
+        reader.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
+        self.assertEqual(reader.tell(), 6)
+        self.assertEqual(reader.read(5), BYTES[6:11])
+
+        # Forward seek within buffer using WHENCE_START - no new GET request
+        reader.seek(13, whence=smart_open.constants.WHENCE_START)
+        self.assertEqual(reader.tell(), 13)
+        self.assertEqual(reader.read(3), BYTES[13:16])
+
+        self.assertEqual(len(responses.calls), initial_calls)
+
+    @responses.activate
     def test_seek_from_end(self):
         responses.add_callback(responses.GET, URL, callback=request_callback)
         reader = smart_open.http.SeekableBufferedInputBase(URL)

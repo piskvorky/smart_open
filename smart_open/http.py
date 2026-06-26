@@ -264,6 +264,12 @@ class SeekableBufferedInputBase(BufferedInputBase):
         if self._current_pos == new_pos:
             return self._current_pos
 
+        # Check if we can satisfy the seek from buffer (forward seek within buffered data)
+        if new_pos > self._current_pos and new_pos - self._current_pos <= len(self._read_buffer):
+            self._read_buffer.read(new_pos - self._current_pos)
+            self._current_pos = new_pos
+            return self._current_pos
+
         logger.debug("http seeking from current_pos: %d to new_pos: %d", self._current_pos, new_pos)
 
         self._current_pos = new_pos

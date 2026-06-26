@@ -12,6 +12,7 @@ import logging
 import os
 import time
 import unittest
+import unittest.mock
 import uuid
 from collections import OrderedDict
 from typing import Literal
@@ -466,6 +467,31 @@ class ReaderTest(unittest.TestCase):
         seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
         self.assertEqual(seek, len(content) - 4)
         self.assertEqual(fin.read(), b'you?')
+
+    def test_seek_forward_within_buffer(self):
+        """Does forward seeking within buffered data avoid additional download_blob requests?"""
+        content = u"hello wořld\nhow are you?".encode('utf8')
+        blob_name = "test_seek_forward_within_buffer_%s" % BLOB_NAME
+        put_to_container(blob_name, contents=content)
+
+        fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT, buffer_size=32)
+        self.assertEqual(fin.read(5), b'hello')
+
+        # Account for the initial download_blob call from the read above.
+        with unittest.mock.patch.object(
+            fin._blob, 'download_blob', wraps=fin._blob.download_blob
+        ) as mock_download:
+            # Forward seek within buffer using WHENCE_CURRENT - no new download
+            seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
+            self.assertEqual(seek, 6)
+            self.assertEqual(fin.read(6), u'wořld'.encode('utf-8'))
+
+            # Forward seek within buffer using WHENCE_START - no new download
+            seek = fin.seek(13, whence=smart_open.constants.WHENCE_START)
+            self.assertEqual(seek, 13)
+            self.assertEqual(fin.read(3), b'how')
+
+            mock_download.assert_not_called()
 
     def test_detect_eof(self):
         content = u"hello wořld\nhow are you?".encode('utf8')
