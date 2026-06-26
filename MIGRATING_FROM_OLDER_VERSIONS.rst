@@ -145,6 +145,23 @@ The ``gs://`` scheme keeps working as a backwards-compatible alias — no code c
    + smart_open.open('gcs://my_bucket/my_file.txt')
 
 
+S3 URIs now recognise ``?versionId=...``
+----------------------------------------
+
+Tracked in `#595 <https://github.com/piskvorky/smart_open/issues/595>`_.
+``smart_open.open('s3://bucket/key?versionId=v1')`` now extracts the ``versionId`` query parameter and forwards it as ``version_id`` to ``smart_open.s3.open``, matching the convention used by `s3fs <https://s3fs.readthedocs.io/en/latest/api.html#s3fs.core.S3FileSystem.split_path>`_ and the AWS CLI:
+
+.. code-block:: diff
+
+   - smart_open.open('s3://bucket/key', transport_params={'version_id': 'v1'})
+   + smart_open.open('s3://bucket/key?versionId=v1')
+
+Other ``?...`` content in the key is preserved as before (the ``QUESTION_MARK_PLACEHOLDER`` workaround in ``smart_open.utils.safe_urlsplit`` still keeps unrelated query strings attached to the key).
+``transport_params['version_id']`` still wins if both are set, with a ``UserWarning``.
+
+If you have a legitimate ``?versionId=...`` substring in your S3 key, call ``smart_open.s3.open(bucket, key, ...)`` directly with the raw key to bypass URI parsing.
+
+
 Migrating to the new compression parameter
 ==========================================
 

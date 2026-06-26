@@ -13,6 +13,7 @@ import io
 import functools
 import itertools
 import logging
+import re
 import time
 from math import inf
 
@@ -75,6 +76,11 @@ URI_EXAMPLES = (
 
 # Returned by AWS when we try to seek beyond EOF.
 _OUT_OF_RANGE = 'InvalidRange'
+
+# Matches the ``versionId`` query parameter in an S3 URI (issue #595).
+# The leading group preserves whether it was the first (``?``) or a later (``&``)
+# query parameter so that we can rebuild the remaining query correctly.
+_VERSION_ID_RE = re.compile(r'(?P<sep>[?&])versionId=(?P<value>[^&]*)')
 
 
 class Retry:
@@ -186,12 +192,31 @@ def parse_uri(uri_as_string):
 
     bucket_id, key_id = uri.split('/', 1)
 
+    #
+    # Extract ``?versionId=...`` from the key (issue #595).  ``safe_urlsplit``
+    # preserves any ``?`` in the URI as part of the key, so we surgically
+    # remove just the ``versionId`` parameter and leave any other ``?...``
+    # segments alone.  Users with a literal ``?versionId=`` in their S3 key
+    # can keep working by calling ``smart_open.s3.open(bucket, key, ...)``
+    # directly with the raw key.
+    #
+    version_id = None
+    match = _VERSION_ID_RE.search(key_id)
+    if match:
+        version_id = match.group('value')
+        before = key_id[:match.start()]
+        after = key_id[match.end():]
+        if match.group('sep') == '?' and after.startswith('&'):
+            after = '?' + after[1:]
+        key_id = before + after
+
     return dict(
         scheme=split_uri.scheme,
         bucket_id=bucket_id,
         key_id=key_id,
         access_id=access_id,
         access_secret=access_secret,
+        version_id=version_id,
     )
 
 
@@ -237,6 +262,17 @@ def _consolidate_params(uri, transport_params):
             aws_secret_access_key=uri['access_secret'],
         )
         uri.update(access_id=None, access_secret=None)
+
+    if uri['version_id'] is not None:
+        if transport_params.get('version_id') is not None:
+            logger.warning(
+                'ignoring versionId parsed from URL because it conflicts with '
+                'transport_params["version_id"]. Drop the URL versionId to '
+                'suppress this warning.'
+            )
+        else:
+            transport_params['version_id'] = uri['version_id']
+        uri.update(version_id=None)
 
     return uri, transport_params
 

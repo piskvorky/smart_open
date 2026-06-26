@@ -272,6 +272,37 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.key_id, "mydir/mykey?param")
+        self.assertIsNone(parsed_uri.version_id)
+
+    def test_s3_uri_version_id(self):
+        """Does ?versionId=... in an S3 URI populate version_id?"""
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey?versionId=v1")
+        self.assertEqual(parsed_uri.scheme, "s3")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.key_id, "mydir/mykey")
+        self.assertEqual(parsed_uri.version_id, "v1")
+
+    def test_s3_uri_version_id_with_other_params(self):
+        """Are non-versionId query params preserved on the key?"""
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://mybucket/mykey?versionId=v1&other=keep"
+        )
+        self.assertEqual(parsed_uri.key_id, "mykey?other=keep")
+        self.assertEqual(parsed_uri.version_id, "v1")
+
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://mybucket/mykey?other=keep&versionId=v1"
+        )
+        self.assertEqual(parsed_uri.key_id, "mykey?other=keep")
+        self.assertEqual(parsed_uri.version_id, "v1")
+
+    def test_s3_uri_no_version_id_when_no_match(self):
+        """``versionId`` is only extracted when the key matches exactly."""
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://mybucket/mykey?versionIdLookalike=foo"
+        )
+        self.assertEqual(parsed_uri.key_id, "mykey?versionIdLookalike=foo")
+        self.assertIsNone(parsed_uri.version_id)
 
     def test_leading_slash_local_file(self):
         path = "/home/misha/hello.txt"
@@ -1767,6 +1798,21 @@ class S3OpenTest(unittest.TestCase):
         smart_open.open('s3://bucket/key')
         actual = mock_open.call_args_list[1][1].get('client_kwargs')
         assert actual is None
+
+    @mock.patch('smart_open.s3.Reader')
+    def test_version_id_from_url_is_forwarded(self, mock_open):
+        """The ?versionId=... query param is forwarded as version_id to s3.open()."""
+        smart_open.open('s3://bucket/key?versionId=v123')
+        self.assertEqual(mock_open.call_args[1]['version_id'], 'v123')
+
+    @mock.patch('smart_open.s3.Reader')
+    def test_version_id_in_transport_params_wins(self, mock_open):
+        """transport_params['version_id'] takes precedence over the URL value."""
+        smart_open.open(
+            's3://bucket/key?versionId=from-url',
+            transport_params={'version_id': 'from-tp'},
+        )
+        self.assertEqual(mock_open.call_args[1]['version_id'], 'from-tp')
 
 
 def function(a, b, c, foo='bar', baz='boz'):
