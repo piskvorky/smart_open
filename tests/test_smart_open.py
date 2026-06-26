@@ -1221,12 +1221,12 @@ class SmartOpenTest(unittest.TestCase):
 
     def test_incorrect(self):
         # incorrect file mode
-        self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "x")
+        self.assertRaises(NotImplementedError, smart_open.open, "s3://bucket/key", "x")
 
         # correct write modes, incorrect scheme
-        self.assertRaises(NotImplementedError, smart_open.smart_open, "hdfs:///blah.txt", "wb+")
-        self.assertRaises(NotImplementedError, smart_open.smart_open, "http:///blah.txt", "w")
-        self.assertRaises(NotImplementedError, smart_open.smart_open, "s3://bucket/key", "wb+")
+        self.assertRaises(NotImplementedError, smart_open.open, "hdfs:///blah.txt", "wb+")
+        self.assertRaises(NotImplementedError, smart_open.open, "http:///blah.txt", "w")
+        self.assertRaises(NotImplementedError, smart_open.open, "s3://bucket/key", "wb+")
 
     def test_write_utf8(self):
         # correct write mode, correct file:// URI
@@ -1955,23 +1955,6 @@ def test_get_binary_mode(mode, expected):
 def test_get_binary_mode_bad(mode):
     with pytest.raises(ValueError):
         smart_open.smart_open_lib._get_binary_mode(mode)
-
-
-def test_backwards_compatibility_wrapper():
-    fpath = os.path.join(CURR_DIR, 'test_data/crime-and-punishment.txt')
-    expected = open(fpath, 'rb').readline()
-
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-
-        actual = smart_open.smart_open(fpath).readline()
-        assert expected == actual
-
-        actual = smart_open.smart_open(fpath, ignore_extension=True).readline()
-        assert expected == actual
-
-    with pytest.raises(DeprecationWarning):
-        smart_open.smart_open(fpath, unsupported_keyword_param=123)
 
 
 @pytest.mark.skipif(os.name == "nt", reason="this test does not work on Windows")

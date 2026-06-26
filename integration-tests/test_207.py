@@ -30,7 +30,7 @@ def tofile():
 def test_fromfile():
     try:
         path = tofile()
-        with smart_open.smart_open(path, 'rb') as fin:
+        with smart_open.open(path, 'rb') as fin:
             np.fromfile(fin)
     finally:
         os.unlink(path)
