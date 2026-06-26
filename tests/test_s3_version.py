@@ -114,6 +114,13 @@ class TestVersionId(unittest.TestCase):
         boto3_body = boto3_body = returned_obj.get()['Body'].read()
         self.assertEqual(boto3_body, self.test_ver1)
 
+    def test_version_id_in_url(self):
+        """Does ``?versionId=...`` in the URL pin the read to that version?"""
+        url = '{}?versionId={}'.format(self.url, self.versions[0])
+        with open(url, mode='rb') as fin:
+            actual = fin.read()
+        self.assertEqual(actual, self.test_ver1)
+
 
 if __name__ == '__main__':
     unittest.main()
