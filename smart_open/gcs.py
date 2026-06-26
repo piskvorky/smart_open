@@ -152,7 +152,4 @@ def Writer(bucket,
 
     _blob = g_blob.open('wb', **blob_open_kwargs)
 
-    # backwards-compatiblity, was deprecated upstream https://cloud.google.com/storage/docs/resumable-uploads
-    _blob.terminate = lambda: None
-
     return _blob
