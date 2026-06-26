@@ -143,8 +143,6 @@ FUNCTIONS
             The name of the blob within the bucket.
         mode: str
             The mode for opening the object. Must be either "rb" or "wb".
-        buffer_size:
-            deprecated
         min_part_size: int, optional
             The minimum part size for multipart uploads. For writing only.
         client: google.cloud.storage.Client, optional
