@@ -36,7 +36,7 @@ PACKAGE CONTENTS
     webhdfs
 
 FUNCTIONS
-    open(uri, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, compression='infer_from_extension', transport_params=None)
+    open(uri, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, compression='infer_from_extension', compression_kwargs=None, transport_params=None)
         Open the URI object, returning a file-like object.
 
         The URI is usually a string in a variety of formats.
@@ -67,6 +67,12 @@ FUNCTIONS
             Mimicks built-in open parameter of the same name.  Ignored.
         compression: str, optional (see smart_open.compression.get_supported_compression_types)
             Explicitly specify the compression/decompression behavior.
+        compression_kwargs: dict, optional
+            Keyword arguments forwarded to the registered compressor callback. Examples
+            of each library's max-compression option: {'compresslevel': 9} for
+            .gz/.bz2, {'preset': 9} for .xz, {'level': 22} for .zst,
+            {'compression_level': 12} for .lz4. Ignored when compression is 'disable'
+            or the URI's extension doesn't match a registered compressor.
         transport_params: dict, optional
             Additional parameters for the transport layer (see notes below).
 
@@ -427,9 +433,12 @@ FUNCTIONS
         ext: str
             The extension.  Must include the leading period, e.g. `.gz`.
         callback: callable
-            The callback.  It must accept two position arguments, file_obj and mode.
-            This function will be called when `smart_open` is opening a file with
-            the specified extension.
+            The callback.  It must accept two positional arguments, file_obj and mode,
+            and is recommended to also accept **kwargs so that whatever the caller passes
+            via smart_open.open(..., compression_kwargs={...}) reaches the underlying
+            library unchanged.  Callbacks with the legacy (file_obj, mode) signature still
+            work, but will raise TypeError if the caller supplies compression_kwargs
+            that the callback doesn't declare.
 
         Examples
         --------
@@ -437,9 +446,9 @@ FUNCTIONS
         Instruct smart_open to use the `lzma` module whenever opening a file
         with a .xz extension (see README.rst for the complete example showing I/O):
 
-        >>> def _handle_xz(file_obj, mode):
+        >>> def _handle_xz(file_obj, mode, **kwargs):
         ...     import lzma
-        ...     return lzma.LZMAFile(filename=file_obj, mode=mode)
+        ...     return lzma.open(filename=file_obj, mode=mode, **kwargs)
         >>>
         >>> register_compressor('.xz', _handle_xz)
 
