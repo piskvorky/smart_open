@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2020 Radim Rehurek <me@radimrehurek.com>
 #
@@ -10,6 +9,7 @@
 The main entrypoint is :func:`get_transport`.  See also :file:`extending.md`.
 
 """
+
 import importlib
 import logging
 
@@ -17,7 +17,7 @@ import smart_open.local_file
 
 logger = logging.getLogger(__name__)
 
-NO_SCHEME = ''
+NO_SCHEME = ""
 
 _REGISTRY = {NO_SCHEME: smart_open.local_file}
 _ERRORS = {}
@@ -58,10 +58,10 @@ def register_transport(submodule):
     elif hasattr(submodule, "SCHEMES"):
         schemes = submodule.SCHEMES
     else:
-        raise ValueError("%r does not have a .SCHEME or .SCHEMES attribute" % submodule)
+        raise ValueError(f"{submodule!r} does not have a .SCHEME or .SCHEMES attribute")
 
     for f in ("open", "open_uri", "parse_uri"):
-        assert hasattr(submodule, f), "%r is missing %r" % (submodule, f)
+        assert hasattr(submodule, f), f"{submodule!r} is missing {f!r}"
 
     for scheme in schemes:
         assert scheme not in _REGISTRY
@@ -78,16 +78,14 @@ def get_transport(scheme):
 
     """
     expected = SUPPORTED_SCHEMES
-    readme_url = (
-        "https://github.com/piskvorky/smart_open/blob/master/README.rst"
-    )
+    readme_url = "https://github.com/piskvorky/smart_open/blob/master/README.rst"
     message = (
-        "Unable to handle scheme %(scheme)r, expected one of %(expected)r. "
-        "Extra dependencies required by %(scheme)r may be missing. "
-        "See <%(readme_url)s> for details." % locals()
+        "Unable to handle scheme {scheme!r}, expected one of {expected!r}. "
+        "Extra dependencies required by {scheme!r} may be missing. "
+        "See <{readme_url}> for details.".format(**locals())
     )
     if scheme in _ERRORS:
-        raise ImportError(_MISSING_DEPS_ERROR % dict(module=_ERRORS[scheme]))
+        raise ImportError(_MISSING_DEPS_ERROR % {"module": _ERRORS[scheme]})
     if scheme in _REGISTRY:
         return _REGISTRY[scheme]
     raise NotImplementedError(message)

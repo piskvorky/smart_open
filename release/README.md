@@ -1,5 +1,5 @@
 > <img width=40% src="https://github.com/user-attachments/assets/cf8f2fa4-37c1-4e50-9fd8-ab6e3fd705b5">
-> 
+>
 > [*New GitHub Release dialog*](https://github.com/piskvorky/smart_open/releases/new?target=master)
 
 ## Release Procedure

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -17,14 +16,14 @@ from smart_open import utils
 
 logger = logging.getLogger(__name__)
 
-SCHEMES = ('hdfs', 'viewfs')
+SCHEMES = ("hdfs", "viewfs")
 
 URI_EXAMPLES = (
-    'hdfs:///path/file',
-    'hdfs://host/path/file',
-    'hdfs://host:port/path/file',
-    'viewfs:///path/file',
-    'viewfs://host/path/file',
+    "hdfs:///path/file",
+    "hdfs://host/path/file",
+    "hdfs://host:port/path/file",
+    "viewfs:///path/file",
+    "viewfs://host/path/file",
 )
 
 
@@ -38,28 +37,27 @@ def parse_uri(uri_as_string):
     else:
         # No netloc (e.g. "hdfs:///path/file") - pass the absolute path to the CLI.
         uri_path = split_uri.path
-    if not uri_path or uri_path == '/':
-        raise RuntimeError("invalid HDFS URI: %r" % uri_as_string)
+    if not uri_path or uri_path == "/":
+        raise RuntimeError(f"invalid HDFS URI: {uri_as_string!r}")
 
-    return dict(scheme=split_uri.scheme, uri_path=uri_path)
+    return {"scheme": split_uri.scheme, "uri_path": uri_path}
 
 
 def open_uri(uri, mode, transport_params):
     utils.check_kwargs(open, transport_params)
 
     parsed_uri = parse_uri(uri)
-    fobj = open(parsed_uri['uri_path'], mode)
-    fobj.name = parsed_uri['uri_path'].split('/')[-1]
+    fobj = open(parsed_uri["uri_path"], mode)
+    fobj.name = parsed_uri["uri_path"].split("/")[-1]
     return fobj
 
 
 def open(uri, mode):
-    if mode == 'rb':
+    if mode == "rb":
         return CliRawInputBase(uri)
-    elif mode == 'wb':
+    if mode == "wb":
         return CliRawOutputBase(uri)
-    else:
-        raise NotImplementedError('hdfs support for mode %r not implemented' % mode)
+    raise NotImplementedError(f"hdfs support for mode {mode!r} not implemented")
 
 
 class CliRawInputBase(io.RawIOBase):
@@ -67,11 +65,12 @@ class CliRawInputBase(io.RawIOBase):
 
     Implements the io.RawIOBase interface of the standard library.
     """
+
     _sub = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(self, uri):
         self._uri = uri
-        self._sub = subprocess.Popen(["hdfs", "dfs", '-cat', self._uri], stdout=subprocess.PIPE)
+        self._sub = subprocess.Popen(["hdfs", "dfs", "-cat", self._uri], stdout=subprocess.PIPE)
 
     #
     # Override some methods from io.IOBase.
@@ -116,7 +115,7 @@ class CliRawInputBase(io.RawIOBase):
         data = self.read(len(b))
         if not data:
             return 0
-        b[:len(data)] = data
+        b[: len(data)] = data
         return len(data)
 
 
@@ -125,12 +124,12 @@ class CliRawOutputBase(io.RawIOBase):
 
     Implements the io.RawIOBase interface of the standard library.
     """
+
     _sub = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(self, uri):
         self._uri = uri
-        self._sub = subprocess.Popen(["hdfs", "dfs", '-put', '-f', '-', self._uri],
-                                     stdin=subprocess.PIPE)
+        self._sub = subprocess.Popen(["hdfs", "dfs", "-put", "-f", "-", self._uri], stdin=subprocess.PIPE)
 
     def close(self):
         logger.debug("close: called")

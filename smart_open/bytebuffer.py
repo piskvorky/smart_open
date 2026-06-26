@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -10,7 +9,7 @@
 import io
 
 
-class ByteBuffer(object):
+class ByteBuffer:
     """Implements a byte buffer that allows callers to read data with minimal
     copying, and has a fast __len__ method. The buffer is parametrized by its
     chunk_size, which is the number of bytes that it will read in from the
@@ -51,15 +50,6 @@ class ByteBuffer(object):
     """
 
     def __init__(self, chunk_size=io.DEFAULT_BUFFER_SIZE):
-        """Create a ByteBuffer instance that reads chunk_size bytes when filled.
-        Note that the buffer has no maximum size.
-
-        Parameters
-        -----------
-        chunk_size: int, optional
-            The the number of bytes that will be read from the supplied reader
-            or iterable when filling the buffer.
-        """
         self._chunk_size = chunk_size
         self.empty()
 
@@ -102,7 +92,7 @@ class ByteBuffer(object):
         if size < 0 or size > len(self):
             size = len(self)
 
-        part = bytes(self._bytes[self._pos:self._pos+size])
+        part = bytes(self._bytes[self._pos : self._pos + size])
         return part
 
     def empty(self):
@@ -142,10 +132,10 @@ class ByteBuffer(object):
         size = min(size, self._chunk_size)
 
         if self._pos != 0:
-            self._bytes = self._bytes[self._pos:]
+            self._bytes = self._bytes[self._pos :]
             self._pos = 0
 
-        if hasattr(source, 'read'):
+        if hasattr(source, "read"):
             new_bytes = source.read(size)
         else:
             new_bytes = bytearray()

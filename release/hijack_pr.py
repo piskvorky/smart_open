@@ -9,6 +9,7 @@ This is a two-step process:
 As a maintainer, you can add changes by making new commits and pushing them
 back to the remote.
 """
+
 import json
 import subprocess
 import sys
@@ -20,15 +21,15 @@ url = f"https://api.github.com/repos/RaRe-Technologies/smart_open/pulls/{prid}"
 with smart_open.open(url) as fin:
     prinfo = json.load(fin)
 
-user = prinfo['head']['user']['login']
-ssh_url = prinfo['head']['repo']['ssh_url']
+user = prinfo["head"]["user"]["login"]
+ssh_url = prinfo["head"]["repo"]["ssh_url"]
 
-remotes = subprocess.check_output(['git', 'remote']).strip().decode('utf-8').split('\n')
+remotes = subprocess.check_output(["git", "remote"]).strip().decode("utf-8").split("\n")
 if user not in remotes:
-    subprocess.check_call(['git', 'remote', 'add', user, ssh_url])
+    subprocess.check_call(["git", "remote", "add", user, ssh_url])
 
-subprocess.check_call(['git', 'fetch', user])
+subprocess.check_call(["git", "fetch", user])
 
-ref = prinfo['head']['ref']
-subprocess.check_call(['git', 'checkout', f'{user}/{ref}'])
-subprocess.check_call(['git', 'switch', '-c', f'{ref}'])
+ref = prinfo["head"]["ref"]
+subprocess.check_call(["git", "checkout", f"{user}/{ref}"])
+subprocess.check_call(["git", "switch", "-c", f"{ref}"])

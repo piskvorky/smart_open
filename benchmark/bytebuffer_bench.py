@@ -1,5 +1,5 @@
-import time
 import sys
+import time
 
 import smart_open
 from smart_open.bytebuffer import ByteBuffer

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -37,7 +36,7 @@ from .compression import register_compressor  # noqa: E402
 from .smart_open_lib import open, parse_uri  # noqa: E402
 
 __all__ = [
-    'open',
-    'parse_uri',
-    'register_compressor',
+    "open",
+    "parse_uri",
+    "register_compressor",
 ]

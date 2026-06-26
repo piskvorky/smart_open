@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2020 Radim Rehurek <me@radimrehurek.com>
 #
@@ -14,6 +13,7 @@ standard library executor with a lazy ``imap`` method.
 
 import logging
 from collections import deque
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class ThreadPoolExecutor(_ThreadPoolExecutor):
     """Subclass with a lazy consuming imap method."""
 
-    def imap(self, fn, *iterables, timeout=None, queued_tasks_per_worker=2):
+    def imap(self, fn, *iterables, timeout=None, queued_tasks_per_worker=2) -> Iterator:
         """Ordered imap that consumes iterables just-in-time.
 
         References:
@@ -30,7 +30,7 @@ class ThreadPoolExecutor(_ThreadPoolExecutor):
 
         Args:
             fn: Function to apply.
-            iterables: One (or more) iterable(s) to pass to fn (using zip) as positional argument(s).
+            *iterables: One (or more) iterable(s) to pass to fn (using zip) as positional argument(s).
             timeout: Per-future result retrieval timeout in seconds.
             queued_tasks_per_worker: Amount of additional items per worker to fetch from iterables to
                     fill the queue: this determines the total queue size.
@@ -39,6 +39,9 @@ class ThreadPoolExecutor(_ThreadPoolExecutor):
                     is called on the input iterable(s) and a new task is submitted.
                 Default 2 ensures there is always some work to pick up. Note that at imap startup,
                     the queue will fill up before the first yield occurs.
+
+        Yields:
+            Results of ``fn`` applied to items from ``iterables``, in input order.
 
         Example:
             long_generator = itertools.count()
@@ -54,7 +57,7 @@ class ThreadPoolExecutor(_ThreadPoolExecutor):
             """Block until the next task is done and return the result."""
             return popleft().result(timeout)
 
-        for args in zip(*iterables):
+        for args in zip(*iterables, strict=False):
             append(submit(fn, *args))
             if len(futures) == maxlen:
                 yield get()

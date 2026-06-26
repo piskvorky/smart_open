@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2020 Radim Rehurek <me@radimrehurek.com>
 #
@@ -8,17 +7,16 @@
 
 """Some universal constants that are common to I/O operations."""
 
+READ_BINARY = "rb"
 
-READ_BINARY = 'rb'
+WRITE_BINARY = "wb"
 
-WRITE_BINARY = 'wb'
-
-APPEND_BINARY = 'ab'
+APPEND_BINARY = "ab"
 
 # APPEND_BINARY intentionally excluded: only Azure supports it, other transports should error.
 BINARY_MODES = (READ_BINARY, WRITE_BINARY)
 
-BINARY_NEWLINE = b'\n'
+BINARY_NEWLINE = b"\n"
 
 WHENCE_START = 0
 

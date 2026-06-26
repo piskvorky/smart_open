@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2020 Radim Rehurek <radim@rare-technologies.com>
 # Copyright (C) 2020 Nicolas Mitchell <ncls.mitchell@gmail.com>
@@ -45,35 +44,35 @@ def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
     first = sr.netloc
-    second = sr.path.lstrip('/')
+    second = sr.path.lstrip("/")
 
     # https://docs.microsoft.com/en-us/rest/api/storageservices/working-with-the-root-container
     if not second:
-        container_id = '$root'
+        container_id = "$root"
         blob_id = first
     else:
         container_id = first
         blob_id = second
 
-    return dict(scheme=SCHEME, container_id=container_id, blob_id=blob_id)
+    return {"scheme": SCHEME, "container_id": container_id, "blob_id": blob_id}
 
 
 def open_uri(uri, mode, transport_params):
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
-    return open(parsed_uri['container_id'], parsed_uri['blob_id'], mode, **kwargs)
+    return open(parsed_uri["container_id"], parsed_uri["blob_id"], mode, **kwargs)
 
 
 def open(
-        container_id,
-        blob_id,
-        mode,
-        client=None,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient] # noqa
-        blob_kwargs=None,
-        buffer_size=DEFAULT_BUFFER_SIZE,
-        min_part_size=_DEFAULT_MIN_PART_SIZE,
-        max_concurrency=DEFAULT_MAX_CONCURRENCY,
-        ):
+    container_id,
+    blob_id,
+    mode,
+    client=None,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]
+    blob_kwargs=None,
+    buffer_size=DEFAULT_BUFFER_SIZE,
+    min_part_size=_DEFAULT_MIN_PART_SIZE,
+    max_concurrency=DEFAULT_MAX_CONCURRENCY,
+):
     """Open an Azure Blob Storage blob for reading or writing.
 
     Parameters
@@ -98,7 +97,7 @@ def open(
 
     """
     if not client:
-        raise ValueError('you must specify the client to connect to Azure')
+        raise ValueError("you must specify the client to connect to Azure")
 
     if mode == smart_open.constants.READ_BINARY:
         return Reader(
@@ -109,28 +108,17 @@ def open(
             line_terminator=smart_open.constants.BINARY_NEWLINE,
             max_concurrency=max_concurrency,
         )
-    elif mode == smart_open.constants.WRITE_BINARY:
-        return Writer(
-            container_id,
-            blob_id,
-            client,
-            blob_kwargs=blob_kwargs,
-            min_part_size=min_part_size
-        )
-    elif mode == smart_open.constants.APPEND_BINARY:
+    if mode == smart_open.constants.WRITE_BINARY:
+        return Writer(container_id, blob_id, client, blob_kwargs=blob_kwargs, min_part_size=min_part_size)
+    if mode == smart_open.constants.APPEND_BINARY:
         return AppendWriter(
-            container_id,
-            blob_id,
-            client,
-            blob_kwargs=blob_kwargs,
-            min_part_size=min_part_size
+            container_id, blob_id, client, blob_kwargs=blob_kwargs, min_part_size=min_part_size
         )
-    else:
-        raise NotImplementedError('Azure Blob Storage support for mode %r not implemented' % mode)
+    raise NotImplementedError(f"Azure Blob Storage support for mode {mode!r} not implemented")
 
 
 def _get_blob_client(client, container, blob):
-    # type: (Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient], str, str) -> azure.storage.blob.BlobClient  # noqa
+    # type: (Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient], str, str) -> azure.storage.blob.BlobClient
     """
     Return an Azure BlobClient starting with any of BlobServiceClient,
     ContainerClient, or BlobClient plus container name and blob name.
@@ -139,10 +127,7 @@ def _get_blob_client(client, container, blob):
         client = client.get_container_client(container)
 
     if hasattr(client, "container_name") and client.container_name != container:
-        raise ValueError(
-            "Client for %r doesn't match "
-            "container %r" % (client.container_name, container)
-        )
+        raise ValueError(f"Client for {client.container_name!r} doesn't match container {container!r}")
 
     if hasattr(client, "get_blob_client"):
         client = client.get_blob_client(blob)
@@ -150,7 +135,7 @@ def _get_blob_client(client, container, blob):
     return client
 
 
-class _RawReader(object):
+class _RawReader:
     """Read an Azure Blob Storage file."""
 
     def __init__(self, blob, size, concurrency):
@@ -172,7 +157,7 @@ class _RawReader(object):
 
     def read(self, size=-1):
         if self._position >= self._size:
-            return b''
+            return b""
         binary = self._download_blob_chunk(size)
         self._position += len(binary)
         return binary
@@ -183,13 +168,14 @@ class _RawReader(object):
             # When reading, we can't seek to the first byte of an empty file.
             # Similarly, we can't seek past the last byte.  Do nothing here.
             #
-            return b''
-        elif size == -1:
+            return b""
+        if size == -1:
             stream = self._blob.download_blob(offset=self._position, max_concurrency=self._concurrency)
         else:
             stream = self._blob.download_blob(
-                offset=self._position, max_concurrency=self._concurrency, length=size)
-        logging.debug('reading with a max concurrency of %d', self._concurrency)
+                offset=self._position, max_concurrency=self._concurrency, length=size
+            )
+        logging.debug("reading with a max concurrency of %d", self._concurrency)
         if isinstance(stream, azure.storage.blob.StorageStreamDownloader):
             binary = stream.readall()
         else:
@@ -204,16 +190,17 @@ class Reader(io.BufferedIOBase):
 
     :raises azure.core.exceptions.ResourceNotFoundError: Raised when the blob to read from does not exist.
     """
+
     _blob = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(
-            self,
-            container,
-            blob,
-            client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
-            buffer_size=DEFAULT_BUFFER_SIZE,
-            line_terminator=smart_open.constants.BINARY_NEWLINE,
-            max_concurrency=DEFAULT_MAX_CONCURRENCY,
+        self,
+        container,
+        blob,
+        client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]
+        buffer_size=DEFAULT_BUFFER_SIZE,
+        line_terminator=smart_open.constants.BINARY_NEWLINE,
+        max_concurrency=DEFAULT_MAX_CONCURRENCY,
     ):
         self._container_name = container
         self._blob_name = blob
@@ -222,11 +209,9 @@ class Reader(io.BufferedIOBase):
         self._blob = _get_blob_client(client, container, blob)
 
         if self._blob is None:
-            raise azure.core.exceptions.ResourceNotFoundError(
-                'blob %s not found in %s' % (blob, container)
-            )
+            raise azure.core.exceptions.ResourceNotFoundError(f"blob {blob} not found in {container}")
         try:
-            self._size = self._blob.get_blob_properties()['size']
+            self._size = self._blob.get_blob_properties()["size"]
         except KeyError:
             self._size = 0
 
@@ -273,10 +258,11 @@ class Reader(io.BufferedIOBase):
         :param int whence: Where the offset is from.
 
         Returns the position after seeking."""
-        logger.debug('seeking to offset: %r whence: %r', offset, whence)
+        logger.debug("seeking to offset: %r whence: %r", offset, whence)
         if whence not in smart_open.constants.WHENCE_CHOICES:
-            raise ValueError('invalid whence %i, expected one of %r' % (whence,
-                                                                       smart_open.constants.WHENCE_CHOICES))
+            raise ValueError(
+                f"invalid whence {whence}, expected one of {smart_open.constants.WHENCE_CHOICES!r}"
+            )
 
         if whence == smart_open.constants.WHENCE_START:
             new_position = offset
@@ -286,17 +272,14 @@ class Reader(io.BufferedIOBase):
             new_position = self._size + offset
 
         # Check if we can satisfy the seek from buffer (forward seek within buffered data)
-        if (
-            new_position > self._position
-            and new_position - self._position <= len(self._current_part)
-        ):
+        if new_position > self._position and new_position - self._position <= len(self._current_part):
             self._current_part.read(new_position - self._position)
             self._position = new_position
             return self._position
 
         self._position = new_position
         self._raw_reader.seek(new_position)
-        logger.debug('current_pos: %r', self._position)
+        logger.debug("current_pos: %r", self._position)
 
         self._current_part.empty()
         return self._position
@@ -312,8 +295,8 @@ class Reader(io.BufferedIOBase):
     def read(self, size=-1):
         """Read up to size bytes from the object and return them."""
         if size == 0:
-            return b''
-        elif size < 0:
+            return b""
+        if size < 0:
             self._position = self._size
             return self._read_from_buffer() + self._raw_reader.read()
 
@@ -338,13 +321,13 @@ class Reader(io.BufferedIOBase):
         data = self.read(len(b))
         if not data:
             return 0
-        b[:len(data)] = data
+        b[: len(data)] = data
         return len(data)
 
     def readline(self, limit=-1):
         """Read up to and including the next newline.  Returns the bytes read."""
         if limit != -1:
-            raise NotImplementedError('limits other than -1 not implemented yet')
+            raise NotImplementedError("limits other than -1 not implemented yet")
 
         #
         # A single line may span multiple buffers.
@@ -357,8 +340,7 @@ class Reader(io.BufferedIOBase):
 
             if line_part.endswith(self._line_terminator):
                 break
-            else:
-                self._fill_buffer()
+            self._fill_buffer()
 
         return line.getvalue()
 
@@ -379,7 +361,7 @@ class Reader(io.BufferedIOBase):
         while len(self._current_part) < size and not self._position == self._size:
             bytes_read = self._current_part.fill(self._raw_reader)
             if bytes_read == 0:
-                logger.debug('reached EOF while filling buffer')
+                logger.debug("reached EOF while filling buffer")
                 return True
 
     def __enter__(self):
@@ -389,18 +371,10 @@ class Reader(io.BufferedIOBase):
         self.close()
 
     def __str__(self):
-        return "(%s, %r, %r)" % (
-            self.__class__.__name__,
-            self._container_name,
-            self._blob_name
-        )
+        return f"({self.__class__.__name__}, {self._container_name!r}, {self._blob_name!r})"
 
     def __repr__(self):
-        return "%s(container=%r, blob=%r)" % (
-            self.__class__.__name__,
-            self._container_name,
-            self._blob_name,
-        )
+        return f"{self.__class__.__name__}(container={self._container_name!r}, blob={self._blob_name!r})"
 
 
 class Writer(io.BufferedIOBase):
@@ -408,15 +382,16 @@ class Writer(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library.
     """
+
     _blob = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(
-            self,
-            container,
-            blob,
-            client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
-            blob_kwargs=None,
-            min_part_size=_DEFAULT_MIN_PART_SIZE,
+        self,
+        container,
+        blob,
+        client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]
+        blob_kwargs=None,
+        min_part_size=_DEFAULT_MIN_PART_SIZE,
     ):
         self._container_name = container
         self._blob_name = blob
@@ -440,11 +415,11 @@ class Writer(io.BufferedIOBase):
         Uploaded (uncommitted) blocks will be garbage collected after 7 days.
 
         See also https://stackoverflow.com/a/69673084/5511061."""
-        logger.debug('%s: terminating multipart upload', self)
+        logger.debug("%s: terminating multipart upload", self)
         if not self.closed:
             self._block_list = []
             self._blob = None
-        logger.debug('%s: terminated multipart upload', self)
+        logger.debug("%s: terminated multipart upload", self)
 
     #
     # Override some methods from io.IOBase.
@@ -452,7 +427,7 @@ class Writer(io.BufferedIOBase):
     def close(self):
         logger.debug("close: called")
         if not self.closed:
-            logger.debug('%s: completing multipart upload', self)
+            logger.debug("%s: completing multipart upload", self)
             try:
                 if self._current_part.tell() > 0:
                     self._upload_part()
@@ -460,7 +435,7 @@ class Writer(io.BufferedIOBase):
             finally:
                 self._block_list = []
                 self._blob = None
-            logger.debug('%s: completed multipart upload', self)
+            logger.debug("%s: completed multipart upload", self)
 
     @property
     def closed(self):
@@ -501,7 +476,7 @@ class Writer(io.BufferedIOBase):
         do any HTTP transfer right away."""
 
         if not isinstance(b, _BINARY_TYPES):
-            raise TypeError("input must be one of %r, got: %r" % (_BINARY_TYPES, type(b)))
+            raise TypeError(f"input must be one of {_BINARY_TYPES!r}, got: {type(b)!r}")
 
         self._current_part.write(b)
         self._total_size += len(b)
@@ -529,7 +504,9 @@ class Writer(io.BufferedIOBase):
 
         logger.info(
             "uploading part #%i, %i bytes (total %.3fGB)",
-            part_num, content_length, range_stop / 1024.0 ** 3,
+            part_num,
+            content_length,
+            range_stop / 1024.0**3,
         )
 
         self._total_parts += 1
@@ -547,32 +524,24 @@ class Writer(io.BufferedIOBase):
             self.close()
 
     def __str__(self):
-        return "(%s, %r, %r)" % (
-            self.__class__.__name__,
-            self._container_name,
-            self._blob_name
-        )
+        return f"({self.__class__.__name__}, {self._container_name!r}, {self._blob_name!r})"
 
     def __repr__(self):
-        return "%s(container=%r, blob=%r, min_part_size=%r)" % (
-            self.__class__.__name__,
-            self._container_name,
-            self._blob_name,
-            self._min_part_size
-        )
+        return f"{self.__class__.__name__}(container={self._container_name!r}, blob={self._blob_name!r}, min_part_size={self._min_part_size!r})"
 
 
 class AppendWriter(io.BufferedIOBase):
     """Append bytes to Azure Blob Storage.
 
     Implements the io.BufferedIOBase interface of the standard library."""
+
     _blob = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(
         self,
         container,
         blob,
-        client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]  # noqa
+        client,  # type: Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient]
         blob_kwargs=None,
         min_part_size=_DEFAULT_MIN_PART_SIZE,
     ):
@@ -635,9 +604,7 @@ class AppendWriter(io.BufferedIOBase):
 
     def write(self, b):
         if not isinstance(b, _BINARY_TYPES):
-            raise TypeError(
-                "input must be one of %r, got: %r" % (_BINARY_TYPES, type(b))
-            )
+            raise TypeError(f"input must be one of {_BINARY_TYPES!r}, got: {type(b)!r}")
         self._current_part.write(b)
         self._total_size += len(b)
         if self._current_part.tell() >= self._min_part_size:
@@ -664,15 +631,7 @@ class AppendWriter(io.BufferedIOBase):
             self.close()
 
     def __str__(self):
-        return "(%s, %r, %r)" % (
-            self.__class__.__name__,
-            self._container_name,
-            self._blob_name,
-        )
+        return f"({self.__class__.__name__}, {self._container_name!r}, {self._blob_name!r})"
 
     def __repr__(self):
-        return "%s(container=%r, blob=%r)" % (
-            self.__class__.__name__,
-            self._container_name,
-            self._blob_name,
-        )
+        return f"{self.__class__.__name__}(container={self._container_name!r}, blob={self._blob_name!r})"

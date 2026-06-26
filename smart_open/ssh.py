@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -23,15 +22,10 @@ Similarly, from a command line::
 """
 
 import getpass
-import os
 import logging
+import os
 import urllib.parse
-
-from typing import (
-    Dict,
-    Callable,
-    Tuple,
-)
+from collections.abc import Callable
 
 try:
     import paramiko
@@ -53,10 +47,10 @@ SCHEMES = ("ssh", "scp", "sftp")
 DEFAULT_PORT = 22
 
 URI_EXAMPLES = (
-    'ssh://username@host/path/file',
-    'ssh://username@host//path/file',
-    'scp://username@host/path/file',
-    'sftp://username@host/path/file',
+    "ssh://username@host/path/file",
+    "ssh://username@host//path/file",
+    "scp://username@host/path/file",
+    "sftp://username@host/path/file",
 )
 
 #
@@ -87,7 +81,7 @@ def _str2bool(string):
 # 1. their corresponding names in the ~/.ssh/config file
 # 2. a callable to convert the parameter value from a string to the appropriate type
 #
-_PARAMIKO_CONFIG_MAP: Dict[str, Tuple[str, Callable]] = {
+_PARAMIKO_CONFIG_MAP: dict[str, tuple[str, Callable]] = {
     "timeout": ("connecttimeout", float),
     "compress": ("compression", _str2bool),
     "gss_auth": ("gssapiauthentication", _str2bool),
@@ -100,21 +94,21 @@ _PARAMIKO_CONFIG_MAP: Dict[str, Tuple[str, Callable]] = {
 def parse_uri(uri_as_string):
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
-    return dict(
-        scheme=split_uri.scheme,
-        uri_path=_unquote(split_uri.path),
-        user=_unquote(split_uri.username),
-        host=split_uri.hostname,
-        port=int(split_uri.port) if split_uri.port else None,
-        password=_unquote(split_uri.password),
-    )
+    return {
+        "scheme": split_uri.scheme,
+        "uri_path": _unquote(split_uri.path),
+        "user": _unquote(split_uri.username),
+        "host": split_uri.hostname,
+        "port": int(split_uri.port) if split_uri.port else None,
+        "password": _unquote(split_uri.password),
+    }
 
 
 def open_uri(uri, mode, transport_params):
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     parsed_uri = parse_uri(uri)
-    uri_path = parsed_uri.pop('uri_path')
-    parsed_uri.pop('scheme')
+    uri_path = parsed_uri.pop("uri_path")
+    parsed_uri.pop("scheme")
     final_params = {**parsed_uri, **kwargs}  # transport_params takes precedence over uri
     return open(uri_path, mode, **final_params)
 
@@ -124,9 +118,9 @@ def _connect_ssh(hostname, username, port, password, connect_kwargs):
     ssh.load_system_host_keys()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     kwargs = (connect_kwargs or {}).copy()
-    if 'key_filename' not in kwargs:
-        kwargs.setdefault('password', password)
-    kwargs.setdefault('username', username)
+    if "key_filename" not in kwargs:
+        kwargs.setdefault("password", password)
+    kwargs.setdefault("username", username)
     ssh.connect(hostname, port, **kwargs)
     return ssh
 
@@ -137,7 +131,7 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
         return host, username, password, port, connect_kwargs
 
     if not host:
-        raise ValueError('you must specify the host to connect to')
+        raise ValueError("you must specify the host to connect to")
 
     # Attempt to load an OpenSSH config.
     #
@@ -291,7 +285,7 @@ def open(
             sftp_client = transport.open_sftp_client()
             break
         except paramiko.SSHException as ex:
-            connection_timed_out = ex.args and ex.args[0] == 'SSH session not active'
+            connection_timed_out = ex.args and ex.args[0] == "SSH session not active"
             if attempt == attempts - 1 or not connection_timed_out:
                 raise
 

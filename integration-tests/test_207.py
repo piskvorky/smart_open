@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -19,10 +18,10 @@ import smart_open
 
 
 def tofile():
-    dt = np.dtype([('time', [('min', int), ('sec', int)]), ('temp', float)])
+    dt = np.dtype([("time", [("min", int), ("sec", int)]), ("temp", float)])
     x = np.zeros((1,), dtype=dt)
 
-    with tempfile.NamedTemporaryFile(prefix='test_207', suffix='.dat', delete=False) as fout:
+    with tempfile.NamedTemporaryFile(prefix="test_207", suffix=".dat", delete=False) as fout:
         x.tofile(fout.name)
         return fout.name
 
@@ -30,7 +29,7 @@ def tofile():
 def test_fromfile():
     try:
         path = tofile()
-        with smart_open.open(path, 'rb') as fin:
+        with smart_open.open(path, "rb") as fin:
             np.fromfile(fin)
     finally:
         os.unlink(path)

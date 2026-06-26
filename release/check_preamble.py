@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -27,6 +26,7 @@ Processing entire subdirectories with one command::
     find subdir1 subdir2 -iname "*.py" | xargs -n 1 python check_preamble.py --replace template.py
 
 """
+
 import argparse
 import logging
 import os
@@ -40,7 +40,7 @@ def extract_preamble(fin):
     for line in fin:
         if end_preamble:
             body.append(line)
-        elif line.startswith('#'):
+        elif line.startswith("#"):
             preamble.append(line)
         else:
             end_preamble = True
@@ -51,9 +51,9 @@ def extract_preamble(fin):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('path', help='the path of the file to check')
-    parser.add_argument('--replace', help='replace the preamble with the one from this file')
-    parser.add_argument('--loglevel', default=logging.INFO)
+    parser.add_argument("path", help="the path of the file to check")
+    parser.add_argument("--replace", help="replace the preamble with the one from this file")
+    parser.add_argument("--loglevel", default=logging.INFO)
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
@@ -62,7 +62,7 @@ def main():
         preamble, body = extract_preamble(fin)
 
     for line in preamble:
-        logging.info('%s: %s', args.path, line.rstrip())
+        logging.info("%s: %s", args.path, line.rstrip())
 
     if not args.replace:
         sys.exit(0)
@@ -71,12 +71,12 @@ def main():
         preamble, _ = extract_preamble(fin)
 
     if os.access(args.path, os.X_OK):
-        preamble.insert(0, '#!/usr/bin/env python\n')
+        preamble.insert(0, "#!/usr/bin/env python\n")
 
-    with open(args.path, 'w') as fout:
+    with open(args.path, "w") as fout:
         for line in preamble + body:
             fout.write(line)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

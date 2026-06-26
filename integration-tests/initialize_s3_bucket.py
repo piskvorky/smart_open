@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2020 Radim Rehurek <me@radimrehurek.com>
 #
@@ -22,20 +21,20 @@ def gzip_compress(data):
     # gzip.compress does not exist under Py2
     #
     buf = io.BytesIO()
-    with gzip.GzipFile(fileobj=buf, mode='wb') as fout:
+    with gzip.GzipFile(fileobj=buf, mode="wb") as fout:
         fout.write(data)
     return buf.getvalue()
 
 
 def _build_contents():
-    hello_bytes = u"hello wořld\nhow are you?".encode('utf8')
-    yield 'hello.txt', hello_bytes
-    yield 'multiline.txt', b'englishman\nin\nnew\nyork\n'
-    yield 'hello.txt.gz', gzip_compress(hello_bytes)
+    hello_bytes = "hello wořld\nhow are you?".encode()
+    yield "hello.txt", hello_bytes
+    yield "multiline.txt", b"englishman\nin\nnew\nyork\n"
+    yield "hello.txt.gz", gzip_compress(hello_bytes)
 
     for i in range(100):
-        key = 'iter_bucket/%02d.txt' % i
-        body = '\n'.join("line%i%i" % (i, line_no) for line_no in range(10)).encode('utf8')
+        key = f"iter_bucket/{i:02d}.txt"
+        body = "\n".join(f"line{i}{line_no}" for line_no in range(10)).encode("utf8")
         yield key, body
 
 
@@ -45,7 +44,7 @@ CONTENTS = dict(_build_contents())
 def main():
     bucket_name = sys.argv[1]
 
-    bucket = boto3.resource('s3').Bucket(bucket_name)
+    bucket = boto3.resource("s3").Bucket(bucket_name)
 
     #
     # Assume the bucket exists.  Creating it ourselves and dealing with
@@ -54,9 +53,9 @@ def main():
     for key in bucket.objects.all():
         key.delete()
 
-    for (key, body) in CONTENTS.items():
+    for key, body in CONTENTS.items():
         bucket.put_object(Key=key, Body=body)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

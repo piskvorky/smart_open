@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -21,23 +20,21 @@ try:
 except ImportError:
     MISSING_DEPS = True
 
-from smart_open import utils, constants
-
 import http.client as httplib
+
+from smart_open import constants, utils
 
 logger = logging.getLogger(__name__)
 
-SCHEME = 'webhdfs'
+SCHEME = "webhdfs"
 
-URI_EXAMPLES = (
-    'webhdfs://host:port/path/file',
-)
+URI_EXAMPLES = ("webhdfs://host:port/path/file",)
 
 MIN_PART_SIZE = 50 * 1024**2  # minimum part size for HDFS multipart uploads
 
 
 def parse_uri(uri_as_str):
-    return dict(scheme=SCHEME, uri=uri_as_str)
+    return {"scheme": SCHEME, "uri": uri_as_str}
 
 
 def open_uri(uri, mode, transport_params):
@@ -63,9 +60,9 @@ def open(http_uri, mode, min_part_size=MIN_PART_SIZE):
     elif mode == constants.WRITE_BINARY:
         fobj = BufferedOutputBase(http_uri, min_part_size=min_part_size)
     else:
-        raise NotImplementedError("webhdfs support for mode %r not implemented" % mode)
+        raise NotImplementedError(f"webhdfs support for mode {mode!r} not implemented")
 
-    fobj.name = http_uri.split('/')[-1]
+    fobj.name = http_uri.split("/")[-1]
     return fobj
 
 
@@ -81,16 +78,12 @@ def _convert_to_http_uri(webhdfs_url):
     split_uri = urllib.parse.urlsplit(webhdfs_url)
     netloc = split_uri.hostname
     if split_uri.port:
-        netloc += ":{}".format(split_uri.port)
+        netloc += f":{split_uri.port}"
     query = split_uri.query
     if split_uri.username:
-        query += (
-            ("&" if query else "") + "user.name=" + urllib.parse.quote(split_uri.username)
-        )
+        query += ("&" if query else "") + "user.name=" + urllib.parse.quote(split_uri.username)
 
-    return urllib.parse.urlunsplit(
-        ("http", netloc, "/webhdfs/v1" + split_uri.path, query, "")
-    )
+    return urllib.parse.urlunsplit(("http", netloc, "/webhdfs/v1" + split_uri.path, query, ""))
 
 
 #
@@ -110,7 +103,7 @@ class BufferedInputBase(io.BufferedIOBase):
         self._response = requests.get(self._uri, params=payload, stream=True)
         if self._response.status_code != httplib.OK:
             raise WebHdfsException.from_response(self._response)
-        self._buf = b''
+        self._buf = b""
 
     #
     # Override some methods from io.IOBase.
@@ -144,9 +137,9 @@ class BufferedInputBase(io.BufferedIOBase):
 
     def read(self, size=None):
         if size is None:
-            self._buf, retval = b'', self._buf + self._response.raw.read()
+            self._buf, retval = b"", self._buf + self._response.raw.read()
             return retval
-        elif size < len(self._buf):
+        if size < len(self._buf):
             self._buf, retval = self._buf[size:], self._buf[:size]
             return retval
 
@@ -179,23 +172,16 @@ class BufferedInputBase(io.BufferedIOBase):
         data = self.read(len(b))
         if not data:
             return 0
-        b[:len(data)] = data
+        b[: len(data)] = data
         return len(data)
 
     def readline(self):
-        self._buf, retval = b'', self._buf + self._response.raw.readline()
+        self._buf, retval = b"", self._buf + self._response.raw.readline()
         return retval
 
 
 class BufferedOutputBase(io.BufferedIOBase):
     def __init__(self, uri, min_part_size=MIN_PART_SIZE):
-        """
-        Parameters
-        ----------
-        min_part_size: int, optional
-            For writing only.
-
-        """
         self._uri = uri
         self._closed = False
         self.min_part_size = min_part_size
@@ -204,8 +190,8 @@ class BufferedOutputBase(io.BufferedIOBase):
         init_response = requests.put(self._uri, params=payload, allow_redirects=False)
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
             raise WebHdfsException.from_response(init_response)
-        uri = init_response.headers['location']
-        response = requests.put(uri, data="", headers={'content-type': 'application/octet-stream'})
+        uri = init_response.headers["location"]
+        response = requests.put(uri, data="", headers={"content-type": "application/octet-stream"})
         if not response.status_code == httplib.CREATED:
             raise WebHdfsException.from_response(response)
         self.lines = []
@@ -231,9 +217,8 @@ class BufferedOutputBase(io.BufferedIOBase):
         init_response = requests.post(self._uri, params=payload, allow_redirects=False)
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
             raise WebHdfsException.from_response(init_response)
-        uri = init_response.headers['location']
-        response = requests.post(uri, data=data,
-                                 headers={'content-type': 'application/octet-stream'})
+        uri = init_response.headers["location"]
+        response = requests.post(uri, data=data, headers={"content-type": "application/octet-stream"})
         if not response.status_code == httplib.OK:
             raise WebHdfsException.from_response(response)
 
@@ -256,7 +241,9 @@ class BufferedOutputBase(io.BufferedIOBase):
             buff = b"".join(self.lines)
             logger.info(
                 "uploading part #%i, %i bytes (total %.3fGB)",
-                self.parts, len(buff), self.total_size / 1024.0 ** 3
+                self.parts,
+                len(buff),
+                self.total_size / 1024.0**3,
             )
             self._upload(buff)
             logger.debug("upload of part #%i finished", self.parts)
@@ -268,7 +255,9 @@ class BufferedOutputBase(io.BufferedIOBase):
         if buff:
             logger.info(
                 "uploading last part #%i, %i bytes (total %.3fGB)",
-                self.parts, len(buff), self.total_size / 1024.0 ** 3
+                self.parts,
+                len(buff),
+                self.total_size / 1024.0**3,
             )
             self._upload(buff)
             logger.debug("upload of last part #%i finished", self.parts)
@@ -283,12 +272,10 @@ class WebHdfsException(Exception):
     def __init__(self, msg="", status_code=None):
         self.msg = msg
         self.status_code = status_code
-        super(WebHdfsException, self).__init__(repr(self))
+        super().__init__(repr(self))
 
     def __repr__(self):
-        return "{}(status_code={}, msg={!r})".format(
-            self.__class__.__name__, self.status_code, self.msg
-        )
+        return f"{self.__class__.__name__}(status_code={self.status_code}, msg={self.msg!r})"
 
     @classmethod
     def from_response(cls, response):

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -10,10 +9,11 @@
 
 import logging
 import ssl
-import urllib.parse
-import smart_open.utils
-from ftplib import FTP, FTP_TLS, error_reply
 import types
+import urllib.parse
+from ftplib import FTP, FTP_TLS, error_reply
+
+import smart_open.utils
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +40,14 @@ def _unquote(text):
 def parse_uri(uri_as_string):
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
-    return dict(
-        scheme=split_uri.scheme,
-        uri_path=_unquote(split_uri.path),
-        user=_unquote(split_uri.username),
-        host=split_uri.hostname,
-        port=int(split_uri.port or DEFAULT_PORT),
-        password=_unquote(split_uri.password),
-    )
+    return {
+        "scheme": split_uri.scheme,
+        "uri_path": _unquote(split_uri.path),
+        "user": _unquote(split_uri.username),
+        "host": split_uri.hostname,
+        "port": int(split_uri.port or DEFAULT_PORT),
+        "password": _unquote(split_uri.password),
+    }
 
 
 def open_uri(uri, mode, transport_params):
@@ -75,9 +75,7 @@ def convert_transport_params_to_args(transport_params):
     kwargs = {k: v for (k, v) in transport_params.items() if k in supported_keywords}
 
     if unsupported_keywords:
-        logger.warning(
-            "ignoring unsupported ftp keyword arguments: %r", unsupported_keywords
-        )
+        logger.warning("ignoring unsupported ftp keyword arguments: %r", unsupported_keywords)
 
     return kwargs
 
@@ -97,9 +95,7 @@ def _connect(hostname, username, port, password, secure_connection, transport_pa
     try:
         ftp.login(username, password)
     except error_reply as e:
-        logger.error(
-            "Unable to login to FTP server: try checking the username and password!"
-        )
+        logger.error("Unable to login to FTP server: try checking the username and password!")
         raise e
     if secure_connection:
         ftp.prot_p()
@@ -152,8 +148,8 @@ def open(
     }
     try:
         ftp_mode, file_obj_mode = mode_to_ftp_cmds[mode]
-    except KeyError:
-        raise ValueError(f"unsupported mode: {mode!r}")
+    except KeyError as err:
+        raise ValueError(f"unsupported mode: {mode!r}") from err
     ftp_mode, file_obj_mode = mode_to_ftp_cmds[mode]
     conn.voidcmd("TYPE I")
     socket = conn.transfercmd(f"{ftp_mode} {path}")

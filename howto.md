@@ -350,8 +350,8 @@ If passing everything via `smart_open` feels awkward, try passing part of the pa
 
 ## How to Read from Github API
 
-The Github API allows users access to, among many other things, read files from repositories that you have 
-access to. Below is an example for how users can read a file with smart_open. For more info, see the 
+The Github API allows users access to, among many other things, read files from repositories that you have
+access to. Below is an example for how users can read a file with smart_open. For more info, see the
 [Github API documentation](https://docs.github.com/en/rest/reference/repos#contents).
 
 ```python

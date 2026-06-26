@@ -172,11 +172,11 @@ Use the ``compression`` parameter instead:
 
     fin = smart_open.open("/path/file.gz", ignore_ext=True)  # No
     fin = smart_open.open("/path/file.gz", compression="disable")  # Yes
-    
+
     fin = smart_open.open("/path/file.gz", ignore_ext=False)  # No
     fin = smart_open.open("/path/file.gz")  # Yes
     fin = smart_open.open("/path/file.gz", compression="infer_from_extension")  # Yes, if you want to be explicit
-    
+
     fin = smart_open.open("/path/file", compression=".gz")  # Yes
 
 
@@ -188,7 +188,7 @@ This API was easy to integrate for smart_open developers, but this came at a cos
 Furthermore, as smart_open supported more and more options, the transport parameter list grew, making it less maintainable.
 
 Starting with version 5.0.0, smart_open uses the `client API`_ instead of the resource API.
-Functionally, very little changes for the smart_open user. 
+Functionally, very little changes for the smart_open user.
 The only difference is in passing transport parameters to the S3 backend.
 
 More specifically, the following S3 transport parameters are no longer supported:
@@ -291,7 +291,7 @@ Migrating to the new dependency management subsystem
 Smart_open has grown over the years to cover a lot of different storages, each with a different set of library dependencies. Not everybody needs *all* of them, so to make each smart_open installation leaner and faster, version 3.0.0 introduced a new, backward-incompatible installation method:
 
 * smart_open < 3.0.0: All dependencies were installed by default. No way to select just a subset during installation.
-* smart_open >= 3.0.0: No dependencies installed by default. Install the ones you need with e.g. ``pip install smart_open[s3]`` (only AWS), or ``smart_open[all]`` (install everything = same behaviour as < 3.0.0; use this for backward compatibility). 
+* smart_open >= 3.0.0: No dependencies installed by default. Install the ones you need with e.g. ``pip install smart_open[s3]`` (only AWS), or ``smart_open[all]`` (install everything = same behaviour as < 3.0.0; use this for backward compatibility).
 
 You can read more about the motivation and internal discussions for this change  `here <https://github.com/piskvorky/smart_open/issues/443>`_.
 

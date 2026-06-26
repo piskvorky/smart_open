@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -10,38 +9,37 @@ import gzip
 import unittest
 
 import pytest
+import requests
 import responses
 
+import smart_open.constants
 import smart_open.http
 import smart_open.s3
-import smart_open.constants
-import requests
 
-BYTES = b'i tried so hard and got so far but in the end it doesn\'t even matter'
+BYTES = b"i tried so hard and got so far but in the end it doesn't even matter"
 GZIPPED_BYTES = gzip.compress(BYTES)
-URL = 'http://localhost'
-HTTPS_URL = 'https://localhost'
+URL = "http://localhost"
+HTTPS_URL = "https://localhost"
 HEADERS = {
-    'Accept-Ranges': 'bytes',
+    "Accept-Ranges": "bytes",
 }
 
 
 def request_callback(request, headers=HEADERS, data=BYTES):
     headers = headers.copy()
-    range_string = request.headers.get('range', 'bytes=0-')
+    range_string = request.headers.get("range", "bytes=0-")
 
-    start, end = range_string.replace('bytes=', '', 1).split('-', 1)
+    start, end = range_string.replace("bytes=", "", 1).split("-", 1)
     start = int(start)
     end = int(end) if end else len(data)
 
     data = data[start:end]
-    headers['Content-Length'] = str(len(data))
+    headers["Content-Length"] = str(len(data))
 
     return (200, headers, data)
 
 
 class HttpTest(unittest.TestCase):
-
     @responses.activate
     def test_read_all(self):
         responses.add(responses.GET, URL, body=BYTES)
@@ -123,22 +121,22 @@ class HttpTest(unittest.TestCase):
         # use default _HEADERS
         x = smart_open.http.BufferedInputBase(URL)
         # set different ones
-        x.headers['Accept-Encoding'] = 'compress, gzip'
-        x.headers['Other-Header'] = 'value'
+        x.headers["Accept-Encoding"] = "compress, gzip"
+        x.headers["Other-Header"] = "value"
 
         # use default again, global shoudn't overwritten from x
         y = smart_open.http.BufferedInputBase(URL)
         # should be default headers
-        self.assertEqual(y.headers, {'Accept-Encoding': 'identity'})
+        self.assertEqual(y.headers, {"Accept-Encoding": "identity"})
         # should be assigned headers
-        self.assertEqual(x.headers, {'Accept-Encoding': 'compress, gzip', 'Other-Header': 'value'})
+        self.assertEqual(x.headers, {"Accept-Encoding": "compress, gzip", "Other-Header": "value"})
 
     @responses.activate
     def test_headers(self):
         """Does the top-level http.open function handle headers correctly?"""
         responses.add_callback(responses.GET, URL, callback=request_callback)
-        reader = smart_open.http.open(URL, 'rb', headers={'Foo': 'bar'})
-        self.assertEqual(reader.headers['Foo'], 'bar')
+        reader = smart_open.http.open(URL, "rb", headers={"Foo": "bar"})
+        self.assertEqual(reader.headers["Foo"], "bar")
 
     @responses.activate
     def test_https_seek_start(self):
@@ -176,16 +174,16 @@ class HttpTest(unittest.TestCase):
     def test_timeout_attribute(self):
         timeout = 1
         responses.add_callback(responses.GET, URL, callback=request_callback)
-        reader = smart_open.open(URL, "rb", transport_params={'timeout': timeout})
-        assert hasattr(reader, 'timeout')
+        reader = smart_open.open(URL, "rb", transport_params={"timeout": timeout})
+        assert hasattr(reader, "timeout")
         assert reader.timeout == timeout
 
     @responses.activate
     def test_session_attribute(self):
         session = requests.Session()
         responses.add_callback(responses.GET, URL, callback=request_callback)
-        reader = smart_open.open(URL, "rb", transport_params={'session': session})
-        assert hasattr(reader, 'session')
+        reader = smart_open.open(URL, "rb", transport_params={"session": session})
+        assert hasattr(reader, "session")
         assert reader.session == session
         assert reader.read() == BYTES
 
@@ -195,7 +193,7 @@ def test_seek_implicitly_enabled(numbytes=10):
     """Can we seek even if the server hasn't explicitly allowed it?"""
     callback = functools.partial(request_callback, headers={})
     responses.add_callback(responses.GET, HTTPS_URL, callback=callback)
-    with smart_open.open(HTTPS_URL, 'rb') as fin:
+    with smart_open.open(HTTPS_URL, "rb") as fin:
         assert fin.seekable()
         first = fin.read(size=numbytes)
         fin.seek(-numbytes, whence=smart_open.constants.WHENCE_CURRENT)
@@ -206,9 +204,9 @@ def test_seek_implicitly_enabled(numbytes=10):
 @responses.activate
 def test_seek_implicitly_disabled():
     """Does seeking fail when the server has explicitly disabled it?"""
-    callback = functools.partial(request_callback, headers={'Accept-Ranges': 'none'})
+    callback = functools.partial(request_callback, headers={"Accept-Ranges": "none"})
     responses.add_callback(responses.GET, HTTPS_URL, callback=callback)
-    with smart_open.open(HTTPS_URL, 'rb') as fin:
+    with smart_open.open(HTTPS_URL, "rb") as fin:
         assert not fin.seekable()
         fin.read()
         with pytest.raises(OSError):
@@ -218,10 +216,11 @@ def test_seek_implicitly_disabled():
 @responses.activate
 def test_gzip_encoding_default_headers():
     """Does Accept-Encoding: identity prevent gzip compression?"""
+
     def callback(request):
         # Server respects Accept-Encoding: identity and sends uncompressed
         headers = HEADERS.copy()
-        headers['Content-Length'] = str(len(BYTES))
+        headers["Content-Length"] = str(len(BYTES))
         return (200, headers, BYTES)
 
     responses.add_callback(responses.GET, URL, callback=callback)
@@ -233,21 +232,21 @@ def test_gzip_encoding_default_headers():
 @responses.activate
 def test_gzip_encoding_explicit_request():
     """Does Accept-Encoding: gzip properly decompress via response.raw?"""
+
     def callback(request):
         # Server sees gzip in Accept-Encoding and returns compressed data
-        if 'gzip' in request.headers.get('Accept-Encoding', ''):
+        if "gzip" in request.headers.get("Accept-Encoding", ""):
             headers = HEADERS.copy()
-            headers['Content-Encoding'] = 'gzip'
-            headers['Content-Length'] = str(len(GZIPPED_BYTES))
+            headers["Content-Encoding"] = "gzip"
+            headers["Content-Length"] = str(len(GZIPPED_BYTES))
             return (200, headers, GZIPPED_BYTES)
-        else:
-            headers = HEADERS.copy()
-            headers['Content-Length'] = str(len(BYTES))
-            return (200, headers, BYTES)
+        headers = HEADERS.copy()
+        headers["Content-Length"] = str(len(BYTES))
+        return (200, headers, BYTES)
 
     responses.add_callback(responses.GET, URL, callback=callback)
     # Explicitly request gzip encoding
-    reader = smart_open.http.SeekableBufferedInputBase(URL, headers={'Accept-Encoding': 'gzip'})
+    reader = smart_open.http.SeekableBufferedInputBase(URL, headers={"Accept-Encoding": "gzip"})
     read_bytes = reader.read()
     assert read_bytes == BYTES  # Should be decompressed by requests/urllib3
 
@@ -302,5 +301,5 @@ def test_read_with_invalid_size():
     responses.add_callback(responses.GET, URL, callback=request_callback)
     reader = smart_open.http.SeekableBufferedInputBase(URL)
 
-    with pytest.raises(ValueError, match='size must be >= -1'):
+    with pytest.raises(ValueError, match="size must be >= -1"):
         reader.read(-2)

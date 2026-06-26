@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2020 Radim Rehurek <me@radimrehurek.com>
 #
@@ -17,8 +16,8 @@ import wrapt
 
 logger = logging.getLogger(__name__)
 
-WORKAROUND_SCHEMES = ['s3', 's3n', 's3a', 'gcs', 'gs']
-QUESTION_MARK_PLACEHOLDER = '///smart_open.utils.QUESTION_MARK_PLACEHOLDER///'
+WORKAROUND_SCHEMES = ["s3", "s3n", "s3a", "gcs", "gs"]
+QUESTION_MARK_PLACEHOLDER = "///smart_open.utils.QUESTION_MARK_PLACEHOLDER///"
 
 
 def inspect_kwargs(kallable):
@@ -51,7 +50,7 @@ def check_kwargs(kallable, kwargs):
     supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
 
     if unsupported_keywords:
-        logger.warning('ignoring unsupported keyword arguments: %r', unsupported_keywords)
+        logger.warning("ignoring unsupported keyword arguments: %r", unsupported_keywords)
 
     return supported_kwargs
 
@@ -104,9 +103,9 @@ def make_range_string(start=None, stop=None):
     #
     if start is None and stop is None:
         raise ValueError("make_range_string requires either a stop or start value")
-    start_str = '' if start is None else str(start)
-    stop_str = '' if stop is None else str(stop)
-    return 'bytes=%s-%s' % (start_str, stop_str)
+    start_str = "" if start is None else str(start)
+    stop_str = "" if stop is None else str(stop)
+    return f"bytes={start_str}-{stop_str}"
 
 
 def parse_content_range(content_range):
@@ -126,9 +125,9 @@ def parse_content_range(content_range):
         The units and three integers from the content-range header.
 
     """
-    units, numbers = content_range.split(' ', 1)
-    range, length = numbers.split('/', 1)
-    start, stop = range.split('-', 1)
+    units, numbers = content_range.split(" ", 1)
+    range, length = numbers.split("/", 1)
+    start, stop = range.split("-", 1)
     return units, int(start), int(stop), int(length)
 
 
@@ -156,21 +155,21 @@ def safe_urlsplit(url):
     sr = urllib.parse.urlsplit(url, allow_fragments=False)
 
     placeholder = None
-    if sr.scheme in WORKAROUND_SCHEMES and '?' in url and QUESTION_MARK_PLACEHOLDER not in url:
+    if sr.scheme in WORKAROUND_SCHEMES and "?" in url and QUESTION_MARK_PLACEHOLDER not in url:
         #
         # This is safe because people will _almost never_ use the below
         # substring in a URL.  If they do, then they're asking for trouble,
         # and this special handling will simply not happen for them.
         #
         placeholder = QUESTION_MARK_PLACEHOLDER
-        url = url.replace('?', placeholder)
+        url = url.replace("?", placeholder)
         sr = urllib.parse.urlsplit(url, allow_fragments=False)
 
     if placeholder is None:
         return sr
 
-    path = sr.path.replace(placeholder, '?')
-    return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, '', '')
+    path = sr.path.replace(placeholder, "?")
+    return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, "", "")
 
 
 class TextIOWrapper(io.TextIOWrapper):

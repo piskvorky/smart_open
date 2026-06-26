@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -9,6 +8,7 @@
 Sample code for HDFS integration tests.
 Requires hadoop to be running on localhost, at the moment.
 """
+
 import smart_open
 
 with smart_open.open("hdfs://user/root/input/core-site.xml") as fin:
@@ -17,5 +17,5 @@ with smart_open.open("hdfs://user/root/input/core-site.xml") as fin:
 with smart_open.open("hdfs://user/root/input/test.txt") as fin:
     print(fin.read())
 
-with smart_open.open("hdfs://user/root/input/test.txt?user.name=root", 'wb') as fout:
-    fout.write(b'hello world')
+with smart_open.open("hdfs://user/root/input/test.txt?user.name=root", "wb") as fout:
+    fout.write(b"hello world")

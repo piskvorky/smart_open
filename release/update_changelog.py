@@ -37,10 +37,12 @@ latest_version = changelog_lines[0].split(",", 1)[0].removeprefix("# ")
 def get_json(url):
     """Perform a GET + json.loads."""
     import requests
+
     print("Requesting", url)
     resp = requests.get(url)
     resp.raise_for_status()
     return json.loads(resp.text)
+
 
 # fetch diff for {latest_version}...{head_branch}
 diff = get_json(
@@ -61,9 +63,7 @@ for commit in diff["commits"]:
     pull_url = pull["html_url"]
     user_name = pull["user"]["login"]
     user_url = pull["user"]["html_url"]
-    new_changelog_lines.append(
-        f"- {title} (PR [#{pull_number}]({pull_url}), [@{user_name}]({user_url}))"
-    )
+    new_changelog_lines.append(f"- {title} (PR [#{pull_number}]({pull_url}), [@{user_name}]({user_url}))")
 
 if new_changelog_lines:
     print("Writing", changelog_path)

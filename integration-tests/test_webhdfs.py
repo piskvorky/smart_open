@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -17,22 +16,21 @@ it may look like:
 $ export SO_WEBHDFS_BASE_URL=webhdfs://hadoop@your-emr-driver:14000/tmp/
 $ py.test integration-tests/test_webhdfs.py
 """
+
 import json
 import os
-import smart_open
-from smart_open.webhdfs import WebHdfsException
+
 import pytest
 
+import smart_open
+from smart_open.webhdfs import WebHdfsException
+
 _SO_WEBHDFS_BASE_URL = os.environ.get("SO_WEBHDFS_BASE_URL")
-assert (
-    _SO_WEBHDFS_BASE_URL is not None
-), "please set the SO_WEBHDFS_BASE_URL environment variable"
+assert _SO_WEBHDFS_BASE_URL is not None, "please set the SO_WEBHDFS_BASE_URL environment variable"
 
 
 def make_url(path):
-    return "{base_url}/{path}".format(
-        base_url=_SO_WEBHDFS_BASE_URL.rstrip("/"), path=path.lstrip("/")
-    )
+    return "{base_url}/{path}".format(base_url=_SO_WEBHDFS_BASE_URL.rstrip("/"), path=path.lstrip("/"))
 
 
 def test_write_and_read():
@@ -50,9 +48,8 @@ def test_binary_write_and_read():
 
 
 def test_not_found():
-    with pytest.raises(WebHdfsException) as exc_info:
-        with smart_open.open(make_url("not_existing"), "r") as f:
-            assert f.read()
+    with pytest.raises(WebHdfsException) as exc_info, smart_open.open(make_url("not_existing"), "r") as f:
+        assert f.read()
     assert exc_info.value.status_code == 404
 
 
@@ -62,7 +59,5 @@ def test_quoted_path():
 
     with smart_open.open(make_url("?op=LISTSTATUS"), "r") as f:
         data = json.load(f)
-        filenames = [
-            entry["pathSuffix"] for entry in data["FileStatuses"]["FileStatus"]
-        ]
+        filenames = [entry["pathSuffix"] for entry in data["FileStatuses"]["FileStatus"]]
         assert "test_@_4.txt" in filenames

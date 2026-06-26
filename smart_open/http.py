@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -17,16 +16,16 @@ try:
 except ImportError:
     MISSING_DEPS = True
 
-from smart_open import bytebuffer, constants
 import smart_open.utils
+from smart_open import bytebuffer, constants
 
 DEFAULT_BUFFER_SIZE = 128 * 1024
-SCHEMES = ('http', 'https')
+SCHEMES = ("http", "https")
 
 logger = logging.getLogger(__name__)
 
 
-_HEADERS = {'Accept-Encoding': 'identity'}
+_HEADERS = {"Accept-Encoding": "identity"}
 """The headers we send to the server with every HTTP request.
 
 For now, we ask the server to send us the files as they are.
@@ -41,7 +40,7 @@ def parse_uri(uri_as_string):
 
     uri_path = split_uri.netloc + split_uri.path
     uri_path = "/" + uri_path.lstrip("/")
-    return dict(scheme=split_uri.scheme, uri_path=uri_path)
+    return {"scheme": split_uri.scheme, "uri_path": uri_path}
 
 
 def open_uri(uri, mode, transport_params):
@@ -49,8 +48,18 @@ def open_uri(uri, mode, transport_params):
     return open(uri, mode, **kwargs)
 
 
-def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
-         headers=None, timeout=None, session=None, buffer_size=DEFAULT_BUFFER_SIZE):
+def open(
+    uri,
+    mode,
+    kerberos=False,
+    user=None,
+    password=None,
+    cert=None,
+    headers=None,
+    timeout=None,
+    session=None,
+    buffer_size=DEFAULT_BUFFER_SIZE,
+):
     """Implement streamed reader from a web site.
 
     Supports Kerberos and Basic HTTP authentication.
@@ -87,22 +96,38 @@ def open(uri, mode, kerberos=False, user=None, password=None, cert=None,
     """
     if mode == constants.READ_BINARY:
         fobj = SeekableBufferedInputBase(
-            uri, mode, buffer_size=buffer_size, kerberos=kerberos,
-            user=user, password=password, cert=cert,
-            headers=headers, session=session, timeout=timeout,
+            uri,
+            mode,
+            buffer_size=buffer_size,
+            kerberos=kerberos,
+            user=user,
+            password=password,
+            cert=cert,
+            headers=headers,
+            session=session,
+            timeout=timeout,
         )
         fobj.name = os.path.basename(urllib.parse.urlparse(uri).path)
         return fobj
-    else:
-        raise NotImplementedError('http support for mode %r not implemented' % mode)
+    raise NotImplementedError(f"http support for mode {mode!r} not implemented")
 
 
 class BufferedInputBase(io.BufferedIOBase):
     response = None  # so `closed` property works in case __init__ fails and __del__ is called
 
-    def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, user=None, password=None, cert=None,
-                 headers=None, session=None, timeout=None):
+    def __init__(
+        self,
+        url,
+        mode="r",
+        buffer_size=DEFAULT_BUFFER_SIZE,
+        kerberos=False,
+        user=None,
+        password=None,
+        cert=None,
+        headers=None,
+        session=None,
+        timeout=None,
+    ):
 
         self.url = url
         self.cert = cert
@@ -110,6 +135,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
         if kerberos:
             import requests_kerberos
+
             self.auth = requests_kerberos.HTTPKerberosAuth()
         elif user is not None and password is not None:
             self.auth = (user, password)
@@ -174,7 +200,7 @@ class BufferedInputBase(io.BufferedIOBase):
         Mimics the read call to a filehandle object.
         """
         if size < -1:
-            raise ValueError(f'size must be >= -1, got {size}')
+            raise ValueError(f"size must be >= -1, got {size}")
 
         logger.debug("reading with size: %d", size)
         if self.closed or size == 0:
@@ -205,7 +231,7 @@ class BufferedInputBase(io.BufferedIOBase):
         data = self.read(len(b))
         if not data:
             return 0
-        b[:len(data)] = data
+        b[: len(data)] = data
         return len(data)
 
 
@@ -215,16 +241,19 @@ class SeekableBufferedInputBase(BufferedInputBase):
     Supports Kerberos, client certificate and Basic HTTP authentication.
     """
 
-    def __init__(self, url, mode='r', buffer_size=DEFAULT_BUFFER_SIZE,
-                 kerberos=False, user=None, password=None, cert=None,
-                 headers=None, session=None, timeout=None):
-        """
-        If Kerberos is True, will attempt to use the local Kerberos credentials.
-        If cert is set, will try to use a client certificate
-        Otherwise, will try to use "basic" HTTP authentication via username/password.
-
-        If none of those are set, will connect unauthenticated.
-        """
+    def __init__(
+        self,
+        url,
+        mode="r",
+        buffer_size=DEFAULT_BUFFER_SIZE,
+        kerberos=False,
+        user=None,
+        password=None,
+        cert=None,
+        headers=None,
+        session=None,
+        timeout=None,
+    ):
         super().__init__(url, mode, buffer_size, kerberos, user, password, cert, headers, session, timeout)
         self.content_length = int(self.response.headers.get("Content-Length", -1))
         #
@@ -242,12 +271,12 @@ class SeekableBufferedInputBase(BufferedInputBase):
         :param int whence: Where the offset is from.
 
         Returns the position after seeking."""
-        logger.debug('seeking to offset: %r whence: %r', offset, whence)
+        logger.debug("seeking to offset: %r whence: %r", offset, whence)
         if whence not in constants.WHENCE_CHOICES:
-            raise ValueError('invalid whence, expected one of %r' % constants.WHENCE_CHOICES)
+            raise ValueError(f"invalid whence, expected one of {constants.WHENCE_CHOICES!r}")
 
         if not self.seekable():
-            raise OSError('stream is not seekable')
+            raise OSError("stream is not seekable")
 
         if whence == constants.WHENCE_START:
             new_pos = offset

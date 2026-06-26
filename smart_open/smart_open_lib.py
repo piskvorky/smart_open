@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -16,16 +15,15 @@ import os.path as P
 import pathlib
 import urllib.parse
 
+import smart_open.compression as so_compression
+
 #
 # This module defines a function called smart_open so we cannot use
 # smart_open.submodule to reference to the submodules.
 #
 import smart_open.local_file as so_file
-import smart_open.compression as so_compression
 import smart_open.utils as so_utils
-
-from smart_open import doctools
-from smart_open import transport
+from smart_open import doctools, transport
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +36,8 @@ def _sniff_scheme(uri_as_string):
     # urlsplit doesn't work on Windows -- it parses the drive as the scheme...
     # no protocol given => assume a local file
     #
-    if os.name == 'nt' and '://' not in uri_as_string:
-        uri_as_string = 'file://' + uri_as_string
+    if os.name == "nt" and "://" not in uri_as_string:
+        uri_as_string = "file://" + uri_as_string
 
     return urllib.parse.urlsplit(uri_as_string).scheme
 
@@ -70,7 +68,7 @@ def parse_uri(uri_as_string):
     # The conversion to a namedtuple is just to keep the old tests happy while
     # I'm still refactoring.
     #
-    Uri = collections.namedtuple('Uri', sorted(as_dict.keys()))
+    Uri = collections.namedtuple("Uri", sorted(as_dict.keys()))
     return Uri(**as_dict)
 
 
@@ -83,18 +81,18 @@ _builtin_open = open
 
 
 def open(
-        uri,
-        mode='r',
-        buffering=-1,
-        encoding=None,
-        errors=None,
-        newline=None,
-        closefd=True,
-        opener=None,
-        compression=so_compression.INFER_FROM_EXTENSION,
-        compression_kwargs=None,
-        transport_params=None,
-        ):
+    uri,
+    mode="r",
+    buffering=-1,
+    encoding=None,
+    errors=None,
+    newline=None,
+    closefd=True,
+    opener=None,
+    compression=so_compression.INFER_FROM_EXTENSION,
+    compression_kwargs=None,
+    transport_params=None,
+):
     r"""Open the URI object, returning a file-like object.
 
     The URI is usually a string in a variety of formats.
@@ -155,13 +153,13 @@ def open(
       <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
 
     """
-    logger.debug('%r', locals())
+    logger.debug("%r", locals())
 
     if not isinstance(mode, str):
-        raise TypeError('mode should be a string')
+        raise TypeError("mode should be a string")
 
     if compression not in so_compression.get_supported_compression_types():
-        raise ValueError(f'invalid compression type: {compression}')
+        raise ValueError(f"invalid compression type: {compression}")
 
     if transport_params is None:
         transport_params = {}
@@ -186,14 +184,14 @@ def open(
     # If we change the default mode to be text, and match the normal behavior
     # of Py2 and 3, then the above assumption will be unnecessary.
     #
-    if encoding is not None and 'b' in mode:
-        mode = mode.replace('b', '')
+    if encoding is not None and "b" in mode:
+        mode = mode.replace("b", "")
 
     if isinstance(uri, pathlib.Path):
         uri = str(uri)
 
     explicit_encoding = encoding
-    encoding = explicit_encoding if explicit_encoding else DEFAULT_ENCODING
+    encoding = explicit_encoding or DEFAULT_ENCODING
 
     #
     # This is how we get from the filename to the end result.  Decompression is
@@ -211,13 +209,13 @@ def open(
     try:
         binary_mode = _get_binary_mode(mode)
     except ValueError as ve:
-        raise NotImplementedError(ve.args[0])
+        raise NotImplementedError(ve.args[0]) from ve
 
     binary = _open_binary_stream(uri, binary_mode, transport_params)
     filename = (
         binary.name
         # if name attribute is not string-like (e.g. ftp socket fileno)...
-        if isinstance(getattr(binary, "name", None), (str, bytes))
+        if isinstance(getattr(binary, "name", None), str | bytes)
         # ...fall back to uri
         else uri
     )
@@ -229,7 +227,7 @@ def open(
         compression_kwargs=compression_kwargs,
     )
 
-    if 'b' not in mode or explicit_encoding is not None:
+    if "b" not in mode or explicit_encoding is not None:
         decoded = _encoding_wrapper(
             decompressed,
             mode,
@@ -246,7 +244,7 @@ def open(
     # them so they are visible to the user.
     #
     if decoded != binary:
-        promoted_attrs = ['to_boto3']
+        promoted_attrs = ["to_boto3"]
         for attr in promoted_attrs:
             try:
                 setattr(decoded, attr, getattr(binary, attr))
@@ -266,38 +264,35 @@ def _get_binary_mode(mode_str):
     mode = list(mode_str)
     binmode = []
 
-    if 't' in mode and 'b' in mode:
+    if "t" in mode and "b" in mode:
         raise ValueError("can't have text and binary mode at once")
 
-    counts = [mode.count(x) for x in 'rwa']
+    counts = [mode.count(x) for x in "rwa"]
     if sum(counts) > 1:
         raise ValueError("must have exactly one of create/read/write/append mode")
 
     def transfer(char):
         binmode.append(mode.pop(mode.index(char)))
 
-    if 'a' in mode:
-        transfer('a')
-    elif 'w' in mode:
-        transfer('w')
-    elif 'r' in mode:
-        transfer('r')
+    if "a" in mode:
+        transfer("a")
+    elif "w" in mode:
+        transfer("w")
+    elif "r" in mode:
+        transfer("r")
     else:
-        raise ValueError(
-            "Must have exactly one of create/read/write/append "
-            "mode and at most one plus"
-        )
+        raise ValueError("Must have exactly one of create/read/write/append mode and at most one plus")
 
-    if 'b' in mode:
-        transfer('b')
-    elif 't' in mode:
-        mode.pop(mode.index('t'))
-        binmode.append('b')
+    if "b" in mode:
+        transfer("b")
+    elif "t" in mode:
+        mode.pop(mode.index("t"))
+        binmode.append("b")
     else:
-        binmode.append('b')
+        binmode.append("b")
 
-    if '+' in mode:
-        transfer('+')
+    if "+" in mode:
+        transfer("+")
 
     #
     # There shouldn't be anything left in the mode list at this stage.
@@ -305,20 +300,20 @@ def _get_binary_mode(mode_str):
     # of this function is broken, or the original input mode is invalid.
     #
     if mode:
-        raise ValueError('invalid mode: %r' % mode_str)
+        raise ValueError(f"invalid mode: {mode_str!r}")
 
-    return ''.join(binmode)
+    return "".join(binmode)
 
 
 def _shortcut_open(
-        uri,
-        mode,
-        compression,
-        buffering=-1,
-        encoding=None,
-        errors=None,
-        newline=None,
-        ):
+    uri,
+    mode,
+    compression,
+    buffering=-1,
+    encoding=None,
+    errors=None,
+    newline=None,
+):
     """Try to open the URI using the standard library io.open function.
 
     This can be much faster than the alternative of opening in binary mode and
@@ -354,16 +349,16 @@ def _shortcut_open(
 
     open_kwargs = {}
     if encoding is not None:
-        open_kwargs['encoding'] = encoding
-        mode = mode.replace('b', '')
+        open_kwargs["encoding"] = encoding
+        mode = mode.replace("b", "")
     if newline is not None:
-        open_kwargs['newline'] = newline
+        open_kwargs["newline"] = newline
 
     #
     # binary mode of the builtin/stdlib open function doesn't take an errors argument
     #
-    if errors and 'b' not in mode:
-        open_kwargs['errors'] = errors
+    if errors and "b" not in mode:
+        open_kwargs["errors"] = errors
 
     return _builtin_open(local_path, mode, buffering=buffering, **open_kwargs)
 
@@ -379,12 +374,12 @@ def _open_binary_stream(uri, mode, transport_params):
     :returns: A named file object
     :rtype: file-like object with a .name attribute
     """
-    if mode not in ('rb', 'rb+', 'wb', 'wb+', 'ab', 'ab+'):
+    if mode not in ("rb", "rb+", "wb", "wb+", "ab", "ab+"):
         #
         # This should really be a ValueError, but for the sake of compatibility
         # with older versions, which raise NotImplementedError, we do the same.
         #
-        raise NotImplementedError('unsupported mode: %r' % mode)
+        raise NotImplementedError(f"unsupported mode: {mode!r}")
 
     if isinstance(uri, int):
         #
@@ -398,12 +393,12 @@ def _open_binary_stream(uri, mode, transport_params):
         return fobj
 
     if not isinstance(uri, str):
-        raise TypeError("don't know how to handle uri %s" % repr(uri))
+        raise TypeError(f"don't know how to handle uri {repr(uri)}")
 
     scheme = _sniff_scheme(uri)
     submodule = transport.get_transport(scheme)
     fobj = submodule.open_uri(uri, mode, transport_params)
-    if not hasattr(fobj, 'name'):
+    if not hasattr(fobj, "name"):
         fobj.name = uri
 
     return fobj
@@ -421,7 +416,7 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
     :arg str errors: The method to use when handling encoding/decoding errors.
     :returns: a file object
     """
-    logger.debug('encoding_wrapper: %r', locals())
+    logger.debug("encoding_wrapper: %r", locals())
 
     #
     # If the mode is binary, but the user specified an encoding, assume they
@@ -432,7 +427,7 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
     #   smart_open(filename, encoding='utf-8') would return a byte stream
     #       without our assumption, because the default mode is rb.
     #
-    if 'b' in mode and encoding is None:
+    if "b" in mode and encoding is None:
         return fileobj
 
     if encoding is None:
@@ -448,7 +443,7 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
     return fileobj
 
 
-class patch_pathlib(object):
+class patch_pathlib:
     """Replace `Path.open` with `smart_open.open`"""
 
     def __init__(self):
@@ -478,9 +473,9 @@ try:
     doctools.tweak_parse_uri_docstring(parse_uri)
 except Exception as ex:
     logger.error(
-        'Encountered a non-fatal error while building docstrings (see below). '
-        'help(smart_open) will provide incomplete information as a result. '
-        'For full help text, see '
-        '<https://github.com/piskvorky/smart_open/blob/master/help.txt>.'
+        "Encountered a non-fatal error while building docstrings (see below). "
+        "help(smart_open) will provide incomplete information as a result. "
+        "For full help text, see "
+        "<https://github.com/piskvorky/smart_open/blob/master/help.txt>."
     )
     logger.exception(ex)

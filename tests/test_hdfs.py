@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -9,8 +8,8 @@ import gzip
 import os
 import os.path as P
 import subprocess
-from unittest import mock
 import sys
+from unittest import mock
 
 import pytest
 
@@ -41,47 +40,50 @@ def cat(path=None):
     return subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
 
-CAP_PATH = P.join(CURR_DIR, 'test_data', 'crime-and-punishment.txt')
-with open(CAP_PATH, encoding='utf-8') as fin:
+CAP_PATH = P.join(CURR_DIR, "test_data", "crime-and-punishment.txt")
+with open(CAP_PATH, encoding="utf-8") as fin:
     CRIME_AND_PUNISHMENT = fin.read()
 
 
-@pytest.mark.parametrize('uri,expected_path', [
-    ('hdfs:///tmp/test.txt', '/tmp/test.txt'),
-    ('hdfs://host/tmp/test.txt', 'hdfs://host/tmp/test.txt'),
-    ('hdfs://host:8020/tmp/test.txt', 'hdfs://host:8020/tmp/test.txt'),
-    ('viewfs:///tmp/test.txt', '/tmp/test.txt'),
-    ('viewfs://cluster/tmp/test.txt', 'viewfs://cluster/tmp/test.txt'),
-])
+@pytest.mark.parametrize(
+    "uri,expected_path",
+    [
+        ("hdfs:///tmp/test.txt", "/tmp/test.txt"),
+        ("hdfs://host/tmp/test.txt", "hdfs://host/tmp/test.txt"),
+        ("hdfs://host:8020/tmp/test.txt", "hdfs://host:8020/tmp/test.txt"),
+        ("viewfs:///tmp/test.txt", "/tmp/test.txt"),
+        ("viewfs://cluster/tmp/test.txt", "viewfs://cluster/tmp/test.txt"),
+    ],
+)
 def test_parse_uri(uri, expected_path):
     parsed = smart_open.hdfs.parse_uri(uri)
-    assert parsed['uri_path'] == expected_path
+    assert parsed["uri_path"] == expected_path
 
 
-@pytest.mark.parametrize('uri', ['hdfs:///', 'hdfs://'])
+@pytest.mark.parametrize("uri", ["hdfs:///", "hdfs://"])
 def test_parse_uri_invalid(uri):
     with pytest.raises(RuntimeError):
         smart_open.hdfs.parse_uri(uri)
 
 
 def test_sanity_read_bytes():
-    with open(CAP_PATH, 'rb') as fin:
-        lines = [line for line in fin]
+    with open(CAP_PATH, "rb") as fin:
+        lines = list(fin)
     assert len(lines) == 3
 
 
 def test_sanity_read_text():
-    with open(CAP_PATH, 'r', encoding='utf-8') as fin:
+    with open(CAP_PATH, encoding="utf-8") as fin:
         text = fin.read()
 
-    expected = 'В начале июля, в чрезвычайно жаркое время'
-    assert text[:len(expected)] == expected
+    expected = "В начале июля, в чрезвычайно жаркое время"
+    assert text[: len(expected)] == expected
 
 
-@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+@pytest.mark.parametrize("schema", [("hdfs",), ("viewfs",)])
 def test_read(schema):
-    with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH)):
-        reader = smart_open.hdfs.CliRawInputBase(f'{schema}://dummy/url')
+    with mock.patch("subprocess.Popen", return_value=cat(CAP_PATH)):
+        reader = smart_open.hdfs.CliRawInputBase(f"{schema}://dummy/url")
         as_bytes = reader.read()
 
     #
@@ -89,48 +91,48 @@ def test_read(schema):
     # tests fail without it.  It may be a bug, but I don't have time to
     # investigate right now.
     #
-    as_text = as_bytes.decode('utf-8').replace(os.linesep, '\n')
+    as_text = as_bytes.decode("utf-8").replace(os.linesep, "\n")
     assert as_text == CRIME_AND_PUNISHMENT
 
 
-@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+@pytest.mark.parametrize("schema", [("hdfs",), ("viewfs",)])
 def test_read_75(schema):
-    with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH)):
-        reader = smart_open.hdfs.CliRawInputBase(f'{schema}://dummy/url')
+    with mock.patch("subprocess.Popen", return_value=cat(CAP_PATH)):
+        reader = smart_open.hdfs.CliRawInputBase(f"{schema}://dummy/url")
         as_bytes = reader.read(75)
 
-    as_text = as_bytes.decode('utf-8').replace(os.linesep, '\n')
-    assert as_text == CRIME_AND_PUNISHMENT[:len(as_text)]
+    as_text = as_bytes.decode("utf-8").replace(os.linesep, "\n")
+    assert as_text == CRIME_AND_PUNISHMENT[: len(as_text)]
 
 
-@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+@pytest.mark.parametrize("schema", [("hdfs",), ("viewfs",)])
 def test_unzip(schema):
-    with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH + '.gz')):
-        with gzip.GzipFile(fileobj=smart_open.hdfs.CliRawInputBase(f'{schema}://dummy/url')) as fin:
+    with mock.patch("subprocess.Popen", return_value=cat(CAP_PATH + ".gz")):
+        with gzip.GzipFile(fileobj=smart_open.hdfs.CliRawInputBase(f"{schema}://dummy/url")) as fin:
             as_bytes = fin.read()
 
-    as_text = as_bytes.decode('utf-8')
+    as_text = as_bytes.decode("utf-8")
     assert as_text == CRIME_AND_PUNISHMENT
 
 
-@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+@pytest.mark.parametrize("schema", [("hdfs",), ("viewfs",)])
 def test_context_manager(schema):
-    with mock.patch('subprocess.Popen', return_value=cat(CAP_PATH)):
-        with smart_open.hdfs.CliRawInputBase(f'{schema}://dummy/url') as fin:
+    with mock.patch("subprocess.Popen", return_value=cat(CAP_PATH)):
+        with smart_open.hdfs.CliRawInputBase(f"{schema}://dummy/url") as fin:
             as_bytes = fin.read()
 
-    as_text = as_bytes.decode('utf-8').replace('\r\n', '\n')
+    as_text = as_bytes.decode("utf-8").replace("\r\n", "\n")
     assert as_text == CRIME_AND_PUNISHMENT
 
 
-@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+@pytest.mark.parametrize("schema", [("hdfs",), ("viewfs",)])
 def test_write(schema):
-    expected = 'мы в ответе за тех, кого приручили'
+    expected = "мы в ответе за тех, кого приручили"
     mocked_cat = cat()
 
-    payload = expected.encode('utf-8')
-    with mock.patch('subprocess.Popen', return_value=mocked_cat):
-        with smart_open.hdfs.CliRawOutputBase(f'{schema}://dummy/url') as fout:
+    payload = expected.encode("utf-8")
+    with mock.patch("subprocess.Popen", return_value=mocked_cat):
+        with smart_open.hdfs.CliRawOutputBase(f"{schema}://dummy/url") as fout:
             written = fout.write(payload)
 
     # CliRawOutputBase implements io.RawIOBase, whose write() contract is to
@@ -138,22 +140,22 @@ def test_write(schema):
     # ray._private.external_storage that assert on the return value.
     assert written == len(payload)
 
-    actual = mocked_cat.stdout.read().decode('utf-8')
+    actual = mocked_cat.stdout.read().decode("utf-8")
     assert actual == expected
 
 
-@pytest.mark.parametrize('schema', [('hdfs', ), ('viewfs', )])
+@pytest.mark.parametrize("schema", [("hdfs",), ("viewfs",)])
 def test_write_zip(schema):
-    expected = 'мы в ответе за тех, кого приручили'
+    expected = "мы в ответе за тех, кого приручили"
     mocked_cat = cat()
 
-    with mock.patch('subprocess.Popen', return_value=mocked_cat):
-        with smart_open.hdfs.CliRawOutputBase(f'{schema}://dummy/url') as fout:
-            with gzip.GzipFile(fileobj=fout, mode='wb') as gz_fout:
-                gz_fout.write(expected.encode('utf-8'))
+    with mock.patch("subprocess.Popen", return_value=mocked_cat):
+        with smart_open.hdfs.CliRawOutputBase(f"{schema}://dummy/url") as fout:
+            with gzip.GzipFile(fileobj=fout, mode="wb") as gz_fout:
+                gz_fout.write(expected.encode("utf-8"))
 
     with gzip.GzipFile(fileobj=mocked_cat.stdout) as fin:
-        actual = fin.read().decode('utf-8')
+        actual = fin.read().decode("utf-8")
 
     assert actual == expected
 
@@ -164,12 +166,12 @@ def main():
     except IndexError:
         bytez = sys.stdin.buffer.read()
     else:
-        with open(path, 'rb') as fin:
+        with open(path, "rb") as fin:
             bytez = fin.read()
 
     sys.stdout.buffer.write(bytez)
     sys.stdout.flush()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

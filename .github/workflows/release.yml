@@ -1,3 +1,4 @@
+---
 name: Release to PyPI
 
 on:

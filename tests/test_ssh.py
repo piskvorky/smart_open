@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import logging
 import os
 import unittest
@@ -18,9 +16,7 @@ def mock_ssh(func):
         smart_open.ssh._SSH.clear()
         return func(*args, **kwargs)
 
-    return mock.patch("paramiko.SSHClient.get_transport")(
-        mock.patch("paramiko.SSHClient.connect")(wrapper)
-    )
+    return mock.patch("paramiko.SSHClient.get_transport")(mock.patch("paramiko.SSHClient.connect")(wrapper))
 
 
 class SSHOpen(unittest.TestCase):
@@ -69,7 +65,7 @@ class SSHOpen(unittest.TestCase):
 
         def mocked_open_sftp():
             if len(mock_connect.call_args_list) < 2:  # simulate timeout until second connect()
-                yield SSHException('SSH session not active')
+                yield SSHException("SSH session not active")
             while True:
                 yield mock_sftp
 
@@ -87,7 +83,7 @@ class SSHOpen(unittest.TestCase):
             2345,
             username="another-user",
             key_filename=["/path/to/key/file"],
-            timeout=20.,
+            timeout=20.0,
             compress=True,
             gss_auth=False,
             gss_kex=False,
@@ -103,7 +99,7 @@ class SSHOpen(unittest.TestCase):
             22,
             username="another-user",
             key_filename=["/path/to/key/file"],
-            timeout=20.,
+            timeout=20.0,
             compress=True,
             gss_auth=False,
             gss_kex=False,
@@ -119,7 +115,7 @@ class SSHOpen(unittest.TestCase):
             22,
             username="another-user",
             key_filename=["/path/to/key/file"],
-            timeout=20.,
+            timeout=20.0,
             compress=True,
             gss_auth=False,
             gss_kex=False,
@@ -135,7 +131,7 @@ class SSHOpen(unittest.TestCase):
             22,
             username="another-user",
             key_filename=["/path/to/key/file"],
-            timeout=20.,
+            timeout=20.0,
             compress=True,
             gss_auth=False,
             gss_kex=False,
@@ -151,7 +147,7 @@ class SSHOpen(unittest.TestCase):
             2345,
             username="new-user",
             key_filename=["/path/to/key/file"],
-            timeout=20.,
+            timeout=20.0,
             compress=True,
             gss_auth=False,
             gss_kex=False,
