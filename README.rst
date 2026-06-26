@@ -192,7 +192,8 @@ For the sake of simplicity, the examples below assume you have all the dependenc
         fout.write(b'hello world')
 
     # stream from a completely custom s3 server, like s3proxy:
-    for line in open('s3u://user:secret@host:port@mybucket/mykey.txt'):
+    client = boto3.client('s3', endpoint_url='http://host:port', aws_access_key_id='user', aws_secret_access_key='secret')
+    for line in open('s3://mybucket/mykey.txt', transport_params={'client': client}):
         print(line)
 
     # Stream to Digital Ocean Spaces bucket providing credentials from boto3 profile

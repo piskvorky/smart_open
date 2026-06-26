@@ -17,7 +17,7 @@ import wrapt
 
 logger = logging.getLogger(__name__)
 
-WORKAROUND_SCHEMES = ['s3', 's3n', 's3u', 's3a', 'gs']
+WORKAROUND_SCHEMES = ['s3', 's3n', 's3a', 'gs']
 QUESTION_MARK_PLACEHOLDER = '///smart_open.utils.QUESTION_MARK_PLACEHOLDER///'
 
 
