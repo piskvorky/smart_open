@@ -40,8 +40,7 @@ import smart_open.s3
 # we create this bucket once before running these tests and then
 # remove it when we're done.  The bucket has a random name so that we
 # can run multiple instances of this suite in parallel and not have
-# them conflict with one another. Travis, for example, runs the Python
-# 2.7, 3.6, and 3.7 suites concurrently.
+# them conflict with one another.
 BUCKET_NAME = 'test-smartopen'
 KEY_NAME = 'test-key'
 WRITE_KEY_NAME = 'test-write-key'

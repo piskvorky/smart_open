@@ -862,7 +862,7 @@ class WriterTest(unittest.TestCase):
     def test_buffered_writer_wrapper_works(self):
         """
         Ensure that we can wrap a smart_open azure stream in a BufferedWriter, which
-        passes a memoryview object to the underlying stream in python >= 2.7
+        passes a memoryview object to the underlying stream.
         """
         expected = u'не думай о секундах свысока'
         blob_name = "test_buffered_writer_wrapper_works_%s" % BLOB_NAME

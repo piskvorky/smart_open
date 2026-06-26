@@ -28,9 +28,6 @@ class ByteBuffer(object):
     Example
     -------
 
-    Note that while this example works in both Python 2 and 3, the doctest only
-    passes in Python 3 due to the bytestring literals in the expected values.
-
     >>> buf = ByteBuffer(chunk_size = 8)
     >>> message_bytes = iter([b'Hello, W', b'orld!'])
     >>> buf.fill(message_bytes)
