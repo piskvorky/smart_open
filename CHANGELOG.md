@@ -1,3 +1,7 @@
+# 7.7.0, 2026-06-26
+
+- Add support for lz4 compression (PR [#921](https://github.com/piskvorky/smart_open/pull/921), [@muxiaofan](https://github.com/muxiaofan))
+
 # 7.6.1, 2026-05-09
 
 - Bump the github-actions group with 2 updates (PR [#919](https://github.com/piskvorky/smart_open/pull/919), [@dependabot[bot]](https://github.com/apps/dependabot))

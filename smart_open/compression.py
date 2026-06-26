@@ -134,6 +134,12 @@ def _handle_xz(file_obj, mode):
     return _maybe_wrap_buffered(result, mode)
 
 
+def _handle_lz4(file_obj, mode):
+    import lz4.frame
+    result = lz4.frame.open(file_obj, mode=mode)
+    return _maybe_wrap_buffered(result, mode)
+
+
 def compression_wrapper(file_obj, mode, compression=INFER_FROM_EXTENSION, filename=None):
     """
     Wrap `file_obj` with an appropriate [de]compression mechanism based on its file extension.
@@ -177,3 +183,4 @@ register_compressor('.bz2', _handle_bz2)
 register_compressor('.gz', _handle_gzip)
 register_compressor('.zst', _handle_zstd)
 register_compressor('.xz', _handle_xz)
+register_compressor('.lz4', _handle_lz4)
