@@ -914,6 +914,19 @@ class WriterTest(unittest.TestCase):
         fout.flush()
         fout.close()
 
+    def test_close_marks_closed_on_error(self):
+        """If close() raises during upload, the writer must still mark itself closed.
+
+        Otherwise __del__ would retry the upload and surface an unraisable exception.
+        """
+        text = u'там за туманами, вечными, пьяными'.encode('utf-8')
+        fout = smart_open.azure.Writer(CONTAINER_NAME, 'key', CLIENT)
+        fout.write(text)
+        with unittest.mock.patch.object(fout, '_upload_part', side_effect=RuntimeError('boom')):
+            with self.assertRaises(RuntimeError):
+                fout.close()
+        self.assertTrue(fout.closed)
+
 
 class AppendWriterTest(unittest.TestCase):
     """Test appending into Azure Blob files."""
@@ -966,11 +979,15 @@ class AppendWriterTest(unittest.TestCase):
         with smart_open.azure.Writer(CONTAINER_NAME, blob_name, CLIENT) as fout:
             fout.write(test_string)
 
+        fout = smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT)
+        fout.write(test_string)
         with self.assertRaises(
             azure.core.exceptions.ResourceExistsError, msg="The blob type is invalid for this operation."
         ):
-            with smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT) as fout:
-                fout.write(test_string)
+            fout.close()
+        # close() raised, but the writer must still mark itself closed so that
+        # __del__ does not retry the upload and trigger an unraisable exception.
+        self.assertTrue(fout.closed)
 
     def test_append_on_error(self):
         """
