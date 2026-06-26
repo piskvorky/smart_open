@@ -24,4 +24,4 @@ class PackageTests(unittest.TestCase):
     @pytest.mark.skipif(skip_tests, reason="requires missing dependencies")
     def test_gcs_raises_helpful_error_with_missing_deps(self):
         with pytest.raises(ImportError, match=r"pip install smart_open\[gcs\]"):
-            open("gs://foo/bar")
+            open("gcs://foo/bar")

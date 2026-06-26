@@ -131,7 +131,9 @@ class ParseUriTest(unittest.TestCase):
     def test_scheme(self):
         """Do URIs schemes parse correctly?"""
         # supported schemes
-        for scheme in ("s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gs", "azure"):
+        for scheme in (
+            "s3", "s3a", "s3n", "hdfs", "file", "http", "https", "gcs", "gs", "azure",
+        ):
             parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
             self.assertEqual(parsed_uri.scheme, scheme)
 
@@ -346,25 +348,32 @@ class ParseUriTest(unittest.TestCase):
         uri = smart_open_lib._parse_uri(as_string)
         self.assertEqual(uri.password, 'some:complex@password$$')
 
-    def test_gs_uri(self):
+    def test_gcs_uri(self):
         """Do GCS URIs parse correctly?"""
         # correct uri without credentials
-        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/myblob")
-        self.assertEqual(parsed_uri.scheme, "gs")
+        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/myblob")
+        self.assertEqual(parsed_uri.scheme, "gcs")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "myblob")
 
-    def test_gs_uri_contains_slash(self):
+    def test_gcs_uri_contains_slash(self):
+        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/mydir/myblob")
+        self.assertEqual(parsed_uri.scheme, "gcs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
+
+    def test_gcs_uri_contains_question_mark(self):
+        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/mydir/myblob?param")
+        self.assertEqual(parsed_uri.scheme, "gcs")
+        self.assertEqual(parsed_uri.bucket_id, "mybucket")
+        self.assertEqual(parsed_uri.blob_id, "mydir/myblob?param")
+
+    def test_gs_uri_backwards_compat(self):
+        """``gs://`` keeps working as a backwards-compat alias of ``gcs://``."""
         parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob")
         self.assertEqual(parsed_uri.scheme, "gs")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.blob_id, "mydir/myblob")
-
-    def test_gs_uri_contains_question_mark(self):
-        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob?param")
-        self.assertEqual(parsed_uri.scheme, "gs")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.blob_id, "mydir/myblob?param")
 
     def test_azure_blob_uri(self):
         """Do Azure Blob URIs parse correctly?"""
