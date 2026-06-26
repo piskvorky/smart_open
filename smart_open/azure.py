@@ -453,11 +453,13 @@ class Writer(io.BufferedIOBase):
         logger.debug("close: called")
         if not self.closed:
             logger.debug('%s: completing multipart upload', self)
-            if self._current_part.tell() > 0:
-                self._upload_part()
-            self._blob.commit_block_list(self._block_list, **self._blob_kwargs)
-            self._block_list = []
-            self._blob = None
+            try:
+                if self._current_part.tell() > 0:
+                    self._upload_part()
+                self._blob.commit_block_list(self._block_list, **self._blob_kwargs)
+            finally:
+                self._block_list = []
+                self._blob = None
             logger.debug('%s: completed multipart upload', self)
 
     @property
@@ -596,9 +598,11 @@ class AppendWriter(io.BufferedIOBase):
     def close(self):
         """No action needed here, as the AppendBlob is automatically committed"""
         if not self.closed:
-            if self._current_part.tell() > 0:
-                self._upload_part()
-            self._blob = None
+            try:
+                if self._current_part.tell() > 0:
+                    self._upload_part()
+            finally:
+                self._blob = None
 
     @property
     def closed(self):
