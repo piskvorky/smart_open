@@ -46,6 +46,24 @@ with open(CAP_PATH, encoding='utf-8') as fin:
     CRIME_AND_PUNISHMENT = fin.read()
 
 
+@pytest.mark.parametrize('uri,expected_path', [
+    ('hdfs:///tmp/test.txt', '/tmp/test.txt'),
+    ('hdfs://host/tmp/test.txt', 'hdfs://host/tmp/test.txt'),
+    ('hdfs://host:8020/tmp/test.txt', 'hdfs://host:8020/tmp/test.txt'),
+    ('viewfs:///tmp/test.txt', '/tmp/test.txt'),
+    ('viewfs://cluster/tmp/test.txt', 'viewfs://cluster/tmp/test.txt'),
+])
+def test_parse_uri(uri, expected_path):
+    parsed = smart_open.hdfs.parse_uri(uri)
+    assert parsed['uri_path'] == expected_path
+
+
+@pytest.mark.parametrize('uri', ['hdfs:///', 'hdfs://'])
+def test_parse_uri_invalid(uri):
+    with pytest.raises(RuntimeError):
+        smart_open.hdfs.parse_uri(uri)
+
+
 def test_sanity_read_bytes():
     with open(CAP_PATH, 'rb') as fin:
         lines = [line for line in fin]

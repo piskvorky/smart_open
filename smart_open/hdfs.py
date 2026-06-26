@@ -21,9 +21,10 @@ SCHEMES = ('hdfs', 'viewfs')
 
 URI_EXAMPLES = (
     'hdfs:///path/file',
-    'hdfs://path/file',
+    'hdfs://host/path/file',
+    'hdfs://host:port/path/file',
     'viewfs:///path/file',
-    'viewfs://path/file',
+    'viewfs://host/path/file',
 )
 
 
@@ -31,9 +32,13 @@ def parse_uri(uri_as_string):
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
 
-    uri_path = split_uri.netloc + split_uri.path
-    uri_path = "/" + uri_path.lstrip("/")
-    if not uri_path:
+    if split_uri.netloc:
+        # Preserve the full URI so the hdfs CLI can route to the right cluster.
+        uri_path = uri_as_string
+    else:
+        # No netloc (e.g. "hdfs:///path/file") - pass the absolute path to the CLI.
+        uri_path = split_uri.path
+    if not uri_path or uri_path == '/':
         raise RuntimeError("invalid HDFS URI: %r" % uri_as_string)
 
     return dict(scheme=split_uri.scheme, uri_path=uri_path)

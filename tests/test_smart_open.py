@@ -1006,11 +1006,19 @@ class SmartOpenReadTest(unittest.TestCase):
             stdout=mock_subprocess.PIPE,
         )
 
-        # second possibility of schema
-        smart_open_object = smart_open.open("hdfs://tmp/test.txt")
+        # netloc host - pass the full URI so the CLI routes to the right cluster
+        smart_open_object = smart_open.open("hdfs://host/tmp/test.txt")
         smart_open_object.__iter__()
         mock_subprocess.Popen.assert_called_with(
-            ["hdfs", "dfs", "-cat", "/tmp/test.txt"],
+            ["hdfs", "dfs", "-cat", "hdfs://host/tmp/test.txt"],
+            stdout=mock_subprocess.PIPE,
+        )
+
+        # netloc host:port - pass the full URI so the CLI routes to the right cluster
+        smart_open_object = smart_open.open("hdfs://host:8020/tmp/test.txt")
+        smart_open_object.__iter__()
+        mock_subprocess.Popen.assert_called_with(
+            ["hdfs", "dfs", "-cat", "hdfs://host:8020/tmp/test.txt"],
             stdout=mock_subprocess.PIPE,
         )
 
@@ -1306,11 +1314,18 @@ class SmartOpenTest(unittest.TestCase):
             ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"], stdin=mock_subprocess.PIPE
         )
 
-        # second possibility of schema
-        smart_open_object = smart_open.open("hdfs://tmp/test.txt", 'wb')
+        # netloc host - pass the full URI so the CLI routes to the right cluster
+        smart_open_object = smart_open.open("hdfs://host/tmp/test.txt", 'wb')
         smart_open_object.write("test")
         mock_subprocess.Popen.assert_called_with(
-            ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"], stdin=mock_subprocess.PIPE
+            ["hdfs", "dfs", "-put", "-f", "-", "hdfs://host/tmp/test.txt"], stdin=mock_subprocess.PIPE
+        )
+
+        # netloc host:port - pass the full URI so the CLI routes to the right cluster
+        smart_open_object = smart_open.open("hdfs://host:8020/tmp/test.txt", 'wb')
+        smart_open_object.write("test")
+        mock_subprocess.Popen.assert_called_with(
+            ["hdfs", "dfs", "-put", "-f", "-", "hdfs://host:8020/tmp/test.txt"], stdin=mock_subprocess.PIPE
         )
 
     @mock_s3
