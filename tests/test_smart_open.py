@@ -78,6 +78,18 @@ def named_temporary_file(mode='w+b', prefix=None, suffix=None, delete=True):
             logger.error(e)
 
 
+def test_compression_kwargs_changes_gzip_output_size():
+    """Confirm compression_kwargs is forwarded: compresslevel=1 must be larger than =9 for .gz."""
+    payload = b"hello world " * 10_000
+    with named_temporary_file(suffix=".gz") as low_tmp, \
+         named_temporary_file(suffix=".gz") as high_tmp:
+        with smart_open.open(low_tmp.name, "wb", compression_kwargs={"compresslevel": 1}) as fout:
+            fout.write(payload)
+        with smart_open.open(high_tmp.name, "wb", compression_kwargs={"compresslevel": 9}) as fout:
+            fout.write(payload)
+        assert os.path.getsize(low_tmp.name) > os.path.getsize(high_tmp.name)
+
+
 def test_compression_extensions():
     for extension in smart_open.compression.get_supported_extensions():
         with named_temporary_file(suffix=extension) as tmp:

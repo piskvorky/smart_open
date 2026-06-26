@@ -44,9 +44,12 @@ def register_compressor(ext, callback):
     ext: str
         The extension.  Must include the leading period, e.g. `.gz`.
     callback: callable
-        The callback.  It must accept two position arguments, file_obj and mode.
-        This function will be called when `smart_open` is opening a file with
-        the specified extension.
+        The callback.  It must accept two positional arguments, file_obj and mode,
+        and is recommended to also accept **kwargs so that whatever the caller passes
+        via smart_open.open(..., compression_kwargs={...}) reaches the underlying
+        library unchanged.  Callbacks with the legacy (file_obj, mode) signature still
+        work, but will raise TypeError if the caller supplies compression_kwargs
+        that the callback doesn't declare.
 
     Examples
     --------
@@ -54,9 +57,9 @@ def register_compressor(ext, callback):
     Instruct smart_open to use the `lzma` module whenever opening a file
     with a .xz extension (see README.rst for the complete example showing I/O):
 
-    >>> def _handle_xz(file_obj, mode):
+    >>> def _handle_xz(file_obj, mode, **kwargs):
     ...     import lzma
-    ...     return lzma.LZMAFile(filename=file_obj, mode=mode)
+    ...     return lzma.open(filename=file_obj, mode=mode, **kwargs)
     >>>
     >>> register_compressor('.xz', _handle_xz)
 
@@ -81,41 +84,47 @@ def _maybe_wrap_buffered(file_obj, mode):
     return result
 
 
-def _handle_bz2(file_obj, mode):
+def _handle_bz2(file_obj, mode, **kwargs):
     import bz2
-    result = bz2.open(filename=file_obj, mode=mode)
+    result = bz2.open(filename=file_obj, mode=mode, **kwargs)
     return _maybe_wrap_buffered(result, mode)
 
 
-def _handle_gzip(file_obj, mode):
+def _handle_gzip(file_obj, mode, **kwargs):
     import gzip
-    result = gzip.open(filename=file_obj, mode=mode)
+    result = gzip.open(filename=file_obj, mode=mode, **kwargs)
     return _maybe_wrap_buffered(result, mode)
 
 
-def _handle_zstd(file_obj, mode):
+def _handle_zstd(file_obj, mode, **kwargs):
     import sys
     if sys.version_info >= (3, 14):
         from compression import zstd
     else:
         from backports import zstd
-    result = zstd.open(file_obj, mode=mode)
+    result = zstd.open(file_obj, mode=mode, **kwargs)
     return _maybe_wrap_buffered(result, mode)
 
 
-def _handle_xz(file_obj, mode):
+def _handle_xz(file_obj, mode, **kwargs):
     import lzma
-    result = lzma.open(filename=file_obj, mode=mode)
+    result = lzma.open(filename=file_obj, mode=mode, **kwargs)
     return _maybe_wrap_buffered(result, mode)
 
 
-def _handle_lz4(file_obj, mode):
+def _handle_lz4(file_obj, mode, **kwargs):
     import lz4.frame
-    result = lz4.frame.open(file_obj, mode=mode)
+    result = lz4.frame.open(file_obj, mode=mode, **kwargs)
     return _maybe_wrap_buffered(result, mode)
 
 
-def compression_wrapper(file_obj, mode, compression=INFER_FROM_EXTENSION, filename=None):
+def compression_wrapper(
+    file_obj,
+    mode,
+    compression=INFER_FROM_EXTENSION,
+    filename=None,
+    compression_kwargs=None,
+):
     """
     Wrap `file_obj` with an appropriate [de]compression mechanism based on its file extension.
 
@@ -125,6 +134,9 @@ def compression_wrapper(file_obj, mode, compression=INFER_FROM_EXTENSION, filena
 
     If `filename` is specified, it will be used to extract the extension.
     If not, the `file_obj.name` attribute is used as the filename.
+
+    If `compression_kwargs` is specified, its contents are forwarded as keyword
+    arguments to the registered compressor callback.
 
     """
     if compression == NO_COMPRESSION:
@@ -147,8 +159,8 @@ def compression_wrapper(file_obj, mode, compression=INFER_FROM_EXTENSION, filena
         callback = _COMPRESSOR_REGISTRY[compression]
     except KeyError:
         return file_obj
-    else:
-        return callback(file_obj, mode)
+
+    return callback(file_obj, mode, **(compression_kwargs or {}))
 
 
 #

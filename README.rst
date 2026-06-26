@@ -271,6 +271,21 @@ To specify the algorithm explicitly (e.g. for non-standard file extensions):
     ...     print(fin.read(32))
     It was a bright cold day in Apri
 
+To forward per-call options to the compression library (e.g. lower gzip's
+default ``compresslevel`` of 9 for faster writes), pass ``compression_kwargs``:
+
+.. code-block:: python
+
+    >>> import tempfile
+    >>> from smart_open import open
+    >>> with tempfile.NamedTemporaryFile(suffix='.gz') as tmp:
+    ...     with open(tmp.name, 'wb', compression_kwargs={'compresslevel': 6}) as fout:
+    ...         _ = fout.write(b'hello world')
+
+The dict is forwarded as-is; spell each option using the underlying library's
+own kwarg name (``compresslevel`` for gzip/bz2, ``preset`` for xz, ``level`` for zstd,
+``compression_level`` for lz4).
+
 You can also easily add support for other file extensions and compression formats.
 For example, to open xz-compressed files:
 
@@ -279,8 +294,8 @@ For example, to open xz-compressed files:
     >>> import lzma, os
     >>> from smart_open import open, register_compressor
 
-    >>> def _handle_xz(file_obj, mode):
-    ...      return lzma.LZMAFile(filename=file_obj, mode=mode)
+    >>> def _handle_xz(file_obj, mode, **kwargs):
+    ...      return lzma.open(filename=file_obj, mode=mode, **kwargs)
 
     >>> register_compressor('.xz', _handle_xz)
 

@@ -92,6 +92,7 @@ def open(
         closefd=True,
         opener=None,
         compression=so_compression.INFER_FROM_EXTENSION,
+        compression_kwargs=None,
         transport_params=None,
         ):
     r"""Open the URI object, returning a file-like object.
@@ -124,6 +125,12 @@ def open(
         Mimicks built-in open parameter of the same name.  Ignored.
     compression: str, optional (see smart_open.compression.get_supported_compression_types)
         Explicitly specify the compression/decompression behavior.
+    compression_kwargs: dict, optional
+        Keyword arguments forwarded to the registered compressor callback. Examples
+        of each library's max-compression option: {'compresslevel': 9} for
+        .gz/.bz2, {'preset': 9} for .xz, {'level': 22} for .zst,
+        {'compression_level': 12} for .lz4. Ignored when compression is 'disable'
+        or the URI's extension doesn't match a registered compressor.
     transport_params: dict, optional
         Additional parameters for the transport layer (see notes below).
 
@@ -219,6 +226,7 @@ def open(
         binary_mode,
         compression,
         filename=filename,
+        compression_kwargs=compression_kwargs,
     )
 
     if 'b' not in mode or explicit_encoding is not None:
