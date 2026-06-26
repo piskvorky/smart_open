@@ -129,7 +129,7 @@ Smart_open has grown over the years to cover a lot of different storages, each w
 * smart_open < 3.0.0: All dependencies were installed by default. No way to select just a subset during installation.
 * smart_open >= 3.0.0: No dependencies installed by default. Install the ones you need with e.g. ``pip install smart_open[s3]`` (only AWS), or ``smart_open[all]`` (install everything = same behaviour as < 3.0.0; use this for backward compatibility). 
 
-You can read more about the motivation and internal discussions for this change  `here <https://github.com/RaRe-Technologies/smart_open/issues/443>`_.
+You can read more about the motivation and internal discussions for this change  `here <https://github.com/piskvorky/smart_open/issues/443>`_.
 
 Migrating to the new ``open`` function
 ======================================
@@ -230,7 +230,7 @@ After:
   'first line\nsecond line\nthird lin'
 
 See ``help("smart_open.open")`` for the full list of acceptable parameter names,
-or view the help online `here <https://github.com/RaRe-Technologies/smart_open/blob/master/help.txt>`__.
+or view the help online `here <https://github.com/piskvorky/smart_open/blob/master/help.txt>`__.
 
 If you pass an invalid parameter name, the ``smart_open.open`` function will warn you about it.
 Keep an eye on your logs for WARNING messages from ``smart_open``.
