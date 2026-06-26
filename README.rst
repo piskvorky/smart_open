@@ -95,7 +95,7 @@ Some examples::
     s3://access_key_id:secret_access_key@bucket/key
     gs://bucket/blob
     azure://bucket/blob
-    hdfs://path/file
+    hdfs://host:port/path/file
     ./local/path/file.gz
     file:///home/user/file.bz2
     [ssh|scp|sftp]://username:password@host/path/file
@@ -176,7 +176,7 @@ For the sake of simplicity, the examples below assume you have all the dependenc
         print(bytes_written)
 
     # stream from HDFS
-    for line in open('hdfs://user/hadoop/my_file.txt', encoding='utf8'):
+    for line in open('hdfs://host:port/user/hadoop/my_file.txt', encoding='utf8'):
         print(line)
 
     # stream from WebHDFS

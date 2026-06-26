@@ -409,9 +409,10 @@ FUNCTIONS
         * ftps://username:password@host/path/file
         * ftps://username:password@host:port/path/file
         * hdfs:///path/file
-        * hdfs://path/file
+        * hdfs://host/path/file
+        * hdfs://host:port/path/file
         * viewfs:///path/file
-        * viewfs://path/file
+        * viewfs://host/path/file
         * s3://my_bucket/my_key
         * s3://my_key:my_secret@my_bucket/my_key
         * s3://my_key:my_secret@my_server:my_port@my_bucket/my_key
