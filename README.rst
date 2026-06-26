@@ -93,7 +93,7 @@ Some examples::
 
     s3://bucket/key
     s3://access_key_id:secret_access_key@bucket/key
-    gs://bucket/blob
+    gcs://bucket/blob
     azure://bucket/blob
     hdfs://host:port/path/file
     ./local/path/file.gz
@@ -204,11 +204,11 @@ For the sake of simplicity, the examples below assume you have all the dependenc
         fout.write(b'here we stand')
 
     # stream from GCS
-    for line in open('gs://my_bucket/my_file.txt'):
+    for line in open('gcs://my_bucket/my_file.txt'):
         print(line)
 
     # stream content *into* GCS (write mode):
-    with open('gs://my_bucket/my_file.txt', 'wb') as fout:
+    with open('gcs://my_bucket/my_file.txt', 'wb') as fout:
         fout.write(b'hello world')
 
     # stream from Azure Blob Storage
@@ -419,7 +419,7 @@ to setting up GCS authentication with a service account.
     from google.cloud.storage import Client
     service_account_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
     client = Client.from_service_account_json(service_account_path)
-    fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
+    fin = open('gcs://gcp-public-data-landsat/index.csv.gz', transport_params=dict(client=client))
 
 If you need more credential options, you can create an explicit ``google.auth.credentials.Credentials`` object
 and pass it to the Client. To create an API token for use in the example below, refer to the
@@ -433,7 +433,7 @@ and pass it to the Client. To create an API token for use in the example below, 
 	token = os.environ['GOOGLE_API_TOKEN']
 	credentials = Credentials(token=token)
 	client = Client(credentials=credentials)
-	fin = open('gs://gcp-public-data-landsat/index.csv.gz', transport_params={'client': client})
+	fin = open('gcs://gcp-public-data-landsat/index.csv.gz', transport_params={'client': client})
 
 GCS Advanced Usage
 ------------------
@@ -448,7 +448,7 @@ Additional blob properties (`docs <https://cloud.google.com/python/docs/referenc
 
     open_kwargs = {'predefined_acl': 'authenticated-read'}
     properties = {'metadata': {'version': 2}, 'storage_class': 'COLDLINE'}
-    fout = open('gs://bucket/key', 'wb', transport_params={'blob_open_kwargs': open_kwargs, 'blob_properties': properties})
+    fout = open('gcs://bucket/key', 'wb', transport_params={'blob_open_kwargs': open_kwargs, 'blob_properties': properties})
 
 Azure Credentials
 -----------------

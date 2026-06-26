@@ -426,7 +426,7 @@ for an explanation). To download all files in a directory you can do this:
 >>> bucket_name = "gcp-public-data-landsat"
 >>> prefix = "LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/"
 >>> for blob in client.list_blobs(client.get_bucket(bucket_name), prefix=prefix):
-...      with open(f"gs://{bucket_name}/{blob.name}") as f:
+...      with open(f"gcs://{bucket_name}/{blob.name}") as f:
 ...          print(f.name)
 ...          break # just show the first iteration for the test
 LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/LC08_L1GT_044034_20130330_20170310_01_T2_ANG.txt
@@ -442,7 +442,7 @@ If you would like to access GCS without using an account you need to explicitly 
 >>> from google.cloud import storage
 >>> from smart_open import open
 >>> client = storage.Client.create_anonymous_client()
->>> f = open("gs://gcp-public-data-landsat/index.csv.gz", transport_params=dict(client=client))
+>>> f = open("gcs://gcp-public-data-landsat/index.csv.gz", transport_params=dict(client=client))
 >>> f.readline()
 'SCENE_ID,PRODUCT_ID,SPACECRAFT_ID,SENSOR_ID,DATE_ACQUIRED,COLLECTION_NUMBER,COLLECTION_CATEGORY,SENSING_TIME,DATA_TYPE,WRS_PATH,WRS_ROW,CLOUD_COVER,NORTH_LAT,SOUTH_LAT,WEST_LON,EAST_LON,TOTAL_SIZE,BASE_URL\n'
 

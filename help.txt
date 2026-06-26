@@ -138,8 +138,8 @@ FUNCTIONS
             Additional parameters for the FTP connection.
             Currently supported parameters: timeout, source_address, encoding.
 
-        gs (smart_open/gcs.py)
-        ~~~~~~~~~~~~~~~~~~~~~~
+        gcs/gs (smart_open/gcs.py)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~
         Implements file-like objects for reading and writing to/from GCS.
 
         bucket_id: str
@@ -383,6 +383,7 @@ FUNCTIONS
         * file
         * ftp
         * ftps
+        * gcs
         * gs
         * hdfs
         * viewfs

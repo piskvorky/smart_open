@@ -23,8 +23,8 @@ from smart_open import constants
 
 logger = logging.getLogger(__name__)
 
-SCHEME = "gs"
-"""Supported scheme for GCS"""
+SCHEMES = ("gcs", "gs")
+"""Supported schemes for GCS.  ``gcs`` is canonical; ``gs`` is kept as a backwards-compatible alias."""
 
 _DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 """Default minimum part size for GCS multipart uploads"""
@@ -34,10 +34,10 @@ _DEFAULT_WRITE_OPEN_KWARGS = {'ignore_flush': True}
 
 def parse_uri(uri_as_string):
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
-    assert sr.scheme == SCHEME
+    assert sr.scheme in SCHEMES
     bucket_id = sr.netloc
     blob_id = sr.path.lstrip('/')
-    return dict(scheme=SCHEME, bucket_id=bucket_id, blob_id=blob_id)
+    return dict(scheme=sr.scheme, bucket_id=bucket_id, blob_id=blob_id)
 
 
 def open_uri(uri, mode, transport_params):

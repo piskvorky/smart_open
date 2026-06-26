@@ -132,6 +132,18 @@ Build a boto3 client with the desired ``endpoint_url`` (and credentials) and pas
 For an ``s3u://`` URL (http endpoint), pass ``endpoint_url='http://host:1234'`` to the client.
 The ``s3``, ``s3n``, and ``s3a`` schemes continue to work, as does the ``s3://key:secret@bucket/key`` form for embedding credentials in the URL.
 
+GCS canonical scheme is now ``gcs://``
+--------------------------------------
+
+Tracked in `#598 <https://github.com/piskvorky/smart_open/issues/598>`_.
+Documentation and examples now use ``gcs://bucket/blob`` as the canonical GCS URI form, matching the ``smart_open.gcs`` module name and the ``smart_open[gcs]`` extras.
+The ``gs://`` scheme keeps working as a backwards-compatible alias — no code change required if you are already using it — but prefer ``gcs://`` in new code:
+
+.. code-block:: diff
+
+   - smart_open.open('gs://my_bucket/my_file.txt')
+   + smart_open.open('gcs://my_bucket/my_file.txt')
+
 
 Migrating to the new compression parameter
 ==========================================
