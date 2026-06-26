@@ -10,7 +10,7 @@ import time
 
 import smart_open
 
-open_fn = smart_open.smart_open
+open_fn = smart_open.open
 # open_fn = open
 
 

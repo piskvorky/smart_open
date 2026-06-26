@@ -450,7 +450,5 @@ FUNCTIONS
     s3_iter_bucket(bucket_name, prefix='', accept_key=None, key_limit=None, workers=16, retries=3, **session_kwargs)
         Deprecated.  Use smart_open.s3.iter_bucket instead.
 
-    smart_open(uri, mode='rb', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, ignore_extension=False, **kwargs)
-
 DATA
     __all__ = ['open', 'parse_uri', 'register_compressor', 's3_iter_bucket...

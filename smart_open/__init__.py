@@ -34,7 +34,7 @@ with contextlib.suppress(PackageNotFoundError):
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-from .smart_open_lib import open, parse_uri, smart_open, register_compressor  # noqa: E402
+from .smart_open_lib import open, parse_uri, register_compressor  # noqa: E402
 
 _WARNING = """smart_open.s3_iter_bucket is deprecated and will stop functioning
 in a future version. Please import iter_bucket from the smart_open.s3 module instead:
@@ -76,5 +76,4 @@ __all__ = [
     'parse_uri',
     'register_compressor',
     's3_iter_bucket',
-    'smart_open',
 ]
