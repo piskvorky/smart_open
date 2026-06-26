@@ -17,7 +17,6 @@ The main functions are:
 
 * `open()`, which opens the given file for reading/writing
 * `parse_uri()`
-* `s3_iter_bucket()`, which goes over all keys in an S3 bucket in parallel
 * `register_compressor()`, which registers callbacks for transparent compressor handling
 
 """
@@ -37,44 +36,8 @@ logger.addHandler(logging.NullHandler())
 from .compression import register_compressor  # noqa: E402
 from .smart_open_lib import open, parse_uri  # noqa: E402
 
-_WARNING = """smart_open.s3_iter_bucket is deprecated and will stop functioning
-in a future version. Please import iter_bucket from the smart_open.s3 module instead:
-
-    from smart_open.s3 import iter_bucket as s3_iter_bucket
-
-"""
-_WARNED = False
-
-
-def s3_iter_bucket(
-        bucket_name,
-        prefix='',
-        accept_key=None,
-        key_limit=None,
-        workers=16,
-        retries=3,
-        **session_kwargs
-):
-    """Deprecated.  Use smart_open.s3.iter_bucket instead."""
-    global _WARNED
-    from .s3 import iter_bucket
-    if not _WARNED:
-        logger.warning(_WARNING)
-        _WARNED = True
-    return iter_bucket(
-        bucket_name=bucket_name,
-        prefix=prefix,
-        accept_key=accept_key,
-        key_limit=key_limit,
-        workers=workers,
-        retries=retries,
-        session_kwargs=session_kwargs
-    )
-
-
 __all__ = [
     'open',
     'parse_uri',
     'register_compressor',
-    's3_iter_bucket',
 ]
