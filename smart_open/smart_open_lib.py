@@ -27,13 +27,6 @@ import smart_open.utils as so_utils
 from smart_open import doctools
 from smart_open import transport
 
-#
-# For backwards compatibility and keeping old unit tests happy.
-#
-from smart_open.compression import register_compressor  # noqa: F401
-from smart_open.utils import check_kwargs as _check_kwargs  # noqa: F401
-from smart_open.utils import inspect_kwargs as _inspect_kwargs  # noqa: F401
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_ENCODING = locale.getpreferredencoding(do_setlocale=False)
