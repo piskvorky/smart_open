@@ -284,6 +284,16 @@ class Reader(io.BufferedIOBase):
             new_position = self._position + offset
         else:
             new_position = self._size + offset
+
+        # Check if we can satisfy the seek from buffer (forward seek within buffered data)
+        if (
+            new_position > self._position
+            and new_position - self._position <= len(self._current_part)
+        ):
+            self._current_part.read(new_position - self._position)
+            self._position = new_position
+            return self._position
+
         self._position = new_position
         self._raw_reader.seek(new_position)
         logger.debug('current_pos: %r', self._position)
