@@ -71,31 +71,6 @@ def register_compressor(ext, callback):
     _COMPRESSOR_REGISTRY[ext] = callback
 
 
-def tweak_close(outer, inner):
-    """Ensure that closing the `outer` stream closes the `inner` stream as well.
-
-    Deprecated: `smart_open.open().__exit__` now always calls `__exit__` on the
-    underlying filestream.
-
-    Use this when your compression library's `close` method does not
-    automatically close the underlying filestream.  See
-    https://github.com/piskvorky/smart_open/issues/630 for an
-    explanation why that is a problem for smart_open.
-    """
-    outer_close = outer.close
-
-    def close_both(*args):
-        nonlocal inner
-        try:
-            outer_close()
-        finally:
-            if inner:
-                inner, fp = None, inner
-                fp.close()
-
-    outer.close = close_both
-
-
 def _maybe_wrap_buffered(file_obj, mode):
     # https://github.com/piskvorky/smart_open/issues/760#issuecomment-1553971657
     result = file_obj
