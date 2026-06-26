@@ -110,6 +110,28 @@ Tracked in `#937 <https://github.com/piskvorky/smart_open/pull/937>`_.
 The ``UserWarning`` that ``smart_open.s3.open_uri`` emitted for the legacy resource-API transport parameters (``multipart_upload_kwargs``, ``object_kwargs``, ``resource``, ``resource_kwargs``, ``session``, ``singlepart_upload_kwargs``) is gone.
 These parameters had already been unsupported since v5.0.0 — see `Migrating to the new client-based S3 API`_ below for the actual translation recipes.
 
+S3 URIs no longer accept embedded ``host[:port]`` or the ``s3u`` scheme
+----------------------------------------------------------------------
+
+Tracked in `#385 <https://github.com/piskvorky/smart_open/issues/385>`_.
+The non-standard ``s3://key:secret@host:port@bucket/key`` form (and its ``s3u://`` http variant) is no longer parsed.
+It broke `RFC 3986 <https://www.rfc-editor.org/rfc/rfc3986>`_ by stuffing two ``@`` separators into the authority, made S3 URI parsing the most fiddly code in the library, and was rarely used in practice.
+Build a boto3 client with the desired ``endpoint_url`` (and credentials) and pass it via ``transport_params['client']`` instead:
+
+.. code-block:: diff
+
+   - smart_open.open('s3://key:secret@host:1234@bucket/key')
+   + client = boto3.client(
+   +     's3',
+   +     endpoint_url='https://host:1234',
+   +     aws_access_key_id='key',
+   +     aws_secret_access_key='secret',
+   + )
+   + smart_open.open('s3://bucket/key', transport_params={'client': client})
+
+For an ``s3u://`` URL (http endpoint), pass ``endpoint_url='http://host:1234'`` to the client.
+The ``s3``, ``s3n``, and ``s3a`` schemes continue to work, as does the ``s3://key:secret@bucket/key`` form for embedding credentials in the URL.
+
 
 Migrating to the new compression parameter
 ==========================================

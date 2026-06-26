@@ -64,16 +64,13 @@ DEFAULT_PART_SIZE = 50 * 1024**2
 MAX_PART_SIZE = 5 * 1024 ** 3
 """The absolute maximum permitted by Amazon."""
 
-SCHEMES = ("s3", "s3n", 's3u', "s3a")
-DEFAULT_PORT = 443
-DEFAULT_HOST = 's3.amazonaws.com'
+SCHEMES = ("s3", "s3n", "s3a")
 
 DEFAULT_BUFFER_SIZE = 128 * 1024
 
 URI_EXAMPLES = (
     's3://my_bucket/my_key',
     's3://my_key:my_secret@my_bucket/my_key',
-    's3://my_key:my_secret@my_server:my_port@my_bucket/my_key',
 )
 
 # Returned by AWS when we try to seek beyond EOF.
@@ -159,16 +156,13 @@ def parse_uri(uri_as_string):
     split_uri = smart_open.utils.safe_urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
 
-    port = DEFAULT_PORT
-    host = DEFAULT_HOST
-    ordinary_calling_format = False
     #
     # These defaults tell boto3 to look for credentials elsewhere
     #
     access_id, access_secret = None, None
 
     #
-    # Common URI template [secret:key@][host[:port]@]bucket/object
+    # Common URI template [secret:key@]bucket/object
     #
     # The urlparse function doesn't handle the above schema, so we have to do
     # it ourselves.
@@ -190,25 +184,12 @@ def parse_uri(uri_as_string):
                 access_id, access_secret = maybe_id, maybe_secret
                 uri = rest
 
-    head, key_id = uri.split('/', 1)
-    if '@' in head and ':' in head:
-        ordinary_calling_format = True
-        host_port, bucket_id = head.split('@')
-        host, port = host_port.split(':', 1)
-        port = int(port)
-    elif '@' in head:
-        ordinary_calling_format = True
-        host, bucket_id = head.split('@')
-    else:
-        bucket_id = head
+    bucket_id, key_id = uri.split('/', 1)
 
     return dict(
         scheme=split_uri.scheme,
         bucket_id=bucket_id,
         key_id=key_id,
-        port=port,
-        host=host,
-        ordinary_calling_format=ordinary_calling_format,
         access_id=access_id,
         access_secret=access_secret,
     )
@@ -256,21 +237,6 @@ def _consolidate_params(uri, transport_params):
             aws_secret_access_key=uri['access_secret'],
         )
         uri.update(access_id=None, access_secret=None)
-
-    if client is not None and uri['host'] != DEFAULT_HOST:
-        logger.warning(
-            'ignoring endpoint_url parsed from URL because they conflict with '
-            'transport_params["client"]. Set transport_params["client"] to None '
-            'to suppress this warning.'
-        )
-        uri.update(host=None)
-    elif uri['host'] != DEFAULT_HOST:
-        if uri['scheme'] == 's3u':
-            scheme = 'http'
-        else:
-            scheme = 'https'
-        inject(endpoint_url=scheme + '://%(host)s:%(port)d' % uri)
-        uri.update(host=None)
 
     return uri, transport_params
 

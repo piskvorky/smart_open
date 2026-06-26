@@ -195,28 +195,6 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.access_id, "accessid")
         self.assertEqual(parsed_uri.access_secret, "access/secret:totally")
 
-    def test_s3_uri_has_atmark_in_key_name2(self):
-        parsed_uri = smart_open_lib._parse_uri(
-            "s3://accessid:access/secret@hostname:1234@mybucket/dir/my@ke@y"
-        )
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "dir/my@ke@y")
-        self.assertEqual(parsed_uri.access_id, "accessid")
-        self.assertEqual(parsed_uri.access_secret, "access/secret")
-        self.assertEqual(parsed_uri.host, "hostname")
-        self.assertEqual(parsed_uri.port, 1234)
-
-    def test_s3_uri_has_atmark_in_key_name3(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@hostname@mybucket/dir/my@ke@y")
-        self.assertEqual(parsed_uri.scheme, "s3")
-        self.assertEqual(parsed_uri.bucket_id, "mybucket")
-        self.assertEqual(parsed_uri.key_id, "dir/my@ke@y")
-        self.assertEqual(parsed_uri.access_id, "accessid")
-        self.assertEqual(parsed_uri.access_secret, "access/secret")
-        self.assertEqual(parsed_uri.host, "hostname")
-        self.assertEqual(parsed_uri.port, 443)
-
     def test_s3_handles_fragments(self):
         uri_str = 's3://bucket-name/folder/picture #1.jpg'
         parsed_uri = smart_open_lib._parse_uri(uri_str)
@@ -226,18 +204,6 @@ class ParseUriTest(unittest.TestCase):
         uri_str = 's3://bucket-name/folder/picture1.jpg?bar'
         parsed_uri = smart_open_lib._parse_uri(uri_str)
         self.assertEqual(parsed_uri.key_id, "folder/picture1.jpg?bar")
-
-    def test_s3_invalid_url_atmark_in_bucket_name(self):
-        self.assertRaises(
-            ValueError, smart_open_lib._parse_uri,
-            "s3://access_id:access_secret@my@bucket@port/mykey",
-        )
-
-    def test_s3_invalid_uri_missing_colon(self):
-        self.assertRaises(
-            ValueError, smart_open_lib._parse_uri,
-            "s3://access_id@access_secret@mybucket@port/mykey",
-        )
 
     def test_webhdfs_uri_to_http(self):
         parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file")
@@ -304,25 +270,6 @@ class ParseUriTest(unittest.TestCase):
         self.assertEqual(parsed_uri.scheme, "s3")
         self.assertEqual(parsed_uri.bucket_id, "mybucket")
         self.assertEqual(parsed_uri.key_id, "mydir/mykey?param")
-
-    def test_host_and_port(self):
-        as_string = 's3u://user:secret@host:1234@mybucket/mykey.txt'
-        uri = smart_open_lib._parse_uri(as_string)
-        self.assertEqual(uri.scheme, "s3u")
-        self.assertEqual(uri.bucket_id, "mybucket")
-        self.assertEqual(uri.key_id, "mykey.txt")
-        self.assertEqual(uri.access_id, "user")
-        self.assertEqual(uri.access_secret, "secret")
-        self.assertEqual(uri.host, "host")
-        self.assertEqual(uri.port, 1234)
-
-    def test_invalid_port(self):
-        as_string = 's3u://user:secret@host:port@mybucket/mykey.txt'
-        self.assertRaises(ValueError, smart_open_lib._parse_uri, as_string)
-
-    def test_invalid_port2(self):
-        as_string = 's3u://user:secret@host:port:foo@mybucket/mykey.txt'
-        self.assertRaises(ValueError, smart_open_lib._parse_uri, as_string)
 
     def test_leading_slash_local_file(self):
         path = "/home/misha/hello.txt"
@@ -1798,13 +1745,12 @@ class S3OpenTest(unittest.TestCase):
 
     @mock.patch('smart_open.s3.Reader')
     def test_transport_params_is_not_mutable(self, mock_open):
-        smart_open.open('s3://access_key:secret_key@host@bucket/key')
+        smart_open.open('s3://access_key:secret_key@bucket/key')
         actual = mock_open.call_args_list[0][1]['client_kwargs']
         expected = {
             'S3.Client': {
                 'aws_access_key_id': 'access_key',
                 'aws_secret_access_key': 'secret_key',
-                'endpoint_url': 'https://host:443',
             }
         }
         assert actual == expected
@@ -1812,30 +1758,6 @@ class S3OpenTest(unittest.TestCase):
         smart_open.open('s3://bucket/key')
         actual = mock_open.call_args_list[1][1].get('client_kwargs')
         assert actual is None
-
-    @mock.patch('smart_open.s3.Reader')
-    def test_respects_endpoint_url_read(self, mock_open):
-        url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
-        smart_open.open(url)
-
-        expected = {
-            'aws_access_key_id': 'key_id',
-            'aws_secret_access_key': 'secret_key',
-            'endpoint_url': 'https://play.min.io:9000',
-        }
-        self.assertEqual(mock_open.call_args[1]['client_kwargs']['S3.Client'], expected)
-
-    @mock.patch('smart_open.s3.MultipartWriter')
-    def test_respects_endpoint_url_write(self, mock_open):
-        url = 's3://key_id:secret_key@play.min.io:9000@smart-open-test/README.rst'
-        smart_open.open(url, 'wb')
-
-        expected = {
-            'aws_access_key_id': 'key_id',
-            'aws_secret_access_key': 'secret_key',
-            'endpoint_url': 'https://play.min.io:9000',
-        }
-        self.assertEqual(mock_open.call_args[1]['client_kwargs']['S3.Client'], expected)
 
 
 def function(a, b, c, foo='bar', baz='boz'):
