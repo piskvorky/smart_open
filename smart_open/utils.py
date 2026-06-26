@@ -22,33 +22,12 @@ QUESTION_MARK_PLACEHOLDER = '///smart_open.utils.QUESTION_MARK_PLACEHOLDER///'
 
 
 def inspect_kwargs(kallable):
-    #
-    # inspect.getargspec got deprecated in Py3.4, and calling it spews
-    # deprecation warnings that we'd prefer to avoid.  Unfortunately, older
-    # versions of Python (<3.3) did not have inspect.signature, so we need to
-    # handle them the old-fashioned getargspec way.
-    #
-    try:
-        signature = inspect.signature(kallable)
-    except AttributeError:
-        try:
-            args, varargs, keywords, defaults = inspect.getargspec(kallable)
-        except TypeError:
-            #
-            # Happens under Py2.7 with mocking.
-            #
-            return {}
-
-        if not defaults:
-            return {}
-        supported_keywords = args[-len(defaults):]
-        return dict(zip(supported_keywords, defaults))
-    else:
-        return {
-            name: param.default
-            for name, param in signature.parameters.items()
-            if param.default != inspect.Parameter.empty
-        }
+    signature = inspect.signature(kallable)
+    return {
+        name: param.default
+        for name, param in signature.parameters.items()
+        if param.default != inspect.Parameter.empty
+    }
 
 
 def check_kwargs(kallable, kwargs):
