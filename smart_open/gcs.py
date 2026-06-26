@@ -8,7 +8,6 @@
 """Implements file-like objects for reading and writing to/from GCS."""
 
 import logging
-import warnings
 
 try:
     import google.cloud.exceptions
@@ -47,16 +46,10 @@ def open_uri(uri, mode, transport_params):
     return open(parsed_uri['bucket_id'], parsed_uri['blob_id'], mode, **kwargs)
 
 
-def warn_deprecated(parameter_name):
-    message = f"Parameter {parameter_name} is deprecated, this parameter no-longer has any effect"
-    warnings.warn(message, UserWarning)
-
-
 def open(
     bucket_id,
     blob_id,
     mode,
-    buffer_size=None,
     min_part_size=_DEFAULT_MIN_PART_SIZE,
     client=None,  # type: google.cloud.storage.Client
     get_blob_kwargs=None,
@@ -73,8 +66,6 @@ def open(
         The name of the blob within the bucket.
     mode: str
         The mode for opening the object. Must be either "rb" or "wb".
-    buffer_size:
-        deprecated
     min_part_size: int, optional
         The minimum part size for multipart uploads. For writing only.
     client: google.cloud.storage.Client, optional
@@ -91,9 +82,6 @@ def open(
     """
     if blob_open_kwargs is None:
         blob_open_kwargs = {}
-
-    if buffer_size is not None:
-        warn_deprecated('buffer_size')
 
     if mode in (constants.READ_BINARY, 'r', 'rt'):
         _blob = Reader(bucket=bucket_id,
@@ -118,8 +106,6 @@ def open(
 
 def Reader(bucket,
            key,
-           buffer_size=None,
-           line_terminator=None,
            client=None,
            get_blob_kwargs=None,
            blob_open_kwargs=None):
@@ -130,10 +116,6 @@ def Reader(bucket,
         blob_open_kwargs = {}
     if client is None:
         client = google.cloud.storage.Client()
-    if buffer_size is not None:
-        warn_deprecated('buffer_size')
-    if line_terminator is not None:
-        warn_deprecated('line_terminator')
 
     bkt = client.bucket(bucket)
     blob = bkt.get_blob(key, **get_blob_kwargs)
