@@ -434,7 +434,7 @@ def _get(client, bucket, key, version, range_string):
 
 
 def _unwrap_ioerror(ioe):
-    """Given an IOError from _get, return the 'Error' dictionary from boto."""
+    """Given an IOError from _get, return the 'Error' dictionary from botocore."""
     try:
         return ioe.backend_error.response['Error']
     except (AttributeError, KeyError):
