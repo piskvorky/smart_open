@@ -15,7 +15,7 @@ import itertools
 import logging
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from math import inf
 from typing import (
     TYPE_CHECKING,
@@ -296,78 +296,77 @@ def open(
 ):
     """Open an S3 object for reading or writing.
 
-    Parameters
-    ----------
-    bucket_id: str
-        The name of the bucket this object resides in.
-    key_id: str
-        The name of the key within the bucket.
-    mode: str
-        The mode for opening the object.  Must be either "rb" or "wb".
-    buffer_size: int, optional
-        Default: 128KB
-        The buffer size in bytes for reading. Controls memory usage. Data is streamed
-        from a S3 network stream in buffer_size chunks. Forward seeks within
-        the current buffer are satisfied without additional GET requests. Backward
-        seeks always open a new GET request. For forward seek-intensive workloads,
-        increase buffer_size to reduce GET requests at the cost of higher memory usage.
-    min_part_size: int, optional
-        The minimum part size for multipart uploads, in bytes.
-        When the writebuffer contains this many bytes, smart_open will upload
-        the bytes to S3 as a single part of a multi-part upload, freeing the
-        buffer either partially or entirely.  When you close the writer, it
-        will assemble the parts together.
-        The value determines the upper limit for the writebuffer.  If buffer
-        space is short (e.g. you are buffering to memory), then use a smaller
-        value for min_part_size, or consider buffering to disk instead (see
-        the writebuffer option).
-        The value must be between 5MB and 5GB.  If you specify a value outside
-        of this range, smart_open will adjust it for you, because otherwise the
-        upload _will_ fail.
-        For writing only.  Does not apply if you set multipart_upload=False.
-    multipart_upload: bool, optional
-        Default: `True`
-        If set to `True`, will use multipart upload for writing to S3. If set
-        to `False`, S3 upload will use the S3 Single-Part Upload API, which
-        is more ideal for small file sizes.
-        For writing only.
-    version_id: str, optional
-        Version of the object, used when reading object.
-        If None, will fetch the most recent version.
-    defer_seek: boolean, optional
-        Default: `False`
-        If set to `True` on a file opened for reading, GetObject will not be
-        called until the first seek() or read().
-        Avoids redundant API queries when seeking before reading.
-    range_chunk_size: int, optional
-        Default: `None`
-        Maximum byte range per S3 GET request when reading.
-        When None (default), a single GET request is made for the entire file,
-        and data is streamed from that single botocore.response.StreamingBody
-        in buffer_size chunks.
-        When set to a positive integer, multiple GET requests are made, each
-        limited to at most this many bytes via HTTP Range headers. Each GET
-        returns a new StreamingBody that is streamed in buffer_size chunks.
-        Useful for reading small portions of large files without forcing
-        S3-compatible systems like SeaweedFS/Ceph to load the entire file.
-        Larger values mean fewer billable GET requests but higher load on S3
-        servers. Smaller values mean more GET requests but less server load per request.
-        Values larger than the file size result in a single GET for the whole file.
-        Affects reading only. Does not affect memory usage (controlled by buffer_size).
-    client: object, optional
-        The S3 client to use when working with boto3.
-        If you don't specify this, then smart_open will create a new client for you.
-    client_kwargs: dict, optional
-        Additional parameters to pass to the relevant functions of the client.
-        The keys are fully qualified method names, e.g. `S3.Client.create_multipart_upload`.
-        The values are kwargs to pass to that method each time it is called.
-    writebuffer: IO[bytes], optional
-        By default, this module will buffer data in memory using io.BytesIO
-        when writing. Pass another binary IO instance here to use it instead.
-        For example, you may pass a file object to buffer to local disk instead
-        of in RAM. Use this to keep RAM usage low at the expense of additional
-        disk IO. If you pass in an open file, then you are responsible for
-        cleaning it up after writing completes.
+    Args:
+        bucket_id: The name of the bucket this object resides in.
+        key_id: The name of the key within the bucket.
+        mode: The mode for opening the object.  Must be either "rb" or "wb".
+        version_id: Version of the object, used when reading object.
+            If None, will fetch the most recent version.
+        buffer_size: Default: 128KB.
+            The buffer size in bytes for reading. Controls memory usage. Data is
+            streamed from a S3 network stream in buffer_size chunks. Forward seeks
+            within the current buffer are satisfied without additional GET requests.
+            Backward seeks always open a new GET request. For forward seek-intensive
+            workloads, increase buffer_size to reduce GET requests at the cost of
+            higher memory usage.
+        min_part_size: The minimum part size for multipart uploads, in bytes.
+            When the writebuffer contains this many bytes, smart_open will upload
+            the bytes to S3 as a single part of a multi-part upload, freeing the
+            buffer either partially or entirely.  When you close the writer, it
+            will assemble the parts together.
+            The value determines the upper limit for the writebuffer.  If buffer
+            space is short (e.g. you are buffering to memory), then use a smaller
+            value for min_part_size, or consider buffering to disk instead (see
+            the writebuffer option).
+            The value must be between 5MB and 5GB.  If you specify a value outside
+            of this range, smart_open will adjust it for you, because otherwise the
+            upload _will_ fail.
+            For writing only.  Does not apply if you set multipart_upload=False.
+        multipart_upload: Default: `True`.
+            If set to `True`, will use multipart upload for writing to S3. If set
+            to `False`, S3 upload will use the S3 Single-Part Upload API, which
+            is more ideal for small file sizes.
+            For writing only.
+        defer_seek: Default: `False`.
+            If set to `True` on a file opened for reading, GetObject will not be
+            called until the first seek() or read().
+            Avoids redundant API queries when seeking before reading.
+        client: The S3 client to use when working with boto3.
+            If you don't specify this, then smart_open will create a new client for
+            you.
+        client_kwargs: Additional parameters to pass to the relevant functions of
+            the client. The keys are fully qualified method names,
+            e.g. `S3.Client.create_multipart_upload`.
+            The values are kwargs to pass to that method each time it is called.
+        writebuffer: By default, this module will buffer data in memory using
+            io.BytesIO when writing. Pass another binary IO instance here to use it
+            instead. For example, you may pass a file object to buffer to local disk
+            instead of in RAM. Use this to keep RAM usage low at the expense of
+            additional disk IO. If you pass in an open file, then you are
+            responsible for cleaning it up after writing completes.
+        range_chunk_size: Default: `None`.
+            Maximum byte range per S3 GET request when reading.
+            When None (default), a single GET request is made for the entire file,
+            and data is streamed from that single botocore.response.StreamingBody
+            in buffer_size chunks.
+            When set to a positive integer, multiple GET requests are made, each
+            limited to at most this many bytes via HTTP Range headers. Each GET
+            returns a new StreamingBody that is streamed in buffer_size chunks.
+            Useful for reading small portions of large files without forcing
+            S3-compatible systems like SeaweedFS/Ceph to load the entire file.
+            Larger values mean fewer billable GET requests but higher load on S3
+            servers. Smaller values mean more GET requests but less server load per
+            request. Values larger than the file size result in a single GET for the
+            whole file. Affects reading only. Does not affect memory usage
+            (controlled by buffer_size).
+
+    Returns:
+        A file-like object for reading or writing.
+
+    Raises:
+        AssertionError: If the mode is somehow neither read nor write binary.
+        NotImplementedError: If the mode is not "rb" or "wb".
+        ValueError: If version_id is specified for write mode.
     """
     logger.debug("%r", locals())
     if mode not in constants.BINARY_MODES:
@@ -473,11 +472,15 @@ class _SeekableRawReader:
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
 
-        :param int offset: The offset in bytes.
-        :param int whence: Where the offset is from.
+        Args:
+            offset: The offset in bytes.
+            whence: Where the offset is from.
 
-        :returns: the position after seeking.
-        :rtype: int
+        Returns:
+            The position after seeking.
+
+        Raises:
+            ValueError: If whence is not one of the supported values.
         """
         if whence not in constants.WHENCE_CHOICES:
             raise ValueError(f"invalid whence, expected one of {constants.WHENCE_CHOICES!r}")
@@ -796,8 +799,14 @@ class Reader(io.BufferedIOBase):
         return self.read(size=size)
 
     def readinto(self, b):
-        """Read up to len(b) bytes into b, and return the number of bytes
-        read."""
+        """Read up to len(b) bytes into b, and return the number of bytes read.
+
+        Args:
+            b: The buffer to read into.
+
+        Returns:
+            The number of bytes read.
+        """
         data = self.read(len(b))
         if not data:
             return 0
@@ -833,10 +842,13 @@ class Reader(io.BufferedIOBase):
     def seek(self, offset, whence=constants.WHENCE_START):
         """Seek to the specified position.
 
-        :param int offset: The offset in bytes.
-        :param int whence: Where the offset is from.
+        Args:
+            offset: The offset in bytes.
+            whence: Where the offset is from.
 
-        Returns the position after seeking."""
+        Returns:
+            The position after seeking.
+        """
         # Convert relative offset to absolute, since self._raw_reader
         # doesn't know our current position.
         if whence == constants.WHENCE_CURRENT:
@@ -879,9 +891,16 @@ class Reader(io.BufferedIOBase):
         """Do nothing."""
 
     def to_boto3(self, resource):
-        """Create an **independent** `boto3.s3.Object` instance that points to
-        the same S3 object as this instance.
+        """Create an **independent** `boto3.s3.Object` instance.
+
+        The returned object points to the same S3 object as this instance.
         Changes to the returned object will not affect the current instance.
+
+        Args:
+            resource: A ``boto3.resource`` instance.
+
+        Returns:
+            A ``boto3.s3.Object`` (or ``ObjectVersion`` when ``version_id`` is set).
         """
         assert resource, "resource must be a boto3.resource instance"
         obj = resource.Object(self._bucket, self._key)
@@ -1041,13 +1060,15 @@ class MultipartWriter(io.BufferedIOBase):
         raise io.UnsupportedOperation("detach() not supported")
 
     def write(self, b: Buffer) -> int:
-        """Write the given buffer (bytes, bytearray, memoryview or any buffer
-        interface implementation) to the S3 file.
+        """Write the given buffer to the S3 file.
 
-        For more information about buffers, see https://docs.python.org/3/c-api/buffer.html
+        The buffer can be bytes, bytearray, memoryview or any buffer interface
+        implementation. For more information about buffers, see
+        https://docs.python.org/3/c-api/buffer.html.
 
         There's buffering happening under the covers, so this may not actually
-        do any HTTP transfer right away."""
+        do any HTTP transfer right away.
+        """
         offset = 0
         mv = memoryview(b)
         self._total_bytes += len(mv)
@@ -1087,9 +1108,16 @@ class MultipartWriter(io.BufferedIOBase):
         logger.debug("%s: terminated multipart upload", self)
 
     def to_boto3(self, resource):
-        """Create an **independent** `boto3.s3.Object` instance that points to
-        the same S3 object as this instance.
+        """Create an **independent** `boto3.s3.Object` instance.
+
+        The returned object points to the same S3 object as this instance.
         Changes to the returned object will not affect the current instance.
+
+        Args:
+            resource: A ``boto3.resource`` instance.
+
+        Returns:
+            A ``boto3.s3.Object`` for the same bucket and key.
         """
         assert resource, "resource must be a boto3.resource instance"
         return resource.Object(self._bucket, self._key)
@@ -1231,11 +1259,19 @@ class SinglepartWriter(io.BufferedIOBase):
         return self._buf.tell()
 
     def write(self, b):
-        """Write the given buffer (bytes, bytearray, memoryview or any buffer
-        interface implementation) into the buffer. Content of the buffer will be
-        written to S3 on close as a single-part upload.
+        """Write the given buffer into the in-memory buffer.
 
-        For more information about buffers, see https://docs.python.org/3/c-api/buffer.html"""
+        The buffer can be bytes, bytearray, memoryview or any buffer interface
+        implementation. Content of the buffer will be written to S3 on close as a
+        single-part upload. For more information about buffers, see
+        https://docs.python.org/3/c-api/buffer.html.
+
+        Args:
+            b: The buffer to write.
+
+        Returns:
+            The number of bytes written.
+        """
         return self._buf.write(b)
 
     def read(self, size=-1):
@@ -1284,64 +1320,52 @@ def iter_bucket(
     max_threads_per_fileobj=4,
     client_kwargs=None,
     session_kwargs=None,
-):
-    """
-    Iterate and download all S3 objects under `s3://bucket_name/prefix`.
+) -> Iterator[tuple[str, bytes]]:
+    """Iterate and download all S3 objects under `s3://bucket_name/prefix`.
 
-    Parameters
-    ----------
-    bucket_name: str
-        The name of the bucket.
-    prefix: str, optional
-        Limits the iteration to keys starting with the prefix.
-    accept_key: callable, optional
-        This is a function that accepts a key name (unicode string) and
-        returns True/False, signalling whether the given key should be downloaded.
-        The default behavior is to accept all keys.
-    key_limit: int, optional
-        If specified, the iterator will stop after yielding this many results.
-    workers: int, optional
-        The number of objects to download concurrently. The entire operation uses
-        a single ThreadPoolExecutor and shared thread-safe boto3 S3.Client. Default: 16
-    retries: int, optional
-        The number of time to retry a failed download. Default: 3
-    max_threads_per_fileobj: int, optional
-        The maximum number of download threads per worker. The maximum size of the
-        connection pool will be `workers * max_threads_per_fileobj + 1`. Default: 4
-    client_kwargs: dict, optional
-        Keyword arguments to pass when creating a new session.
-        For a list of available names and values, see:
-        https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html#boto3.session.Session.client
-    session_kwargs: dict, optional
-        Keyword arguments to pass when creating a new session.
-        For a list of available names and values, see:
-        https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html#boto3.session.Session
+    Args:
+        bucket_name: The name of the bucket.
+        prefix: Limits the iteration to keys starting with the prefix.
+        accept_key: A function that accepts a key name (unicode string) and
+            returns True/False, signalling whether the given key should be
+            downloaded. The default behavior is to accept all keys.
+        key_limit: If specified, the iterator will stop after yielding this many
+            results.
+        workers: The number of objects to download concurrently. The entire
+            operation uses a single ThreadPoolExecutor and shared thread-safe boto3
+            S3.Client. Default: 16.
+        retries: The number of time to retry a failed download. Default: 3.
+        max_threads_per_fileobj: The maximum number of download threads per worker.
+            The maximum size of the connection pool will be
+            `workers * max_threads_per_fileobj + 1`. Default: 4.
+        client_kwargs: Keyword arguments to pass when creating a new session.
+            For a list of available names and values, see:
+            https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html#boto3.session.Session.client
+        session_kwargs: Keyword arguments to pass when creating a new session.
+            For a list of available names and values, see:
+            https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html#boto3.session.Session
 
+    Yields:
+        Tuples of ``(key, content)``, where ``key`` is the full key name (does not
+        include the bucket name) and ``content`` is the full contents of the key.
 
-    Yields
-    ------
-    str
-        The full key name (does not include the bucket name).
-    bytes
-        The full contents of the key.
+    Raises:
+        ValueError: If bucket_name is None.
 
-    Notes
-    -----
-    The keys are processed in parallel, using `workers` threads (default: 16),
-    to speed up downloads greatly.
+    Note:
+        The keys are processed in parallel, using `workers` threads (default: 16),
+        to speed up downloads greatly.
 
-    Examples
-    --------
+    Example:
+        >>> # get all JSON files under "mybucket/foo/"
+        >>> for key, content in iter_bucket(
+        ...         bucket_name, prefix='foo/',
+        ...         accept_key=lambda key: key.endswith('.json')):
+        ...     print key, len(content)
 
-      >>> # get all JSON files under "mybucket/foo/"
-      >>> for key, content in iter_bucket(
-      ...         bucket_name, prefix='foo/',
-      ...         accept_key=lambda key: key.endswith('.json')):
-      ...     print key, len(content)
-
-      >>> # limit to 10k files, using 32 parallel workers (default is 16)
-      >>> for key, content in iter_bucket(bucket_name, key_limit=10000, workers=32):
-      ...     print key, len(content)
+        >>> # limit to 10k files, using 32 parallel workers (default is 16)
+        >>> for key, content in iter_bucket(bucket_name, key_limit=10000, workers=32):
+        ...     print key, len(content)
     """
     if accept_key is None:
         accept_key = _accept_all

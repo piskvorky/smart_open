@@ -114,25 +114,22 @@ def open(
 ):
     """Open a file for reading or writing via FTP/FTPS.
 
-    Parameters
-    ----------
-    path: str
-        The path on the remote server
-    mode: str
-        Must be "rb" or "wb"
-    host: str
-        The host to connect to
-    user: str
-        The username to use for the connection
-    password: str
-        The password for the specified username
-    port: int
-        The port to connect to
-    secure_connection: bool
-        True for FTPS, False for FTP
-    transport_params: dict
-        Additional parameters for the FTP connection.
-        Currently supported parameters: timeout, source_address, encoding.
+    Args:
+        path: The path on the remote server.
+        mode: Must be "rb" or "wb".
+        host: The host to connect to.
+        user: The username to use for the connection.
+        password: The password for the specified username.
+        port: The port to connect to.
+        secure_connection: True for FTPS, False for FTP.
+        transport_params: Additional parameters for the FTP connection.
+            Currently supported parameters: timeout, source_address, encoding.
+
+    Returns:
+        A file-like object for the remote FTP/FTPS file.
+
+    Raises:
+        ValueError: If `host` or `user` is not specified, or if `mode` is unsupported.
     """
     if not host:
         raise ValueError("you must specify the host to connect to")

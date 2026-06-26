@@ -40,6 +40,7 @@ test = [
   "smart_open[all]",
   "moto[server]",
   "responses",
+  "pre-commit",
   "pytest",
   "pytest-rerunfailures",
   "pytest_benchmark",

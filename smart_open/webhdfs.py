@@ -43,14 +43,18 @@ def open_uri(uri, mode, transport_params):
 
 
 def open(http_uri, mode, min_part_size=MIN_PART_SIZE):
-    """
-    Parameters
-    ----------
-    http_uri: str
-        webhdfs url converted to http REST url
-    min_part_size: int, optional
-        For writing only.
+    """Open a WebHDFS URI for reading or writing.
 
+    Args:
+        http_uri: webhdfs url converted to http REST url.
+        mode: The mode for opening the object. Must be either "rb" or "wb".
+        min_part_size: For writing only.
+
+    Returns:
+        A file-like object for reading from or writing to the WebHDFS file.
+
+    Raises:
+        NotImplementedError: If the requested mode is not supported.
     """
     if http_uri.startswith(SCHEME):
         http_uri = _convert_to_http_uri(http_uri)
@@ -67,13 +71,13 @@ def open(http_uri, mode, min_part_size=MIN_PART_SIZE):
 
 
 def _convert_to_http_uri(webhdfs_url):
-    """
-    Convert webhdfs uri to http url and return it as text
+    """Convert webhdfs uri to http url and return it as text.
 
-    Parameters
-    ----------
-    webhdfs_url: str
-        A URL starting with webhdfs://
+    Args:
+        webhdfs_url: A URL starting with webhdfs://.
+
+    Returns:
+        The converted HTTP URL as a string.
     """
     split_uri = urllib.parse.urlsplit(webhdfs_url)
     netloc = split_uri.hostname
@@ -181,6 +185,18 @@ class BufferedInputBase(io.BufferedIOBase):
 
 
 class BufferedOutputBase(io.BufferedIOBase):
+    """Writes bytes to a WebHDFS file in multipart chunks.
+
+    Args:
+        uri: The HTTP WebHDFS REST URL to write to.
+        min_part_size: The minimum part size for multipart uploads.
+            For writing only.
+
+    Raises:
+        WebHdfsException: If the WebHDFS server returns an unexpected status
+            code when creating the file.
+    """
+
     def __init__(self, uri, min_part_size=MIN_PART_SIZE):
         self._uri = uri
         self._closed = False
@@ -223,10 +239,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             raise WebHdfsException.from_response(response)
 
     def write(self, b):
-        """
-        Write the given bytes (binary string) into the WebHDFS file from constructor.
-
-        """
+        """Write the given bytes (binary string) into the WebHDFS file from constructor."""
         if self._closed:
             raise ValueError("I/O operation on closed file")
 

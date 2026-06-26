@@ -64,35 +64,31 @@ def open(
 
     Supports Kerberos and Basic HTTP authentication.
 
-    Parameters
-    ----------
-    url: str
-        The URL to open.
-    mode: str
-        The mode to open using.
-    kerberos: boolean, optional
-        If True, will attempt to use the local Kerberos credentials
-    user: str, optional
-        The username for authenticating over HTTP
-    password: str, optional
-        The password for authenticating over HTTP
-    cert: str/tuple, optional
-        if String, path to ssl client cert file (.pem). If Tuple, (‘cert’, ‘key’)
-    headers: dict, optional
-        Any headers to send in the request. If ``None``, the default headers are sent:
-        ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
-        set this variable to an empty dict, ``{}``.
-    session: object, optional
-        The requests Session object to use with http get requests.
-        Can be used for OAuth2 clients.
-    buffer_size: int, optional
-        The buffer size to use when performing I/O.
+    Args:
+        uri: The URL to open.
+        mode: The mode to open using.
+        kerberos: If True, will attempt to use the local Kerberos credentials.
+        user: The username for authenticating over HTTP.
+        password: The password for authenticating over HTTP.
+        cert: If a string, path to ssl client cert file (``.pem``).
+            If a tuple, ``('cert', 'key')``.
+        headers: Any headers to send in the request. If ``None``, the default headers
+            are sent: ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
+            set this variable to an empty dict, ``{}``.
+        timeout: Request timeout in seconds.
+        session: The ``requests.Session`` object to use with HTTP GET requests.
+            Can be used for OAuth2 clients.
+        buffer_size: The buffer size to use when performing I/O.
 
-    Note
-    ----
-    If neither kerberos or (user, password) are set, will connect
-    unauthenticated, unless set separately in headers.
+    Returns:
+        A file-like object opened for reading.
 
+    Raises:
+        NotImplementedError: If ``mode`` is anything other than ``"rb"``.
+
+    Note:
+        If neither ``kerberos`` nor ``(user, password)`` are set, will connect
+        unauthenticated, unless set separately in headers.
     """
     if mode == constants.READ_BINARY:
         fobj = SeekableBufferedInputBase(
@@ -196,9 +192,7 @@ class BufferedInputBase(io.BufferedIOBase):
         raise io.UnsupportedOperation
 
     def read(self, size=-1):
-        """
-        Mimics the read call to a filehandle object.
-        """
+        """Mimic the read call to a filehandle object."""
         if size < -1:
             raise ValueError(f"size must be >= -1, got {size}")
 
@@ -226,8 +220,7 @@ class BufferedInputBase(io.BufferedIOBase):
         return self.read(size=size)
 
     def readinto(self, b):
-        """Read up to len(b) bytes into b, and return the number of bytes
-        read."""
+        """Read up to ``len(b)`` bytes into ``b``, and return the number of bytes read."""
         data = self.read(len(b))
         if not data:
             return 0
@@ -236,9 +229,13 @@ class BufferedInputBase(io.BufferedIOBase):
 
 
 class SeekableBufferedInputBase(BufferedInputBase):
-    """
-    Implement seekable streamed reader from a web site.
+    """Seekable streamed reader from a web site.
+
     Supports Kerberos, client certificate and Basic HTTP authentication.
+    If ``kerberos`` is True, will attempt to use the local Kerberos credentials.
+    If ``cert`` is set, will try to use a client certificate. Otherwise, will try
+    to use "basic" HTTP authentication via username/password. If none of those are
+    set, will connect unauthenticated.
     """
 
     def __init__(
@@ -267,10 +264,17 @@ class SeekableBufferedInputBase(BufferedInputBase):
     def seek(self, offset, whence=0):
         """Seek to the specified position.
 
-        :param int offset: The offset in bytes.
-        :param int whence: Where the offset is from.
+        Args:
+            offset: The offset in bytes.
+            whence: Where the offset is from.
 
-        Returns the position after seeking."""
+        Returns:
+            The position after seeking.
+
+        Raises:
+            ValueError: If ``whence`` is not one of ``WHENCE_CHOICES``.
+            OSError: If the stream is not seekable.
+        """
         logger.debug("seeking to offset: %r whence: %r", offset, whence)
         if whence not in constants.WHENCE_CHOICES:
             raise ValueError(f"invalid whence, expected one of {constants.WHENCE_CHOICES!r}")

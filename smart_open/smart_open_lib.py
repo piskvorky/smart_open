@@ -43,22 +43,16 @@ def _sniff_scheme(uri_as_string):
 
 
 def parse_uri(uri_as_string):
-    """
-    Parse the given URI from a string.
+    """Parse the given URI from a string.
 
-    Parameters
-    ----------
-    uri_as_string: str
-        The URI to parse.
+    Args:
+        uri_as_string: The URI to parse.
 
-    Returns
-    -------
-    collections.namedtuple
-        The parsed URI.
+    Returns:
+        The parsed URI as a ``collections.namedtuple``.
 
-    Notes
-    -----
-    smart_open/doctools.py magic goes here
+    Note:
+        smart_open/doctools.py magic goes here
     """
     scheme = _sniff_scheme(uri_as_string)
     submodule = transport.get_transport(scheme)
@@ -103,55 +97,49 @@ def open(
     - an instance of the pathlib.Path class
     - a stream (anything that implements io.IOBase-like functionality)
 
-    Parameters
-    ----------
-    uri: str or object
-        The object to open.
-    mode: str, optional
-        Mimicks built-in open parameter of the same name.
-    buffering: int, optional
-        Mimicks built-in open parameter of the same name.
-    encoding: str, optional
-        Mimicks built-in open parameter of the same name.
-    errors: str, optional
-        Mimicks built-in open parameter of the same name.
-    newline: str, optional
-        Mimicks built-in open parameter of the same name.
-    closefd: boolean, optional
-        Mimicks built-in open parameter of the same name.  Ignored.
-    opener: object, optional
-        Mimicks built-in open parameter of the same name.  Ignored.
-    compression: str, optional (see smart_open.compression.get_supported_compression_types)
-        Explicitly specify the compression/decompression behavior.
-    compression_kwargs: dict, optional
-        Keyword arguments forwarded to the registered compressor callback. Examples
-        of each library's max-compression option: {'compresslevel': 9} for
-        .gz/.bz2, {'preset': 9} for .xz, {'level': 22} for .zst,
-        {'compression_level': 12} for .lz4. Ignored when compression is 'disable'
-        or the URI's extension doesn't match a registered compressor.
-    transport_params: dict, optional
-        Additional parameters for the transport layer (see notes below).
+    Args:
+        uri: The object to open.
+        mode: Mimicks built-in open parameter of the same name.
+        buffering: Mimicks built-in open parameter of the same name.
+        encoding: Mimicks built-in open parameter of the same name.
+        errors: Mimicks built-in open parameter of the same name.
+        newline: Mimicks built-in open parameter of the same name.
+        closefd: Mimicks built-in open parameter of the same name.  Ignored.
+        opener: Mimicks built-in open parameter of the same name.  Ignored.
+        compression: Explicitly specify the compression/decompression behavior.
+            See ``smart_open.compression.get_supported_compression_types``.
+        compression_kwargs: Keyword arguments forwarded to the registered
+            compressor callback. Examples of each library's max-compression
+            option: ``{'compresslevel': 9}`` for .gz/.bz2, ``{'preset': 9}`` for
+            .xz, ``{'level': 22}`` for .zst, ``{'compression_level': 12}`` for
+            .lz4. Ignored when compression is 'disable' or the URI's extension
+            doesn't match a registered compressor.
+        transport_params: Additional parameters for the transport layer (see
+            notes below).
 
-    Returns
-    -------
-    A file-like object.
+    Returns:
+        A file-like object.
 
-    Notes
-    -----
-    smart_open has several implementations for its transport layer (e.g. S3, HTTP).
-    Each transport layer has a different set of keyword arguments for overriding
-    default behavior.  If you specify a keyword argument that is *not* supported
-    by the transport layer being used, smart_open will ignore that argument and
-    log a warning message.
+    Raises:
+        TypeError: If ``mode`` is not a string or if the URI type is not
+            recognized.
+        ValueError: If ``compression`` is not a supported value.
+        NotImplementedError: If ``mode`` cannot be parsed into a valid binary
+            mode.
 
-    smart_open/doctools.py magic goes here
+    Note:
+        smart_open has several implementations for its transport layer
+        (e.g. S3, HTTP). Each transport layer has a different set of keyword
+        arguments for overriding default behavior. If you specify a keyword
+        argument that is *not* supported by the transport layer being used,
+        smart_open will ignore that argument and log a warning message.
 
-    See Also
-    --------
-    - `Standard library reference <https://docs.python.org/3.14/library/functions.html#open>`__
-    - `smart_open README.rst
-      <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
+        smart_open/doctools.py magic goes here
 
+    See Also:
+        - `Standard library reference <https://docs.python.org/3.14/library/functions.html#open>`__
+        - `smart_open README.rst
+          <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
     """
     logger.debug("%r", locals())
 
@@ -324,13 +312,20 @@ def _shortcut_open(
         1. Opening a local file; and
         2. Compression is disabled
 
-    If it is not possible to use the built-in open for the specified URI, returns None.
+    If it is not possible to use the built-in open for the specified URI,
+    returns None.
 
-    :param str uri: A string indicating what to open.
-    :param str mode: The mode to pass to the open function.
-    :param str compression: The compression type selected.
-    :returns: The opened file
-    :rtype: file
+    Args:
+        uri: A string indicating what to open.
+        mode: The mode to pass to the open function.
+        compression: The compression type selected.
+        buffering: Mimicks built-in open parameter of the same name.
+        encoding: Mimicks built-in open parameter of the same name.
+        errors: Mimicks built-in open parameter of the same name.
+        newline: Mimicks built-in open parameter of the same name.
+
+    Returns:
+        The opened file, or None if no shortcut is possible.
     """
     if not isinstance(uri, str):
         return None
@@ -368,11 +363,17 @@ def _open_binary_stream(uri, mode, transport_params):
 
     Not all modes are supported for all protocols.
 
-    :arg uri: The URI to open.  May be a string, or something else.
-    :arg str mode: The mode to open with.  Must be rb, wb or ab.
-    :arg transport_params: Keyword argumens for the transport layer.
-    :returns: A named file object
-    :rtype: file-like object with a .name attribute
+    Args:
+        uri: The URI to open.  May be a string, or something else.
+        mode: The mode to open with.  Must be rb, wb or ab.
+        transport_params: Keyword arguments for the transport layer.
+
+    Returns:
+        A file-like object with a ``.name`` attribute.
+
+    Raises:
+        NotImplementedError: If ``mode`` is not a supported binary mode.
+        TypeError: If ``uri`` is not a string or integer file descriptor.
     """
     if mode not in ("rb", "rb+", "wb", "wb+", "ab", "ab+"):
         #
@@ -410,11 +411,15 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
     If mode specifies binary access, does nothing, unless the encoding is
     specified.  A non-null encoding implies text mode.
 
-    :arg fileobj: must quack like a filehandle object.
-    :arg str mode: is the mode which was originally requested by the user.
-    :arg str encoding: The text encoding to use.  If mode is binary, overrides mode.
-    :arg str errors: The method to use when handling encoding/decoding errors.
-    :returns: a file object
+    Args:
+        fileobj: Must quack like a filehandle object.
+        mode: The mode which was originally requested by the user.
+        encoding: The text encoding to use.  If mode is binary, overrides mode.
+        errors: The method to use when handling encoding/decoding errors.
+        newline: Forwarded to the text wrapper.
+
+    Returns:
+        A file object.
     """
     logger.debug("encoding_wrapper: %r", locals())
 

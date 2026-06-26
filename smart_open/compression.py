@@ -39,32 +39,29 @@ def get_supported_extensions():
 def register_compressor(ext, callback):
     """Register a callback for transparently decompressing files with a specific extension.
 
-    Parameters
-    ----------
-    ext: str
-        The extension.  Must include the leading period, e.g. `.gz`.
-    callback: callable
-        The callback.  It must accept two positional arguments, file_obj and mode,
-        and is recommended to also accept **kwargs so that whatever the caller passes
-        via smart_open.open(..., compression_kwargs={...}) reaches the underlying
-        library unchanged.  Callbacks with the legacy (file_obj, mode) signature still
-        work, but will raise TypeError if the caller supplies compression_kwargs
-        that the callback doesn't declare.
+    Args:
+        ext: The extension.  Must include the leading period, e.g. `.gz`.
+        callback: The callback.  It must accept two positional arguments, file_obj and mode,
+            and is recommended to also accept **kwargs so that whatever the caller passes
+            via smart_open.open(..., compression_kwargs={...}) reaches the underlying
+            library unchanged.  Callbacks with the legacy (file_obj, mode) signature still
+            work, but will raise TypeError if the caller supplies compression_kwargs
+            that the callback doesn't declare.
 
-    Examples
-    --------
+    Raises:
+        ValueError: If `ext` does not start with a period.
 
-    Instruct smart_open to use the `lzma` module whenever opening a file
-    with a .xz extension (see README.rst for the complete example showing I/O):
+    Example:
+        Instruct smart_open to use the `lzma` module whenever opening a file
+        with a .xz extension (see README.rst for the complete example showing I/O):
 
-    >>> def _handle_xz(file_obj, mode, **kwargs):
-    ...     import lzma
-    ...     return lzma.open(filename=file_obj, mode=mode, **kwargs)
-    >>>
-    >>> register_compressor('.xz', _handle_xz)
+        >>> def _handle_xz(file_obj, mode, **kwargs):
+        ...     import lzma
+        ...     return lzma.open(filename=file_obj, mode=mode, **kwargs)
+        >>>
+        >>> register_compressor('.xz', _handle_xz)
 
-    This is just an example: `lzma` is in the standard library and is registered by default.
-
+        This is just an example: `lzma` is in the standard library and is registered by default.
     """
     if not (ext and ext[0] == "."):
         raise ValueError(f"ext must be a string starting with ., not {ext!r}")
@@ -130,8 +127,7 @@ def compression_wrapper(
     filename=None,
     compression_kwargs=None,
 ):
-    """
-    Wrap `file_obj` with an appropriate [de]compression mechanism based on its file extension.
+    """Wrap `file_obj` with an appropriate [de]compression mechanism based on its file extension.
 
     If the filename extension isn't recognized, simply return the original `file_obj` unchanged.
 
@@ -142,7 +138,6 @@ def compression_wrapper(
 
     If `compression_kwargs` is specified, its contents are forwarded as keyword
     arguments to the registered compressor callback.
-
     """
     if compression == NO_COMPRESSION:
         return file_obj

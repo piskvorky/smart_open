@@ -75,26 +75,28 @@ def open(
 ):
     """Open an Azure Blob Storage blob for reading or writing.
 
-    Parameters
-    ----------
-    container_id: str
-        The name of the container this object resides in.
-    blob_id: str
-        The name of the blob within the bucket.
-    mode: str
-        The mode for opening the object.  Must be either "rb", "wb", or "ab".
-    client: azure.storage.blob.BlobServiceClient, ContainerClient, or BlobClient
-        The Azure Blob Storage client to use when working with azure-storage-blob.
-    blob_kwargs: dict, optional
-        Additional parameters to pass to `BlobClient.commit_block_list` (for "wb")
-        or `BlobClient.upload_blob` (for "ab"). For writing only.
-    buffer_size: int, optional
-        The buffer size to use when performing I/O. For reading only.
-    min_part_size: int, optional
-        The minimum part size for multipart uploads. For writing only.
-    max_concurrency: int, optional
-        The number of parallel connections with which to download. For reading only.
+    Args:
+        container_id: The name of the container this object resides in.
+        blob_id: The name of the blob within the bucket.
+        mode: The mode for opening the object.  Must be either "rb", "wb", or "ab".
+        client: The Azure Blob Storage client to use when working with
+            azure-storage-blob. May be a BlobServiceClient, ContainerClient, or
+            BlobClient.
+        blob_kwargs: Additional parameters to pass to
+            ``BlobClient.commit_block_list`` (for "wb") or
+            ``BlobClient.upload_blob`` (for "ab"). For writing only.
+        buffer_size: The buffer size to use when performing I/O. For reading only.
+        min_part_size: The minimum part size for multipart uploads. For writing
+            only.
+        max_concurrency: The number of parallel connections with which to
+            download. For reading only.
 
+    Returns:
+        A file-like object for reading from or writing to the blob.
+
+    Raises:
+        ValueError: If no client is provided.
+        NotImplementedError: If the requested mode is not supported.
     """
     if not client:
         raise ValueError("you must specify the client to connect to Azure")
@@ -148,9 +150,11 @@ class _RawReader:
     def seek(self, position):
         """Seek to the specified position (byte offset) in the Azure Blob Storage blob.
 
-        :param int position: The byte offset from the beginning of the blob.
+        Args:
+            position: The byte offset from the beginning of the blob.
 
-        Returns the position after seeking.
+        Returns:
+            The position after seeking.
         """
         self._position = position
         return self._position
@@ -188,7 +192,19 @@ class Reader(io.BufferedIOBase):
 
     Implements the io.BufferedIOBase interface of the standard library.
 
-    :raises azure.core.exceptions.ResourceNotFoundError: Raised when the blob to read from does not exist.
+    Args:
+        container: The name of the container the blob resides in.
+        blob: The name of the blob within the container.
+        client: The Azure Blob Storage client. May be a BlobServiceClient,
+            ContainerClient, or BlobClient.
+        buffer_size: The buffer size to use when performing I/O.
+        line_terminator: The line terminator to use when reading lines.
+        max_concurrency: The number of parallel connections with which to
+            download.
+
+    Raises:
+        azure.core.exceptions.ResourceNotFoundError: Raised when the blob to read
+            from does not exist.
     """
 
     _blob = None  # so `closed` property works in case __init__ fails and __del__ is called
@@ -254,10 +270,16 @@ class Reader(io.BufferedIOBase):
     def seek(self, offset, whence=smart_open.constants.WHENCE_START):
         """Seek to the specified position.
 
-        :param int offset: The offset in bytes.
-        :param int whence: Where the offset is from.
+        Args:
+            offset: The offset in bytes.
+            whence: Where the offset is from.
 
-        Returns the position after seeking."""
+        Returns:
+            The position after seeking.
+
+        Raises:
+            ValueError: If ``whence`` is not one of the accepted values.
+        """
         logger.debug("seeking to offset: %r whence: %r", offset, whence)
         if whence not in smart_open.constants.WHENCE_CHOICES:
             raise ValueError(

@@ -56,27 +56,23 @@ def open(
 ):
     """Open an GCS blob for reading or writing.
 
-    Parameters
-    ----------
-    bucket_id: str
-        The name of the bucket this object resides in.
-    blob_id: str
-        The name of the blob within the bucket.
-    mode: str
-        The mode for opening the object. Must be either "rb" or "wb".
-    min_part_size: int, optional
-        The minimum part size for multipart uploads. For writing only.
-    client: google.cloud.storage.Client, optional
-        The GCS client to use when working with google-cloud-storage.
-    get_blob_kwargs: dict, optional
-        Additional keyword arguments to propagate to the bucket.get_blob
-        method of the google-cloud-storage library. For reading only.
-    blob_properties: dict, optional
-        Set properties on blob before writing. For writing only.
-    blob_open_kwargs: dict, optional
-        Additional keyword arguments to propagate to the blob.open method
-        of the google-cloud-storage library.
+    Args:
+        bucket_id: The name of the bucket this object resides in.
+        blob_id: The name of the blob within the bucket.
+        mode: The mode for opening the object. Must be either "rb" or "wb".
+        min_part_size: The minimum part size for multipart uploads. For writing only.
+        client: The GCS client to use when working with google-cloud-storage.
+        get_blob_kwargs: Additional keyword arguments to propagate to the bucket.get_blob
+            method of the google-cloud-storage library. For reading only.
+        blob_properties: Set properties on blob before writing. For writing only.
+        blob_open_kwargs: Additional keyword arguments to propagate to the blob.open method
+            of the google-cloud-storage library.
 
+    Returns:
+        A file-like object for the GCS blob.
+
+    Raises:
+        NotImplementedError: If `mode` is not one of the supported modes.
     """
     if blob_open_kwargs is None:
         blob_open_kwargs = {}

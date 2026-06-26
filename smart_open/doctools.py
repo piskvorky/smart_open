@@ -34,67 +34,74 @@ else:
 def extract_kwargs(docstring):
     """Extract keyword argument documentation from a function's docstring.
 
-    Parameters
-    ----------
-    docstring: str
-        The docstring to extract keyword arguments from.
+    Supports both NumPy-style (underlined ``Parameters``) and Google-style
+    (``Args:``) sections, so transport submodules can migrate independently.
 
-    Returns
-    -------
-    list of (str, str, list str)
+    Args:
+        docstring: The docstring to extract keyword arguments from.
 
-    str
-        The name of the keyword argument.
-    str
-        Its type.
-    str
-        Its documentation as a list of lines.
+    Returns:
+        A list of ``[name, type, description_lines]`` triples. ``name`` is the
+        name of the keyword argument, ``type`` is its type (may be an empty
+        string when missing) and ``description_lines`` is its documentation as
+        a list of lines.
 
-    Notes
-    -----
-    The implementation is rather fragile.  It expects the following:
+    Note:
+        The implementation is rather fragile. For NumPy style it expects:
 
-    1. The parameters are under an underlined Parameters section
-    2. Keyword parameters have the literal ", optional" after the type
-    3. Names and types are not indented
-    4. Descriptions are indented with 4 spaces
-    5. The Parameters section ends with an empty line.
+        1. The parameters are under an underlined Parameters section
+        2. Keyword parameters have the literal ", optional" after the type
+        3. Names and types are not indented
+        4. Descriptions are indented with 4 spaces
+        5. The Parameters section ends with an empty line.
 
-    Examples
-    --------
+        For Google style it expects:
 
-    >>> docstring = '''The foo function.
-    ... Parameters
-    ... ----------
-    ... bar: str, optional
-    ...     This parameter is the bar.
-    ... baz: int, optional
-    ...     This parameter is the baz.
-    ...
-    ... '''
-    >>> kwargs = extract_kwargs(docstring)
-    >>> kwargs[0]
-    ('bar', 'str, optional', ['This parameter is the bar.'])
+        1. The parameters are under an ``Args:`` header
+        2. Argument lines start with 4 spaces of indent (``    name: desc``)
+        3. Continuation lines for a description are indented with 8 spaces
+        4. The ``Args:`` section ends with an empty line or another section header.
 
+    Example:
+        >>> docstring = '''The foo function.
+        ... Args:
+        ...     bar: This parameter is the bar.
+        ...     baz: This parameter is the baz.
+        ...
+        ... '''
+        >>> kwargs = extract_kwargs(docstring)
+        >>> kwargs[0]
+        ['bar', '', ['This parameter is the bar.']]
     """
     if not docstring:
         return []
 
     lines = inspect.cleandoc(docstring).split("\n")
+
+    #
+    # Detect the section style by scanning for a header.
+    #
+    for idx, line in enumerate(lines):
+        if line == "Parameters" and idx + 1 < len(lines) and lines[idx + 1].startswith("---"):
+            return _extract_kwargs_numpy(lines[idx:])
+        if line.rstrip() == "Args:":
+            return _extract_kwargs_google(lines[idx:])
+
+    return []
+
+
+def _extract_kwargs_numpy(lines):
+    """Parse a NumPy-style ``Parameters`` section into kwargs triples.
+
+    Args:
+        lines: Cleaned docstring lines beginning with the ``Parameters`` header.
+
+    Returns:
+        A list of ``[name, type, description_lines]`` triples.
+    """
     kwargs = []
-
-    #
-    # 1. Find the underlined 'Parameters' section
-    # 2. Once there, continue parsing parameters until we hit an empty line
-    #
-    while lines and lines[0] != "Parameters":
-        lines.pop(0)
-
-    if not lines:
-        return []
-
-    lines.pop(0)
-    lines.pop(0)
+    # Drop the 'Parameters' header and the '----------' underline.
+    lines = lines[2:]
 
     for line in lines:
         if not line.strip():  # stop at the first empty line encountered
@@ -112,40 +119,70 @@ def extract_kwargs(docstring):
     return kwargs
 
 
+def _extract_kwargs_google(lines):
+    """Parse a Google-style ``Args:`` section into kwargs triples.
+
+    Type information is not extracted (returned as an empty string) since
+    Google-style docstrings in this codebase don't include argument types in
+    the docstring.
+
+    Args:
+        lines: Cleaned docstring lines beginning with the ``Args:`` header.
+
+    Returns:
+        A list of ``[name, type, description_lines]`` triples.
+    """
+    kwargs = []
+    # Drop the 'Args:' header.
+    lines = lines[1:]
+
+    for line in lines:
+        if not line.strip():  # stop at the first empty line encountered
+            break
+        # Argument line: 4-space indent, then ``name: description``.
+        if line.startswith("    ") and not line.startswith("        "):
+            stripped = line[4:]
+            if ":" not in stripped:
+                continue
+            name, desc = stripped.split(":", 1)
+            kwargs.append([name.strip(), "", [desc.strip()] if desc.strip() else []])
+            continue
+        # Continuation line for the previous arg: 8-space (or deeper) indent.
+        if line.startswith("        ") and kwargs:
+            kwargs[-1][-1].append(line.strip())
+
+    return kwargs
+
+
 def to_docstring(kwargs, lpad=""):
     """Reconstruct a docstring from keyword argument info.
 
     Basically reverses :func:`extract_kwargs`.
 
-    Parameters
-    ----------
-    kwargs: list
-        Output from the extract_kwargs function
-    lpad: str, optional
-        Padding string (from the left).
+    Args:
+        kwargs: Output from the :func:`extract_kwargs` function.
+        lpad: Padding string (from the left).
 
-    Returns
-    -------
-    str
+    Returns:
         The docstring snippet documenting the keyword arguments.
 
-    Examples
-    --------
-
-    >>> kwargs = [
-    ...     ('bar', 'str, optional', ['This parameter is the bar.']),
-    ...     ('baz', 'int, optional', ['This parameter is the baz.']),
-    ... ]
-    >>> print(to_docstring(kwargs), end='')
-    bar: str, optional
-        This parameter is the bar.
-    baz: int, optional
-        This parameter is the baz.
-
+    Example:
+        >>> kwargs = [
+        ...     ('bar', 'str, optional', ['This parameter is the bar.']),
+        ...     ('baz', 'int, optional', ['This parameter is the baz.']),
+        ... ]
+        >>> print(to_docstring(kwargs), end='')
+        bar: str, optional
+            This parameter is the bar.
+        baz: int, optional
+            This parameter is the baz.
     """
     buf = io.StringIO()
     for name, type_, description in kwargs:
-        buf.write(f"{lpad}{name}: {type_}\n")
+        if type_:
+            buf.write(f"{lpad}{name}: {type_}\n")
+        else:
+            buf.write(f"{lpad}{name}:\n")
         for line in description:
             buf.write(f"{lpad}    {line}\n")
     return buf.getvalue()
@@ -154,19 +191,15 @@ def to_docstring(kwargs, lpad=""):
 def extract_examples_from_readme_rst(indent=None):
     """Extract examples from this project's README.rst file.
 
-    Parameters
-    ----------
-    indent: str
-        Prepend each line with this string.  Should contain some number of spaces.
+    Args:
+        indent: Prepend each line with this string.  Should contain some number
+            of spaces.
 
-    Returns
-    -------
-    str
-        The examples.
+    Returns:
+        The examples as a single string.
 
-    Notes
-    -----
-    Quite fragile, depends on named labels inside the README.rst file.
+    Note:
+        Quite fragile, depends on named labels inside the README.rst file.
     """
     if indent is None:
         indent = LPAD
@@ -213,8 +246,7 @@ def tweak_open_docstring(f):
             if kwargs:
                 print(to_docstring(kwargs, lpad=LPAD))
 
-        print(f"{LPAD}Examples")
-        print(f"{LPAD}--------")
+        print(f"{LPAD}Examples:")
         print()
         print(extract_examples_from_readme_rst(indent=LPAD))
 

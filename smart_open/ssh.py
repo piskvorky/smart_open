@@ -7,18 +7,15 @@
 
 """Implements I/O streams over SSH.
 
-Examples
---------
-
->>> with open('/proc/version_signature', host='1.2.3.4') as conn:
-...     print(conn.read())
-b'Ubuntu 4.4.0-1061.70-aws 4.4.131'
-
-Similarly, from a command line::
-
-    $ python -c "from smart_open import ssh;print(ssh.open('/proc/version_signature', host='1.2.3.4').read())"
+Example:
+    >>> with open('/proc/version_signature', host='1.2.3.4') as conn:
+    ...     print(conn.read())
     b'Ubuntu 4.4.0-1061.70-aws 4.4.131'
 
+    Similarly, from a command line::
+
+        $ python -c "from smart_open import ssh;print(ssh.open('/proc/version_signature', host='1.2.3.4').read())"
+        b'Ubuntu 4.4.0-1061.70-aws 4.4.131'
 """
 
 import getpass
@@ -227,40 +224,32 @@ def open(
 
     Expects authentication to be already set up via existing keys on the local machine.
 
-    Parameters
-    ----------
-    path: str
-        The path to the file to open on the remote machine.
-    mode: str, optional
-        The mode to use for opening the file.
-    host: str, optional
-        The hostname of the remote machine. May not be None.
-    user: str, optional
-        The username to use to login to the remote machine.
-        If None, defaults to the name of the current user.
-    password: str, optional
-        The password to use to login to the remote machine.
-    port: int, optional
-        The port to connect to.
-    connect_kwargs: dict, optional
-        Any additional settings to be passed to paramiko.SSHClient.connect.
-    prefetch_kwargs: dict, optional
-        Any additional settings to be passed to paramiko.SFTPFile.prefetch.
-        The presence of this dict (even if empty) triggers prefetching.
-    buffer_size: int, optional
-        Passed to the bufsize argument of paramiko.SFTPClient.open.
+    Args:
+        path: The path to the file to open on the remote machine.
+        mode: The mode to use for opening the file.
+        host: The hostname of the remote machine. May not be None.
+        user: The username to use to login to the remote machine.
+            If None, defaults to the name of the current user.
+        password: The password to use to login to the remote machine.
+        port: The port to connect to.
+        connect_kwargs: Any additional settings to be passed to paramiko.SSHClient.connect.
+        prefetch_kwargs: Any additional settings to be passed to paramiko.SFTPFile.prefetch.
+            The presence of this dict (even if empty) triggers prefetching.
+        buffer_size: Passed to the bufsize argument of paramiko.SFTPClient.open.
 
-    Returns
-    -------
-    A file-like object.
+    Returns:
+        A file-like object.
 
-    Important
-    ---------
-    If you specify a previously unseen host, then its host key will be added to
-    the local ~/.ssh/known_hosts *automatically*.
+    Raises:
+        paramiko.SSHException: If the SSH session is no longer active and
+            cannot be re-established within the retry limit.
 
-    If ``username`` or ``password`` are specified in *both* the uri and
-    ``transport_params``, ``transport_params`` will take precedence
+    Note:
+        If you specify a previously unseen host, then its host key will be added to
+        the local ~/.ssh/known_hosts *automatically*.
+
+        If ``username`` or ``password`` are specified in *both* the uri and
+        ``transport_params``, ``transport_params`` will take precedence.
     """
     host, user, password, port, connect_kwargs = _maybe_fetch_config(
         host, user, password, port, connect_kwargs
