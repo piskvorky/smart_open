@@ -1,3 +1,116 @@
+Migrating to v8.0.0
+===================
+
+Version 8.0.0 drops several long-deprecated APIs and backwards-compat shims that had been emitting warnings (or were no-ops) for years.
+Tracked under `#926 <https://github.com/piskvorky/smart_open/issues/926>`_.
+
+``smart_open.s3_iter_bucket`` removed
+-------------------------------------
+
+Tracked in `#927 <https://github.com/piskvorky/smart_open/pull/927>`_.
+The top-level ``smart_open.s3_iter_bucket`` wrapper has been removed.
+Import ``iter_bucket`` from ``smart_open.s3`` instead:
+
+.. code-block:: diff
+
+   - from smart_open import s3_iter_bucket
+   + from smart_open.s3 import iter_bucket as s3_iter_bucket
+
+Top-level ``smart_open.smart_open()`` removed
+---------------------------------------------
+
+Tracked in `#928 <https://github.com/piskvorky/smart_open/pull/928>`_.
+The compatibility wrapper around ``smart_open.open()`` has been removed.
+Call ``smart_open.open()`` directly; if you were using ``ignore_extension=True``, switch to ``compression='disable'``:
+
+.. code-block:: diff
+
+   - fin = smart_open.smart_open('s3://bucket/key.gz', 'rb', ignore_extension=True)
+   + fin = smart_open.open('s3://bucket/key.gz', 'rb', compression='disable')
+
+``smart_open_lib`` backwards-compat re-exports removed
+------------------------------------------------------
+
+Tracked in `#929 <https://github.com/piskvorky/smart_open/pull/929>`_.
+The underscored re-export aliases in ``smart_open.smart_open_lib`` are gone.
+Import the canonical names from ``smart_open.utils`` (the public ``smart_open.register_compressor`` continues to work):
+
+.. code-block:: diff
+
+   - from smart_open.smart_open_lib import _check_kwargs, _inspect_kwargs
+   + from smart_open.utils import check_kwargs, inspect_kwargs
+
+``s3.iter_bucket`` ``session_kwargs`` is now a dict
+---------------------------------------------------
+
+Tracked in `#930 <https://github.com/piskvorky/smart_open/pull/930>`_.
+``smart_open.s3.iter_bucket`` no longer accepts session keyword arguments via ``**session_kwargs``.
+Pass a single ``session_kwargs`` dict instead:
+
+.. code-block:: diff
+
+     smart_open.s3.iter_bucket(
+         bucket,
+   -     aws_access_key_id='id',
+   -     aws_secret_access_key='secret',
+   +     session_kwargs={
+   +         'aws_access_key_id': 'id',
+   +         'aws_secret_access_key': 'secret',
+   +     },
+     )
+
+``concurrency.create_pool`` and ``ConcurrentFuturesPool`` removed
+-----------------------------------------------------------------
+
+Tracked in `#931 <https://github.com/piskvorky/smart_open/pull/931>`_.
+The ``create_pool`` context manager and ``ConcurrentFuturesPool`` class are gone.
+Use ``smart_open.concurrency.ThreadPoolExecutor`` directly:
+
+.. code-block:: diff
+
+   - with smart_open.concurrency.create_pool(processes=8) as pool:
+   -     for result in pool.imap_unordered(fn, items):
+   -         ...
+   + with smart_open.concurrency.ThreadPoolExecutor(max_workers=8) as pool:
+   +     for result in pool.imap(fn, items):
+   +         ...
+
+``compression.tweak_close()`` removed
+-------------------------------------
+
+Tracked in `#933 <https://github.com/piskvorky/smart_open/pull/933>`_.
+The ``smart_open.compression.tweak_close()`` helper has been removed.
+``smart_open.open().__exit__`` already calls ``__exit__`` on the underlying filestream, so the helper's behaviour is provided by the standard exit path — drop the call.
+
+GCS ``buffer_size`` and ``line_terminator`` parameters removed
+--------------------------------------------------------------
+
+Tracked in `#935 <https://github.com/piskvorky/smart_open/pull/935>`_.
+``smart_open.gcs.open()`` and ``smart_open.gcs.Reader()`` no longer accept ``buffer_size`` or ``line_terminator`` (``Reader`` only).
+They have been no-ops emitting a ``UserWarning`` for years.
+Drop them from your call sites:
+
+.. code-block:: diff
+
+   - smart_open.gcs.open(bucket, blob, 'rb', buffer_size=8192)
+   + smart_open.gcs.open(bucket, blob, 'rb')
+
+GCS writer ``terminate()`` no longer exists
+-------------------------------------------
+
+Tracked in `#936 <https://github.com/piskvorky/smart_open/pull/936>`_.
+The no-op ``.terminate()`` monkey-patch on the google-cloud-storage blob writer has been removed.
+It had been a silent no-op for years (`Google deprecated resumable-upload termination upstream <https://cloud.google.com/storage/docs/resumable-uploads>`_).
+Rely on the writer's context manager or ``.close()`` for normal completion.
+
+S3 ``open_uri`` deprecated transport-parameter warnings removed
+---------------------------------------------------------------
+
+Tracked in `#937 <https://github.com/piskvorky/smart_open/pull/937>`_.
+The ``UserWarning`` that ``smart_open.s3.open_uri`` emitted for the legacy resource-API transport parameters (``multipart_upload_kwargs``, ``object_kwargs``, ``resource``, ``resource_kwargs``, ``session``, ``singlepart_upload_kwargs``) is gone.
+These parameters had already been unsupported since v5.0.0 — see `Migrating to the new client-based S3 API`_ below for the actual translation recipes.
+
+
 Migrating to the new compression parameter
 ==========================================
 
