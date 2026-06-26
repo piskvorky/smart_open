@@ -6,11 +6,11 @@ Also, you need to install py.test and its benchmarks addon:
 
 Then, to run the tests, run:
 
-    SO_S3_URL=s3://bucket/smart_open_test py.test integration-tests/test_s3.py
+    SO_BUCKET=bucket SO_KEY=key py.test integration-tests/test_s3.py
 
 You may use any key name instead of "smart_open_test".
 It does not have to be an existing key.
-**The tests will remove the key prior to each test, so be sure the key doesn't contain anything important.**
+The tests will create temporary keys under `s3://SO_BUCKET/SO_KEY` and remove them at completion.
 
 The tests will take several minutes to complete.
 Each test will run several times to obtain summary statistics such as min, max, mean and median.
@@ -18,7 +18,7 @@ This allows us to detect regressions in performance.
 Here is some example output (you need a wide screen to get the best of it):
 
 ```
-(smartopen)sergeyich:smart_open misha$ SMART_OPEN_S3_URL=s3://bucket/smart_open_test py.test integration-tests/test_s3.py
+$ SMART_OPEN_S3_URL=s3://bucket/smart_open_test py.test integration-tests/test_s3.py
 =============================================== test session starts ================================================
 platform darwin -- Python 3.6.3, pytest-3.3.0, py-1.5.2, pluggy-0.6.0
 benchmark: 3.1.1 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)

@@ -1,0 +1,46 @@
+name: Release to PyPI
+
+on:
+  release:
+    types: [prereleased, released]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # softprops/action-gh-release
+      id-token: write  # pypa/gh-action-pypi-publish
+      issues: write # apexskier/github-release-commenter
+      pull-requests: write # apexskier/github-release-commenter
+
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: 3.x
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip setuptools wheel build
+
+    - name: Build package distributions
+      run: |
+        python -m build
+
+    - name: Upload package distributions as release assets
+      uses: softprops/action-gh-release@v3.0.0
+      with:
+        files: dist/*
+
+    # https://github.com/pypa/gh-action-pypi-publish#trusted-publishing
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@v1.14.0
+
+    - uses: apexskier/github-release-commenter@v1.4.1
+      with:
+        comment-template: |
+          Released {release_link}

@@ -1,0 +1,111 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [master, develop]
+  workflow_dispatch:  # allows running CI manually from the Actions tab
+
+concurrency:  # https://stackoverflow.com/questions/66335225#comment133398800_72408109
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        include:
+          # sync with linting steps below
+          - {python-version: '3.10', os: ubuntu-24.04}
+          - {python-version: '3.14', os: ubuntu-24.04}
+
+          - {python-version: '3.10', os: windows-2025}
+          - {python-version: '3.14', os: windows-2025}
+
+          - {python-version: '3.10', os: macos-15}
+          - {python-version: '3.14', os: macos-15}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - name: Install smart_open without dependencies
+        run: uv pip install -e .
+
+      - name: Check that smart_open imports without dependencies
+        run: python -c 'import smart_open'
+
+      - name: Install smart_open and its dependencies
+        run: uv pip install -e .[test]
+
+      - name: Run flake8 linter (source)
+        if: matrix.python-version == '3.10' # sync with matrix above
+        run: flake8 --show-source smart_open
+
+      - name: "Check whether help.txt update was forgotten"
+        if: matrix.python-version == '3.10' && github.event_name == 'pull_request' # sync with matrix above
+        run: |
+          python update_helptext.py
+          test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
+
+      - name: Run unit tests
+        # configuration in pyproject.toml
+        run: pytest tests -v
+
+      - name: Run doctests
+        if: startsWith(matrix.os, 'ubuntu')
+        run: python ci_helpers/doctest.py
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Start vsftpd
+        if: startsWith(matrix.os, 'ubuntu')
+        timeout-minutes: 2
+        run: |
+          sudo apt-get install vsftpd
+          sudo bash ci_helpers/helpers.sh create_ftp_ftps_servers
+
+      - name: Run integration tests
+        if: startsWith(matrix.os, 'ubuntu')
+        run: python ci_helpers/run_integration_tests.py
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Run benchmarks
+        if: startsWith(matrix.os, 'ubuntu')
+        run: python ci_helpers/run_benchmarks.py
+        env:
+          SO_BUCKET: smart-open
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      #
+      # The test_coverage environment in tox.ini generates coverage data and
+      # saves it to disk.  This step uploads that data.  We do it
+      # separately from the tox env because the upload can fail for various
+      # reasons (e.g. https://github.com/lemurheavy/coveralls-public/issues/1392)
+      # and we don't want it to break the build.
+      #
+      # Looks like there's a github action for this
+      # (https://github.com/coverallsapp/github-action/issues/30) but it does
+      # not work with pytest output.
+      #
+      # - name: Upload code coverage to coveralls.io
+      #   if: ${{ matrix.coveralls }}
+      #   continue-on-error: true
+      #   env:
+      #     GITHUB_TOKEN: ${{ github.token }}
+      #   run: |
+      #     pip install coveralls
+      #     coveralls
