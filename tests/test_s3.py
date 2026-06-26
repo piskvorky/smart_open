@@ -1064,8 +1064,10 @@ class IterBucketCredentialsTest(unittest.TestCase):
             smart_open.s3.iter_bucket(
                 BUCKET_NAME,
                 workers=1,
-                aws_access_key_id='access_id',
-                aws_secret_access_key='access_secret'
+                session_kwargs={
+                    'aws_access_key_id': 'access_id',
+                    'aws_secret_access_key': 'access_secret',
+                },
             )
         )
         self.assertEqual(len(result), num_keys)

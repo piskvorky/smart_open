@@ -1342,7 +1342,7 @@ def iter_bucket(
     retries=3,
     max_threads_per_fileobj=4,
     client_kwargs=None,
-    **session_kwargs,  # double star notation for backwards compatibility
+    session_kwargs=None,
 ):
     """
     Iterate and download all S3 objects under `s3://bucket_name/prefix`.
@@ -1386,9 +1386,8 @@ def iter_bucket(
 
     Notes
     -----
-    The keys are processed in parallel, using `workers` processes (default: 16),
-    to speed up downloads greatly. If multiprocessing is not available, thus
-    _MULTIPROCESSING is False, this parameter will be ignored.
+    The keys are processed in parallel, using `workers` threads (default: 16),
+    to speed up downloads greatly.
 
     Examples
     --------
@@ -1422,6 +1421,8 @@ def iter_bucket(
 
     # thread-safe client to share across _list_bucket and _download_key calls
     # https://github.com/boto/boto3/blob/1.38.41/docs/source/guide/clients.rst?plain=1#L111
+    if session_kwargs is None:
+        session_kwargs = {}
     session = boto3.session.Session(**session_kwargs)
     if client_kwargs is None:
         client_kwargs = {}
