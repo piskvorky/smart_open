@@ -10,11 +10,13 @@ import boto3
 
 from smart_open import open
 
+logger = logging.getLogger(__name__)
+
 #
 # These are publicly available via play.min.io
 #
 KEY_ID = "Q3AM3UQ867SPQQA43P2F"
-SECRET_KEY = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"  # noqa: S105  # public play.min.io credential
+SECRET_KEY = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"  # public play.min.io credential
 ENDPOINT_URL = "https://play.min.io:9000"
 
 
@@ -25,7 +27,7 @@ def read_boto3():
 
     obj = s3.Object("smart-open-test", "README.rst")
     data = obj.get()["Body"].read()
-    logging.info("read %d bytes via boto3", len(data))  # noqa: LOG015  # standalone script
+    logger.info("read %d bytes via boto3", len(data))
     return data
 
 
@@ -40,11 +42,11 @@ def read_smart_open():
     #
     tp = {}
     if get_default_region() != "us-east-1":
-        logging.info("injecting custom session")  # noqa: LOG015  # standalone script
+        logger.info("injecting custom session")
         tp["session"] = get_minio_session()
     with open(url, transport_params=tp) as fin:
         text = fin.read()
-        logging.info("read %d characters via smart_open", len(text))  # noqa: LOG015  # standalone script
+        logger.info("read %d characters via smart_open", len(text))
         return text
 
 

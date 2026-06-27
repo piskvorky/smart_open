@@ -11,9 +11,9 @@ SCHEME = "missing"
 open = io.open
 
 
-def parse_uri(uri_as_string):  # pragma: no cover  # noqa: D103
-    ...
+def parse_uri(uri_as_string):  # pragma: no cover
+    """No-op stub for test fixture."""
 
 
-def open_uri(uri_as_string, mode, transport_params):  # pragma: no cover  # noqa: D103
-    ...
+def open_uri(uri_as_string, mode, transport_params):  # pragma: no cover
+    """No-op stub for test fixture."""

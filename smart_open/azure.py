@@ -520,11 +520,9 @@ class Writer(io.BufferedIOBase):
         content_length = self._current_part.tell()
         range_stop = self._bytes_uploaded + content_length - 1
 
-        """  # noqa: E501
-        block_id's must be base64 encoded, all the same length, and less than or equal to 64 bytes in size prior
-        to encoding.
-        https://docs.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.blobclient?view=azure-python#stage-block-block-id--data--length-none----kwargs-
-        """
+        # block_id's must be base64 encoded, all the same length, and less than or equal to
+        # 64 bytes in size prior to encoding.
+        # https://docs.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.blobclient?view=azure-python#stage-block-block-id--data--length-none----kwargs-
         zero_padded_part_num = str(part_num).zfill(64 // 2)
         block_id = base64.b64encode(zero_padded_part_num.encode())
         self._current_part.seek(0)

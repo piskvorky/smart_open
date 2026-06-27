@@ -43,11 +43,11 @@ class ByteBufferTest(unittest.TestCase):
         assert len(buf) == 0
 
         contents = b"foo bar baz"
-        buf._bytes = contents  # noqa: SLF001  # test reaches into private state
+        buf._bytes = contents  # test reaches into private state
         assert len(buf) == len(contents)
 
         pos = 4
-        buf._pos = pos  # noqa: SLF001  # test reaches into private state
+        buf._pos = pos  # test reaches into private state
         assert len(buf) == len(contents) - pos
 
     def test_fill_from_reader(self):
@@ -59,7 +59,7 @@ class ByteBufferTest(unittest.TestCase):
         bytes_filled = buf.fill(content_reader)
         assert bytes_filled == CHUNK_SIZE
         assert len(buf) == CHUNK_SIZE
-        assert buf._bytes == contents  # noqa: SLF001  # test reaches into private state
+        assert buf._bytes == contents  # test reaches into private state
 
     def test_fill_from_iterable(self):
         """Fill from iterable."""
@@ -70,7 +70,7 @@ class ByteBufferTest(unittest.TestCase):
         bytes_filled = buf.fill(contents_iter)
         assert bytes_filled == CHUNK_SIZE
         assert len(buf) == CHUNK_SIZE
-        assert buf._bytes == contents  # noqa: SLF001  # test reaches into private state
+        assert buf._bytes == contents  # test reaches into private state
 
     def test_fill_from_list(self):
         """Fill from list."""
@@ -81,7 +81,7 @@ class ByteBufferTest(unittest.TestCase):
         bytes_filled = buf.fill(contents_list)
         assert bytes_filled == CHUNK_SIZE
         assert len(buf) == CHUNK_SIZE
-        assert buf._bytes == contents  # noqa: SLF001  # test reaches into private state
+        assert buf._bytes == contents  # test reaches into private state
 
     def test_fill_multiple(self):
         """Fill multiple."""

@@ -58,9 +58,9 @@ class HttpTest(unittest.TestCase):
         reader = smart_open.http.SeekableBufferedInputBase(URL)
 
         reader.seek(10)
-        assert reader.tell() == 10  # noqa: PLR2004  # test uses inline magic value
+        assert reader.tell() == 10  # test uses inline magic value
         read_bytes = reader.read(size=10)
-        assert reader.tell() == 20  # noqa: PLR2004  # test uses inline magic value
+        assert reader.tell() == 20  # test uses inline magic value
         assert BYTES[10:20] == read_bytes
 
         reader.seek(20)
@@ -81,11 +81,11 @@ class HttpTest(unittest.TestCase):
         read_bytes = reader.read(size=10)
         assert BYTES[10:20] == read_bytes
 
-        assert reader.tell() == 20  # noqa: PLR2004  # test uses inline magic value
+        assert reader.tell() == 20  # test uses inline magic value
         reader.seek(10, whence=smart_open.constants.WHENCE_CURRENT)
-        assert reader.tell() == 30  # noqa: PLR2004  # test uses inline magic value
+        assert reader.tell() == 30  # test uses inline magic value
         read_bytes = reader.read(size=10)
-        assert reader.tell() == 40  # noqa: PLR2004  # test uses inline magic value
+        assert reader.tell() == 40  # test uses inline magic value
         assert BYTES[30:40] == read_bytes
 
     @responses.activate
@@ -99,12 +99,12 @@ class HttpTest(unittest.TestCase):
 
         # Forward seek within buffer using WHENCE_CURRENT - no new GET request
         reader.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-        assert reader.tell() == 6  # noqa: PLR2004  # test uses inline magic value
+        assert reader.tell() == 6  # test uses inline magic value
         assert reader.read(5) == BYTES[6:11]
 
         # Forward seek within buffer using WHENCE_START - no new GET request
         reader.seek(13, whence=smart_open.constants.WHENCE_START)
-        assert reader.tell() == 13  # noqa: PLR2004  # test uses inline magic value
+        assert reader.tell() == 13  # test uses inline magic value
         assert reader.read(3) == BYTES[13:16]
 
         assert len(responses.calls) == initial_calls
@@ -220,7 +220,7 @@ def test_seek_implicitly_disabled():
     with smart_open.open(HTTPS_URL, "rb") as fin:
         assert not fin.seekable()
         fin.read()
-        with pytest.raises(OSError):  # noqa: PT011  # legacy broad pytest.raises
+        with pytest.raises(OSError, match="stream is not seekable"):
             fin.seek(0)
 
 

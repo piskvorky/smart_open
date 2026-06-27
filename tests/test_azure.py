@@ -286,8 +286,10 @@ class FakeBlobServiceClient:
     @classmethod
     def from_connection_string(cls, conn_str, credential=None, **kwargs):
         """From connection string."""
-        account_url, secondary, credential = azure.storage.blob._shared.base_client.parse_connection_str(  # noqa: SLF001  # test reaches into private state
-            conn_str, credential, "blob"
+        account_url, secondary, credential = (
+            azure.storage.blob._shared.base_client.parse_connection_str(  # test reaches into private state
+                conn_str, credential, "blob"
+            )
         )
         if "secondary_hostname" not in kwargs:
             kwargs["secondary_hostname"] = secondary
@@ -394,10 +396,11 @@ def put_to_container(blob_name, contents, num_attempts=12, sleep_time=5):
         try:
             container_client = get_container_client()
             container_client.upload_blob(blob_name, contents)
-            return  # noqa: TRY300  # explicit try/except shape
-        except azure.common.AzureHttpError as err:  # noqa: PERF203  # try/except in test loop
-            logger.exception("caught %r, retrying", err)  # noqa: TRY401  # verbose log in test
+        except azure.common.AzureHttpError:  # noqa: PERF203  # try/except in test loop
+            logger.exception("caught error, retrying")
             time.sleep(sleep_time)
+        else:
+            return
 
     msg = f"failed to create container {CONTAINER_NAME} after {num_attempts} attempts"
     raise AssertionError(msg)
@@ -494,8 +497,8 @@ class ReaderTest(unittest.TestCase):
 
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         seek = fin.seek(6)
-        assert seek == 6  # noqa: PLR2004  # test uses inline magic value
-        assert fin.tell() == 6  # noqa: PLR2004  # test uses inline magic value
+        assert seek == 6  # test uses inline magic value
+        assert fin.tell() == 6  # test uses inline magic value
         assert fin.read(6) == "wořld".encode()
 
     def test_seek_current(self):
@@ -507,7 +510,7 @@ class ReaderTest(unittest.TestCase):
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         assert fin.read(5) == b"hello"
         seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-        assert seek == 6  # noqa: PLR2004  # test uses inline magic value
+        assert seek == 6  # test uses inline magic value
         assert fin.read(6) == "wořld".encode()
 
     def test_seek_end(self):
@@ -532,18 +535,18 @@ class ReaderTest(unittest.TestCase):
 
         # Account for the initial download_blob call from the read above.
         with unittest.mock.patch.object(
-            fin._blob,  # noqa: SLF001  # test reaches into private state
+            fin._blob,  # test reaches into private state
             "download_blob",
-            wraps=fin._blob.download_blob,  # noqa: SLF001  # test reaches into private state
+            wraps=fin._blob.download_blob,  # test reaches into private state
         ) as mock_download:
             # Forward seek within buffer using WHENCE_CURRENT - no new download
             seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-            assert seek == 6  # noqa: PLR2004  # test uses inline magic value
+            assert seek == 6  # test uses inline magic value
             assert fin.read(6) == "wořld".encode()
 
             # Forward seek within buffer using WHENCE_START - no new download
             seek = fin.seek(13, whence=smart_open.constants.WHENCE_START)
-            assert seek == 13  # noqa: PLR2004  # test uses inline magic value
+            assert seek == 13  # test uses inline magic value
             assert fin.read(3) == b"how"
 
             mock_download.assert_not_called()
@@ -828,7 +831,7 @@ class WriterTest(unittest.TestCase):
         logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
             fout.write("testžížáč".encode())
-            assert fout.tell() == 14  # noqa: PLR2004  # test uses inline magic value
+            assert fout.tell() == 14  # test uses inline magic value
 
     def test_write_03(self):
         """Do multiple writes less than the min_part_size work correctly?"""
@@ -844,22 +847,26 @@ class WriterTest(unittest.TestCase):
             first_part = b"t" * 262141
             fout.write(first_part)
             local_write.write(first_part)
-            assert fout._current_part.tell() == 262141  # noqa: PLR2004, SLF001  # test uses inline magic value; test reaches into private state
+            assert (
+                fout._current_part.tell() == 262141
+            )  # test uses inline magic value; test reaches into private state
             second_part = b"t\n"
             fout.write(second_part)
             local_write.write(second_part)
-            assert fout._current_part.tell() == 262143  # noqa: PLR2004, SLF001  # test uses inline magic value; test reaches into private state
-            assert fout._total_parts == 0  # noqa: SLF001  # test reaches into private state
+            assert (
+                fout._current_part.tell() == 262143
+            )  # test uses inline magic value; test reaches into private state
+            assert fout._total_parts == 0  # test reaches into private state
             third_part = b"t"
             fout.write(third_part)
             local_write.write(third_part)
-            assert fout._current_part.tell() == 0  # noqa: SLF001  # test reaches into private state
-            assert fout._total_parts == 1  # noqa: SLF001  # test reaches into private state
+            assert fout._current_part.tell() == 0  # test reaches into private state
+            assert fout._total_parts == 1  # test reaches into private state
             fourth_part = b"t" * 1
             fout.write(fourth_part)
             local_write.write(fourth_part)
-            assert fout._current_part.tell() == 1  # noqa: SLF001  # test reaches into private state
-            assert fout._total_parts == 1  # noqa: SLF001  # test reaches into private state
+            assert fout._current_part.tell() == 1  # test reaches into private state
+            assert fout._total_parts == 1  # test reaches into private state
         # read back the same key and check its content
         uri = f"azure://{CONTAINER_NAME}/{blob_name}"
         output = list(smart_open.open(uri, transport_params={"client": CLIENT}))
@@ -881,8 +888,8 @@ class WriterTest(unittest.TestCase):
                 part = b"t" * min_part_size
                 fout.write(part)
                 local_write.write(part)
-                assert fout._current_part.tell() == 0  # noqa: SLF001  # test reaches into private state
-                assert fout._total_parts == i  # noqa: SLF001  # test reaches into private state
+                assert fout._current_part.tell() == 0  # test reaches into private state
+                assert fout._total_parts == i  # test reaches into private state
         # read back the same key and check its content
         uri = f"azure://{CONTAINER_NAME}/{blob_name}"
         output = list(smart_open.open(uri, transport_params={"client": CLIENT}))
@@ -1048,8 +1055,9 @@ class AppendWriterTest(unittest.TestCase):
 
         fout = smart_open.azure.AppendWriter(CONTAINER_NAME, blob_name, CLIENT)
         fout.write(test_string)
-        with self.assertRaises(  # noqa: PT027  # legacy unittest assertRaises
-            azure.core.exceptions.ResourceExistsError, msg="The blob type is invalid for this operation."
+        with pytest.raises(
+            azure.core.exceptions.ResourceExistsError,
+            match="The blob type is invalid for this operation",
         ):
             fout.close()
         # close() raised, but the writer must still mark itself closed so that
@@ -1149,10 +1157,10 @@ class AppendWriterTest(unittest.TestCase):
             # First write: min_part_size - 1 bytes, should stay in buffer
             first_part = b"x" * (min_part_size - 1)
             fout.write(first_part)
-            assert fout._current_part.tell() == min_part_size - 1  # noqa: SLF001  # test reaches into private state
+            assert fout._current_part.tell() == min_part_size - 1  # test reaches into private state
             # Second write: 1 byte reaches min_part_size, triggers upload
             fout.write(b"y")
-            assert fout._current_part.tell() == 0  # noqa: SLF001  # test reaches into private state
+            assert fout._current_part.tell() == 0  # test reaches into private state
         # Verify the data was written correctly
         output = list(
             smart_open.open(

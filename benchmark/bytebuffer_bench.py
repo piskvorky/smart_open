@@ -11,7 +11,7 @@ def raw_bytebuffer_benchmark():
 
     start = time.time()
     for _ in range(10_000):
-        assert buffer.fill([b"X" * 1000]) == 1000  # noqa: PLR2004  # benchmark size
+        assert buffer.fill([b"X" * 1000]) == 1000  # benchmark size
     return time.time() - start
 
 
@@ -23,7 +23,7 @@ def file_read_benchmark(filename):
     read = file.read(100_000_000)
     end = time.time()
 
-    if len(read) < 100_000_000:  # noqa: PLR2004  # benchmark size
+    if len(read) < 100_000_000:  # benchmark size
         print("File smaller than 100MB")
 
     return end - start

@@ -10,7 +10,7 @@ class TransportTest(unittest.TestCase):
 
     def test_registry_requires_declared_schemes(self):
         """Registry requires declared schemes."""
-        with pytest.raises(ValueError):  # noqa: PT011  # legacy broad pytest.raises
+        with pytest.raises(ValueError, match=r"does not have a \.SCHEME or \.SCHEMES attribute"):
             register_transport("tests.fixtures.no_schemes_transport")
 
     def test_registry_errors_on_double_register_scheme(self):

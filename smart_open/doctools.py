@@ -224,8 +224,8 @@ def tweak_open_docstring(f):
     body_pad = LPAD + "    "
 
     with contextlib.redirect_stdout(buf):
-        print(f"{LPAD}Transports:")  # noqa: T201  # builds docstring via redirect_stdout
-        print()  # noqa: T201
+        print(f"{LPAD}Transports:")  # builds docstring via redirect_stdout
+        print()
         for scheme, submodule in sorted(transport._REGISTRY.items()):  # noqa: SLF001  # intra-package coupling
             if scheme == transport.NO_SCHEME or submodule in seen:
                 continue
@@ -238,28 +238,28 @@ def tweak_open_docstring(f):
 
             relpath = Path(submodule.__file__).relative_to(root_path)
             heading = "{} ({})".format("/".join(schemes), relpath)
-            print(f"{body_pad}{heading}")  # noqa: T201
-            print(f"{body_pad}{'~' * len(heading)}")  # noqa: T201
-            print(f"{body_pad}{submodule.__doc__.split(chr(10))[0]}")  # noqa: T201
-            print()  # noqa: T201
+            print(f"{body_pad}{heading}")
+            print(f"{body_pad}{'~' * len(heading)}")
+            print(f"{body_pad}{submodule.__doc__.split(chr(10))[0]}")
+            print()
 
             kwargs = extract_kwargs(submodule.open.__doc__)
             if kwargs:
-                print(to_docstring(kwargs, lpad=body_pad))  # noqa: T201
+                print(to_docstring(kwargs, lpad=body_pad))
 
-        print(f"{LPAD}Examples:")  # noqa: T201
-        print()  # noqa: T201
-        print(extract_examples_from_readme_rst(indent=body_pad))  # noqa: T201
+        print(f"{LPAD}Examples:")
+        print()
+        print(extract_examples_from_readme_rst(indent=body_pad))
 
-        print(f"{LPAD}Codecs:")  # noqa: T201
-        print()  # noqa: T201
-        print(f"{body_pad}smart_open supports transparent compression and decompression for files")  # noqa: T201
-        print(f"{body_pad}with the following extensions:")  # noqa: T201
-        print()  # noqa: T201
+        print(f"{LPAD}Codecs:")
+        print()
+        print(f"{body_pad}smart_open supports transparent compression and decompression for files")
+        print(f"{body_pad}with the following extensions:")
+        print()
         for extension in compression.get_supported_extensions():
-            print(f"{body_pad}* {extension}")  # noqa: T201
-        print()  # noqa: T201
-        print(f"{body_pad}The codec is selected based on the file extension.")  # noqa: T201
+            print(f"{body_pad}* {extension}")
+        print()
+        print(f"{body_pad}The codec is selected based on the file extension.")
 
     #
     # The docstring can be None if -OO was passed to the interpreter.
@@ -292,15 +292,15 @@ def tweak_parse_uri_docstring(f):
     body_pad = LPAD + "    "
 
     with contextlib.redirect_stdout(buf):
-        print(f"{LPAD}Schemes:")  # noqa: T201
-        print()  # noqa: T201
+        print(f"{LPAD}Schemes:")
+        print()
         for scheme in schemes:
-            print(f"{body_pad}* {scheme}")  # noqa: T201
-        print()  # noqa: T201
-        print(f"{LPAD}Examples:")  # noqa: T201
-        print()  # noqa: T201
+            print(f"{body_pad}* {scheme}")
+        print()
+        print(f"{LPAD}Examples:")
+        print()
         for example in examples:
-            print(f"{body_pad}* {example}")  # noqa: T201
+            print(f"{body_pad}* {example}")
 
     if f.__doc__:
         f.__doc__ = f.__doc__.replace(PLACEHOLDER, buf.getvalue())

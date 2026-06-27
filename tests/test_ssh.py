@@ -15,7 +15,7 @@ def mock_ssh(func):
     """Mock ssh."""
 
     def wrapper(*args, **kwargs):
-        smart_open.ssh._SSH.clear()  # noqa: SLF001  # test reaches into private state
+        smart_open.ssh._SSH.clear()  # test reaches into private state
         return func(*args, **kwargs)
 
     return mock.patch("paramiko.SSHClient.get_transport")(mock.patch("paramiko.SSHClient.connect")(wrapper))
@@ -26,24 +26,28 @@ class SSHOpen(unittest.TestCase):
 
     def setUp(self):
         """SetUp."""
-        self._cfg_files = smart_open.ssh._SSH_CONFIG_FILES  # noqa: SLF001  # test reaches into private state
-        smart_open.ssh._SSH_CONFIG_FILES = [_CONFIG_PATH]  # noqa: SLF001  # test reaches into private state
+        self._cfg_files = smart_open.ssh._SSH_CONFIG_FILES  # test reaches into private state
+        smart_open.ssh._SSH_CONFIG_FILES = [_CONFIG_PATH]  # test reaches into private state
 
     def tearDown(self):
         """TearDown."""
-        smart_open.ssh._SSH_CONFIG_FILES = self._cfg_files  # noqa: SLF001  # test reaches into private state
+        smart_open.ssh._SSH_CONFIG_FILES = self._cfg_files  # test reaches into private state
 
     @mock_ssh
     def test_open(self, mock_connect, get_transp_mock):
         """Open."""
         smart_open.open("ssh://user:pass@some-host/")
-        mock_connect.assert_called_with("some-host", 22, username="user", password="pass")  # noqa: S106  # fixture password kwarg
+        mock_connect.assert_called_with(
+            "some-host", 22, username="user", password="pass"
+        )  # fixture password kwarg
 
     @mock_ssh
     def test_percent_encoding(self, mock_connect, get_transp_mock):
         """Percent encoding."""
         smart_open.open("ssh://user%3a:pass%40@some-host/")
-        mock_connect.assert_called_with("some-host", 22, username="user:", password="pass@")  # noqa: S106  # fixture password kwarg
+        mock_connect.assert_called_with(
+            "some-host", 22, username="user:", password="pass@"
+        )  # fixture password kwarg
 
     @mock_ssh
     def test_open_without_password(self, mock_connect, get_transp_mock):
@@ -58,7 +62,9 @@ class SSHOpen(unittest.TestCase):
             "ssh://user:pass@some-host/",
             transport_params={"connect_kwargs": {"username": "ubuntu", "password": "pwd"}},
         )
-        mock_connect.assert_called_with("some-host", 22, username="ubuntu", password="pwd")  # noqa: S106  # fixture password kwarg
+        mock_connect.assert_called_with(
+            "some-host", 22, username="ubuntu", password="pwd"
+        )  # fixture password kwarg
 
     @mock_ssh
     def test_open_with_key_filename(self, mock_connect, get_transp_mock):
@@ -77,7 +83,7 @@ class SSHOpen(unittest.TestCase):
 
         def mocked_open_sftp():
             if (
-                len(mock_connect.call_args_list) < 2  # noqa: PLR2004  # test uses inline magic value
+                len(mock_connect.call_args_list) < 2  # test uses inline magic value
             ):  # simulate timeout until second connect()
                 yield SSHException("SSH session not active")
             while True:
@@ -86,7 +92,9 @@ class SSHOpen(unittest.TestCase):
         get_transp_mock().open_sftp_client.side_effect = mocked_open_sftp()
 
         smart_open.open("ssh://user:pass@some-host/")
-        mock_connect.assert_called_with("some-host", 22, username="user", password="pass")  # noqa: S106  # fixture password kwarg
+        mock_connect.assert_called_with(
+            "some-host", 22, username="user", password="pass"
+        )  # fixture password kwarg
         mock_sftp.open.assert_called_once()
 
     @mock_ssh

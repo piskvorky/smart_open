@@ -32,6 +32,8 @@ import logging
 import os
 import sys
 
+logger = logging.getLogger(__name__)
+
 
 def extract_preamble(fin):
     """Split ``fin`` into preamble (leading `#` lines) and body lines."""
@@ -64,7 +66,7 @@ def main():
         preamble, body = extract_preamble(fin)
 
     for line in preamble:
-        logging.info("%s: %s", args.path, line.rstrip())  # noqa: LOG015  # release script
+        logger.info("%s: %s", args.path, line.rstrip())
 
     if not args.replace:
         sys.exit(0)

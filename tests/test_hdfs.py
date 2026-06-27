@@ -6,7 +6,7 @@
 #
 import gzip
 import os
-import os.path as P  # noqa: N812  # lowercase alias
+import os.path
 import subprocess
 import sys
 from unittest import mock
@@ -15,7 +15,7 @@ import pytest
 
 import smart_open.hdfs
 
-CURR_DIR = P.dirname(P.abspath(__file__))  # noqa: PTH100, PTH120  # test fixture abspath; test fixture dirname
+CURR_DIR = os.path.dirname(os.path.abspath(__file__))  # noqa: PTH100, PTH120  # test fixture abspath; test fixture dirname
 if sys.platform.startswith("win"):
     pytest.skip("these tests don't work under Windows", allow_module_level=True)
 
@@ -34,13 +34,13 @@ if sys.platform.startswith("win"):
 #
 def cat(path=None):
     """Cat."""
-    command = [sys.executable, P.abspath(__file__)]  # noqa: PTH100  # test fixture abspath
+    command = [sys.executable, os.path.abspath(__file__)]  # noqa: PTH100  # test fixture abspath
     if path:
         command.append(path)
     return subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)  # noqa: S603  # subprocess in test helper
 
 
-CAP_PATH = P.join(CURR_DIR, "test_data", "crime-and-punishment.txt")  # noqa: PTH118  # test fixture path join
+CAP_PATH = os.path.join(CURR_DIR, "test_data", "crime-and-punishment.txt")  # noqa: PTH118  # test fixture path join
 with open(CAP_PATH, encoding="utf-8") as fin:  # noqa: PTH123  # test fixture path open
     CRIME_AND_PUNISHMENT = fin.read()
 
@@ -48,10 +48,10 @@ with open(CAP_PATH, encoding="utf-8") as fin:  # noqa: PTH123  # test fixture pa
 @pytest.mark.parametrize(
     ("uri", "expected_path"),
     [
-        ("hdfs:///tmp/test.txt", "/tmp/test.txt"),  # noqa: S108  # tmp path in test
+        ("hdfs:///tmp/test.txt", "/tmp/test.txt"),  # tmp path in test
         ("hdfs://host/tmp/test.txt", "hdfs://host/tmp/test.txt"),
         ("hdfs://host:8020/tmp/test.txt", "hdfs://host:8020/tmp/test.txt"),
-        ("viewfs:///tmp/test.txt", "/tmp/test.txt"),  # noqa: S108  # tmp path in test
+        ("viewfs:///tmp/test.txt", "/tmp/test.txt"),  # tmp path in test
         ("viewfs://cluster/tmp/test.txt", "viewfs://cluster/tmp/test.txt"),
     ],
 )
@@ -72,7 +72,7 @@ def test_sanity_read_bytes():
     """Sanity read bytes."""
     with open(CAP_PATH, "rb") as fin:  # noqa: PTH123  # test fixture path open
         lines = list(fin)
-    assert len(lines) == 3  # noqa: PLR2004  # test uses inline magic value
+    assert len(lines) == 3  # test uses inline magic value
 
 
 def test_sanity_read_text():

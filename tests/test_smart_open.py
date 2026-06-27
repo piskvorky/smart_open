@@ -54,7 +54,7 @@ _resource = functools.partial(boto3.resource, region_name="us-east-1")
 # https://stackoverflow.com/a/58955530
 #
 @contextlib.contextmanager
-def named_temporary_file(mode="w+b", prefix=None, suffix=None, delete=True):  # noqa: FBT002
+def named_temporary_file(mode="w+b", prefix=None, suffix=None, *, delete=True):
     """Named temporary file."""
     filename = io.StringIO()
     if prefix:
@@ -69,11 +69,11 @@ def named_temporary_file(mode="w+b", prefix=None, suffix=None, delete=True):  # 
     if delete:
         try:
             os.unlink(pathname)  # noqa: PTH108  # test fixture unlink
-        except PermissionError as e:
+        except PermissionError:
             #
             # This can happen on Windows for unknown reasons.
             #
-            logger.exception(e)  # noqa: TRY401  # verbose log in test
+            logger.exception("failed to unlink temporary file")
 
 
 def test_compression_kwargs_changes_gzip_output_size():
@@ -139,19 +139,22 @@ class ParseUriTest(unittest.TestCase):
             "gs",
             "azure",
         ):
-            parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")  # noqa: SLF001  # test reaches into private state
+            parsed_uri = smart_open_lib._parse_uri(
+                scheme + "://mybucket/mykey"
+            )  # test reaches into private state
             assert parsed_uri.scheme == scheme
 
         # unsupported scheme => NotImplementedError
-        self.assertRaises(NotImplementedError, smart_open_lib._parse_uri, "foobar://mybucket/mykey")  # noqa: PT027, SLF001  # legacy unittest assertRaises; test reaches into private state
+        with pytest.raises(NotImplementedError):
+            smart_open_lib._parse_uri("foobar://mybucket/mykey")  # test reaches into private state
         # unknown scheme => default_scheme
-        parsed_uri = smart_open_lib._parse_uri("blah blah")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri("blah blah")  # test reaches into private state
         assert parsed_uri.scheme == "file"
 
     def test_s3_uri(self):
         """Do S3 URIs parse correctly?"""
         # correct uri without credentials
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey")  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mykey"
@@ -160,7 +163,7 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_contains_slash(self):
         """S3 uri contains slash."""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey")  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mydir/mykey"
@@ -169,79 +172,95 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_with_credentials(self):
         """S3 uri with credentials."""
-        parsed_uri = smart_open_lib._parse_uri("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mykey"
         assert parsed_uri.access_id == "ACCESSID456"
-        assert parsed_uri.access_secret == "acces/sse_cr-et"  # noqa: S105  # fixture password literal
+        assert parsed_uri.access_secret == "acces/sse_cr-et"  # fixture password literal
 
     def test_s3_uri_with_credentials2(self):
         """S3 uri with credentials2."""
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/mykey")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://accessid:access/secret@mybucket/mykey"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mykey"
         assert parsed_uri.access_id == "accessid"
-        assert parsed_uri.access_secret == "access/secret"  # noqa: S105  # fixture password literal
+        assert parsed_uri.access_secret == "access/secret"  # fixture password literal
 
     def test_s3_uri_has_atmark_in_key_name(self):
         """S3 uri has atmark in key name."""
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/my@ke@y")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://accessid:access/secret@mybucket/my@ke@y"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "my@ke@y"
         assert parsed_uri.access_id == "accessid"
-        assert parsed_uri.access_secret == "access/secret"  # noqa: S105  # fixture password literal
+        assert parsed_uri.access_secret == "access/secret"  # fixture password literal
 
     #
     # Nb. should never happen in theory, but if it does, we should avoid crashing
     #
     def test_s3_uri_has_colon_in_secret(self):
         """S3 uri has colon in secret."""
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret:totally@mybucket/my@ke@y")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://accessid:access/secret:totally@mybucket/my@ke@y"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "my@ke@y"
         assert parsed_uri.access_id == "accessid"
-        assert parsed_uri.access_secret == "access/secret:totally"  # noqa: S105  # fixture password literal
+        assert parsed_uri.access_secret == "access/secret:totally"  # fixture password literal
 
     def test_s3_handles_fragments(self):
         """S3 handles fragments."""
         uri_str = "s3://bucket-name/folder/picture #1.jpg"
-        parsed_uri = smart_open_lib._parse_uri(uri_str)  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(uri_str)  # test reaches into private state
         assert parsed_uri.key_id == "folder/picture #1.jpg"
 
     def test_s3_handles_querystring(self):
         """S3 handles querystring."""
         uri_str = "s3://bucket-name/folder/picture1.jpg?bar"
-        parsed_uri = smart_open_lib._parse_uri(uri_str)  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(uri_str)  # test reaches into private state
         assert parsed_uri.key_id == "folder/picture1.jpg?bar"
 
     def test_webhdfs_uri_to_http(self):
         """Webhdfs uri to http."""
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "webhdfs://host:14000/path/file"
+        )  # test reaches into private state
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path/file"
         assert actual == expected
 
     def test_webhdfs_uri_to_http_with_query(self):
         """Webhdfs uri to http with query."""
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file?a=1")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "webhdfs://host:14000/path/file?a=1"
+        )  # test reaches into private state
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path/file?a=1"
         assert actual == expected
 
     def test_webhdfs_uri_to_http_with_user(self):
         """Webhdfs uri to http with user."""
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "webhdfs://user@host:14000/path"
+        )  # test reaches into private state
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path?user.name=user"
         assert actual == expected
 
     def test_webhdfs_uri_to_http_with_user_and_query(self):
         """Webhdfs uri to http with user and query."""
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path?a=1")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "webhdfs://user@host:14000/path?a=1"
+        )  # test reaches into private state
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path?a=1&user.name=user"
         assert actual == expected
@@ -249,7 +268,7 @@ class ParseUriTest(unittest.TestCase):
     def test_uri_from_issue_223_works(self):
         """Uri from issue 223 works."""
         uri = "s3://:@omax-mis/twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6"
-        parsed_uri = smart_open_lib._parse_uri(uri)  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(uri)  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "omax-mis"
         assert parsed_uri.key_id == "twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6"
@@ -258,7 +277,9 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_with_colon_in_key_name(self):
         """Correctly parse the s3 url if there is a colon in the key or dir."""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/my:key")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://mybucket/mydir/my:key"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mydir/my:key"
@@ -267,7 +288,9 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_with_at_symbol_in_key_name0(self):
         """Correctly parse the s3 url if there is an @ symbol (and colon) in the key or dir."""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir:my@key")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://mybucket/mydir:my@key"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mydir:my@key"
@@ -276,7 +299,9 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_with_at_symbol_in_key_name1(self):
         """Correctly parse the s3 url if there is an @ symbol (and colon) in the key or dir."""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/my:dir@my/key")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://mybucket/my:dir@my/key"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "my:dir@my/key"
@@ -285,7 +310,9 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_contains_question_mark(self):
         """S3 uri contains question mark."""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey?param")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://mybucket/mydir/mykey?param"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mydir/mykey?param"
@@ -293,7 +320,9 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_version_id(self):
         """Does ?versionId=... in an S3 URI populate version_id?"""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey?versionId=v1")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://mybucket/mydir/mykey?versionId=v1"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mydir/mykey"
@@ -301,57 +330,63 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_version_id_with_other_params(self):
         """Are non-versionId query params preserved on the key?"""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey?versionId=v1&other=keep")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://mybucket/mykey?versionId=v1&other=keep"
+        )  # test reaches into private state
         assert parsed_uri.key_id == "mykey?other=keep"
         assert parsed_uri.version_id == "v1"
 
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey?other=keep&versionId=v1")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://mybucket/mykey?other=keep&versionId=v1"
+        )  # test reaches into private state
         assert parsed_uri.key_id == "mykey?other=keep"
         assert parsed_uri.version_id == "v1"
 
     def test_s3_uri_no_version_id_when_no_match(self):
         """``versionId`` is only extracted when the key matches exactly."""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey?versionIdLookalike=foo")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "s3://mybucket/mykey?versionIdLookalike=foo"
+        )  # test reaches into private state
         assert parsed_uri.key_id == "mykey?versionIdLookalike=foo"
         assert parsed_uri.version_id is None
 
     def test_leading_slash_local_file(self):
         """Leading slash local file."""
         path = "/home/misha/hello.txt"
-        uri = smart_open_lib._parse_uri(path)  # noqa: SLF001  # test reaches into private state
+        uri = smart_open_lib._parse_uri(path)  # test reaches into private state
         assert uri.scheme == "file"
         assert uri.uri_path == path
 
-        uri = smart_open_lib._parse_uri("//" + path)  # noqa: SLF001  # test reaches into private state
+        uri = smart_open_lib._parse_uri("//" + path)  # test reaches into private state
         assert uri.scheme == "file"
         assert uri.uri_path == "//" + path
 
     def test_ssh(self):
         """Ssh."""
         as_string = "ssh://user@host:1234/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
+        uri = smart_open_lib._parse_uri(as_string)  # test reaches into private state
         assert uri.scheme == "ssh"
         assert uri.uri_path == "/path/to/file"
         assert uri.user == "user"
         assert uri.host == "host"
-        assert uri.port == 1234  # noqa: PLR2004  # test uses inline magic value
+        assert uri.port == 1234  # test uses inline magic value
         assert uri.password is None
 
     def test_ssh_with_pass(self):
         """Ssh with pass."""
         as_string = "ssh://user:pass@host:1234/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
+        uri = smart_open_lib._parse_uri(as_string)  # test reaches into private state
         assert uri.scheme == "ssh"
         assert uri.uri_path == "/path/to/file"
         assert uri.user == "user"
         assert uri.host == "host"
-        assert uri.port == 1234  # noqa: PLR2004  # test uses inline magic value
-        assert uri.password == "pass"  # noqa: S105  # fixture password literal
+        assert uri.port == 1234  # test uses inline magic value
+        assert uri.password == "pass"  # fixture password literal
 
     def test_scp(self):
         """Scp."""
         as_string = "scp://user@host:/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
+        uri = smart_open_lib._parse_uri(as_string)  # test reaches into private state
         assert uri.scheme == "scp"
         assert uri.uri_path == "/path/to/file"
         assert uri.user == "user"
@@ -362,18 +397,18 @@ class ParseUriTest(unittest.TestCase):
     def test_scp_with_pass(self):
         """Scp with pass."""
         as_string = "scp://user:pass@host:/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
+        uri = smart_open_lib._parse_uri(as_string)  # test reaches into private state
         assert uri.scheme == "scp"
         assert uri.uri_path == "/path/to/file"
         assert uri.user == "user"
         assert uri.host == "host"
         assert uri.port is None
-        assert uri.password == "pass"  # noqa: S105  # fixture password literal
+        assert uri.password == "pass"  # fixture password literal
 
     def test_sftp(self):
         """Sftp."""
         as_string = "sftp://host/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
+        uri = smart_open_lib._parse_uri(as_string)  # test reaches into private state
         assert uri.scheme == "sftp"
         assert uri.uri_path == "/path/to/file"
         assert uri.user is None
@@ -384,45 +419,51 @@ class ParseUriTest(unittest.TestCase):
     def test_sftp_with_user_and_pass(self):
         """Sftp with user and pass."""
         as_string = "sftp://user:pass@host:2222/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
+        uri = smart_open_lib._parse_uri(as_string)  # test reaches into private state
         assert uri.scheme == "sftp"
         assert uri.uri_path == "/path/to/file"
         assert uri.user == "user"
         assert uri.host == "host"
-        assert uri.port == 2222  # noqa: PLR2004  # test uses inline magic value
-        assert uri.password == "pass"  # noqa: S105  # fixture password literal
+        assert uri.port == 2222  # test uses inline magic value
+        assert uri.password == "pass"  # fixture password literal
 
     def test_ssh_complex_password_with_colon(self):
         """Ssh complex password with colon."""
         as_string = "sftp://user:some:complex@password$$@host:2222/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
-        assert uri.password == "some:complex@password$$"  # noqa: S105  # fixture password literal
+        uri = smart_open_lib._parse_uri(as_string)  # test reaches into private state
+        assert uri.password == "some:complex@password$$"  # fixture password literal
 
     def test_gcs_uri(self):
         """Do GCS URIs parse correctly?"""
         # correct uri without credentials
-        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/myblob")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/myblob")  # test reaches into private state
         assert parsed_uri.scheme == "gcs"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.blob_id == "myblob"
 
     def test_gcs_uri_contains_slash(self):
         """Gcs uri contains slash."""
-        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/mydir/myblob")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "gcs://mybucket/mydir/myblob"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "gcs"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.blob_id == "mydir/myblob"
 
     def test_gcs_uri_contains_question_mark(self):
         """Gcs uri contains question mark."""
-        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/mydir/myblob?param")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "gcs://mybucket/mydir/myblob?param"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "gcs"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.blob_id == "mydir/myblob?param"
 
     def test_gs_uri_backwards_compat(self):
         """``gs://`` keeps working as a backwards-compat alias of ``gcs://``."""
-        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "gs://mybucket/mydir/myblob"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "gs"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.blob_id == "mydir/myblob"
@@ -430,21 +471,25 @@ class ParseUriTest(unittest.TestCase):
     def test_azure_blob_uri(self):
         """Do Azure Blob URIs parse correctly?"""
         # correct uri without credentials
-        parsed_uri = smart_open_lib._parse_uri("azure://mycontainer/myblob")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "azure://mycontainer/myblob"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "azure"
         assert parsed_uri.container_id == "mycontainer"
         assert parsed_uri.blob_id == "myblob"
 
     def test_azure_blob_uri_root_container(self):
         """Azure blob uri root container."""
-        parsed_uri = smart_open_lib._parse_uri("azure://myblob")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri("azure://myblob")  # test reaches into private state
         assert parsed_uri.scheme == "azure"
         assert parsed_uri.container_id == "$root"
         assert parsed_uri.blob_id == "myblob"
 
     def test_azure_blob_uri_contains_slash(self):
         """Azure blob uri contains slash."""
-        parsed_uri = smart_open_lib._parse_uri("azure://mycontainer/mydir/myblob")  # noqa: SLF001  # test reaches into private state
+        parsed_uri = smart_open_lib._parse_uri(
+            "azure://mycontainer/mydir/myblob"
+        )  # test reaches into private state
         assert parsed_uri.scheme == "azure"
         assert parsed_uri.container_id == "mycontainer"
         assert parsed_uri.blob_id == "mydir/myblob"
@@ -481,7 +526,7 @@ class ParseUriTest(unittest.TestCase):
         try:
             with path.open("r", encoding="utf-8") as infile:
                 lines = infile.readlines()
-            assert len(lines) == 3  # noqa: PLR2004  # test uses inline magic value
+            assert len(lines) == 3  # test uses inline magic value
         finally:
             _patch_pathlib(obj.old_impl)
 
@@ -503,7 +548,7 @@ class SmartOpenHttpTest(unittest.TestCase):
             "rb",
             host="ip_address",
             user="ubuntu",
-            password="pass",  # noqa: S106  # fixture password kwarg
+            password="pass",  # fixture password kwarg
             port=1022,
         )
 
@@ -546,7 +591,7 @@ class SmartOpenHttpTest(unittest.TestCase):
         assert cert_path == actual_request.req_kwargs["cert"]
 
     @responses.activate
-    def _test_compressed_http(self, suffix, query):
+    def _test_compressed_http(self, suffix, *, query):
         """Can open <suffix> via http?"""
         assert suffix in (".gz", ".bz2")
 
@@ -561,19 +606,19 @@ class SmartOpenHttpTest(unittest.TestCase):
 
     def test_http_gz(self):
         """Can open gzip via http?"""
-        self._test_compressed_http(".gz", False)  # noqa: FBT003  # boolean positional in mock call
+        self._test_compressed_http(".gz", query=False)
 
     def test_http_bz2(self):
         """Can open bzip2 via http?"""
-        self._test_compressed_http(".bz2", False)  # noqa: FBT003  # boolean positional in mock call
+        self._test_compressed_http(".bz2", query=False)
 
     def test_http_gz_query(self):
         """Can open gzip via http with a query appended to URI?"""
-        self._test_compressed_http(".gz", True)  # noqa: FBT003  # boolean positional in mock call
+        self._test_compressed_http(".gz", query=True)
 
     def test_http_bz2_query(self):
         """Can open bzip2 via http with a query appended to URI?"""
-        self._test_compressed_http(".bz2", True)  # noqa: FBT003  # boolean positional in mock call
+        self._test_compressed_http(".bz2", query=True)
 
 
 class RealFileSystemTests(unittest.TestCase):
@@ -897,7 +942,7 @@ class SmartOpenReadTest(unittest.TestCase):
         reader = smart_open.open("s3://mybucket/mykey", "rb")
 
         actual_lines = [line.decode("utf-8") for line in reader]
-        assert len(actual_lines) == 2  # noqa: PLR2004  # test uses inline magic value
+        assert len(actual_lines) == 2  # test uses inline magic value
         assert lines[0] == actual_lines[0]
         assert lines[1] == actual_lines[1]
 
@@ -929,7 +974,7 @@ class SmartOpenReadTest(unittest.TestCase):
         # call s3_iter_lines and check output
         reader = smart_open.open("s3://mybucket/mykey", "rb")
         output = list(reader)
-        assert len(output) == 2  # noqa: PLR2004  # test uses inline magic value
+        assert len(output) == 2  # test uses inline magic value
         assert b"".join(output) == test_string
 
     # TODO: add more complex test for file://  # noqa: TD002, TD003  # legacy TODO
@@ -937,14 +982,14 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_file(self, mock_smart_open):
         """Is file:// line iterator called correctly?"""
         prefix = "file://"
-        full_path = "/tmp/test.txt"  # noqa: S108  # tmp path in test
+        full_path = "/tmp/test.txt"  # tmp path in test
         read_mode = "rb"
         smart_open_object = smart_open.open(prefix + full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
         mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
-        full_path = "/tmp/test#hash##more.txt"  # noqa: S108  # tmp path in test
+        full_path = "/tmp/test#hash##more.txt"  # tmp path in test
         read_mode = "rb"
         smart_open_object = smart_open.open(prefix + full_path, read_mode)
         smart_open_object.__iter__()
@@ -965,7 +1010,7 @@ class SmartOpenReadTest(unittest.TestCase):
     def test_file_errors(self, mock_smart_open):
         """File errors."""
         prefix = "file://"
-        full_path = "/tmp/test.txt"  # noqa: S108  # tmp path in test
+        full_path = "/tmp/test.txt"  # tmp path in test
         read_mode = "r"
         short_path = "~/tmp/test.txt"
         full_path = os.path.expanduser(short_path)  # noqa: PTH111  # test fixture expanduser
@@ -977,18 +1022,18 @@ class SmartOpenReadTest(unittest.TestCase):
     @mock.patch(_BUILTIN_OPEN)
     def test_file_buffering(self, mock_smart_open):
         """File buffering."""
-        smart_open_object = smart_open.open("/tmp/somefile", "rb", buffering=0)  # noqa: S108  # tmp path in test
+        smart_open_object = smart_open.open("/tmp/somefile", "rb", buffering=0)  # tmp path in test
         smart_open_object.__iter__()
         # called with the correct expanded path?
-        mock_smart_open.assert_called_with("/tmp/somefile", "rb", buffering=0)  # noqa: S108  # tmp path in test
+        mock_smart_open.assert_called_with("/tmp/somefile", "rb", buffering=0)  # tmp path in test
 
     @mock.patch(_BUILTIN_OPEN)
     def test_file_buffering2(self, mock_smart_open):
         """File buffering2."""
-        smart_open_object = smart_open.open("/tmp/somefile", "rb", 0)  # noqa: S108  # tmp path in test
+        smart_open_object = smart_open.open("/tmp/somefile", "rb", 0)  # tmp path in test
         smart_open_object.__iter__()
         # called with the correct expanded path?
-        mock_smart_open.assert_called_with("/tmp/somefile", "rb", buffering=0)  # noqa: S108  # tmp path in test
+        mock_smart_open.assert_called_with("/tmp/somefile", "rb", buffering=0)  # tmp path in test
 
     # couldn't find any project for mocking up HDFS data
     # TODO: we want to test also a content of the files, not just fnc call params  # noqa: TD002, TD003  # legacy TODO
@@ -1000,7 +1045,7 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object.__iter__()
         # called with the correct params?
         mock_subprocess.Popen.assert_called_with(
-            ["hdfs", "dfs", "-cat", "/tmp/test.txt"],  # noqa: S108  # tmp path in test
+            ["hdfs", "dfs", "-cat", "/tmp/test.txt"],  # tmp path in test
             stdout=mock_subprocess.PIPE,
         )
 
@@ -1128,7 +1173,7 @@ class SmartOpenReadTest(unittest.TestCase):
             fout.write("test")
             # Note that tell() in general returns an opaque number for text files.
             # See https://docs.python.org/3/library/io.html#io.TextIOBase.tell
-            assert fout.tell() == 4  # noqa: PLR2004  # test uses inline magic value
+            assert fout.tell() == 4  # test uses inline magic value
 
 
 class SmartOpenS3KwargsTest(unittest.TestCase):
@@ -1147,7 +1192,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         mock_client.assert_called_with(
             "s3",
             aws_access_key_id="access_id",
-            aws_secret_access_key="access_secret",  # noqa: S106  # fixture password kwarg
+            aws_secret_access_key="access_secret",  # fixture password kwarg
             config=mock_client.call_args.kwargs["config"],
         )
 
@@ -1164,7 +1209,7 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         mock_client.assert_called_with(
             "s3",
             aws_access_key_id="access_id",
-            aws_secret_access_key="access_secret",  # noqa: S106  # fixture password kwarg
+            aws_secret_access_key="access_secret",  # fixture password kwarg
             endpoint_url="http://aa.domain.com",
             config=mock_client.call_args.kwargs["config"],
         )
@@ -1240,11 +1285,15 @@ class SmartOpenTest(unittest.TestCase):
     def test_incorrect(self):
         """Incorrect."""
         # incorrect file mode
-        self.assertRaises(NotImplementedError, smart_open.open, "s3://bucket/key", "x")  # noqa: PT027  # legacy unittest assertRaises
+        with pytest.raises(NotImplementedError):
+            smart_open.open("s3://bucket/key", "x")
         # correct write modes, incorrect scheme
-        self.assertRaises(NotImplementedError, smart_open.open, "hdfs:///blah.txt", "wb+")  # noqa: PT027  # legacy unittest assertRaises
-        self.assertRaises(NotImplementedError, smart_open.open, "http:///blah.txt", "w")  # noqa: PT027  # legacy unittest assertRaises
-        self.assertRaises(NotImplementedError, smart_open.open, "s3://bucket/key", "wb+")  # noqa: PT027  # legacy unittest assertRaises
+        with pytest.raises(NotImplementedError):
+            smart_open.open("hdfs:///blah.txt", "wb+")
+        with pytest.raises(NotImplementedError):
+            smart_open.open("http:///blah.txt", "w")
+        with pytest.raises(NotImplementedError):
+            smart_open.open("s3://bucket/key", "wb+")
 
     def test_write_utf8(self):
         """Write utf8."""
@@ -1334,7 +1383,7 @@ class SmartOpenTest(unittest.TestCase):
         smart_open_object.write("test")
         # called with the correct params?
         mock_subprocess.Popen.assert_called_with(
-            ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"],  # noqa: S108  # tmp path in test
+            ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"],  # tmp path in test
             stdin=mock_subprocess.PIPE,
         )
 
@@ -1457,7 +1506,7 @@ class WebHdfsWriteTest(unittest.TestCase):
         )
         smart_open.open("webhdfs://127.0.0.1:8440/path/file", "wb")
 
-        assert len(responses.calls) == 2  # noqa: PLR2004  # test uses inline magic value
+        assert len(responses.calls) == 2  # test uses inline magic value
         path, params = responses.calls[0].request.url.split("?")
         assert path == "http://127.0.0.1:8440/webhdfs/v1/path/file"
         assert params in {"overwrite=True&op=CREATE", "op=CREATE&overwrite=True"}
@@ -1499,7 +1548,7 @@ class WebHdfsWriteTest(unittest.TestCase):
         smart_open_object.write(test_string)
         smart_open_object.close()
 
-        assert len(responses.calls) == 4  # noqa: PLR2004  # test uses inline magic value
+        assert len(responses.calls) == 4  # test uses inline magic value
         assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"
         assert responses.calls[3].request.url == "http://127.0.0.1:8440/file"
 
@@ -1541,7 +1590,7 @@ class CompressionFormatTest(unittest.TestCase):
         fpath = os.path.join(CURR_DIR, "test_data/crlf_at_1k_boundary.warc.gz")  # noqa: PTH118  # test fixture path join
         with smart_open.open(fpath, "rb") as infile:
             data = infile.read()
-        m = hashlib.md5(data)  # noqa: S324  # md5 in test is fine
+        m = hashlib.md5(data, usedforsecurity=False)
         assert m.hexdigest() == "18473e60f8c7c98d29d65bf805736a0d", "Failed to read gzip"
 
     def test_write_read_gz(self):
@@ -1567,7 +1616,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
 
     # note: these tests are derived from the Python 3.x tip bz2 tests.
 
-    TEXT_LINES = [  # noqa: RUF012  # mock class attribute
+    TEXT_LINES = (
         b"root:x:0:0:root:/root:/bin/bash\n",
         b"bin:x:1:1:bin:/bin:\n",
         b"daemon:x:2:2:daemon:/sbin:\n",
@@ -1589,7 +1638,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
         b"postgres:x:101:102:PostgreSQL Server:/var/lib/pgsql:/bin/bash\n",
         b"mysql:x:102:103:MySQL server:/var/lib/mysql:/bin/bash\n",
         b"www:x:103:104::/var/www:/bin/false\n",
-    ]
+    )
 
     TEXT = b"".join(TEXT_LINES)
 
@@ -1658,8 +1707,9 @@ class S3OpenTest(unittest.TestCase):
 
     def test_bad_mode(self):
         """Bad mode should raise and exception."""
-        uri = smart_open_lib._parse_uri("s3://bucket/key")  # noqa: SLF001  # test reaches into private state
-        self.assertRaises(NotImplementedError, smart_open.open, uri, "x")  # noqa: PT027  # legacy unittest assertRaises
+        uri = smart_open_lib._parse_uri("s3://bucket/key")  # test reaches into private state
+        with pytest.raises(NotImplementedError):
+            smart_open.open(uri, "x")
 
     @mock_s3
     def test_rw_encoding(self):
@@ -1679,8 +1729,8 @@ class S3OpenTest(unittest.TestCase):
         with smart_open.open(key, "rb") as fin:
             assert text.encode("koi8-r") == fin.read()
 
-        with smart_open.open(key, "r", encoding="euc-jp") as fin:
-            self.assertRaises(UnicodeDecodeError, fin.read)  # noqa: PT027  # legacy unittest assertRaises
+        with smart_open.open(key, "r", encoding="euc-jp") as fin, pytest.raises(UnicodeDecodeError):
+            fin.read()
         with smart_open.open(key, "r", encoding="euc-jp", errors="replace") as fin:
             fin.read()
 
@@ -1982,7 +2032,7 @@ def test_s3_disable_compression(url, _compression, expected):
 )
 def test_get_binary_mode(mode, expected):
     """Get binary mode."""
-    actual = smart_open.smart_open_lib._get_binary_mode(mode)  # noqa: SLF001  # test reaches into private state
+    actual = smart_open.smart_open_lib._get_binary_mode(mode)  # test reaches into private state
     assert actual == expected
 
 
@@ -2000,7 +2050,7 @@ def test_get_binary_mode(mode, expected):
 def test_get_binary_mode_bad(mode):
     """Get binary mode bad."""
     with pytest.raises(ValueError):  # noqa: PT011  # legacy broad pytest.raises
-        smart_open.smart_open_lib._get_binary_mode(mode)  # noqa: SLF001  # test reaches into private state
+        smart_open.smart_open_lib._get_binary_mode(mode)  # test reaches into private state
 
 
 @pytest.mark.skipif(os.name == "nt", reason="this test does not work on Windows")

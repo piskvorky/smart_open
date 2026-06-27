@@ -10,7 +10,8 @@ BUCKET, KEY = "smart-open-versioned", "demo.txt"
 URL = f"s3://{BUCKET}/{KEY}"
 
 
-def assert_equal(a, b):  # noqa: D103  # trivial
+def assert_equal(a, b):
+    """Assert two values are equal, formatting both into the failure message."""
     assert a == b, f"{a!r} != {b!r}"
 
 

@@ -54,7 +54,7 @@ def test_not_found():
     """Reading a missing path raises WebHdfsException with status 404."""
     with pytest.raises(WebHdfsException) as exc_info, smart_open.open(make_url("not_existing"), "r") as f:
         assert f.read()
-    assert exc_info.value.status_code == 404  # noqa: PLR2004  # HTTP status
+    assert exc_info.value.status_code == 404  # HTTP status
 
 
 def test_quoted_path():

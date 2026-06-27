@@ -94,8 +94,8 @@ class ReaderTest(unittest.TestCase):
         """Does seeking from the start of S3 files work correctly?"""
         fin = smart_open.s3.Reader(BUCKET_NAME, "hello.txt")
         seek = fin.seek(6)
-        assert seek == 6  # noqa: PLR2004  # byte offset
-        assert fin.tell() == 6  # noqa: PLR2004  # byte offset
+        assert seek == 6  # byte offset
+        assert fin.tell() == 6  # byte offset
         assert fin.read(6) == "wořld".encode()
 
     def test_seek_current(self):
@@ -103,7 +103,7 @@ class ReaderTest(unittest.TestCase):
         fin = smart_open.s3.Reader(BUCKET_NAME, "hello.txt")
         assert fin.read(5) == b"hello"
         seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-        assert seek == 6  # noqa: PLR2004  # byte offset
+        assert seek == 6  # byte offset
         assert fin.read(6) == "wořld".encode()
 
     def test_seek_end(self):
@@ -234,28 +234,28 @@ class WriterTest(unittest.TestCase):
             # Write some data without triggering an upload
             #
             fout.write(title)
-            assert fout._total_parts == 0  # noqa: SLF001  # asserting writer internals
-            assert fout._buf.tell() == 48  # noqa: PLR2004, SLF001  # expected buffer size
+            assert fout._total_parts == 0  # asserting writer internals
+            assert fout._buf.tell() == 48  # expected buffer size
 
             #
             # Trigger a part upload
             #
             fout.write(data)
-            assert fout._total_parts == 1  # noqa: SLF001  # asserting writer internals
-            assert fout._buf.tell() == 661  # noqa: PLR2004, SLF001  # expected buffer size
+            assert fout._total_parts == 1  # asserting writer internals
+            assert fout._buf.tell() == 661  # expected buffer size
 
             #
             # Write _without_ triggering a part upload
             #
             fout.write(to_be_continued)
-            assert fout._total_parts == 1  # noqa: SLF001  # asserting writer internals
-            assert fout._buf.tell() == 710  # noqa: PLR2004, SLF001  # expected buffer size
+            assert fout._total_parts == 1  # asserting writer internals
+            assert fout._buf.tell() == 710  # expected buffer size
 
         #
         # We closed the writer, so the final part must have been uploaded
         #
-        assert fout._buf.tell() == 0  # noqa: SLF001  # asserting writer internals
-        assert fout._total_parts == 2  # noqa: PLR2004, SLF001  # expected part count
+        assert fout._buf.tell() == 0  # asserting writer internals
+        assert fout._total_parts == 2  # expected part count
 
         #
         # read back the same key and check its content
@@ -268,7 +268,7 @@ class WriterTest(unittest.TestCase):
     def test_empty_key(self):
         """Does writing no data cause key with an empty value to be created?"""
         smart_open_write = smart_open.s3.MultipartWriter(BUCKET_NAME, self.key)
-        with smart_open_write as fout:  # noqa: F841  # context manager side-effect
+        with smart_open_write:
             pass
 
         # read back the same key and check its content

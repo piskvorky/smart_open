@@ -372,7 +372,7 @@ class WriterTest(unittest.TestCase):
 
         self.client.bucket(BUCKET_NAME).get_blob(BLOB_NAME).open.assert_called_once_with(
             "wb",
-            **smart_open.gcs._DEFAULT_WRITE_OPEN_KWARGS,  # noqa: SLF001  # test reaches into private state
+            **smart_open.gcs._DEFAULT_WRITE_OPEN_KWARGS,  # test reaches into private state
         )
 
     def test_open_kwargs_passthrough(self):

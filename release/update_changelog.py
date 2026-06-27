@@ -19,7 +19,7 @@ repo = "smart_open"
 head_branch = "develop"
 
 # get the new version (used for the header only)
-if len(sys.argv) != 2:  # noqa: PLR2004  # CLI arg count
+if len(sys.argv) != 2:  # CLI arg count
     msg = "Use `python release/update_changelog.py X.Y.Z` to generate a new CHANGELOG.md entry before releasing vX.Y.Z"
     raise ValueError(msg)
 new_version = sys.argv[1].removeprefix("v")

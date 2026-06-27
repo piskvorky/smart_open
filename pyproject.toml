@@ -100,13 +100,22 @@ select = ["ALL"]
 "**/tests/**/*.py" = [
   "D100", # tests is not a package
   "D104", # tests modules don't need docstrings
-  "S101" # assert is the whole point of tests
+  "PLR2004", # magic value comparisons are normal in tests
+  "S101", # assert is the whole point of tests
+  "S105", "S106", "S108", # hardcoded passwords/tmp paths are normal in tests
+  "SLF001" # tests reach into private state of the package they test
+]
+"smart_open/doctools.py" = [
+  "T201" # builds smart_open.open() docstring by writing to sys.stdout
 ]
 "{integration-tests,benchmark,ci_helpers,release}/**/*.py" = [
   "D100", # scripts dir is not a package
   "D104", # script modules don't need docstrings
   "INP001", # not a namespace package
+  "PLR2004", # magic value comparisons are normal in scripts/tests
   "S101", # assert is fine in scripts
+  "S105", "S106", "S108", # hardcoded passwords/tmp paths are normal in scripts/tests
+  "SLF001", # scripts/tests reach into private state of the package they test
   "T20" # print is the whole point of these helpers
 ]
 

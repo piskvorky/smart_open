@@ -30,15 +30,15 @@ def test():
     #
     # Ensure the cache is being used
     #
-    assert ("localhost", "misha") in smart_open.ssh._SSH  # noqa: SLF001  # integration test reaches into private state
+    assert ("localhost", "misha") in smart_open.ssh._SSH  # integration test reaches into private state
 
     try:
-        connect_ssh = smart_open.ssh._connect_ssh  # noqa: SLF001  # integration test reaches into private state
-        smart_open.ssh._connect_ssh = explode  # noqa: SLF001  # integration test reaches into private state
+        connect_ssh = smart_open.ssh._connect_ssh  # integration test reaches into private state
+        smart_open.ssh._connect_ssh = explode  # integration test reaches into private state
 
         with smart_open.open("ssh://misha@localhost/Users/misha/git/smart_open/howto.md") as fin:
             howto = fin.read()
 
         assert "How-to Guides" in howto
     finally:
-        smart_open.ssh._connect_ssh = connect_ssh  # noqa: SLF001  # integration test reaches into private state
+        smart_open.ssh._connect_ssh = connect_ssh  # integration test reaches into private state
