@@ -18,14 +18,14 @@ if os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get("AWS_SECRET_ACCESS_KEY
 
     os.environ["PYTEST_ADDOPTS"] = "--reruns 3 --reruns-delay 1"
 
-    commit_hash = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
+    commit_hash = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()  # noqa: S607  # CI script
 
     #
     # This is a temporary key that test_s3 will use for I/O.
     #
     os.environ["SO_KEY"] = str(uuid.uuid4())
-    subprocess.check_call(
-        [
+    subprocess.check_call(  # noqa: S603  # CI script
+        [  # noqa: S607  # CI script
             "pytest",
             "-v",
             "integration-tests/test_s3.py",
@@ -42,6 +42,8 @@ if os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get("AWS_SECRET_ACCESS_KEY
         for f in files:
             if f.endswith(f"{commit_hash}.json"):
                 out_url = f"{url}/{platform.python_version()}.json"
-                with open(os.path.join(root, f)) as fin:
-                    with smart_open.open(out_url, "wt") as fout:
-                        fout.write(fin.read())
+                with (
+                    open(os.path.join(root, f)) as fin,  # noqa: PTH118, PTH123  # CI script
+                    smart_open.open(out_url, "wt") as fout,
+                ):
+                    fout.write(fin.read())

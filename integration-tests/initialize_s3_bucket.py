@@ -17,6 +17,7 @@ import boto3
 
 
 def gzip_compress(data):
+    """Return ``data`` gzip-compressed as bytes."""
     #
     # gzip.compress does not exist under Py2
     #
@@ -42,6 +43,7 @@ CONTENTS = dict(_build_contents())
 
 
 def main():
+    """Reset the named bucket so it contains exactly the test CONTENTS."""
     bucket_name = sys.argv[1]
 
     bucket = boto3.resource("s3").Bucket(bucket_name)

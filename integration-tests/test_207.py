@@ -18,6 +18,7 @@ import smart_open
 
 
 def tofile():
+    """Write a small numpy array to a temp file and return its path."""
     dt = np.dtype([("time", [("min", int), ("sec", int)]), ("temp", float)])
     x = np.zeros((1,), dtype=dt)
 
@@ -27,9 +28,10 @@ def tofile():
 
 
 def test_fromfile():
+    """Reading a numpy ``.dat`` file through smart_open round-trips successfully."""
     try:
         path = tofile()
         with smart_open.open(path, "rb") as fin:
             np.fromfile(fin)
     finally:
-        os.unlink(path)
+        os.unlink(path)  # noqa: PTH108  # paired with tempfile.NamedTemporaryFile.name

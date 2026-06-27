@@ -11,4 +11,4 @@ command = [
     "--cov-report",
     "term-missing",
 ]
-subprocess.check_call(command)
+subprocess.check_call(command)  # noqa: S603  # CI script

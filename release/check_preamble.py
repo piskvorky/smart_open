@@ -34,6 +34,7 @@ import sys
 
 
 def extract_preamble(fin):
+    """Split ``fin`` into preamble (leading `#` lines) and body lines."""
     end_preamble = False
     preamble, body = [], []
 
@@ -50,6 +51,7 @@ def extract_preamble(fin):
 
 
 def main():
+    """Check or replace the preamble of a Python source file."""
     parser = argparse.ArgumentParser()
     parser.add_argument("path", help="the path of the file to check")
     parser.add_argument("--replace", help="replace the preamble with the one from this file")
@@ -58,22 +60,22 @@ def main():
 
     logging.basicConfig(level=args.loglevel)
 
-    with open(args.path) as fin:
+    with open(args.path) as fin:  # noqa: PTH123  # release script
         preamble, body = extract_preamble(fin)
 
     for line in preamble:
-        logging.info("%s: %s", args.path, line.rstrip())
+        logging.info("%s: %s", args.path, line.rstrip())  # noqa: LOG015  # release script
 
     if not args.replace:
         sys.exit(0)
 
-    with open(args.replace) as fin:
+    with open(args.replace) as fin:  # noqa: PTH123  # release script
         preamble, _ = extract_preamble(fin)
 
     if os.access(args.path, os.X_OK):
         preamble.insert(0, "#!/usr/bin/env python\n")
 
-    with open(args.path, "w") as fout:
+    with open(args.path, "w") as fout:  # noqa: PTH123  # release script
         for line in preamble + body:
             fout.write(line)
 

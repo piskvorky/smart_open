@@ -2,15 +2,13 @@ from smart_open import open
 
 
 def read_bytes(url, limit):
-    bytes_ = []
+    """Read ``limit`` one-byte chunks from ``url`` and return them as a list."""
     with open(url, "rb") as fin:
-        for _i in range(limit):
-            bytes_.append(fin.read(1))
-
-    return bytes_
+        return [fin.read(1) for _i in range(limit)]
 
 
 def test(benchmark):
+    """Benchmark many small reads against a large S3 object."""
     #
     # This file is around 850MB.
     #

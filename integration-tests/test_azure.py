@@ -2,7 +2,7 @@ import io
 import os
 
 import azure.storage.blob
-from pytest import fixture
+import pytest
 
 import smart_open
 
@@ -16,13 +16,15 @@ assert _AZURE_STORAGE_CONNECTION_STRING is not None, (
 )
 
 
-@fixture
+@pytest.fixture
 def client():
+    """Provide an Azure BlobServiceClient built from the env connection string."""
     # type: () -> azure.storage.blob.BlobServiceClient
     return azure.storage.blob.BlobServiceClient.from_connection_string(_AZURE_STORAGE_CONNECTION_STRING)
 
 
 def initialize_bucket(client):
+    """Empty the configured Azure container so each test starts clean."""
     container_client = client.get_container_client(_AZURE_CONTAINER)
     blobs = container_client.list_blobs()
     for blob in blobs:
@@ -30,6 +32,7 @@ def initialize_bucket(client):
 
 
 def write_read(key, content, write_mode, read_mode, **kwargs):
+    """Write ``content`` to ``key`` then read it back, returning the value read."""
     with smart_open.open(key, write_mode, **kwargs) as fout:
         fout.write(content)
     with smart_open.open(key, read_mode, **kwargs) as fin:
@@ -37,6 +40,7 @@ def write_read(key, content, write_mode, read_mode, **kwargs):
 
 
 def read_length_prefixed_messages(key, read_mode, **kwargs):
+    """Read length-prefixed binary messages from ``key`` and concatenate them."""
     result = io.BytesIO()
 
     with smart_open.open(key, read_mode, **kwargs) as fin:
@@ -50,15 +54,17 @@ def read_length_prefixed_messages(key, read_mode, **kwargs):
 
 
 def test_azure_readwrite_text(benchmark, client):
+    """Round-trip a text blob via smart_open against Azure."""
     initialize_bucket(client)
 
     key = _FILE_PREFIX + "/sanity.txt"
-    text = "с гранатою в кармане, с чекою в руке"
+    text = "с гранатою в кармане, с чекою в руке"  # noqa: RUF001  # Cyrillic fixture
     actual = benchmark(write_read, key, text, "w", "r", encoding="utf-8", transport_params={"client": client})
     assert actual == text
 
 
 def test_azure_readwrite_text_gzip(benchmark, client):
+    """Round-trip a gzip-compressed text blob via smart_open against Azure."""
     initialize_bucket(client)
 
     key = _FILE_PREFIX + "/sanity.txt.gz"
@@ -68,6 +74,7 @@ def test_azure_readwrite_text_gzip(benchmark, client):
 
 
 def test_azure_readwrite_binary(benchmark, client):
+    """Round-trip a binary blob via smart_open against Azure."""
     initialize_bucket(client)
 
     key = _FILE_PREFIX + "/sanity.txt"
@@ -77,6 +84,7 @@ def test_azure_readwrite_binary(benchmark, client):
 
 
 def test_azure_readwrite_binary_gzip(benchmark, client):
+    """Round-trip a gzip-compressed binary blob via smart_open against Azure."""
     initialize_bucket(client)
 
     key = _FILE_PREFIX + "/sanity.txt.gz"
@@ -86,6 +94,7 @@ def test_azure_readwrite_binary_gzip(benchmark, client):
 
 
 def test_azure_performance(benchmark, client):
+    """Benchmark uncompressed binary read/write performance against Azure."""
     initialize_bucket(client)
 
     one_megabyte = io.BytesIO()
@@ -99,6 +108,7 @@ def test_azure_performance(benchmark, client):
 
 
 def test_azure_performance_gz(benchmark, client):
+    """Benchmark gzip-compressed binary read/write performance against Azure."""
     initialize_bucket(client)
 
     one_megabyte = io.BytesIO()
@@ -112,9 +122,10 @@ def test_azure_performance_gz(benchmark, client):
 
 
 def test_azure_performance_small_reads(benchmark, client):
+    """Benchmark many small reads against Azure with a 1 MiB buffer."""
     initialize_bucket(client)
 
-    ONE_MIB = 1024**2
+    ONE_MIB = 1024**2  # noqa: N806  # intentional constant in test scope
     one_megabyte_of_msgs = io.BytesIO()
     msg = b"\x0f" + b"0123456789abcde"  # a length-prefixed "message"
     for _ in range(0, ONE_MIB, len(msg)):

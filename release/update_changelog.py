@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: EXE001  # release script run via python
 """Add a new section on the top of CHANGELOG.md.
 
 Usage:
@@ -18,7 +19,7 @@ repo = "smart_open"
 head_branch = "develop"
 
 # get the new version (used for the header only)
-if len(sys.argv) != 2:
+if len(sys.argv) != 2:  # noqa: PLR2004  # CLI arg count
     msg = "Use `python release/update_changelog.py X.Y.Z` to generate a new CHANGELOG.md entry before releasing vX.Y.Z"
     raise ValueError(msg)
 new_version = sys.argv[1].removeprefix("v")
@@ -39,7 +40,7 @@ def get_json(url):
     import requests
 
     print("Requesting", url)
-    resp = requests.get(url)
+    resp = requests.get(url)  # noqa: S113  # release script
     resp.raise_for_status()
     return json.loads(resp.text)
 
@@ -67,7 +68,7 @@ for commit in diff["commits"]:
 
 if new_changelog_lines:
     print("Writing", changelog_path)
-    date = datetime.now().strftime("%Y-%m-%d")
+    date = datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005  # local release date
     new_changelog = [
         f"# {new_version}, {date}",
         "",

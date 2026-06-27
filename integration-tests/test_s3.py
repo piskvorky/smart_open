@@ -27,7 +27,7 @@ assert _KEY is not None, "please set the SO_KEY environment variable"
 #
 def _random_string(length=8):
     alphabet = string.ascii_lowercase + string.digits
-    return "".join(random.choices(alphabet, k=length))
+    return "".join(random.choices(alphabet, k=length))  # noqa: S311  # non-crypto unique suffix
 
 
 @contextlib.contextmanager
@@ -49,7 +49,8 @@ def _test_case(function):
     return inner
 
 
-def write_read(uri, content, write_mode, read_mode, encoding=None, s3_upload=None, **kwargs):
+def write_read(uri, content, write_mode, read_mode, encoding=None, s3_upload=None, **kwargs):  # noqa: PLR0913  # benchmark helper signature
+    """Write ``content`` to ``uri`` then read it back, returning the value read."""
     write_params = dict(kwargs)
     write_params.update(s3_upload=s3_upload)
     with smart_open.open(uri, write_mode, encoding=encoding, transport_params=write_params) as fout:
@@ -59,6 +60,7 @@ def write_read(uri, content, write_mode, read_mode, encoding=None, s3_upload=Non
 
 
 def read_length_prefixed_messages(uri, read_mode, encoding=None, **kwargs):
+    """Read length-prefixed binary messages from ``uri`` and concatenate them."""
     with smart_open.open(uri, read_mode, encoding=encoding, transport_params=kwargs) as fin:
         actual = b""
         length_byte = fin.read(1)
@@ -72,13 +74,15 @@ def read_length_prefixed_messages(uri, read_mode, encoding=None, **kwargs):
 
 @_test_case
 def test_s3_readwrite_text(benchmark, uri):
-    text = "с гранатою в кармане, с чекою в руке"
+    """Round-trip a text object via smart_open against S3."""
+    text = "с гранатою в кармане, с чекою в руке"  # noqa: RUF001  # Cyrillic fixture
     actual = benchmark(write_read, uri, text, "w", "r", "utf-8")
     assert actual == text
 
 
 @_test_case
 def test_s3_readwrite_text_gzip(benchmark, uri):
+    """Round-trip a gzip-compressed text object via smart_open against S3."""
     text = "не чайки здесь запели на знакомом языке"
     actual = benchmark(write_read, uri, text, "w", "r", "utf-8")
     assert actual == text
@@ -86,6 +90,7 @@ def test_s3_readwrite_text_gzip(benchmark, uri):
 
 @_test_case
 def test_s3_readwrite_binary(benchmark, uri):
+    """Round-trip a binary object via smart_open against S3."""
     binary = b"this is a test"
     actual = benchmark(write_read, uri, binary, "wb", "rb")
     assert actual == binary
@@ -93,6 +98,7 @@ def test_s3_readwrite_binary(benchmark, uri):
 
 @_test_case
 def test_s3_readwrite_binary_gzip(benchmark, uri):
+    """Round-trip a gzip-compressed binary object via smart_open against S3."""
     binary = b"this is a test"
     actual = benchmark(write_read, uri, binary, "wb", "rb")
     assert actual == binary
@@ -100,6 +106,7 @@ def test_s3_readwrite_binary_gzip(benchmark, uri):
 
 @_test_case
 def test_s3_performance(benchmark, uri):
+    """Benchmark uncompressed binary read/write performance against S3."""
     one_megabyte = io.BytesIO()
     for _ in range(1024 * 128):
         one_megabyte.write(b"01234567")
@@ -111,6 +118,7 @@ def test_s3_performance(benchmark, uri):
 
 @_test_case
 def test_s3_performance_gz(benchmark, uri):
+    """Benchmark gzip-compressed binary read/write performance against S3."""
     one_megabyte = io.BytesIO()
     for _ in range(1024 * 128):
         one_megabyte.write(b"01234567")
@@ -122,6 +130,7 @@ def test_s3_performance_gz(benchmark, uri):
 
 @_test_case
 def test_s3_performance_small_reads(benchmark, uri):
+    """Benchmark many small reads against S3 with a 1 MiB buffer."""
     one_mib = 1024**2
     one_megabyte_of_msgs = io.BytesIO()
     msg = b"\x0f" + b"0123456789abcde"  # a length-prefixed "message"
@@ -138,7 +147,8 @@ def test_s3_performance_small_reads(benchmark, uri):
 
 @_test_case
 def test_s3_encrypted_file(benchmark, uri):
-    text = "с гранатою в кармане, с чекою в руке"
+    """Round-trip a text object with server-side encryption enabled."""
+    text = "с гранатою в кармане, с чекою в руке"  # noqa: RUF001  # Cyrillic fixture
     s3_upload = {"ServerSideEncryption": "AES256"}
     actual = benchmark(write_read, uri, text, "w", "r", "utf-8", s3_upload=s3_upload)
     assert actual == text

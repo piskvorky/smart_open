@@ -10,11 +10,12 @@ BUCKET, KEY = "smart-open-versioned", "demo.txt"
 URL = f"s3://{BUCKET}/{KEY}"
 
 
-def assert_equal(a, b):
+def assert_equal(a, b):  # noqa: D103  # trivial
     assert a == b, f"{a!r} != {b!r}"
 
 
 def main():
+    """Verify smart_open returns the correct content for each S3 object version."""
     versions = [v.id for v in boto3.resource("s3").Bucket(BUCKET).object_versions.filter(Prefix=KEY)]
     expected_versions = [
         "KiQpZPsKI5Dm2oJZy_RzskTOtl2snjBg",

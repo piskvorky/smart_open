@@ -10,10 +10,11 @@ import time
 import smart_open
 
 open_fn = smart_open.open
-# open_fn = open
+# open_fn = open  # noqa: ERA001
 
 
 def report_time_iterate_rows(file_name, report_every=100000):
+    """Iterate ``file_name`` line by line, printing throughput every N rows."""
     start = time.time()
     last = start
     with open_fn(file_name, "r") as f:

@@ -14,7 +14,7 @@ from smart_open import open
 # These are publicly available via play.min.io
 #
 KEY_ID = "Q3AM3UQ867SPQQA43P2F"
-SECRET_KEY = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
+SECRET_KEY = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"  # noqa: S105  # public play.min.io credential
 ENDPOINT_URL = "https://play.min.io:9000"
 
 
@@ -25,11 +25,12 @@ def read_boto3():
 
     obj = s3.Object("smart-open-test", "README.rst")
     data = obj.get()["Body"].read()
-    logging.info("read %d bytes via boto3", len(data))
+    logging.info("read %d bytes via boto3", len(data))  # noqa: LOG015  # standalone script
     return data
 
 
 def read_smart_open():
+    """Read a known object via smart_open and return its contents."""
     url = "s3://Q3AM3UQ867SPQQA43P2F:zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG@play.min.io:9000@smart-open-test/README.rst"
 
     #
@@ -39,15 +40,16 @@ def read_smart_open():
     #
     tp = {}
     if get_default_region() != "us-east-1":
-        logging.info("injecting custom session")
+        logging.info("injecting custom session")  # noqa: LOG015  # standalone script
         tp["session"] = get_minio_session()
     with open(url, transport_params=tp) as fin:
         text = fin.read()
-        logging.info("read %d characters via smart_open", len(text))
+        logging.info("read %d characters via smart_open", len(text))  # noqa: LOG015  # standalone script
         return text
 
 
 def get_minio_session():
+    """Return a boto3 session configured for play.min.io."""
     return boto3.Session(
         region_name="us-east-1",
         aws_access_key_id=KEY_ID,
@@ -56,10 +58,12 @@ def get_minio_session():
 
 
 def get_default_region():
+    """Return the AWS region from the user's default boto3 session."""
     return boto3.Session().region_name
 
 
 def main():
+    """Compare boto3 and smart_open reads of the same minio object."""
     logging.basicConfig(level=logging.INFO)
     from_boto3 = read_boto3()
     from_smart_open = read_smart_open()

@@ -24,12 +24,12 @@ with smart_open.open(url) as fin:
 user = prinfo["head"]["user"]["login"]
 ssh_url = prinfo["head"]["repo"]["ssh_url"]
 
-remotes = subprocess.check_output(["git", "remote"]).strip().decode("utf-8").split("\n")
+remotes = subprocess.check_output(["git", "remote"]).strip().decode("utf-8").split("\n")  # noqa: S607  # release script
 if user not in remotes:
-    subprocess.check_call(["git", "remote", "add", user, ssh_url])
+    subprocess.check_call(["git", "remote", "add", user, ssh_url])  # noqa: S603, S607  # release script
 
-subprocess.check_call(["git", "fetch", user])
+subprocess.check_call(["git", "fetch", user])  # noqa: S603, S607  # release script
 
 ref = prinfo["head"]["ref"]
-subprocess.check_call(["git", "checkout", f"{user}/{ref}"])
-subprocess.check_call(["git", "switch", "-c", f"{ref}"])
+subprocess.check_call(["git", "checkout", f"{user}/{ref}"])  # noqa: S603, S607  # release script
+subprocess.check_call(["git", "switch", "-c", f"{ref}"])  # noqa: S603, S607  # release script

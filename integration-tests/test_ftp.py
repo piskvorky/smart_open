@@ -12,10 +12,12 @@ ssl.create_default_context = partial(ssl.create_default_context, cafile="/etc/vs
 
 @pytest.fixture(params=[("ftp", 21), ("ftps", 90)])
 def server_info(request):
+    """Yield (scheme, port) tuples for each FTP server flavor under test."""
     return request.param
 
 
 def test_nonbinary(server_info):
+    """Round-trip text content over FTP/FTPS via smart_open."""
     server_type = server_info[0]
     port_num = server_info[1]
     file_contents = "Test Test \n new test \n another tests"
@@ -37,6 +39,7 @@ def test_nonbinary(server_info):
 
 
 def test_binary(server_info):
+    """Round-trip binary content over FTP/FTPS via smart_open."""
     server_type = server_info[0]
     port_num = server_info[1]
     file_contents = b"Test Test \n new test \n another tests"
@@ -58,6 +61,7 @@ def test_binary(server_info):
 
 
 def test_compression(server_info):
+    """Verify gzip compression round-trips correctly over FTP/FTPS."""
     server_type = server_info[0]
     port_num = server_info[1]
     file_contents = "Test Test \n new test \n another tests"
@@ -92,10 +96,11 @@ def test_compression(server_info):
 
 
 def test_line_endings_non_binary(server_info):
+    """Text-mode reads strip CRLF; binary-mode reads preserve them."""
     server_type = server_info[0]
     port_num = server_info[1]
-    B_CLRF = b"\r\n"
-    CLRF = "\r\n"
+    B_CLRF = b"\r\n"  # noqa: N806  # intentional constant in test scope
+    CLRF = "\r\n"  # noqa: N806  # intentional constant in test scope
     file_contents = f"Test Test {CLRF} new test {CLRF} another tests{CLRF}"
 
     with open(f"{server_type}://user:123@localhost:{port_num}/file3", "w") as f:
@@ -111,10 +116,11 @@ def test_line_endings_non_binary(server_info):
 
 
 def test_line_endings_binary(server_info):
+    """Binary-mode writes preserve CRLF on the server; text-mode reads strip it."""
     server_type = server_info[0]
     port_num = server_info[1]
-    B_CLRF = b"\r\n"
-    CLRF = "\r\n"
+    B_CLRF = b"\r\n"  # noqa: N806  # intentional constant in test scope
+    CLRF = "\r\n"  # noqa: N806  # intentional constant in test scope
     file_contents = f"Test Test {CLRF} new test {CLRF} another tests{CLRF}".encode()
 
     with open(f"{server_type}://user:123@localhost:{port_num}/file4", "wb") as f:

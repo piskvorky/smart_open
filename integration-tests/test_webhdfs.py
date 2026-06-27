@@ -30,10 +30,12 @@ assert _SO_WEBHDFS_BASE_URL is not None, "please set the SO_WEBHDFS_BASE_URL env
 
 
 def make_url(path):
+    """Join the configured WebHDFS base URL with ``path``."""
     return "{base_url}/{path}".format(base_url=_SO_WEBHDFS_BASE_URL.rstrip("/"), path=path.lstrip("/"))
 
 
 def test_write_and_read():
+    """Round-trip text content via WebHDFS."""
     with smart_open.open(make_url("test2.txt"), "w") as f:
         f.write("write_test\n")
     with smart_open.open(make_url("test2.txt"), "r") as f:
@@ -41,6 +43,7 @@ def test_write_and_read():
 
 
 def test_binary_write_and_read():
+    """Round-trip binary content via WebHDFS."""
     with smart_open.open(make_url("test3.txt"), "wb") as f:
         f.write(b"binary_write_test\n")
     with smart_open.open(make_url("test3.txt"), "rb") as f:
@@ -48,12 +51,14 @@ def test_binary_write_and_read():
 
 
 def test_not_found():
+    """Reading a missing path raises WebHdfsException with status 404."""
     with pytest.raises(WebHdfsException) as exc_info, smart_open.open(make_url("not_existing"), "r") as f:
         assert f.read()
-    assert exc_info.value.status_code == 404
+    assert exc_info.value.status_code == 404  # noqa: PLR2004  # HTTP status
 
 
 def test_quoted_path():
+    """Percent-encoded paths round-trip via WebHDFS LISTSTATUS."""
     with smart_open.open(make_url("test_%40_4.txt"), "w") as f:
         f.write("write_test\n")
 

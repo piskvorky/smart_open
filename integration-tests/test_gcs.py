@@ -11,6 +11,7 @@ assert _GCS_URL is not None, "please set the SO_GCS_URL environment variable"
 
 
 def initialize_bucket():
+    """Empty the configured GCS prefix so each test starts clean."""
     client = google.cloud.storage.Client()
     parsed = urllib.parse.urlparse(_GCS_URL)
     bucket_name = parsed.netloc
@@ -22,6 +23,7 @@ def initialize_bucket():
 
 
 def write_read(key, content, write_mode, read_mode, **kwargs):
+    """Write ``content`` to ``key`` then read it back, returning the value read."""
     with smart_open.open(key, write_mode, **kwargs) as fout:
         fout.write(content)
     with smart_open.open(key, read_mode, **kwargs) as fin:
@@ -29,6 +31,7 @@ def write_read(key, content, write_mode, read_mode, **kwargs):
 
 
 def read_length_prefixed_messages(key, read_mode, **kwargs):
+    """Read length-prefixed binary messages from ``key`` and concatenate them."""
     result = io.BytesIO()
 
     with smart_open.open(key, read_mode, **kwargs) as fin:
@@ -42,15 +45,17 @@ def read_length_prefixed_messages(key, read_mode, **kwargs):
 
 
 def test_gcs_readwrite_text(benchmark):
+    """Round-trip a text object via smart_open against GCS."""
     initialize_bucket()
 
     key = _GCS_URL + "/sanity.txt"
-    text = "с гранатою в кармане, с чекою в руке"
+    text = "с гранатою в кармане, с чекою в руке"  # noqa: RUF001  # Cyrillic fixture
     actual = benchmark(write_read, key, text, "w", "r", encoding="utf-8")
     assert actual == text
 
 
 def test_gcs_readwrite_text_gzip(benchmark):
+    """Round-trip a gzip-compressed text object via smart_open against GCS."""
     initialize_bucket()
 
     key = _GCS_URL + "/sanity.txt.gz"
@@ -60,6 +65,7 @@ def test_gcs_readwrite_text_gzip(benchmark):
 
 
 def test_gcs_readwrite_binary(benchmark):
+    """Round-trip a binary object via smart_open against GCS."""
     initialize_bucket()
 
     key = _GCS_URL + "/sanity.txt"
@@ -69,6 +75,7 @@ def test_gcs_readwrite_binary(benchmark):
 
 
 def test_gcs_readwrite_binary_gzip(benchmark):
+    """Round-trip a gzip-compressed binary object via smart_open against GCS."""
     initialize_bucket()
 
     key = _GCS_URL + "/sanity.txt.gz"
@@ -78,6 +85,7 @@ def test_gcs_readwrite_binary_gzip(benchmark):
 
 
 def test_gcs_performance(benchmark):
+    """Benchmark uncompressed binary read/write performance against GCS."""
     initialize_bucket()
 
     one_megabyte = io.BytesIO()
@@ -91,6 +99,7 @@ def test_gcs_performance(benchmark):
 
 
 def test_gcs_performance_gz(benchmark):
+    """Benchmark gzip-compressed binary read/write performance against GCS."""
     initialize_bucket()
 
     one_megabyte = io.BytesIO()
@@ -104,9 +113,10 @@ def test_gcs_performance_gz(benchmark):
 
 
 def test_gcs_performance_small_reads(benchmark):
+    """Benchmark many small reads against GCS with a 1 MiB buffer."""
     initialize_bucket()
 
-    ONE_MIB = 1024**2
+    ONE_MIB = 1024**2  # noqa: N806  # intentional constant in test scope
     one_megabyte_of_msgs = io.BytesIO()
     msg = b"\x0f" + b"0123456789abcde"  # a length-prefixed "message"
     for _ in range(0, ONE_MIB, len(msg)):
