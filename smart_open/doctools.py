@@ -15,7 +15,6 @@ For internal use only.
 import contextlib
 import inspect
 import io
-import re
 import sys
 from pathlib import Path
 
@@ -109,10 +108,10 @@ def to_docstring(kwargs, lpad=""):
 
     Example:
         >>> kwargs = [
-        ...     ('bar', 'str, optional', ['This parameter is the bar.']),
-        ...     ('baz', 'int, optional', ['This parameter is the baz.']),
+        ...     ("bar", "str, optional", ["This parameter is the bar."]),
+        ...     ("baz", "int, optional", ["This parameter is the baz."]),
         ... ]
-        >>> print(to_docstring(kwargs), end='')
+        >>> print(to_docstring(kwargs), end="")
         bar: str, optional
             This parameter is the bar.
         baz: int, optional
@@ -129,8 +128,8 @@ def to_docstring(kwargs, lpad=""):
     return buf.getvalue()
 
 
-def extract_examples_from_readme_rst(indent=None):
-    """Extract examples from this project's README.rst file.
+def extract_examples_from_readme(indent=None):
+    """Extract examples from this project's README.md file.
 
     Args:
         indent: Prepend each line with this string.  Should contain some number
@@ -140,20 +139,22 @@ def extract_examples_from_readme_rst(indent=None):
         The examples as a single string.
 
     Note:
-        Quite fragile, depends on named labels inside the README.rst file.
+        Quite fragile, depends on the example markers and the fenced code block
+        inside the README.md file.
     """
     if indent is None:
         indent = LPAD
-    readme_path = Path(__file__).resolve().parent.parent / "README.rst"
+    readme_path = Path(__file__).resolve().parent.parent / "README.md"
     try:
-        with readme_path.open() as fin:
-            lines = list(fin)
-        start = lines.index(".. _doctools_before_examples:\n")
-        end = lines.index(".. _doctools_after_examples:\n")
-        lines = lines[start + 4 : end - 2]
-        return "".join([indent + re.sub("^  ", "", line) for line in lines])
+        text = readme_path.read_text(encoding="utf-8")
+        body = text.split("<!-- doctools_before_examples -->", 1)[1]
+        body = body.split("<!-- doctools_after_examples -->", 1)[0]
+        # keep only the contents of the ```python ... ``` fenced code block
+        body = body.split("```python", 1)[1].rsplit("```", 1)[0]
+        lines = body.strip("\n").split("\n")
+        return "".join(indent + line + "\n" for line in lines)
     except Exception:  # noqa: BLE001  # README parsing is best-effort; any failure falls back gracefully
-        return indent + "See README.rst"
+        return indent + "See README.md"
 
 
 def tweak_open_docstring(f):
@@ -190,7 +191,7 @@ def tweak_open_docstring(f):
 
         print(f"{LPAD}Examples:")
         print()
-        print(extract_examples_from_readme_rst(indent=body_pad))
+        print(extract_examples_from_readme(indent=body_pad))
 
         print(f"{LPAD}Codecs:")
         print()

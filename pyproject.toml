@@ -24,7 +24,7 @@ dependencies = ["wrapt"]
 description = "Utils for streaming large files (S3, HDFS, GCS, SFTP, Azure Blob Storage, gzip, bz2, zst...)"
 dynamic = ["version"]
 name = "smart_open"
-readme = "README.rst"
+readme = "README.md"
 requires-python = ">=3.10,<4.0" # sync with classifiers above
 urls = {Repository = "https://github.com/piskvorky/smart_open"}
 
@@ -77,6 +77,10 @@ addopts = [
 [tool.ruff]
 line-length = 110 # historical smart_open style
 output-format = "concise"
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
 
 [tool.ruff.lint]
 ignore = [

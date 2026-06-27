@@ -79,7 +79,7 @@ def get_transport(scheme):
 
     """
     expected = SUPPORTED_SCHEMES
-    readme_url = "https://github.com/piskvorky/smart_open/blob/master/README.rst"
+    readme_url = "https://github.com/piskvorky/smart_open/blob/master/README.md"
     message = (
         "Unable to handle scheme {scheme!r}, expected one of {expected!r}. "
         "Extra dependencies required by {scheme!r} may be missing. "

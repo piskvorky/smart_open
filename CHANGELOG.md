@@ -233,7 +233,7 @@ You may continue to use `ignore_ext` parameter for now, but it will be deprecate
 # 5.0.0, 30 Mar 2021
 
 This release modifies the handling of transport parameters for the S3 back-end in a backwards-incompatible way.
-See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.rst) for details.
+See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.md) for details.
 
 - Refactor S3, replace high-level resource/session API with low-level client API (PR [#583](https://github.com/RaRe-Technologies/smart_open/pull/583), [@mpenkov](https://github.com/mpenkov))
 - Fix potential infinite loop when reading from webhdfs (PR [#597](https://github.com/RaRe-Technologies/smart_open/pull/597), [@traboukos](https://github.com/traboukos))

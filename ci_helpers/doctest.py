@@ -7,4 +7,4 @@ import os
 import subprocess
 
 if os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get("AWS_SECRET_ACCESS_KEY"):
-    subprocess.check_call(["python", "-m", "doctest", "README.rst", "-v"])  # noqa: S607  # CI script
+    subprocess.check_call(["python", "-m", "doctest", "README.md", "-v"])  # noqa: S607  # CI script
