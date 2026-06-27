@@ -165,7 +165,7 @@ class CrapClient:
         self._datasize = len(data)
         self._body = CrapStream(data, modulus=modulus)
 
-    def get_object(self, *args, Range=None, **kwargs):  # noqa: N803
+    def get_object(self, *args, Range=None, **kwargs):  # noqa: N803  # mimics boto3 PascalCase kwarg
         """Get object."""
         start = 0
         end = self._datasize

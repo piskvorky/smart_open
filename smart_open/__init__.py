@@ -33,8 +33,8 @@ with contextlib.suppress(PackageNotFoundError):
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-from .compression import register_compressor  # noqa: E402
-from .smart_open_lib import open, parse_uri  # noqa: E402
+from .compression import register_compressor  # noqa: E402  # logger setup precedes imports (see #474)
+from .smart_open_lib import open, parse_uri  # noqa: E402  # logger setup precedes imports (see #474)
 
 __all__ = [
     "open",

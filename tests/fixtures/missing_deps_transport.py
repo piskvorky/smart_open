@@ -3,7 +3,7 @@
 import io
 
 try:
-    import this_module_does_not_exist_but_we_need_it  # noqa: F401
+    import this_module_does_not_exist_but_we_need_it  # noqa: F401  # fixture intentionally imports a missing module
 except ImportError:
     MISSING_DEPS = True
 

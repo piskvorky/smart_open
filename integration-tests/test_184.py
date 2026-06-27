@@ -10,7 +10,7 @@ import time
 import smart_open
 
 open_fn = smart_open.open
-# open_fn = open  # noqa: ERA001
+# open_fn = open  # noqa: ERA001  # alternative left in for manual benchmarking
 
 
 def report_time_iterate_rows(file_name, report_every=100000):
