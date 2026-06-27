@@ -1,4 +1,4 @@
-"""A transport that is missing the required SCHEME/SCHEMAS attributes"""
+"""A transport that is missing the required SCHEME/SCHEMAS attributes."""
 
 import io
 

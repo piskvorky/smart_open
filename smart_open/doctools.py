@@ -217,6 +217,7 @@ def extract_examples_from_readme_rst(indent=None):
 
 
 def tweak_open_docstring(f):
+    """Inject transport, compression and example sections into ``f``'s docstring."""
     buf = io.StringIO()
     seen = set()
 
@@ -266,6 +267,7 @@ def tweak_open_docstring(f):
 
 
 def tweak_parse_uri_docstring(f):
+    """Inject supported schemes and example URIs into ``f``'s docstring."""
     buf = io.StringIO()
     seen = set()
     schemes = []
@@ -277,10 +279,8 @@ def tweak_parse_uri_docstring(f):
 
         seen.add(submodule)
 
-        try:
+        with contextlib.suppress(AttributeError):
             examples.extend(submodule.URI_EXAMPLES)
-        except AttributeError:
-            pass
 
         try:
             schemes.extend(submodule.SCHEMES)

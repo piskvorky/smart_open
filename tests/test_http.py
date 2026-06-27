@@ -45,7 +45,7 @@ class HttpTest(unittest.TestCase):
         responses.add(responses.GET, URL, body=BYTES)
         reader = smart_open.http.SeekableBufferedInputBase(URL)
         read_bytes = reader.read()
-        self.assertEqual(BYTES, read_bytes)
+        assert read_bytes == BYTES
 
     @responses.activate
     def test_seek_from_start(self):
@@ -53,18 +53,18 @@ class HttpTest(unittest.TestCase):
         reader = smart_open.http.SeekableBufferedInputBase(URL)
 
         reader.seek(10)
-        self.assertEqual(reader.tell(), 10)
+        assert reader.tell() == 10
         read_bytes = reader.read(size=10)
-        self.assertEqual(reader.tell(), 20)
-        self.assertEqual(BYTES[10:20], read_bytes)
+        assert reader.tell() == 20
+        assert BYTES[10:20] == read_bytes
 
         reader.seek(20)
         read_bytes = reader.read(size=10)
-        self.assertEqual(BYTES[20:30], read_bytes)
+        assert BYTES[20:30] == read_bytes
 
         reader.seek(0)
         read_bytes = reader.read(size=10)
-        self.assertEqual(BYTES[:10], read_bytes)
+        assert BYTES[:10] == read_bytes
 
     @responses.activate
     def test_seek_from_current(self):
@@ -73,14 +73,14 @@ class HttpTest(unittest.TestCase):
 
         reader.seek(10)
         read_bytes = reader.read(size=10)
-        self.assertEqual(BYTES[10:20], read_bytes)
+        assert BYTES[10:20] == read_bytes
 
-        self.assertEqual(reader.tell(), 20)
+        assert reader.tell() == 20
         reader.seek(10, whence=smart_open.constants.WHENCE_CURRENT)
-        self.assertEqual(reader.tell(), 30)
+        assert reader.tell() == 30
         read_bytes = reader.read(size=10)
-        self.assertEqual(reader.tell(), 40)
-        self.assertEqual(BYTES[30:40], read_bytes)
+        assert reader.tell() == 40
+        assert BYTES[30:40] == read_bytes
 
     @responses.activate
     def test_seek_forward_within_buffer(self):
@@ -88,20 +88,20 @@ class HttpTest(unittest.TestCase):
         responses.add_callback(responses.GET, URL, callback=request_callback)
         reader = smart_open.http.SeekableBufferedInputBase(URL, buffer_size=32)
 
-        self.assertEqual(reader.read(5), BYTES[:5])
+        assert reader.read(5) == BYTES[:5]
         initial_calls = len(responses.calls)
 
         # Forward seek within buffer using WHENCE_CURRENT - no new GET request
         reader.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-        self.assertEqual(reader.tell(), 6)
-        self.assertEqual(reader.read(5), BYTES[6:11])
+        assert reader.tell() == 6
+        assert reader.read(5) == BYTES[6:11]
 
         # Forward seek within buffer using WHENCE_START - no new GET request
         reader.seek(13, whence=smart_open.constants.WHENCE_START)
-        self.assertEqual(reader.tell(), 13)
-        self.assertEqual(reader.read(3), BYTES[13:16])
+        assert reader.tell() == 13
+        assert reader.read(3) == BYTES[13:16]
 
-        self.assertEqual(len(responses.calls), initial_calls)
+        assert len(responses.calls) == initial_calls
 
     @responses.activate
     def test_seek_from_end(self):
@@ -109,10 +109,10 @@ class HttpTest(unittest.TestCase):
         reader = smart_open.http.SeekableBufferedInputBase(URL)
 
         reader.seek(-10, whence=smart_open.constants.WHENCE_END)
-        self.assertEqual(reader.tell(), len(BYTES) - 10)
+        assert reader.tell() == len(BYTES) - 10
         read_bytes = reader.read(size=10)
-        self.assertEqual(reader.tell(), len(BYTES))
-        self.assertEqual(BYTES[-10:], read_bytes)
+        assert reader.tell() == len(BYTES)
+        assert BYTES[-10:] == read_bytes
 
     @responses.activate
     def test_headers_are_as_assigned(self):
@@ -127,16 +127,16 @@ class HttpTest(unittest.TestCase):
         # use default again, global shoudn't overwritten from x
         y = smart_open.http.BufferedInputBase(URL)
         # should be default headers
-        self.assertEqual(y.headers, {"Accept-Encoding": "identity"})
+        assert y.headers == {"Accept-Encoding": "identity"}
         # should be assigned headers
-        self.assertEqual(x.headers, {"Accept-Encoding": "compress, gzip", "Other-Header": "value"})
+        assert x.headers == {"Accept-Encoding": "compress, gzip", "Other-Header": "value"}
 
     @responses.activate
     def test_headers(self):
         """Does the top-level http.open function handle headers correctly?"""
         responses.add_callback(responses.GET, URL, callback=request_callback)
         reader = smart_open.http.open(URL, "rb", headers={"Foo": "bar"})
-        self.assertEqual(reader.headers["Foo"], "bar")
+        assert reader.headers["Foo"] == "bar"
 
     @responses.activate
     def test_https_seek_start(self):
@@ -147,7 +147,7 @@ class HttpTest(unittest.TestCase):
             read_bytes_1 = fin.read(size=10)
             fin.seek(0)
             read_bytes_2 = fin.read(size=10)
-            self.assertEqual(read_bytes_1, read_bytes_2)
+            assert read_bytes_1 == read_bytes_2
 
     @responses.activate
     def test_https_seek_forward(self):
@@ -157,7 +157,7 @@ class HttpTest(unittest.TestCase):
         with smart_open.open(HTTPS_URL, "rb") as fin:
             fin.seek(10)
             read_bytes = fin.read(size=10)
-            self.assertEqual(BYTES[10:20], read_bytes)
+            assert BYTES[10:20] == read_bytes
 
     @responses.activate
     def test_https_seek_reverse(self):
@@ -168,7 +168,7 @@ class HttpTest(unittest.TestCase):
             read_bytes_1 = fin.read(size=10)
             fin.seek(-10, whence=smart_open.constants.WHENCE_CURRENT)
             read_bytes_2 = fin.read(size=10)
-            self.assertEqual(read_bytes_1, read_bytes_2)
+            assert read_bytes_1 == read_bytes_2
 
     @responses.activate
     def test_timeout_attribute(self):

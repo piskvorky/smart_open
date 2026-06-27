@@ -4,10 +4,7 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-"""
-Sample code for HDFS integration tests.
-Requires hadoop to be running on localhost, at the moment.
-"""
+"""Sample code for HDFS integration tests (requires hadoop on localhost)."""
 
 import smart_open
 

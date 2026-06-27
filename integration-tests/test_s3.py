@@ -55,8 +55,7 @@ def write_read(uri, content, write_mode, read_mode, encoding=None, s3_upload=Non
     with smart_open.open(uri, write_mode, encoding=encoding, transport_params=write_params) as fout:
         fout.write(content)
     with smart_open.open(uri, read_mode, encoding=encoding, transport_params=kwargs) as fin:
-        actual = fin.read()
-    return actual
+        return fin.read()
 
 
 def read_length_prefixed_messages(uri, read_mode, encoding=None, **kwargs):

@@ -8,6 +8,7 @@
 """Implements the majority of smart_open's top-level API."""
 
 import collections
+import contextlib
 import locale
 import logging
 import os
@@ -144,10 +145,12 @@ def open(
     logger.debug("%r", locals())
 
     if not isinstance(mode, str):
-        raise TypeError("mode should be a string")
+        msg = "mode should be a string"
+        raise TypeError(msg)
 
     if compression not in so_compression.get_supported_compression_types():
-        raise ValueError(f"invalid compression type: {compression}")
+        msg = f"invalid compression type: {compression}"
+        raise ValueError(msg)
 
     if transport_params is None:
         transport_params = {}
@@ -234,10 +237,8 @@ def open(
     if decoded != binary:
         promoted_attrs = ["to_boto3"]
         for attr in promoted_attrs:
-            try:
+            with contextlib.suppress(AttributeError):
                 setattr(decoded, attr, getattr(binary, attr))
-            except AttributeError:
-                pass
 
     return so_utils.FileLikeProxy(decoded, binary)
 
@@ -253,11 +254,13 @@ def _get_binary_mode(mode_str):
     binmode = []
 
     if "t" in mode and "b" in mode:
-        raise ValueError("can't have text and binary mode at once")
+        msg = "can't have text and binary mode at once"
+        raise ValueError(msg)
 
     counts = [mode.count(x) for x in "rwa"]
     if sum(counts) > 1:
-        raise ValueError("must have exactly one of create/read/write/append mode")
+        msg = "must have exactly one of create/read/write/append mode"
+        raise ValueError(msg)
 
     def transfer(char):
         binmode.append(mode.pop(mode.index(char)))
@@ -269,7 +272,8 @@ def _get_binary_mode(mode_str):
     elif "r" in mode:
         transfer("r")
     else:
-        raise ValueError("Must have exactly one of create/read/write/append mode and at most one plus")
+        msg = "Must have exactly one of create/read/write/append mode and at most one plus"
+        raise ValueError(msg)
 
     if "b" in mode:
         transfer("b")
@@ -288,7 +292,8 @@ def _get_binary_mode(mode_str):
     # of this function is broken, or the original input mode is invalid.
     #
     if mode:
-        raise ValueError(f"invalid mode: {mode_str!r}")
+        msg = f"invalid mode: {mode_str!r}"
+        raise ValueError(msg)
 
     return "".join(binmode)
 
@@ -380,7 +385,8 @@ def _open_binary_stream(uri, mode, transport_params):
         # This should really be a ValueError, but for the sake of compatibility
         # with older versions, which raise NotImplementedError, we do the same.
         #
-        raise NotImplementedError(f"unsupported mode: {mode!r}")
+        msg = f"unsupported mode: {mode!r}"
+        raise NotImplementedError(msg)
 
     if isinstance(uri, int):
         #
@@ -390,11 +396,11 @@ def _open_binary_stream(uri, mode, transport_params):
         # so we just give up here.  The user will have to handle their own
         # compression, etc. explicitly.
         #
-        fobj = _builtin_open(uri, mode, closefd=False)
-        return fobj
+        return _builtin_open(uri, mode, closefd=False)
 
     if not isinstance(uri, str):
-        raise TypeError(f"don't know how to handle uri {repr(uri)}")
+        msg = f"don't know how to handle uri {uri!r}"
+        raise TypeError(msg)
 
     scheme = _sniff_scheme(uri)
     submodule = transport.get_transport(scheme)
@@ -438,31 +444,32 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
     if encoding is None:
         encoding = DEFAULT_ENCODING
 
-    fileobj = so_utils.TextIOWrapper(
+    return so_utils.TextIOWrapper(
         fileobj,
         encoding=encoding,
         errors=errors,
         newline=newline,
         write_through=True,
     )
-    return fileobj
 
 
 class patch_pathlib:
-    """Replace `Path.open` with `smart_open.open`"""
+    """Replace `Path.open` with `smart_open.open`."""
 
     def __init__(self):
         self.old_impl = _patch_pathlib(open)
 
     def __enter__(self):
+        """Enter the patched-pathlib context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Restore the original ``Path.open`` implementation."""
         _patch_pathlib(self.old_impl)
 
 
 def _patch_pathlib(func):
-    """Replace `Path.open` with `func`"""
+    """Replace `Path.open` with `func`."""
     old_impl = pathlib.Path.open
     pathlib.Path.open = func
     return old_impl
@@ -477,7 +484,7 @@ try:
     doctools.tweak_open_docstring(open)
     doctools.tweak_parse_uri_docstring(parse_uri)
 except Exception as ex:
-    logger.error(
+    logger.exception(
         "Encountered a non-fatal error while building docstrings (see below). "
         "help(smart_open) will provide incomplete information as a result. "
         "For full help text, see "

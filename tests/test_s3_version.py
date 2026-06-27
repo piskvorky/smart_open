@@ -13,6 +13,8 @@ try:
 except ImportError:
     from moto import mock_aws as mock_s3
 
+import pytest
+
 from smart_open import open
 
 BUCKET_NAME = "test-smartopen"
@@ -69,39 +71,39 @@ class TestVersionId(unittest.TestCase):
         params = {"version_id": self.versions[0]}
         with open(self.url, mode="rb", transport_params=params) as fin:
             actual = fin.read()
-        self.assertEqual(actual, self.test_ver1)
+        assert actual == self.test_ver1
 
     def test_bad_id(self):
         """Does passing an invalid version_id exception into the s3 submodule get handled correctly?"""
         params = {"version_id": "bad-version-does-not-exist"}
-        with self.assertRaises(IOError):
+        with pytest.raises(IOError):
             open(self.url, "rb", transport_params=params)
 
     def test_bad_mode(self):
         """Do we correctly handle non-None version when writing?"""
         params = {"version_id": self.versions[0]}
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             open(self.url, "wb", transport_params=params)
 
     def test_no_version(self):
         """Passing in no version at all gives the newest version of the file?"""
         with open(self.url, "rb") as fin:
             actual = fin.read()
-        self.assertEqual(actual, self.test_ver2)
+        assert actual == self.test_ver2
 
     def test_newest_version(self):
         """Passing in the newest version explicitly gives the most recent content?"""
         params = {"version_id": self.versions[1]}
         with open(self.url, mode="rb", transport_params=params) as fin:
             actual = fin.read()
-        self.assertEqual(actual, self.test_ver2)
+        assert actual == self.test_ver2
 
     def test_oldest_version(self):
         """Passing in the oldest version gives the oldest content?"""
         params = {"version_id": self.versions[0]}
         with open(self.url, mode="rb", transport_params=params) as fin:
             actual = fin.read()
-        self.assertEqual(actual, self.test_ver1)
+        assert actual == self.test_ver1
 
     def test_version_to_boto3(self):
         """Passing in the oldest version gives the oldest content?"""
@@ -111,14 +113,14 @@ class TestVersionId(unittest.TestCase):
             returned_obj = fin.to_boto3(_resource("s3"))
 
         boto3_body = boto3_body = returned_obj.get()["Body"].read()
-        self.assertEqual(boto3_body, self.test_ver1)
+        assert boto3_body == self.test_ver1
 
     def test_version_id_in_url(self):
         """Does ``?versionId=...`` in the URL pin the read to that version?"""
         url = f"{self.url}?versionId={self.versions[0]}"
         with open(url, mode="rb") as fin:
             actual = fin.read()
-        self.assertEqual(actual, self.test_ver1)
+        assert actual == self.test_ver1
 
 
 if __name__ == "__main__":

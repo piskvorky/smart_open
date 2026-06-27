@@ -31,6 +31,7 @@ _DEFAULT_WRITE_OPEN_KWARGS = {"ignore_flush": True}
 
 
 def parse_uri(uri_as_string):
+    """Parse a ``gcs://`` or ``gs://`` URI into its bucket and blob components."""
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme in SCHEMES
     bucket_id = sr.netloc
@@ -39,6 +40,7 @@ def parse_uri(uri_as_string):
 
 
 def open_uri(uri, mode, transport_params):
+    """Open a GCS URI using the given mode and transport params."""
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     return open(parsed_uri["bucket_id"], parsed_uri["blob_id"], mode, **kwargs)
@@ -97,13 +99,14 @@ def open(
         )
 
     else:
-        raise NotImplementedError(f"GCS support for mode {mode} not implemented")
+        msg = f"GCS support for mode {mode} not implemented"
+        raise NotImplementedError(msg)
 
     return _blob
 
 
 def Reader(bucket, key, client=None, get_blob_kwargs=None, blob_open_kwargs=None):
-
+    """Return a file-like object for reading the GCS blob `key` from `bucket`."""
     if get_blob_kwargs is None:
         get_blob_kwargs = {}
     if blob_open_kwargs is None:
@@ -115,13 +118,14 @@ def Reader(bucket, key, client=None, get_blob_kwargs=None, blob_open_kwargs=None
     blob = bkt.get_blob(key, **get_blob_kwargs)
 
     if blob is None:
-        raise google.cloud.exceptions.NotFound(f"blob {key} not found in {bucket}")
+        msg = f"blob {key} not found in {bucket}"
+        raise google.cloud.exceptions.NotFound(msg)
 
     return blob.open("rb", **blob_open_kwargs)
 
 
 def Writer(bucket, blob, min_part_size=None, client=None, blob_properties=None, blob_open_kwargs=None):
-
+    """Return a file-like object for writing to GCS blob `blob` in `bucket`."""
     if blob_open_kwargs is None:
         blob_open_kwargs = {}
     if blob_properties is None:
@@ -139,6 +143,4 @@ def Writer(bucket, blob, min_part_size=None, client=None, blob_properties=None, 
     for k, v in blob_properties.items():
         setattr(g_blob, k, v)
 
-    _blob = g_blob.open("wb", **blob_open_kwargs)
-
-    return _blob
+    return g_blob.open("wb", **blob_open_kwargs)

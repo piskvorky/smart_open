@@ -35,6 +35,7 @@ the client (us) has to decompress them with the appropriate algorithm.
 
 
 def parse_uri(uri_as_string):
+    """Parse an ``http://`` or ``https://`` URI into its path component."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
 
@@ -44,6 +45,7 @@ def parse_uri(uri_as_string):
 
 
 def open_uri(uri, mode, transport_params):
+    """Open an HTTP/HTTPS URI using the given mode and transport params."""
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     return open(uri, mode, **kwargs)
 
@@ -105,10 +107,13 @@ def open(
         )
         fobj.name = os.path.basename(urllib.parse.urlparse(uri).path)
         return fobj
-    raise NotImplementedError(f"http support for mode {mode!r} not implemented")
+    msg = f"http support for mode {mode!r} not implemented"
+    raise NotImplementedError(msg)
 
 
 class BufferedInputBase(io.BufferedIOBase):
+    """Buffered HTTP reader implementing the `io.BufferedIOBase` interface."""
+
     response = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(
@@ -175,6 +180,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
     @property
     def closed(self):
+        """Return True if the stream is closed."""
         return self.response is None
 
     def readable(self):
@@ -182,6 +188,7 @@ class BufferedInputBase(io.BufferedIOBase):
         return True
 
     def seekable(self):
+        """Return False; the base HTTP reader does not support seeking."""
         return False
 
     #
@@ -194,7 +201,8 @@ class BufferedInputBase(io.BufferedIOBase):
     def read(self, size=-1):
         """Mimic the read call to a filehandle object."""
         if size < -1:
-            raise ValueError(f"size must be >= -1, got {size}")
+            msg = f"size must be >= -1, got {size}"
+            raise ValueError(msg)
 
         logger.debug("reading with size: %d", size)
         if self.closed or size == 0:
@@ -277,10 +285,12 @@ class SeekableBufferedInputBase(BufferedInputBase):
         """
         logger.debug("seeking to offset: %r whence: %r", offset, whence)
         if whence not in constants.WHENCE_CHOICES:
-            raise ValueError(f"invalid whence, expected one of {constants.WHENCE_CHOICES!r}")
+            msg = f"invalid whence, expected one of {constants.WHENCE_CHOICES!r}"
+            raise ValueError(msg)
 
         if not self.seekable():
-            raise OSError("stream is not seekable")
+            msg = "stream is not seekable"
+            raise OSError(msg)
 
         if whence == constants.WHENCE_START:
             new_pos = offset
@@ -321,9 +331,11 @@ class SeekableBufferedInputBase(BufferedInputBase):
         return self._current_pos
 
     def tell(self):
+        """Return the current stream position."""
         return self._current_pos
 
     def seekable(self, *args, **kwargs):
+        """Return True if the server reports it accepts byte-range requests."""
         return self._seekable
 
     def truncate(self, size=None):
@@ -335,7 +347,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         if start_pos is not None:
             headers["range"] = smart_open.utils.make_range_string(start_pos)
 
-        response = self.session.get(
+        return self.session.get(
             self.url,
             auth=self.auth,
             stream=True,
@@ -343,4 +355,3 @@ class SeekableBufferedInputBase(BufferedInputBase):
             headers=headers,
             timeout=self.timeout,
         )
-        return response

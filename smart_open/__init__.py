@@ -5,9 +5,10 @@
 # from the MIT License (MIT).
 #
 
-"""
-Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
-filesystem / compressed files, and many more, using a simple, Pythonic API.
+"""Utilities for streaming to/from several file-like data storages.
+
+Supports S3 / HDFS / local filesystem / compressed files, and many more,
+using a simple, Pythonic API.
 
 The streaming makes heavy use of generators and pipes, to avoid loading
 full file contents into memory, allowing work with arbitrarily large files.

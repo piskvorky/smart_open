@@ -19,6 +19,7 @@ from typing import Literal
 import azure.common
 import azure.core.exceptions
 import azure.storage.blob
+import pytest
 
 import smart_open
 import smart_open.constants
@@ -78,11 +79,12 @@ class FakeBlobClient:
 
     def get_blob_properties(self):
         if not self._exists:
-            raise azure.core.exceptions.ResourceNotFoundError("The specified blob does not exist.")
+            msg = "The specified blob does not exist."
+            raise azure.core.exceptions.ResourceNotFoundError(msg)
         return self.metadata
 
     def get_block_list(self, block_list_type: Literal["all", "uncommitted", "committed"] = "committed"):
-        """Returns a tuple of two lists - committed and uncommitted blocks"""
+        """Returns a tuple of two lists - committed and uncommitted blocks."""
         return [], list(self._staged_contents.keys())
 
     def set_blob_metadata(self, metadata):
@@ -97,9 +99,8 @@ class FakeBlobClient:
 
         if blob_type == azure.storage.blob.BlobType.APPENDBLOB:
             if self._exists and self._blob_type != azure.storage.blob.BlobType.APPENDBLOB:
-                raise azure.core.exceptions.ResourceExistsError(
-                    "The blob type is invalid for this operation."
-                )
+                msg = "The blob type is invalid for this operation."
+                raise azure.core.exceptions.ResourceExistsError(msg)
             self._blob_type = azure.storage.blob.BlobType.APPENDBLOB
             self._exists = True
             # Append to existing contents
@@ -126,15 +127,15 @@ class FakeBlobClientTest(unittest.TestCase):
     def test_delete_blob(self):
         data = b"Lorem ipsum"
         self.blob_client.upload_blob(data)
-        self.assertEqual(self.container_client.list_blobs(), [self.blob_client.blob_name])
+        assert self.container_client.list_blobs() == [self.blob_client.blob_name]
         self.blob_client.delete_blob()
-        self.assertEqual(self.container_client.list_blobs(), [])
+        assert self.container_client.list_blobs() == []
 
     def test_upload_blob(self):
         data = b"Lorem ipsum"
         self.blob_client.upload_blob(data)
         actual = self.blob_client.download_blob().read()
-        self.assertEqual(actual, data)
+        assert actual == data
 
 
 class FakeContainerClient:
@@ -160,10 +161,10 @@ class FakeContainerClient:
 
     def download_blob(self, blob):
         if blob.blob_name not in list(self.__blob_clients.keys()):
-            raise azure.core.exceptions.ResourceNotFoundError("The specified blob does not exist.")
+            msg = "The specified blob does not exist."
+            raise azure.core.exceptions.ResourceNotFoundError(msg)
         blob_client = self.__blob_clients[blob.blob_name]
-        blob_content = blob_client.download_blob()
-        return blob_content
+        return blob_client.download_blob()
 
     def get_blob_client(self, blob_name):
         return self.__blob_clients.get(blob_name, FakeBlobClient(self, blob_name))
@@ -190,17 +191,17 @@ class FakeContainerClientTest(unittest.TestCase):
 
     def test_nonexistent_blob(self):
         blob_client = self.container_client.get_blob_client("test-blob.txt")
-        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
+        with pytest.raises(azure.core.exceptions.ResourceNotFoundError):
             self.container_client.download_blob(blob_client)
 
     def test_delete_blob(self):
         blob_name = "test-blob.txt"
         data = b"Lorem ipsum"
         self.container_client.upload_blob(blob_name, data)
-        self.assertEqual(self.container_client.list_blobs(), [blob_name])
+        assert self.container_client.list_blobs() == [blob_name]
         blob_client = FakeBlobClient(self.container_client, "test-blob.txt")
         self.container_client.delete_blob(blob_client)
-        self.assertEqual(self.container_client.list_blobs(), [])
+        assert self.container_client.list_blobs() == []
 
     def test_delete_blobs(self):
         blob_name_1 = "test-blob-1.txt"
@@ -208,16 +209,14 @@ class FakeContainerClientTest(unittest.TestCase):
         data = b"Lorem ipsum"
         self.container_client.upload_blob(blob_name_1, data)
         self.container_client.upload_blob(blob_name_2, data)
-        self.assertEqual(self.container_client.list_blobs(), [blob_name_1, blob_name_2])
+        assert self.container_client.list_blobs() == [blob_name_1, blob_name_2]
 
     def test_delete_container(self):
         container_name = "test-container"
         container_client = self.blob_service_client.create_container(container_name)
-        self.assertEqual(
-            self.blob_service_client.get_container_client(container_name).container_name, container_name
-        )
+        assert self.blob_service_client.get_container_client(container_name).container_name == container_name
         container_client.delete_container()
-        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
+        with pytest.raises(azure.core.exceptions.ResourceNotFoundError):
             self.blob_service_client.get_container_client(container_name)
 
     def test_list_blobs(self):
@@ -226,9 +225,9 @@ class FakeContainerClientTest(unittest.TestCase):
         data = b"Lorem ipsum"
         self.container_client.upload_blob(blob_name_1, data)
         self.container_client.upload_blob(blob_name_2, data)
-        self.assertEqual(self.container_client.list_blobs(), [blob_name_1, blob_name_2])
+        assert self.container_client.list_blobs() == [blob_name_1, blob_name_2]
         self.container_client.delete_blobs()
-        self.assertEqual(self.container_client.list_blobs(), [])
+        assert self.container_client.list_blobs() == []
 
     def test_upload_blob(self):
         blob_name = "test-blob.txt"
@@ -236,7 +235,7 @@ class FakeContainerClientTest(unittest.TestCase):
         self.container_client.upload_blob(blob_name, data)
         blob_client = self.container_client.get_blob_client(blob_name)
         actual = self.container_client.download_blob(blob_client).read()
-        self.assertEqual(actual, data)
+        assert actual == data
 
 
 class FakeBlobServiceClient:
@@ -259,7 +258,8 @@ class FakeBlobServiceClient:
 
     def create_container(self, container_name, metadata=None):
         if container_name in self.__container_clients:
-            raise azure.core.exceptions.ResourceExistsError("The specified container already exists.")
+            msg = "The specified container already exists."
+            raise azure.core.exceptions.ResourceExistsError(msg)
         container_client = FakeContainerClient(self, container_name)
         if metadata is not None:
             container_client.create_container(metadata)
@@ -271,12 +271,12 @@ class FakeBlobServiceClient:
 
     def get_blob_client(self, container, blob):
         container = self.__container_clients[container]
-        blob_client = container.get_blob_client(blob)
-        return blob_client
+        return container.get_blob_client(blob)
 
     def get_container_client(self, container):
         if container not in self.__container_clients:
-            raise azure.core.exceptions.ResourceNotFoundError("The specified container does not exist.")
+            msg = "The specified container does not exist."
+            raise azure.core.exceptions.ResourceNotFoundError(msg)
         return self.__container_clients[container]
 
 
@@ -285,26 +285,26 @@ class FakeBlobServiceClientTest(unittest.TestCase):
         self.blob_service_client = FakeBlobServiceClient.from_connection_string(CONNECT_STR)
 
     def test_nonexistent_container(self):
-        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
+        with pytest.raises(azure.core.exceptions.ResourceNotFoundError):
             self.blob_service_client.get_container_client("test-container")
 
     def test_create_container(self):
         container_name = "test_container"
         expected = self.blob_service_client.create_container(container_name)
         actual = self.blob_service_client.get_container_client(container_name)
-        self.assertEqual(actual, expected)
+        assert actual == expected
 
     def test_duplicate_container(self):
         container_name = "test-container"
         self.blob_service_client.create_container(container_name)
-        with self.assertRaises(azure.core.exceptions.ResourceExistsError):
+        with pytest.raises(azure.core.exceptions.ResourceExistsError):
             self.blob_service_client.create_container(container_name)
 
     def test_delete_container(self):
         container_name = "test_container"
         self.blob_service_client.create_container(container_name)
         self.blob_service_client.delete_container(container_name)
-        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
+        with pytest.raises(azure.core.exceptions.ResourceNotFoundError):
             self.blob_service_client.get_container_client(container_name)
 
     def test_get_blob_client(self):
@@ -312,7 +312,7 @@ class FakeBlobServiceClientTest(unittest.TestCase):
         blob_name = "test-blob.txt"
         self.blob_service_client.create_container(container_name)
         blob_client = self.blob_service_client.get_blob_client(container_name, blob_name)
-        self.assertEqual(blob_client.blob_name, blob_name)
+        assert blob_client.blob_name == blob_name
 
 
 if DISABLE_MOCKS:
@@ -344,23 +344,20 @@ def put_to_container(blob_name, contents, num_attempts=12, sleep_time=5):
             container_client.upload_blob(blob_name, contents)
             return
         except azure.common.AzureHttpError as err:
-            logger.error("caught %r, retrying", err)
+            logger.exception("caught %r, retrying", err)
             time.sleep(sleep_time)
 
-    raise AssertionError(f"failed to create container {CONTAINER_NAME} after {num_attempts} attempts")
+    msg = f"failed to create container {CONTAINER_NAME} after {num_attempts} attempts"
+    raise AssertionError(msg)
 
 
 def setUpModule():
-    """Called once by unittest when initializing this module.  Set up the
-    test Azure container.
-    """
+    """Set up the test Azure container (called once by unittest)."""
     CLIENT.create_container(CONTAINER_NAME)
 
 
 def tearDownModule():
-    """Called once by unittest when tearing down this module.  Empty and
-    removes the test Azure container.
-    """
+    """Empty and remove the test Azure container (called once by unittest)."""
     try:
         container_client = get_container_client()
         container_client.delete_container()
@@ -381,7 +378,7 @@ class ReaderTest(unittest.TestCase):
         # connect to fake Azure Blob Storage and read from the fake key we filled above
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         output = [line.rstrip(b"\n") for line in fin]
-        self.assertEqual(output, expected.split(b"\n"))
+        assert output == expected.split(b"\n")
 
     def test_iter_context_manager(self):
         # same thing but using a context manager
@@ -391,7 +388,7 @@ class ReaderTest(unittest.TestCase):
 
         with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             output = [line.rstrip(b"\n") for line in fin]
-            self.assertEqual(output, expected.split(b"\n"))
+            assert output == expected.split(b"\n")
 
     def test_read(self):
         """Are Azure Blob Storage files read correctly?"""
@@ -401,9 +398,9 @@ class ReaderTest(unittest.TestCase):
         logger.debug("content: %r len: %r", content, len(content))
 
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
-        self.assertEqual(content[:6], fin.read(6))
-        self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
-        self.assertEqual(content[14:], fin.read())  # read the rest
+        assert content[:6] == fin.read(6)
+        assert content[6:14] == fin.read(8)  # ř is 2 bytes
+        assert content[14:] == fin.read()  # read the rest
 
     def test_read_max_concurrency(self):
         """Are Azure Blob Storage files read correctly?"""
@@ -413,9 +410,9 @@ class ReaderTest(unittest.TestCase):
         logger.debug("content: %r len: %r", content, len(content))
 
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT, max_concurrency=4)
-        self.assertEqual(content[:6], fin.read(6))
-        self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
-        self.assertEqual(content[14:], fin.read())  # read the rest
+        assert content[:6] == fin.read(6)
+        assert content[6:14] == fin.read(8)  # ř is 2 bytes
+        assert content[14:] == fin.read()  # read the rest
 
     def test_seek_beginning(self):
         """Does seeking to the beginning of Azure Blob Storage files work correctly?"""
@@ -424,14 +421,14 @@ class ReaderTest(unittest.TestCase):
         put_to_container(blob_name, contents=content)
 
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
-        self.assertEqual(content[:6], fin.read(6))
-        self.assertEqual(content[6:14], fin.read(8))  # ř is 2 bytes
+        assert content[:6] == fin.read(6)
+        assert content[6:14] == fin.read(8)  # ř is 2 bytes
 
         fin.seek(0)
-        self.assertEqual(content, fin.read())  # no size given => read whole file
+        assert content == fin.read()  # no size given => read whole file
 
         fin.seek(0)
-        self.assertEqual(content, fin.read(-1))  # same thing
+        assert content == fin.read(-1)  # same thing
 
     def test_seek_start(self):
         """Does seeking from the start of Azure Blob Storage files work correctly?"""
@@ -441,9 +438,9 @@ class ReaderTest(unittest.TestCase):
 
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         seek = fin.seek(6)
-        self.assertEqual(seek, 6)
-        self.assertEqual(fin.tell(), 6)
-        self.assertEqual(fin.read(6), "wořld".encode())
+        assert seek == 6
+        assert fin.tell() == 6
+        assert fin.read(6) == "wořld".encode()
 
     def test_seek_current(self):
         """Does seeking from the middle of Azure Blob Storage files work correctly?"""
@@ -452,10 +449,10 @@ class ReaderTest(unittest.TestCase):
         put_to_container(blob_name, contents=content)
 
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
-        self.assertEqual(fin.read(5), b"hello")
+        assert fin.read(5) == b"hello"
         seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-        self.assertEqual(seek, 6)
-        self.assertEqual(fin.read(6), "wořld".encode())
+        assert seek == 6
+        assert fin.read(6) == "wořld".encode()
 
     def test_seek_end(self):
         """Does seeking from the end of Azure Blob Storage files work correctly?"""
@@ -465,8 +462,8 @@ class ReaderTest(unittest.TestCase):
 
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
-        self.assertEqual(seek, len(content) - 4)
-        self.assertEqual(fin.read(), b"you?")
+        assert seek == len(content) - 4
+        assert fin.read() == b"you?"
 
     def test_seek_forward_within_buffer(self):
         """Does forward seeking within buffered data avoid additional download_blob requests?"""
@@ -475,7 +472,7 @@ class ReaderTest(unittest.TestCase):
         put_to_container(blob_name, contents=content)
 
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT, buffer_size=32)
-        self.assertEqual(fin.read(5), b"hello")
+        assert fin.read(5) == b"hello"
 
         # Account for the initial download_blob call from the read above.
         with unittest.mock.patch.object(
@@ -483,13 +480,13 @@ class ReaderTest(unittest.TestCase):
         ) as mock_download:
             # Forward seek within buffer using WHENCE_CURRENT - no new download
             seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-            self.assertEqual(seek, 6)
-            self.assertEqual(fin.read(6), "wořld".encode())
+            assert seek == 6
+            assert fin.read(6) == "wořld".encode()
 
             # Forward seek within buffer using WHENCE_START - no new download
             seek = fin.seek(13, whence=smart_open.constants.WHENCE_START)
-            self.assertEqual(seek, 13)
-            self.assertEqual(fin.read(3), b"how")
+            assert seek == 13
+            assert fin.read(3) == b"how"
 
             mock_download.assert_not_called()
 
@@ -501,9 +498,9 @@ class ReaderTest(unittest.TestCase):
         fin = smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT)
         fin.read()
         eof = fin.tell()
-        self.assertEqual(eof, len(content))
+        assert eof == len(content)
         fin.seek(0, whence=smart_open.constants.WHENCE_END)
-        self.assertEqual(eof, fin.tell())
+        assert eof == fin.tell()
 
     def test_read_gzip(self):
         expected = "раcцветали яблони и груши, поплыли туманы над рекой...".encode()
@@ -518,21 +515,21 @@ class ReaderTest(unittest.TestCase):
         # Make sure we're reading things correctly.
         #
         with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
-            self.assertEqual(fin.read(), buf.getvalue())
+            assert fin.read() == buf.getvalue()
 
         #
         # Make sure the buffer we wrote is legitimate gzip.
         #
         sanity_buf = io.BytesIO(buf.getvalue())
         with gzip.GzipFile(fileobj=sanity_buf) as zipfile:
-            self.assertEqual(zipfile.read(), expected)
+            assert zipfile.read() == expected
 
         logger.debug("starting actual test")
         with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
-        self.assertEqual(expected, actual)
+        assert expected == actual
 
     def test_readline(self):
         content = b"englishman\nin\nnew\nyork\n"
@@ -541,14 +538,14 @@ class ReaderTest(unittest.TestCase):
 
         with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             fin.readline()
-            self.assertEqual(fin.tell(), content.index(b"\n") + 1)
+            assert fin.tell() == content.index(b"\n") + 1
 
             fin.seek(0)
             actual = list(fin)
-            self.assertEqual(fin.tell(), len(content))
+            assert fin.tell() == len(content)
 
         expected = [b"englishman\n", b"in\n", b"new\n", b"york\n"]
-        self.assertEqual(expected, actual)
+        assert expected == actual
 
     def test_readline_tiny_buffer(self):
         content = b"englishman\nin\nnew\nyork\n"
@@ -559,7 +556,7 @@ class ReaderTest(unittest.TestCase):
             actual = list(fin)
 
         expected = [b"englishman\n", b"in\n", b"new\n", b"york\n"]
-        self.assertEqual(expected, actual)
+        assert expected == actual
 
     def test_read0_does_not_return_data(self):
         content = b"englishman\nin\nnew\nyork\n"
@@ -569,7 +566,7 @@ class ReaderTest(unittest.TestCase):
         with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             data = fin.read(0)
 
-        self.assertEqual(data, b"")
+        assert data == b""
 
     def test_read_past_end(self):
         content = b"englishman\nin\nnew\nyork\n"
@@ -579,7 +576,7 @@ class ReaderTest(unittest.TestCase):
         with smart_open.azure.Reader(CONTAINER_NAME, blob_name, CLIENT) as fin:
             data = fin.read(100)
 
-        self.assertEqual(data, content)
+        assert data == content
 
     def test_read_container_client(self):
         content = b"spirits in the material world"
@@ -608,7 +605,7 @@ class ReaderTest(unittest.TestCase):
 
     def test_nonexisting_container(self):
         with (
-            self.assertRaises(azure.core.exceptions.ResourceNotFoundError),
+            pytest.raises(azure.core.exceptions.ResourceNotFoundError),
             smart_open.azure.open("thiscontainerdoesntexist", "mykey", "rb", CLIENT) as fin,
         ):
             fin.read()
@@ -635,7 +632,7 @@ class WriterTest(unittest.TestCase):
                 transport_params={"client": CLIENT},
             )
         )
-        self.assertEqual(output, [test_string])
+        assert output == [test_string]
 
     def test_write_container_client(self):
         """Does writing into Azure Blob Storage work correctly?"""
@@ -671,7 +668,7 @@ class WriterTest(unittest.TestCase):
         ) as fout:
             fout.write(test_string)
 
-        self.assertEqual(blob_client.get_blob_properties()["name"], blob_name)
+        assert blob_client.get_blob_properties()["name"] == blob_name
 
         output = list(
             smart_open.open(
@@ -680,7 +677,7 @@ class WriterTest(unittest.TestCase):
                 transport_params={"client": CLIENT},
             )
         )
-        self.assertEqual(output, [test_string])
+        assert output == [test_string]
 
     def test_abort_upload(self):
         """Does aborted upload skip commit_block_list?"""
@@ -700,7 +697,7 @@ class WriterTest(unittest.TestCase):
                 raise ValueError
         except ValueError:
             # FakeBlobClient.commit_block_list was not called
-            self.assertGreater(len(blob_client.get_block_list("uncommitted")[1]), 0)
+            assert len(blob_client.get_block_list("uncommitted")[1]) > 0
 
     def test_abort_upload_text_mode(self):
         """Does aborted upload skip commit_block_list in text mode?"""
@@ -720,7 +717,7 @@ class WriterTest(unittest.TestCase):
                 raise ValueError
         except ValueError:
             # FakeBlobClient.commit_block_list was not called
-            self.assertGreater(len(blob_client.get_block_list("uncommitted")[1]), 0)
+            assert len(blob_client.get_block_list("uncommitted")[1]) > 0
 
     def test_abort_upload_compressed(self):
         """Does aborted upload skip commit_block_list with compression?"""
@@ -740,7 +737,7 @@ class WriterTest(unittest.TestCase):
                 raise ValueError
         except ValueError:
             # FakeBlobClient.commit_block_list was not called
-            self.assertGreater(len(blob_client.get_block_list("uncommitted")[1]), 0)
+            assert len(blob_client.get_block_list("uncommitted")[1]) > 0
 
     def test_incorrect_input(self):
         """Does azure write fail on incorrect input?"""
@@ -761,7 +758,7 @@ class WriterTest(unittest.TestCase):
         logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
             fout.write("testžížáč".encode())
-            self.assertEqual(fout.tell(), 14)
+            assert fout.tell() == 14
 
     def test_write_03(self):
         """Do multiple writes less than the min_part_size work correctly?"""
@@ -777,32 +774,32 @@ class WriterTest(unittest.TestCase):
             first_part = b"t" * 262141
             fout.write(first_part)
             local_write.write(first_part)
-            self.assertEqual(fout._current_part.tell(), 262141)
+            assert fout._current_part.tell() == 262141
 
             second_part = b"t\n"
             fout.write(second_part)
             local_write.write(second_part)
-            self.assertEqual(fout._current_part.tell(), 262143)
-            self.assertEqual(fout._total_parts, 0)
+            assert fout._current_part.tell() == 262143
+            assert fout._total_parts == 0
 
             third_part = b"t"
             fout.write(third_part)
             local_write.write(third_part)
-            self.assertEqual(fout._current_part.tell(), 0)
-            self.assertEqual(fout._total_parts, 1)
+            assert fout._current_part.tell() == 0
+            assert fout._total_parts == 1
 
             fourth_part = b"t" * 1
             fout.write(fourth_part)
             local_write.write(fourth_part)
-            self.assertEqual(fout._current_part.tell(), 1)
-            self.assertEqual(fout._total_parts, 1)
+            assert fout._current_part.tell() == 1
+            assert fout._total_parts == 1
 
         # read back the same key and check its content
         uri = f"azure://{CONTAINER_NAME}/{blob_name}"
         output = list(smart_open.open(uri, transport_params={"client": CLIENT}))
         local_write.seek(0)
         actual = [line.decode("utf-8") for line in list(local_write)]
-        self.assertEqual(output, actual)
+        assert output == actual
 
     def test_write_03a(self):
         """Do multiple writes greater than or equal to the min_part_size work correctly?"""
@@ -818,15 +815,15 @@ class WriterTest(unittest.TestCase):
                 part = b"t" * min_part_size
                 fout.write(part)
                 local_write.write(part)
-                self.assertEqual(fout._current_part.tell(), 0)
-                self.assertEqual(fout._total_parts, i)
+                assert fout._current_part.tell() == 0
+                assert fout._total_parts == i
 
         # read back the same key and check its content
         uri = f"azure://{CONTAINER_NAME}/{blob_name}"
         output = list(smart_open.open(uri, transport_params={"client": CLIENT}))
         local_write.seek(0)
         actual = [line.decode("utf-8") for line in list(local_write)]
-        self.assertEqual(output, actual)
+        assert output == actual
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
@@ -839,7 +836,7 @@ class WriterTest(unittest.TestCase):
         output = list(
             smart_open.open(f"azure://{CONTAINER_NAME}/{blob_name}", transport_params={"client": CLIENT})
         )
-        self.assertEqual(output, [])
+        assert output == []
 
     def test_gzip(self):
         expected = "а не спеть ли мне песню... о любви".encode()
@@ -852,13 +849,10 @@ class WriterTest(unittest.TestCase):
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
-        self.assertEqual(expected, actual)
+        assert expected == actual
 
     def test_buffered_writer_wrapper_works(self):
-        """
-        Ensure that we can wrap a smart_open azure stream in a BufferedWriter, which
-        passes a memoryview object to the underlying stream.
-        """
+        """Ensure that we can wrap a smart_open azure stream in a `BufferedWriter`."""
         expected = "не думай о секундах свысока"
         blob_name = f"test_buffered_writer_wrapper_works_{BLOB_NAME}"
 
@@ -874,7 +868,7 @@ class WriterTest(unittest.TestCase):
         ):
             actual = text.read()
 
-        self.assertEqual(expected, actual)
+        assert expected == actual
 
     def test_binary_iterator(self):
         expected = "выйду ночью в поле с конём".encode().split(b" ")
@@ -882,12 +876,12 @@ class WriterTest(unittest.TestCase):
         put_to_container(blob_name=blob_name, contents=b"\n".join(expected))
         with smart_open.azure.open(CONTAINER_NAME, blob_name, "rb", CLIENT) as fin:
             actual = [line.rstrip() for line in fin]
-        self.assertEqual(expected, actual)
+        assert expected == actual
 
     def test_nonexisting_container(self):
         expected = "выйду ночью в поле с конём".encode()
         with (
-            self.assertRaises(azure.core.exceptions.ResourceNotFoundError),
+            pytest.raises(azure.core.exceptions.ResourceNotFoundError),
             smart_open.azure.open("thiscontainerdoesntexist", "mykey", "wb", CLIENT) as fout,
         ):
             fout.write(expected)
@@ -915,9 +909,9 @@ class WriterTest(unittest.TestCase):
         fout = smart_open.azure.Writer(CONTAINER_NAME, "key", CLIENT)
         fout.write(text)
         with unittest.mock.patch.object(fout, "_upload_part", side_effect=RuntimeError("boom")):
-            with self.assertRaises(RuntimeError):
+            with pytest.raises(RuntimeError):
                 fout.close()
-        self.assertTrue(fout.closed)
+        assert fout.closed
 
 
 class AppendWriterTest(unittest.TestCase):
@@ -941,7 +935,7 @@ class AppendWriterTest(unittest.TestCase):
                 transport_params={"client": CLIENT},
             )
         )
-        self.assertEqual(output, [test_string])
+        assert output == [test_string]
 
     def test_append_existing_blob(self):
         """Does appending into an existing Azure Blob file work correctly?"""
@@ -962,13 +956,10 @@ class AppendWriterTest(unittest.TestCase):
                 transport_params={"client": CLIENT},
             )
         )
-        self.assertEqual(output, [test_string_1 + test_string_2])
+        assert output == [test_string_1 + test_string_2]
 
     def test_append_existing_write_blob(self):
-        """
-        Does appending into an existing Azure Blob file but not of type AppendBlob work correctly?
-        It the already existing blob is of type BlockBlob, PageBlob, etc., the write should fail.
-        """
+        """Appending to an existing non-AppendBlob blob should fail on close."""
         test_string = "žluťoučký koníček".encode()
         blob_name = f"test_append_existing_write_blob_{BLOB_NAME}"
 
@@ -984,13 +975,10 @@ class AppendWriterTest(unittest.TestCase):
             fout.close()
         # close() raised, but the writer must still mark itself closed so that
         # __del__ does not retry the upload and trigger an unraisable exception.
-        self.assertTrue(fout.closed)
+        assert fout.closed
 
     def test_append_on_error(self):
-        """
-        Does appending into an Azure Blob file work correctly when an error occurs?
-        With buffering, unflushed data is discarded on error (same as Writer).
-        """
+        """On error, unflushed AppendWriter buffer is discarded (same as Writer)."""
         test_string = "žluťoučký koníček".encode()
         blob_name = f"test_append_on_error_{BLOB_NAME}"
 
@@ -1003,7 +991,7 @@ class AppendWriterTest(unittest.TestCase):
         # Small write stays in buffer; terminate() discards it, so the blob
         # is never created.  Opening a non-existent blob for reading raises
         # ResourceNotFoundError.
-        with self.assertRaises(azure.core.exceptions.ResourceNotFoundError):
+        with pytest.raises(azure.core.exceptions.ResourceNotFoundError):
             smart_open.open(
                 f"azure://{CONTAINER_NAME}/{blob_name}",
                 "rb",
@@ -1029,14 +1017,10 @@ class AppendWriterTest(unittest.TestCase):
                 transport_params={"client": CLIENT},
             )
         )
-        self.assertEqual(output, [test_string_1 + test_string_2 + test_string_3])
+        assert output == [test_string_1 + test_string_2 + test_string_3]
 
     def test_append_block_over_max_block_size(self):
-        """
-        Does appending into an Azure Blob file work correctly when the block size is over the max block size?
-        By default, this block size is 4MB. Refer to official Azure documentation for more information:
-        https://learn.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs#about-append-blobs
-        """
+        """Appending a payload over the 4MB Azure block limit should still succeed."""
         test_string = b"0" * 4 * 1024 * 1024 + b"1" * 1024  # Create file with size over 4MB
         blob_name = f"test_append_block_over_max_block_size_{BLOB_NAME}"
 
@@ -1050,7 +1034,7 @@ class AppendWriterTest(unittest.TestCase):
                 transport_params={"client": CLIENT},
             )
         )
-        self.assertEqual(output, [test_string])
+        assert output == [test_string]
 
     def test_append_compressed_gzip(self):
         """Does appending to a gzip-compressed Azure Blob work via smart_open.open?"""
@@ -1068,7 +1052,7 @@ class AppendWriterTest(unittest.TestCase):
         with smart_open.open(uri, "rb", transport_params=tp) as fp:
             actual = fp.read()
 
-        self.assertEqual(actual, expected * 2)
+        assert actual == expected * 2
 
     def test_append_min_part_size_buffering(self):
         """Does the min_part_size buffering mechanic work correctly for AppendWriter?
@@ -1086,11 +1070,11 @@ class AppendWriterTest(unittest.TestCase):
             # First write: min_part_size - 1 bytes, should stay in buffer
             first_part = b"x" * (min_part_size - 1)
             fout.write(first_part)
-            self.assertEqual(fout._current_part.tell(), min_part_size - 1)
+            assert fout._current_part.tell() == min_part_size - 1
 
             # Second write: 1 byte reaches min_part_size, triggers upload
             fout.write(b"y")
-            self.assertEqual(fout._current_part.tell(), 0)
+            assert fout._current_part.tell() == 0
 
         # Verify the data was written correctly
         output = list(
@@ -1100,4 +1084,4 @@ class AppendWriterTest(unittest.TestCase):
                 transport_params={"client": CLIENT},
             )
         )
-        self.assertEqual(output, [first_part + b"y"])
+        assert output == [first_part + b"y"]

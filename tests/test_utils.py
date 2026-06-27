@@ -12,7 +12,7 @@ import smart_open.utils
 
 
 @pytest.mark.parametrize(
-    "value,minval,maxval,expected",
+    ("value", "minval", "maxval", "expected"),
     [
         (5, 0, 10, 5),
         (11, 0, 10, 10),
@@ -26,7 +26,7 @@ def test_clamp(value, minval, maxval, expected):
 
 
 @pytest.mark.parametrize(
-    "value,params,expected",
+    ("value", "params", "expected"),
     [
         (10, {}, 10),
         (-10, {}, 0),
@@ -48,7 +48,7 @@ def test_check_kwargs():
 
 
 @pytest.mark.parametrize(
-    "url,expected",
+    ("url", "expected"),
     [
         ("s3://bucket/key", ("s3", "bucket", "/key", "", "")),
         ("s3://bucket/key?", ("s3", "bucket", "/key?", "", "")),

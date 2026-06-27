@@ -79,23 +79,95 @@ line-length = 110 # historical smart_open style
 output-format = "concise"
 
 [tool.ruff.lint]
-# scoped down vs mapply: smart_open is a long-lived codebase, full "ALL" would surface ~1500 legacy violations
 ignore = [
+  "ANN", # we don't enforce type hints
+  "D107", # we have pydoclint with class docstring
+  "D203", # there is D211
+  "D213", # there is D212
+  "TRY003", # there is EM102
+  "FIX002", # there is TD002,TD003
+  "TC003", # clutters
+  "PLC0415", # local imports are necessary for optional dependencies
+  "COM812", # conflicts with ruff format
   "E501", # line length handled by ruff-format
-  "E731" # lambda assignment is widely used in smart_open
+  "E731", # lambda assignment is widely used in smart_open
+  "T20", # print/pprint legitimate in scripts and helpers
+  "A001", "A002", "A004", # smart_open intentionally shadows the builtin `open`
+  "EM101", "EM102", # plain strings inside exception constructors are fine
+  "PLR0913", # smart_open public APIs have many transport-layer kwargs by design
+  "C901", # legacy functions can be complex, refactor in dedicated PRs
+  "PLR2004", # magic value comparisons are clearer than named constants in many places
+  "RUF001", # ambiguous unicode chars are intentional in test fixtures
+  "PTH", # os.path is widely used; pathlib migration is a separate effort
+  "S101", # assert is used outside tests too
+  "S105", "S106", "S107", # hardcoded "password"-named kwargs are not secrets
+  "S108", # /tmp paths in tests/integration scripts are fine
+  "S113", # request timeouts in test scripts are fine
+  "S311", # pseudo-random in tests is fine
+  "S603", "S607", # subprocess invocations in ci_helpers are fine
+  "ERA001", # commented-out code is sometimes intentional
+  "LOG015", # root logger calls in scripts are fine
+  "N806", # some variables are intentionally uppercase
+  "N801", "N802", "N803", "N812", "N818", # legacy names match unittest/external APIs
+  "RET504", # explicit-assign-before-return is sometimes clearer
+  "SLF001", # private member access is used to glue smart_open's transports
+  "ARG001", "ARG002", "ARG005", # io.IOBase overrides keep interface args even when unused
+  "FBT002", "FBT003", # boolean kwargs/positional flags exist in the public API
+  "SIM115", "SIM117", # legacy context-manager patterns are clearer in places
+  "SIM105", "SIM108", # readability over conciseness
+  "BLE001", # bare except: is intentional in a couple of fallback paths
+  "TRY300", "TRY301", "TRY401", # try/except style is widely varied across smart_open
+  "PT012", "PT028", # legacy pytest patterns
+  "PERF203", "PERF401", # micro-perf rewrites are out of scope here
+  "G004", # f-string in log message is fine
+  "DTZ005", # naive datetime in release scripts is intentional
+  "S321", # ftplib usage is the whole point of smart_open/ftp.py
+  "PLR0912", # legacy functions can be branchy, refactor in dedicated PRs
+  "PLW0127", "PLW0128", # legacy self-assignment patterns in compatibility shims
+  "PGH004", # `# noqa` without a code is grandfathered in
+  "PYI024", # collections.namedtuple is fine in legacy public APIs
+  "S507", # paramiko AutoAddPolicy is a documented smart_open ssh default
+  "EXE001" # shebang on release scripts is informational
 ]
-select = [
-  "E", # pycodestyle errors
-  "F", # pyflakes
-  "W", # pycodestyle warnings
-  "I", # isort
-  "UP", # pyupgrade
-  "B", # bugbear
-  "C4" # comprehensions
+select = ["ALL"]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"**/tests/**/*.py" = [
+  "D100", # tests is not a package
+  "D101", "D102", "D103", # test classes/methods/functions don't need docstrings
+  "D104", # tests modules don't need docstrings
+  "INP001", # tests dir is intentionally not a namespace package
+  "PT006", "PT009", "PT011", "PT027", # legacy unittest-style patterns survive in this test suite
+  "PT013", # `import pytest as pt` shorthand
+  "PYI024", # collections.namedtuple usage in tests
+  "RUF012", # mutable class attributes in mock fixtures
+  "S324", # md5 in tests is fine
+  "S507", # paramiko AutoAddPolicy in tests
+  "TD002", "TD003" # legacy TODOs in tests
+]
+"integration-tests/**/*.py" = [
+  "D100", "D101", "D102", "D103", "D104",
+  "INP001", # not a namespace package
+  "PT013" # `import pytest as pt` shorthand
+]
+"benchmark/**/*.py" = [
+  "D100", "D101", "D102", "D103", "D104",
+  "INP001" # not a namespace package
+]
+"ci_helpers/**/*.py" = [
+  "D100", "D101", "D102", "D103", "D104",
+  "INP001" # not a namespace package
+]
+"release/**/*.py" = [
+  "D100", "D101", "D102", "D103", "D104",
+  "INP001" # not a namespace package
 ]
 
 [tool.ruff.lint.isort]
 known-first-party = ["smart_open", "tests"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.setuptools.packages.find]
 include = ["smart_open"]

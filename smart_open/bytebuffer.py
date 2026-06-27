@@ -86,8 +86,7 @@ class ByteBuffer:
         if size < 0 or size > len(self):
             size = len(self)
 
-        part = bytes(self._bytes[self._pos : self._pos + size])
-        return part
+        return bytes(self._bytes[self._pos : self._pos + size])
 
     def empty(self):
         """Remove all bytes from the buffer."""
@@ -155,8 +154,5 @@ class ByteBuffer:
             The line bytes (including the terminator if present).
         """
         index = self._bytes.find(terminator, self._pos)
-        if index == -1:
-            size = len(self)
-        else:
-            size = index - self._pos + 1
+        size = len(self) if index == -1 else index - self._pos + 1
         return self.read(size)

@@ -1,4 +1,4 @@
-"""A no-op transport that registers scheme 'foo'"""
+"""A no-op transport that registers scheme 'foo'."""
 
 import io
 

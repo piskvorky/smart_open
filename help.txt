@@ -1,11 +1,11 @@
 Help on package smart_open:
 
 NAME
-    smart_open
+    smart_open - Utilities for streaming to/from several file-like data storages.
 
 DESCRIPTION
-    Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
-    filesystem / compressed files, and many more, using a simple, Pythonic API.
+    Supports S3 / HDFS / local filesystem / compressed files, and many more,
+    using a simple, Pythonic API.
 
     The streaming makes heavy use of generators and pipes, to avoid loading
     full file contents into memory, allowing work with arbitrarily large files.

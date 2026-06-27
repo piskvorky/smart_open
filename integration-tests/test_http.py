@@ -19,28 +19,28 @@ class ReadTest(unittest.TestCase):
         url = BASE_URL + "crime-and-punishment.txt"
         with smart_open.open(url, encoding="utf-8") as fin:
             text = fin.read()
-        self.assertTrue(text.startswith("В начале июля, в чрезвычайно жаркое время,"))
-        self.assertTrue(text.endswith("улизнуть, чтобы никто не видал.\n"))
+        assert text.startswith("В начале июля, в чрезвычайно жаркое время,")
+        assert text.endswith("улизнуть, чтобы никто не видал.\n")
 
     def test_read_binary(self):
         url = BASE_URL + "crime-and-punishment.txt"
         with smart_open.open(url, "rb") as fin:
             text = fin.read()
-        self.assertTrue(text.startswith("В начале июля, в чрезвычайно".encode()))
-        self.assertTrue(text.endswith("улизнуть, чтобы никто не видал.\n".encode()))
+        assert text.startswith("В начале июля, в чрезвычайно".encode())
+        assert text.endswith("улизнуть, чтобы никто не видал.\n".encode())
 
     def test_read_gzip_text(self):
         url = BASE_URL + "crime-and-punishment.txt.gz"
         with smart_open.open(url, encoding="utf-8") as fin:
             text = fin.read()
-        self.assertTrue(text.startswith("В начале июля, в чрезвычайно жаркое время,"))
-        self.assertTrue(text.endswith("улизнуть, чтобы никто не видал.\n"))
+        assert text.startswith("В начале июля, в чрезвычайно жаркое время,")
+        assert text.endswith("улизнуть, чтобы никто не видал.\n")
 
     def test_read_gzip_binary(self):
         url = BASE_URL + "crime-and-punishment.txt.gz"
         with smart_open.open(url, "rb", compression="disable") as fin:
             binary = fin.read()
-        self.assertTrue(binary.startswith(GZIP_MAGIC))
+        assert binary.startswith(GZIP_MAGIC)
 
 
 if __name__ == "__main__":

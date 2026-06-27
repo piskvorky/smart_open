@@ -16,6 +16,7 @@ from unittest import mock
 
 import google.api_core.exceptions
 import google.cloud
+import pytest
 
 import smart_open
 import smart_open.constants
@@ -62,7 +63,8 @@ class FakeBucket:
         try:
             return self.blobs[blob_id]
         except KeyError as e:
-            raise google.cloud.exceptions.NotFound(f"Blob {blob_id} not found") from e
+            msg = f"Blob {blob_id} not found"
+            raise google.cloud.exceptions.NotFound(msg) from e
 
     def list_blobs(self):
         return list(self.blobs.values())
@@ -71,7 +73,7 @@ class FakeBucket:
         del self.blobs[blob.name]
 
     def register_blob(self, blob):
-        if blob.name not in self.blobs.keys():
+        if blob.name not in self.blobs:
             self.blobs[blob.name] = blob
 
     def register_upload(self, upload):
@@ -87,20 +89,20 @@ class FakeBucketTest(unittest.TestCase):
         blob_id = "blob.txt"
         expected = FakeBlob(blob_id, self.bucket)
         actual = self.bucket.blob(blob_id)
-        self.assertEqual(actual, expected)
+        assert actual == expected
 
     def test_blob_alternate_constuctor(self):
         blob_id = "blob.txt"
         expected = self.bucket.blob(blob_id)
         actual = self.bucket.list_blobs()[0]
-        self.assertEqual(actual, expected)
+        assert actual == expected
 
     def test_delete(self):
         blob_id = "blob.txt"
         blob = FakeBlob(blob_id, self.bucket)
         self.bucket.delete()
-        self.assertFalse(self.bucket.exists())
-        self.assertFalse(blob.exists())
+        assert not self.bucket.exists()
+        assert not blob.exists()
 
     def test_get_multiple_blobs(self):
         blob_one_id = "blob_one.avro"
@@ -109,11 +111,11 @@ class FakeBucketTest(unittest.TestCase):
         blob_two = self.bucket.blob(blob_two_id)
         actual_first_blob = self.bucket.get_blob(blob_one_id)
         actual_second_blob = self.bucket.get_blob(blob_two_id)
-        self.assertEqual(actual_first_blob, blob_one)
-        self.assertEqual(actual_second_blob, blob_two)
+        assert actual_first_blob == blob_one
+        assert actual_second_blob == blob_two
 
     def test_get_nonexistent_blob(self):
-        with self.assertRaises(google.cloud.exceptions.NotFound):
+        with pytest.raises(google.cloud.exceptions.NotFound):
             self.bucket.get_blob("test-blob")
 
     def test_list_blobs(self):
@@ -121,7 +123,7 @@ class FakeBucketTest(unittest.TestCase):
         blob_two = self.bucket.blob("blob_two.parquet")
         actual = self.bucket.list_blobs()
         expected = [blob_one, blob_two]
-        self.assertEqual(actual, expected)
+        assert actual == expected
 
 
 class FakeBlob:
@@ -173,18 +175,19 @@ class FakeClient:
         try:
             return self.__buckets[bucket_id]
         except KeyError as e:
-            raise google.cloud.exceptions.NotFound(f"Bucket {bucket_id} not found") from e
+            msg = f"Bucket {bucket_id} not found"
+            raise google.cloud.exceptions.NotFound(msg) from e
 
     def create_bucket(self, bucket_id):
-        bucket = FakeBucket(self, bucket_id)
-        return bucket
+        return FakeBucket(self, bucket_id)
 
     def get_bucket(self, bucket_id):
         return self.bucket(bucket_id)
 
     def register_bucket(self, bucket):
         if bucket.name in self.__buckets:
-            raise google.cloud.exceptions.Conflict(f"Bucket {bucket.name} already exists")
+            msg = f"Bucket {bucket.name} already exists"
+            raise google.cloud.exceptions.Conflict(msg)
         self.__buckets[bucket.name] = bucket
 
     def delete_bucket(self, bucket):
@@ -199,26 +202,26 @@ class FakeClientTest(unittest.TestCase):
         self.client = FakeClient()
 
     def test_nonexistent_bucket(self):
-        with self.assertRaises(google.cloud.exceptions.NotFound):
+        with pytest.raises(google.cloud.exceptions.NotFound):
             self.client.bucket("test-bucket")
 
     def test_bucket(self):
         bucket_id = "test-bucket"
         bucket = FakeBucket(self.client, bucket_id)
         actual = self.client.bucket(bucket_id)
-        self.assertEqual(actual, bucket)
+        assert actual == bucket
 
     def test_duplicate_bucket(self):
         bucket_id = "test-bucket"
         FakeBucket(self.client, bucket_id)
-        with self.assertRaises(google.cloud.exceptions.Conflict):
+        with pytest.raises(google.cloud.exceptions.Conflict):
             FakeBucket(self.client, bucket_id)
 
     def test_create_bucket(self):
         bucket_id = "test-bucket"
         bucket = self.client.create_bucket(bucket_id)
         actual = self.client.get_bucket(bucket_id)
-        self.assertEqual(actual, bucket)
+        assert actual == bucket
 
 
 def get_test_bucket(client):
@@ -255,15 +258,15 @@ class OpenTest(unittest.TestCase):
             self.mock_gcs.stop()
 
     def test_read_never_returns_none(self):
-        """read should never return None."""
+        """Read should never return None."""
         test_string = "ветер по морю гуляет..."
         with smart_open.gcs.open(BUCKET_NAME, BLOB_NAME, "wb") as fout:
             fout.write(test_string.encode("utf8"))
 
         r = smart_open.gcs.open(BUCKET_NAME, BLOB_NAME, "rb")
-        self.assertEqual(r.read(), test_string.encode("utf-8"))
-        self.assertEqual(r.read(), b"")
-        self.assertEqual(r.read(), b"")
+        assert r.read() == test_string.encode("utf-8")
+        assert r.read() == b""
+        assert r.read() == b""
 
     def test_round_trip(self):
         test_string = "ветер по морю гуляет..."
@@ -274,7 +277,7 @@ class OpenTest(unittest.TestCase):
         with smart_open.open(url, encoding="utf-8") as fin:
             actual = fin.read()
 
-        self.assertEqual(test_string, actual)
+        assert test_string == actual
 
 
 class WriterTest(unittest.TestCase):
@@ -299,12 +302,12 @@ class WriterTest(unittest.TestCase):
         b = self.client.bucket(BUCKET_NAME).get_blob(BLOB_NAME)
 
         for k, v in blob_properties.items():
-            self.assertEqual(getattr(b, k), v)
+            assert getattr(b, k) == v
 
     def test_get_blob_kwargs_passthrough(self):
         get_blob_kwargs = {"generation": "1111111111111111"}
 
-        with self.assertRaises(google.cloud.exceptions.NotFound):
+        with pytest.raises(google.cloud.exceptions.NotFound):
             smart_open.gcs.Reader(BUCKET_NAME, BLOB_NAME, get_blob_kwargs=get_blob_kwargs)
 
         self.client.bucket(BUCKET_NAME).get_blob.assert_called_once_with(BLOB_NAME, **get_blob_kwargs)
@@ -324,7 +327,7 @@ class WriterTest(unittest.TestCase):
         self.client.bucket(BUCKET_NAME).get_blob(BLOB_NAME).open.assert_called_once_with("wb", **open_kwargs)
 
     def test_non_existing_bucket(self):
-        with self.assertRaises(google.cloud.exceptions.NotFound):
+        with pytest.raises(google.cloud.exceptions.NotFound):
             smart_open.gcs.Writer("unknown_bucket", BLOB_NAME)
 
 

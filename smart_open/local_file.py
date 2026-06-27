@@ -26,17 +26,19 @@ open = io.open
 
 
 def parse_uri(uri_as_string):
+    """Parse a ``file://`` URI (or bare local path) into its path component."""
     local_path = extract_local_path(uri_as_string)
     return {"scheme": SCHEME, "uri_path": local_path}
 
 
 def open_uri(uri_as_string, mode, transport_params):
+    """Open a local file URI using the given mode."""
     parsed_uri = parse_uri(uri_as_string)
-    fobj = builtins.open(parsed_uri["uri_path"], mode)
-    return fobj
+    return builtins.open(parsed_uri["uri_path"], mode)
 
 
 def extract_local_path(uri_as_string):
+    """Return the user-expanded local filesystem path from `uri_as_string`."""
     if uri_as_string.startswith("file://"):
         local_path = uri_as_string.replace("file://", "", 1)
     else:

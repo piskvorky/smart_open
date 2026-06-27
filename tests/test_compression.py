@@ -29,7 +29,7 @@ def label(thing, name):
 
 
 @pytest.mark.parametrize(
-    "fileobj,compression,filename",
+    ("fileobj", "compression", "filename"),
     [
         (io.BytesIO(plain), "disable", None),
         (io.BytesIO(plain), "disable", ""),

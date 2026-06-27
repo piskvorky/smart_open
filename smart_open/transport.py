@@ -58,7 +58,8 @@ def register_transport(submodule):
     elif hasattr(submodule, "SCHEMES"):
         schemes = submodule.SCHEMES
     else:
-        raise ValueError(f"{submodule!r} does not have a .SCHEME or .SCHEMES attribute")
+        msg = f"{submodule!r} does not have a .SCHEME or .SCHEMES attribute"
+        raise ValueError(msg)
 
     for f in ("open", "open_uri", "parse_uri"):
         assert hasattr(submodule, f), f"{submodule!r} is missing {f!r}"

@@ -65,7 +65,8 @@ def _str2bool(string):
         return False
     if string == "yes":
         return True
-    raise ValueError(f"Expected 'yes' / 'no', got {string}.")
+    msg = f"Expected 'yes' / 'no', got {string}."
+    raise ValueError(msg)
 
 
 #
@@ -89,6 +90,7 @@ _PARAMIKO_CONFIG_MAP: dict[str, tuple[str, Callable]] = {
 
 
 def parse_uri(uri_as_string):
+    """Parse an ``ssh://``/``scp://``/``sftp://`` URI into connection components."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
     return {
@@ -102,6 +104,7 @@ def parse_uri(uri_as_string):
 
 
 def open_uri(uri, mode, transport_params):
+    """Open an SSH/SCP/SFTP URI using the given mode and transport params."""
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     parsed_uri = parse_uri(uri)
     uri_path = parsed_uri.pop("uri_path")
@@ -128,7 +131,8 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
         return host, username, password, port, connect_kwargs
 
     if not host:
-        raise ValueError("you must specify the host to connect to")
+        msg = "you must specify the host to connect to"
+        raise ValueError(msg)
 
     # Attempt to load an OpenSSH config.
     #

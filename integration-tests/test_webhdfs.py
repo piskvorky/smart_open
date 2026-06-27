@@ -4,8 +4,8 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-"""
-Sample code for WebHDFS integration tests.
+"""Sample code for WebHDFS integration tests.
+
 To run it working WebHDFS in your network is needed - simply
 set _SO_WEBHDFS_BASE_URL env variable to webhdfs url you have
 write access to.

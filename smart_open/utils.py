@@ -21,6 +21,7 @@ QUESTION_MARK_PLACEHOLDER = "///smart_open.utils.QUESTION_MARK_PLACEHOLDER///"
 
 
 def inspect_kwargs(kallable):
+    """Return a ``{name: default}`` mapping for every default-valued kwarg of `kallable`."""
     signature = inspect.signature(kallable)
     return {
         name: param.default
@@ -63,8 +64,7 @@ def clamp(value, minval=0, maxval=None):
     """
     if maxval is not None:
         value = min(value, maxval)
-    value = max(value, minval)
-    return value
+    return max(value, minval)
 
 
 def make_range_string(start=None, stop=None):
@@ -84,7 +84,8 @@ def make_range_string(start=None, stop=None):
     # https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.35
     #
     if start is None and stop is None:
-        raise ValueError("make_range_string requires either a stop or start value")
+        msg = "make_range_string requires either a stop or start value"
+        raise ValueError(msg)
     start_str = "" if start is None else str(start)
     stop_str = "" if stop is None else str(stop)
     return f"bytes={start_str}-{stop_str}"
@@ -150,6 +151,8 @@ def safe_urlsplit(url):
 
 
 class TextIOWrapper(io.TextIOWrapper):
+    """`io.TextIOWrapper` subclass that does not close the buffer on exceptions."""
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Call close on underlying buffer only when there was no exception.
 
@@ -163,6 +166,8 @@ class TextIOWrapper(io.TextIOWrapper):
 
 
 class FileLikeProxy(wrapt.ObjectProxy):
+    """Wrap an `outer` file-like object so that closing it also closes `inner`."""
+
     __inner = ...  # initialized before wrapt disallows __setattr__ on certain objects
 
     def __init__(self, outer, inner):
@@ -181,9 +186,11 @@ class FileLikeProxy(wrapt.ObjectProxy):
             self.__inner.__exit__(*args, **kwargs)
 
     def __next__(self):
+        """Delegate iteration to the wrapped file-like object."""
         return self.__wrapped__.__next__()
 
     def close(self):
+        """Close both the wrapped object and the inner object."""
         try:
             return self.__wrapped__.close()
         finally:

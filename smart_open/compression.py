@@ -28,7 +28,7 @@ def get_supported_compression_types():
 
     See compression paratemeter to smart_open.open().
     """
-    return [NO_COMPRESSION, INFER_FROM_EXTENSION] + get_supported_extensions()
+    return [NO_COMPRESSION, INFER_FROM_EXTENSION, *get_supported_extensions()]
 
 
 def get_supported_extensions():
@@ -64,7 +64,8 @@ def register_compressor(ext, callback):
         This is just an example: `lzma` is in the standard library and is registered by default.
     """
     if not (ext and ext[0] == "."):
-        raise ValueError(f"ext must be a string starting with ., not {ext!r}")
+        msg = f"ext must be a string starting with ., not {ext!r}"
+        raise ValueError(msg)
     ext = ext.lower()
     if ext in _COMPRESSOR_REGISTRY:
         logger.warning("overriding existing compression handler for %r", ext)
@@ -152,7 +153,8 @@ def compression_wrapper(
         _, compression = os.path.splitext(filename)
 
     if compression in _COMPRESSOR_REGISTRY and mode.endswith("+"):
-        raise ValueError(f"transparent (de)compression unsupported for mode {mode!r}")
+        msg = f"transparent (de)compression unsupported for mode {mode!r}"
+        raise ValueError(msg)
 
     try:
         callback = _COMPRESSOR_REGISTRY[compression]

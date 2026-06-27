@@ -41,6 +41,7 @@ DEFAULT_MAX_CONCURRENCY = 1
 
 
 def parse_uri(uri_as_string):
+    """Parse an ``azure://`` URI into its container and blob components."""
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme == SCHEME
     first = sr.netloc
@@ -58,6 +59,7 @@ def parse_uri(uri_as_string):
 
 
 def open_uri(uri, mode, transport_params):
+    """Open an Azure Blob Storage URI using the given mode and transport params."""
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     return open(parsed_uri["container_id"], parsed_uri["blob_id"], mode, **kwargs)
@@ -99,7 +101,8 @@ def open(
         NotImplementedError: If the requested mode is not supported.
     """
     if not client:
-        raise ValueError("you must specify the client to connect to Azure")
+        msg = "you must specify the client to connect to Azure"
+        raise ValueError(msg)
 
     if mode == smart_open.constants.READ_BINARY:
         return Reader(
@@ -116,20 +119,19 @@ def open(
         return AppendWriter(
             container_id, blob_id, client, blob_kwargs=blob_kwargs, min_part_size=min_part_size
         )
-    raise NotImplementedError(f"Azure Blob Storage support for mode {mode!r} not implemented")
+    msg = f"Azure Blob Storage support for mode {mode!r} not implemented"
+    raise NotImplementedError(msg)
 
 
 def _get_blob_client(client, container, blob):
     # type: (Union[azure.storage.blob.BlobServiceClient, azure.storage.blob.ContainerClient, azure.storage.blob.BlobClient], str, str) -> azure.storage.blob.BlobClient
-    """
-    Return an Azure BlobClient starting with any of BlobServiceClient,
-    ContainerClient, or BlobClient plus container name and blob name.
-    """
+    """Return an Azure BlobClient for the given container and blob."""
     if hasattr(client, "get_container_client"):
         client = client.get_container_client(container)
 
     if hasattr(client, "container_name") and client.container_name != container:
-        raise ValueError(f"Client for {client.container_name!r} doesn't match container {container!r}")
+        msg = f"Client for {client.container_name!r} doesn't match container {container!r}"
+        raise ValueError(msg)
 
     if hasattr(client, "get_blob_client"):
         client = client.get_blob_client(blob)
@@ -225,7 +227,8 @@ class Reader(io.BufferedIOBase):
         self._blob = _get_blob_client(client, container, blob)
 
         if self._blob is None:
-            raise azure.core.exceptions.ResourceNotFoundError(f"blob {blob} not found in {container}")
+            msg = f"blob {blob} not found in {container}"
+            raise azure.core.exceptions.ResourceNotFoundError(msg)
         try:
             self._size = self._blob.get_blob_properties()["size"]
         except KeyError:
@@ -248,6 +251,7 @@ class Reader(io.BufferedIOBase):
 
     @property
     def closed(self):
+        """Return True if the stream is closed."""
         return self._blob is None
 
     def readable(self):
@@ -255,9 +259,7 @@ class Reader(io.BufferedIOBase):
         return True
 
     def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError.
-
-        We offer only seek support, and no truncate support."""
+        """Return True; we support `seek` but not `truncate`."""
         return True
 
     #
@@ -282,9 +284,8 @@ class Reader(io.BufferedIOBase):
         """
         logger.debug("seeking to offset: %r whence: %r", offset, whence)
         if whence not in smart_open.constants.WHENCE_CHOICES:
-            raise ValueError(
-                f"invalid whence {whence}, expected one of {smart_open.constants.WHENCE_CHOICES!r}"
-            )
+            msg = f"invalid whence {whence}, expected one of {smart_open.constants.WHENCE_CHOICES!r}"
+            raise ValueError(msg)
 
         if whence == smart_open.constants.WHENCE_START:
             new_position = offset
@@ -349,7 +350,8 @@ class Reader(io.BufferedIOBase):
     def readline(self, limit=-1):
         """Read up to and including the next newline.  Returns the bytes read."""
         if limit != -1:
-            raise NotImplementedError("limits other than -1 not implemented yet")
+            msg = "limits other than -1 not implemented yet"
+            raise NotImplementedError(msg)
 
         #
         # A single line may span multiple buffers.
@@ -380,22 +382,27 @@ class Reader(io.BufferedIOBase):
 
     def _fill_buffer(self, size=-1):
         size = max(size, self._current_part._chunk_size)
-        while len(self._current_part) < size and not self._position == self._size:
+        while len(self._current_part) < size and self._position != self._size:
             bytes_read = self._current_part.fill(self._raw_reader)
             if bytes_read == 0:
                 logger.debug("reached EOF while filling buffer")
                 return True
+        return None
 
     def __enter__(self):
+        """Enter the reader context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Close the reader on context exit."""
         self.close()
 
     def __str__(self):
+        """Return a short human-readable description of the reader."""
         return f"({self.__class__.__name__}, {self._container_name!r}, {self._blob_name!r})"
 
     def __repr__(self):
+        """Return an unambiguous representation of the reader."""
         return f"{self.__class__.__name__}(container={self._container_name!r}, blob={self._blob_name!r})"
 
 
@@ -429,14 +436,15 @@ class Writer(io.BufferedIOBase):
         self._blob = _get_blob_client(client, container, blob)
 
     def flush(self):
-        pass
+        """No-op flush; data is buffered until `close` or `_upload_part`."""
 
     def terminate(self):
         """Do not commit block list on abort.
 
         Uploaded (uncommitted) blocks will be garbage collected after 7 days.
 
-        See also https://stackoverflow.com/a/69673084/5511061."""
+        See also https://stackoverflow.com/a/69673084/5511061.
+        """
         logger.debug("%s: terminating multipart upload", self)
         if not self.closed:
             self._block_list = []
@@ -447,6 +455,7 @@ class Writer(io.BufferedIOBase):
     # Override some methods from io.IOBase.
     #
     def close(self):
+        """Commit the buffered block list and close the stream."""
         logger.debug("close: called")
         if not self.closed:
             logger.debug("%s: completing multipart upload", self)
@@ -461,6 +470,7 @@ class Writer(io.BufferedIOBase):
 
     @property
     def closed(self):
+        """Return True if the stream is closed."""
         return self._blob is None
 
     def writable(self):
@@ -468,9 +478,7 @@ class Writer(io.BufferedIOBase):
         return True
 
     def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError.
-
-        We offer only tell support, and no seek or truncate support."""
+        """Return True; we support `tell` but not `seek` or `truncate`."""
         return True
 
     def seek(self, offset, whence=smart_open.constants.WHENCE_START):
@@ -489,16 +497,19 @@ class Writer(io.BufferedIOBase):
     # io.BufferedIOBase methods.
     #
     def detach(self):
-        raise io.UnsupportedOperation("detach() not supported")
+        """Unsupported."""
+        msg = "detach() not supported"
+        raise io.UnsupportedOperation(msg)
 
     def write(self, b):
         """Write the given bytes (binary string) to the Azure Blob Storage file.
 
         There's buffering happening under the covers, so this may not actually
-        do any HTTP transfer right away."""
-
+        do any HTTP transfer right away.
+        """
         if not isinstance(b, _BINARY_TYPES):
-            raise TypeError(f"input must be one of {_BINARY_TYPES!r}, got: {type(b)!r}")
+            msg = f"input must be one of {_BINARY_TYPES!r}, got: {type(b)!r}"
+            raise TypeError(msg)
 
         self._current_part.write(b)
         self._total_size += len(b)
@@ -537,25 +548,30 @@ class Writer(io.BufferedIOBase):
         self._current_part.seek(0, io.SEEK_END)
 
     def __enter__(self):
+        """Enter the writer context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Close or terminate the writer on context exit."""
         if exc_type is not None:
             self.terminate()
         else:
             self.close()
 
     def __str__(self):
+        """Return a short human-readable description of the writer."""
         return f"({self.__class__.__name__}, {self._container_name!r}, {self._blob_name!r})"
 
     def __repr__(self):
+        """Return an unambiguous representation of the writer."""
         return f"{self.__class__.__name__}(container={self._container_name!r}, blob={self._blob_name!r}, min_part_size={self._min_part_size!r})"
 
 
 class AppendWriter(io.BufferedIOBase):
     """Append bytes to Azure Blob Storage.
 
-    Implements the io.BufferedIOBase interface of the standard library."""
+    Implements the io.BufferedIOBase interface of the standard library.
+    """
 
     _blob = None  # so `closed` property works in case __init__ fails and __del__ is called
 
@@ -578,16 +594,16 @@ class AppendWriter(io.BufferedIOBase):
         self._blob = _get_blob_client(client, container, blob)
 
     def flush(self):
-        pass
+        """No-op flush; data is buffered until `close` or `_upload_part`."""
 
     def terminate(self):
-        """AppendBlob cannot be aborted, so we do nothing here"""
+        """AppendBlob cannot be aborted, so we do nothing here."""
         if not self.closed:
             self._current_part = io.BytesIO()
             self._blob = None
 
     def close(self):
-        """No action needed here, as the AppendBlob is automatically committed"""
+        """No action needed here, as the AppendBlob is automatically committed."""
         if not self.closed:
             try:
                 if self._current_part.tell() > 0:
@@ -597,6 +613,7 @@ class AppendWriter(io.BufferedIOBase):
 
     @property
     def closed(self):
+        """Return True if the stream is closed."""
         return self._blob is None
 
     def writable(self):
@@ -604,9 +621,7 @@ class AppendWriter(io.BufferedIOBase):
         return True
 
     def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError.
-
-        We offer only tell support, and no seek or truncate support."""
+        """Return True; we support `tell` but not `seek` or `truncate`."""
         return True
 
     def seek(self, offset, whence=smart_open.constants.WHENCE_START):
@@ -622,11 +637,15 @@ class AppendWriter(io.BufferedIOBase):
         return self._total_size
 
     def detach(self):
-        raise io.UnsupportedOperation("detach() not supported")
+        """Unsupported."""
+        msg = "detach() not supported"
+        raise io.UnsupportedOperation(msg)
 
     def write(self, b):
+        """Append `b` to the AppendBlob, buffering until ``min_part_size``."""
         if not isinstance(b, _BINARY_TYPES):
-            raise TypeError(f"input must be one of {_BINARY_TYPES!r}, got: {type(b)!r}")
+            msg = f"input must be one of {_BINARY_TYPES!r}, got: {type(b)!r}"
+            raise TypeError(msg)
         self._current_part.write(b)
         self._total_size += len(b)
         if self._current_part.tell() >= self._min_part_size:
@@ -644,16 +663,20 @@ class AppendWriter(io.BufferedIOBase):
         self._current_part = io.BytesIO()
 
     def __enter__(self):
+        """Enter the append writer context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Close or terminate the append writer on context exit."""
         if exc_type is not None:
             self.terminate()
         else:
             self.close()
 
     def __str__(self):
+        """Return a short human-readable description of the append writer."""
         return f"({self.__class__.__name__}, {self._container_name!r}, {self._blob_name!r})"
 
     def __repr__(self):
+        """Return an unambiguous representation of the append writer."""
         return f"{self.__class__.__name__}(container={self._container_name!r}, blob={self._blob_name!r})"

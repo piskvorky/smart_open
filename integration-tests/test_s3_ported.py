@@ -48,7 +48,7 @@ class ReaderTest(unittest.TestCase):
 
         fin = smart_open.s3.Reader(BUCKET_NAME, key_name)
         actual = [line.rstrip(b"\n") for line in fin]
-        self.assertEqual(expected, actual)
+        assert expected == actual
 
     def test_iter_context_manager(self):
         # same thing but using a context manager
@@ -57,7 +57,7 @@ class ReaderTest(unittest.TestCase):
 
         with smart_open.s3.Reader(BUCKET_NAME, key_name) as fin:
             actual = [line.rstrip(b"\n") for line in fin]
-        self.assertEqual(expected, actual)
+        assert expected == actual
 
     def test_read(self):
         """Are S3 files read correctly?"""
@@ -65,9 +65,9 @@ class ReaderTest(unittest.TestCase):
         expected = CONTENTS[key_name]
 
         fin = smart_open.s3.Reader(BUCKET_NAME, key_name)
-        self.assertEqual(expected[:6], fin.read(6))
-        self.assertEqual(expected[6:14], fin.read(8))  # ř is 2 bytes
-        self.assertEqual(expected[14:], fin.read())  # read the rest
+        assert expected[:6] == fin.read(6)
+        assert expected[6:14] == fin.read(8)  # ř is 2 bytes
+        assert expected[14:] == fin.read()  # read the rest
 
     def test_seek_beginning(self):
         """Does seeking to the beginning of S3 files work correctly?"""
@@ -75,30 +75,30 @@ class ReaderTest(unittest.TestCase):
         expected = CONTENTS[key_name]
 
         fin = smart_open.s3.Reader(BUCKET_NAME, key_name)
-        self.assertEqual(expected[:6], fin.read(6))
-        self.assertEqual(expected[6:14], fin.read(8))  # ř is 2 bytes
+        assert expected[:6] == fin.read(6)
+        assert expected[6:14] == fin.read(8)  # ř is 2 bytes
 
         fin.seek(0)
-        self.assertEqual(expected, fin.read())  # no size given => read whole file
+        assert expected == fin.read()  # no size given => read whole file
 
         fin.seek(0)
-        self.assertEqual(expected, fin.read(-1))  # same thing
+        assert expected == fin.read(-1)  # same thing
 
     def test_seek_start(self):
         """Does seeking from the start of S3 files work correctly?"""
         fin = smart_open.s3.Reader(BUCKET_NAME, "hello.txt")
         seek = fin.seek(6)
-        self.assertEqual(seek, 6)
-        self.assertEqual(fin.tell(), 6)
-        self.assertEqual(fin.read(6), "wořld".encode())
+        assert seek == 6
+        assert fin.tell() == 6
+        assert fin.read(6) == "wořld".encode()
 
     def test_seek_current(self):
         """Does seeking from the middle of S3 files work correctly?"""
         fin = smart_open.s3.Reader(BUCKET_NAME, "hello.txt")
-        self.assertEqual(fin.read(5), b"hello")
+        assert fin.read(5) == b"hello"
         seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-        self.assertEqual(seek, 6)
-        self.assertEqual(fin.read(6), "wořld".encode())
+        assert seek == 6
+        assert fin.read(6) == "wořld".encode()
 
     def test_seek_end(self):
         """Does seeking from the end of S3 files work correctly?"""
@@ -107,8 +107,8 @@ class ReaderTest(unittest.TestCase):
 
         fin = smart_open.s3.Reader(BUCKET_NAME, key_name)
         seek = fin.seek(-4, whence=smart_open.constants.WHENCE_END)
-        self.assertEqual(seek, len(expected) - 4)
-        self.assertEqual(fin.read(), b"you?")
+        assert seek == len(expected) - 4
+        assert fin.read() == b"you?"
 
     def test_detect_eof(self):
         key_name = "hello.txt"
@@ -117,9 +117,9 @@ class ReaderTest(unittest.TestCase):
         fin = smart_open.s3.Reader(BUCKET_NAME, key_name)
         fin.read()
         eof = fin.tell()
-        self.assertEqual(eof, len(expected))
+        assert eof == len(expected)
         fin.seek(0, whence=smart_open.constants.WHENCE_END)
-        self.assertEqual(eof, fin.tell())
+        assert eof == fin.tell()
 
     def test_read_gzip(self):
         key_name = "hello.txt.gz"
@@ -131,7 +131,7 @@ class ReaderTest(unittest.TestCase):
             with gzip.GzipFile(fileobj=fin) as zipfile:
                 actual = zipfile.read()
 
-        self.assertEqual(expected, actual)
+        assert expected == actual
 
     def test_readline(self):
         key_name = "multiline.txt"
@@ -139,14 +139,14 @@ class ReaderTest(unittest.TestCase):
 
         with smart_open.s3.Reader(BUCKET_NAME, key_name) as fin:
             fin.readline()
-            self.assertEqual(fin.tell(), expected.index(b"\n") + 1)
+            assert fin.tell() == expected.index(b"\n") + 1
 
             fin.seek(0)
             actual = list(fin)
-            self.assertEqual(fin.tell(), len(expected))
+            assert fin.tell() == len(expected)
 
         expected = [b"englishman\n", b"in\n", b"new\n", b"york\n"]
-        self.assertEqual(expected, actual)
+        assert expected == actual
 
     def test_readline_tiny_buffer(self):
         key_name = "multiline.txt"
@@ -156,13 +156,13 @@ class ReaderTest(unittest.TestCase):
             actual = list(fin)
 
         expected = [b"englishman\n", b"in\n", b"new\n", b"york\n"]
-        self.assertEqual(expected, actual)
+        assert expected == actual
 
     def test_read0_does_not_return_data(self):
         with smart_open.s3.Reader(BUCKET_NAME, "hello.txt") as fin:
             data = fin.read(0)
 
-        self.assertEqual(data, b"")
+        assert data == b""
 
     def test_to_boto3(self):
         key_name = "multiline.txt"
@@ -172,7 +172,7 @@ class ReaderTest(unittest.TestCase):
             returned_obj = fin.to_boto3(boto3.resource("s3"))
 
         boto3_body = returned_obj.get()["Body"].read()
-        self.assertEqual(expected, boto3_body)
+        assert expected == boto3_body
 
 
 def read_key(key):
@@ -198,7 +198,7 @@ class WriterTest(unittest.TestCase):
             fout.write(test_string)
 
         data = read_key(self.key)
-        self.assertEqual(data, test_string)
+        assert data == test_string
 
     def test_multipart(self):
         """Does s3 multipart chunking work correctly?"""
@@ -258,13 +258,10 @@ class WriterTest(unittest.TestCase):
 
         # read back the same key and check its content
         data = read_key(self.key)
-        self.assertEqual(data, b"")
+        assert data == b""
 
     def test_buffered_writer_wrapper_works(self):
-        """
-        Ensure that we can wrap a smart_open s3 stream in a BufferedWriter, which
-        passes a memoryview object to the underlying stream in python >= 2.7
-        """
+        """Ensure that we can wrap a smart_open s3 stream in a BufferedWriter."""
         expected = "не думай о секундах свысока"
 
         with smart_open.s3.MultipartWriter(BUCKET_NAME, self.key) as fout:
@@ -272,7 +269,7 @@ class WriterTest(unittest.TestCase):
                 sub_out.write(expected.encode("utf-8"))
 
         text = read_key(self.key).decode("utf-8")
-        self.assertEqual(expected, text)
+        assert expected == text
 
     def test_double_close(self):
         text = "там за туманами, вечными, пьяными".encode()
@@ -282,7 +279,7 @@ class WriterTest(unittest.TestCase):
         fout.close()
 
         result = read_key(self.key)
-        self.assertEqual(result, text)
+        assert result == text
 
     def test_flush_close(self):
         text = "там за туманами, вечными, пьяными".encode()
@@ -292,7 +289,7 @@ class WriterTest(unittest.TestCase):
         fout.close()
 
         result = read_key(self.key)
-        self.assertEqual(result, text)
+        assert result == text
 
 
 class IterBucketTest(unittest.TestCase):
@@ -302,16 +299,16 @@ class IterBucketTest(unittest.TestCase):
 
     def test_multithreading(self):
         actual = list(smart_open.s3.iter_bucket(BUCKET_NAME, prefix="iter_bucket"))
-        self.assertEqual(len(self.expected), len(actual))
-        self.assertEqual(self.expected, sorted(actual))
+        assert len(self.expected) == len(actual)
+        assert self.expected == sorted(actual)
 
     def test_accept_key(self):
         expected = [(key, value) for (key, value) in self.expected if "4" in key]
         actual = list(
             smart_open.s3.iter_bucket(BUCKET_NAME, prefix="iter_bucket", accept_key=lambda key: "4" in key)
         )
-        self.assertEqual(len(expected), len(actual))
-        self.assertEqual(expected, sorted(actual))
+        assert len(expected) == len(actual)
+        assert expected == sorted(actual)
 
 
 @pytest.mark.parametrize("workers", [1, 4, 8, 16, 64])

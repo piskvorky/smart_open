@@ -14,7 +14,8 @@ import smart_open.ssh
 
 
 def explode(*args, **kwargs):
-    raise RuntimeError("this function should never have been called")
+    msg = "this function should never have been called"
+    raise RuntimeError(msg)
 
 
 @pytest.mark.skipif("SMART_OPEN_SSH" not in os.environ, reason="this test only works on the dev machine")

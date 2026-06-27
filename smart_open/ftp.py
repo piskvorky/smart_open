@@ -38,6 +38,7 @@ def _unquote(text):
 
 
 def parse_uri(uri_as_string):
+    """Parse an ``ftp://`` or ``ftps://`` URI into connection components."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
     return {
@@ -51,11 +52,12 @@ def parse_uri(uri_as_string):
 
 
 def open_uri(uri, mode, transport_params):
+    """Open an FTP/FTPS URI using the given mode and transport params."""
     smart_open.utils.check_kwargs(open, transport_params)
     parsed_uri = parse_uri(uri)
     uri_path = parsed_uri.pop("uri_path")
     scheme = parsed_uri.pop("scheme")
-    secure_conn = True if scheme == "ftps" else False
+    secure_conn = scheme == "ftps"
     return open(
         uri_path,
         mode,
@@ -66,6 +68,7 @@ def open_uri(uri, mode, transport_params):
 
 
 def convert_transport_params_to_args(transport_params):
+    """Return the subset of `transport_params` that the FTP client accepts."""
     supported_keywords = [
         "timeout",
         "source_address",
@@ -89,14 +92,14 @@ def _connect(hostname, username, port, password, secure_connection, transport_pa
         ftp = FTP(**kwargs)
     try:
         ftp.connect(hostname, port)
-    except Exception as e:
-        logger.error("Unable to connect to FTP server: try checking the host and port!")
-        raise e
+    except Exception:
+        logger.exception("Unable to connect to FTP server: try checking the host and port!")
+        raise
     try:
         ftp.login(username, password)
-    except error_reply as e:
-        logger.error("Unable to login to FTP server: try checking the username and password!")
-        raise e
+    except error_reply:
+        logger.exception("Unable to login to FTP server: try checking the username and password!")
+        raise
     if secure_connection:
         ftp.prot_p()
     return ftp
@@ -132,9 +135,11 @@ def open(
         ValueError: If `host` or `user` is not specified, or if `mode` is unsupported.
     """
     if not host:
-        raise ValueError("you must specify the host to connect to")
+        msg = "you must specify the host to connect to"
+        raise ValueError(msg)
     if not user:
-        raise ValueError("you must specify the user")
+        msg = "you must specify the user"
+        raise ValueError(msg)
     if not transport_params:
         transport_params = {}
     conn = _connect(host, user, port, password, secure_connection, transport_params)
@@ -146,7 +151,8 @@ def open(
     try:
         ftp_mode, file_obj_mode = mode_to_ftp_cmds[mode]
     except KeyError as err:
-        raise ValueError(f"unsupported mode: {mode!r}") from err
+        msg = f"unsupported mode: {mode!r}"
+        raise ValueError(msg) from err
     ftp_mode, file_obj_mode = mode_to_ftp_cmds[mode]
     conn.voidcmd("TYPE I")
     socket = conn.transfercmd(f"{ftp_mode} {path}")

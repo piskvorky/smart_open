@@ -46,7 +46,7 @@ with open(CAP_PATH, encoding="utf-8") as fin:
 
 
 @pytest.mark.parametrize(
-    "uri,expected_path",
+    ("uri", "expected_path"),
     [
         ("hdfs:///tmp/test.txt", "/tmp/test.txt"),
         ("hdfs://host/tmp/test.txt", "hdfs://host/tmp/test.txt"),
