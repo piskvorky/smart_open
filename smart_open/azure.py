@@ -181,7 +181,7 @@ class _RawReader:
             stream = self._blob.download_blob(
                 offset=self._position, max_concurrency=self._concurrency, length=size
             )
-        logging.debug("reading with a max concurrency of %d", self._concurrency)
+        logger.debug("reading with a max concurrency of %d", self._concurrency)
         if isinstance(stream, azure.storage.blob.StorageStreamDownloader):
             binary = stream.readall()
         else:
@@ -223,8 +223,7 @@ class Reader(io.BufferedIOBase):
         self._container_name = container
         self._blob_name = blob
 
-        # type: azure.storage.blob.BlobClient
-        self._blob = _get_blob_client(client, container, blob)
+        self._blob: azure.storage.blob.BlobClient = _get_blob_client(client, container, blob)
 
         if self._blob is None:
             msg = f"blob {blob} not found in {container}"
@@ -373,11 +372,9 @@ class Reader(io.BufferedIOBase):
     #
     def _read_from_buffer(self, size=-1):
         """Remove at most size bytes from our buffer and return them."""
-        # logger.debug('reading %r bytes from %r byte-long buffer', size, len(self._current_part))
         size = size if size >= 0 else len(self._current_part)
         part = self._current_part.read(size)
         self._position += len(part)
-        # logger.debug('part: %r', part)
         return part
 
     def _fill_buffer(self, size=-1):
@@ -432,8 +429,7 @@ class Writer(io.BufferedIOBase):
         self._current_part = io.BytesIO()
         self._block_list = []
 
-        # type: azure.storage.blob.BlobClient
-        self._blob = _get_blob_client(client, container, blob)
+        self._blob: azure.storage.blob.BlobClient = _get_blob_client(client, container, blob)
 
     def flush(self):
         """No-op flush; data is buffered until `close` or `_upload_part`."""
@@ -590,8 +586,7 @@ class AppendWriter(io.BufferedIOBase):
         self._total_size = 0
         self._current_part = io.BytesIO()
 
-        # type: azure.storage.blob.BlobClient
-        self._blob = _get_blob_client(client, container, blob)
+        self._blob: azure.storage.blob.BlobClient = _get_blob_client(client, container, blob)
 
     def flush(self):
         """No-op flush; data is buffered until `close` or `_upload_part`."""

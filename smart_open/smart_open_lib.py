@@ -12,7 +12,7 @@ import contextlib
 import locale
 import logging
 import os
-import os.path as P
+import os.path
 import pathlib
 import urllib.parse
 
@@ -341,7 +341,7 @@ def _shortcut_open(
 
     local_path = so_file.extract_local_path(uri)
     if compression == so_compression.INFER_FROM_EXTENSION:
-        _, extension = P.splitext(local_path)
+        _, extension = os.path.splitext(local_path)
         if extension in so_compression.get_supported_extensions():
             return None
     elif compression != so_compression.NO_COMPRESSION:
@@ -483,11 +483,10 @@ def _patch_pathlib(func):
 try:
     doctools.tweak_open_docstring(open)
     doctools.tweak_parse_uri_docstring(parse_uri)
-except Exception as ex:
+except Exception:
     logger.exception(
         "Encountered a non-fatal error while building docstrings (see below). "
         "help(smart_open) will provide incomplete information as a result. "
         "For full help text, see "
         "<https://github.com/piskvorky/smart_open/blob/master/help.txt>."
     )
-    logger.exception(ex)

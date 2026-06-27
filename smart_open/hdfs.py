@@ -32,12 +32,10 @@ def parse_uri(uri_as_string):
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES
 
-    if split_uri.netloc:
-        # Preserve the full URI so the hdfs CLI can route to the right cluster.
-        uri_path = uri_as_string
-    else:
-        # No netloc (e.g. "hdfs:///path/file") - pass the absolute path to the CLI.
-        uri_path = split_uri.path
+    # Preserve the full URI when netloc is set so the hdfs CLI can route to
+    # the right cluster; otherwise (e.g. "hdfs:///path/file") pass the
+    # absolute path to the CLI.
+    uri_path = uri_as_string if split_uri.netloc else split_uri.path
     if not uri_path or uri_path == "/":
         msg = f"invalid HDFS URI: {uri_as_string!r}"
         raise RuntimeError(msg)

@@ -212,7 +212,7 @@ def extract_examples_from_readme_rst(indent=None):
         end = lines.index(".. _doctools_after_examples:\n")
         lines = lines[start + 4 : end - 2]
         return "".join([indent + re.sub("^  ", "", line) for line in lines])
-    except Exception:
+    except Exception:  # noqa: BLE001
         return indent + "See README.rst"
 
 

@@ -829,7 +829,7 @@ class WriterTest(unittest.TestCase):
         """Does writing no data cause key with an empty value to be created?"""
         blob_name = f"test_write_04_{BLOB_NAME}"
         smart_open_write = smart_open.azure.Writer(CONTAINER_NAME, blob_name, CLIENT)
-        with smart_open_write as fout:  # noqa
+        with smart_open_write as fout:  # noqa: F841
             pass
 
         # read back the same key and check its content

@@ -18,6 +18,7 @@ Example:
         b'Ubuntu 4.4.0-1061.70-aws 4.4.131'
 """
 
+import contextlib
 import getpass
 import logging
 import os
@@ -174,13 +175,9 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
             actual_hostname = cfg["hostname"]
 
         if port is None:
-            try:
+            # Nb. ignore missing/invalid port numbers
+            with contextlib.suppress(KeyError, ValueError):
                 port = int(cfg["port"])
-            except (KeyError, ValueError):
-                #
-                # Nb. ignore missing/invalid port numbers
-                #
-                pass
 
         #
         # Special case, as we can have multiple identity files, so we check

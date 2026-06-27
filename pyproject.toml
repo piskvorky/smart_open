@@ -91,77 +91,88 @@ ignore = [
   "COM812", # conflicts with ruff format
   "E501", # line length handled by ruff-format
   "E731", # lambda assignment is widely used in smart_open
-  "T20", # print/pprint legitimate in scripts and helpers
   "A001", "A002", "A004", # smart_open intentionally shadows the builtin `open`
-  "EM101", "EM102", # plain strings inside exception constructors are fine
-  "PLR0913", # smart_open public APIs have many transport-layer kwargs by design
-  "C901", # legacy functions can be complex, refactor in dedicated PRs
-  "PLR2004", # magic value comparisons are clearer than named constants in many places
-  "RUF001", # ambiguous unicode chars are intentional in test fixtures
+  "ARG002", # io.IOBase overrides keep interface args even when unused
+  "C901", "PLR0912", "PLR0913", # legacy functions can be complex/branchy; refactor in dedicated PRs
+  "FBT002", # boolean kwargs are part of smart_open's public APIs
+  "N818", # WebHdfsException is a public name; renaming is a breaking change
   "PTH", # os.path is widely used; pathlib migration is a separate effort
-  "S101", # assert is used outside tests too
-  "S105", "S106", "S107", # hardcoded "password"-named kwargs are not secrets
-  "S108", # /tmp paths in tests/integration scripts are fine
-  "S113", # request timeouts in test scripts are fine
-  "S311", # pseudo-random in tests is fine
-  "S603", "S607", # subprocess invocations in ci_helpers are fine
-  "ERA001", # commented-out code is sometimes intentional
-  "LOG015", # root logger calls in scripts are fine
-  "N806", # some variables are intentionally uppercase
-  "N801", "N802", "N803", "N812", "N818", # legacy names match unittest/external APIs
-  "RET504", # explicit-assign-before-return is sometimes clearer
-  "SLF001", # private member access is used to glue smart_open's transports
-  "ARG001", "ARG002", "ARG005", # io.IOBase overrides keep interface args even when unused
-  "FBT002", "FBT003", # boolean kwargs/positional flags exist in the public API
-  "SIM115", "SIM117", # legacy context-manager patterns are clearer in places
-  "SIM105", "SIM108", # readability over conciseness
-  "BLE001", # bare except: is intentional in a couple of fallback paths
-  "TRY300", "TRY301", "TRY401", # try/except style is widely varied across smart_open
-  "PT012", "PT028", # legacy pytest patterns
-  "PERF203", "PERF401", # micro-perf rewrites are out of scope here
-  "G004", # f-string in log message is fine
-  "DTZ005", # naive datetime in release scripts is intentional
-  "S321", # ftplib usage is the whole point of smart_open/ftp.py
-  "PLR0912", # legacy functions can be branchy, refactor in dedicated PRs
-  "PLW0127", "PLW0128", # legacy self-assignment patterns in compatibility shims
-  "PGH004", # `# noqa` without a code is grandfathered in
-  "PYI024", # collections.namedtuple is fine in legacy public APIs
-  "S507", # paramiko AutoAddPolicy is a documented smart_open ssh default
-  "EXE001" # shebang on release scripts is informational
+  "S101", # `assert` is used as a precondition check on parsed URIs across transports
+  "SLF001" # private-member access is used to glue smart_open's transports
 ]
 select = ["ALL"]
 
 [tool.ruff.lint.extend-per-file-ignores]
+# tests deliberately use unittest-style patterns, reach into private state,
+# carry security-warning-flagged fixtures, and don't ship docstrings
 "**/tests/**/*.py" = [
-  "D100", # tests is not a package
-  "D101", "D102", "D103", # test classes/methods/functions don't need docstrings
-  "D104", # tests modules don't need docstrings
+  "ARG001", # unused fn args common in pytest fixtures
+  "BLE001", # bare `except Exception` is fine for "did it raise anything?" assertions
+  "D10", # missing docstrings
+  "ERA001", # commented-out code in tests is often a TODO marker
+  "FBT003", # boolean positionals in mock calls
+  "G004", # f-strings in log messages are fine
   "INP001", # tests dir is intentionally not a namespace package
-  "PT006", "PT009", "PT011", "PT027", # legacy unittest-style patterns survive in this test suite
-  "PT013", # `import pytest as pt` shorthand
-  "PYI024", # collections.namedtuple usage in tests
+  "LOG015", # root logger in tests is fine
+  "N801", "N802", "N803", "N806", "N812", # CamelCase unittest setUp/tearDown and intentional uppercase vars
+  "PERF", # micro-performance rewrites are out of scope in tests
+  "PLR2004", # magic numbers in tests are clearer than constants
+  "PLW0127", "PLW0128", # legacy self-assignment patterns
+  "PT006", "PT009", "PT011", "PT012", "PT013", "PT027", "PT028", # legacy unittest patterns
+  "PYI024", # collections.namedtuple in fixtures
+  "RUF001", # ambiguous unicode chars in string fixtures
   "RUF012", # mutable class attributes in mock fixtures
+  "S101", # assert is the whole point of tests
+  "S105", "S106", "S107", # hardcoded "password"-named kwargs in fixtures
+  "S108", # /tmp paths in tests
+  "S113", # request timeouts in tests
+  "S311", # pseudo-random in tests
   "S324", # md5 in tests is fine
-  "S507", # paramiko AutoAddPolicy in tests
-  "TD002", "TD003" # legacy TODOs in tests
+  "S507", # paramiko AutoAddPolicy in ssh tests
+  "S603", "S607", # subprocess in test helpers
+  "SIM105", "SIM108", "SIM115", "SIM117", # context-manager patterns in test setup
+  "T20", # print in tests is fine
+  "TD002", "TD003", # legacy TODOs in tests
+  "TRY300", "TRY301", "TRY401" # try/except patterns in tests
 ]
-"integration-tests/**/*.py" = [
-  "D100", "D101", "D102", "D103", "D104",
+# scripts and helpers under these dirs aren't packages and frequently print
+"{integration-tests,benchmark,ci_helpers,release}/**/*.py" = [
+  "ARG001", # ssh integration tests pass unused args to paramiko shims
+  "D10", # missing docstrings
+  "DTZ005", # naive datetime in release scripts is intentional
+  "ERA001", # commented-out code is sometimes intentional in scripts
+  "EXE001", # shebang on release scripts is informational
   "INP001", # not a namespace package
-  "PT013" # `import pytest as pt` shorthand
+  "LOG015", # root logger in scripts is fine
+  "N806", # uppercase locals (B_CLRF, ONE_MIB, ...) are intentional
+  "PERF", # not a hot path
+  "PGH004", # `# noqa` without a code is grandfathered in
+  "PLR2004", # magic numbers in scripts are fine
+  "PT013", # `import pytest as pt` shorthand
+  "RUF001", # ambiguous unicode chars in string fixtures
+  "S101", # assert is fine in scripts
+  "S105", # hardcoded "password"-named kwargs in fixtures
+  "S108", # /tmp paths in integration tests
+  "S113", # request timeouts in scripts
+  "S311", # pseudo-random in scripts
+  "S603", "S607", # subprocess invocations in ci_helpers
+  "SIM115", "SIM117", # context-manager patterns in scripts
+  "T20" # print is the whole point of these helpers
 ]
-"benchmark/**/*.py" = [
-  "D100", "D101", "D102", "D103", "D104",
-  "INP001" # not a namespace package
+# files where a single specific rule is intentional
+"smart_open/compression.py" = ["SIM115"] # returns the file object to caller
+"smart_open/doctools.py" = ["T20"] # builds docstrings via redirect_stdout
+"smart_open/ftp.py" = ["S321"] # ftplib is the whole point of this module
+"smart_open/gcs.py" = ["N802"] # Reader/Writer factories named after the classes they return
+"smart_open/hdfs.py" = ["S603", "S607"] # invokes the local `hdfs` CLI by design
+"smart_open/local_file.py" = ["ARG001"] # transport_params is a required open_uri signature
+"smart_open/s3.py" = [
+  "ARG001", "ARG005", # interface-conformance args/lambdas for boto3 callbacks
+  "PERF203" # retry loop intentionally try/except per attempt
 ]
-"ci_helpers/**/*.py" = [
-  "D100", "D101", "D102", "D103", "D104",
-  "INP001" # not a namespace package
-]
-"release/**/*.py" = [
-  "D100", "D101", "D102", "D103", "D104",
-  "INP001" # not a namespace package
-]
+"smart_open/smart_open_lib.py" = ["N801", "PYI024"] # patch_pathlib, plus legacy `Uri` namedtuple
+"smart_open/ssh.py" = ["S507"] # paramiko AutoAddPolicy is documented behaviour
+"smart_open/webhdfs.py" = ["S113"] # WebHDFS requests use server-side timeouts
 
 [tool.ruff.lint.isort]
 known-first-party = ["smart_open", "tests"]

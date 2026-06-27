@@ -100,7 +100,7 @@ class Retry:
                     err,
                     self.attempts - attempt - 1,
                 )
-                logger.exception(err)
+                logger.exception("retryable error")
                 time.sleep(self.sleep_seconds)
             except botocore.exceptions.ClientError as err:
                 error_code = err.response["Error"].get("Code")
@@ -111,7 +111,7 @@ class Retry:
                     error_code,
                     self.attempts - attempt - 1,
                 )
-                logger.exception(err)
+                logger.exception("retryable error")
                 time.sleep(self.sleep_seconds)
         logger.critical("encountered too many non-fatal errors, giving up")
         msg = "%s failed after %d attempts"
@@ -972,7 +972,7 @@ class MultipartWriter(io.BufferedIOBase):
     ):
         adjusted_ps = smart_open.utils.clamp(part_size, MIN_PART_SIZE, MAX_PART_SIZE)
         if part_size != adjusted_ps:
-            logger.warning(f"adjusting part_size from {part_size} to {adjusted_ps}")
+            logger.warning("adjusting part_size from %s to %s", part_size, adjusted_ps)
             part_size = adjusted_ps
         self._part_size = part_size
 

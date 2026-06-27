@@ -602,7 +602,7 @@ class MultipartWriterTest(unittest.TestCase):
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
         smart_open_write = smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME)
-        with smart_open_write as fout:  # noqa
+        with smart_open_write as fout:  # noqa: F841
             pass
 
         # read back the same key and check its content
@@ -829,7 +829,7 @@ class SinglepartWriterTest(unittest.TestCase):
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
         smart_open_write = smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME)
-        with smart_open_write as fout:  # noqa
+        with smart_open_write as fout:  # noqa: F841
             pass
 
         # read back the same key and check its content
