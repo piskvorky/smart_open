@@ -1,11 +1,11 @@
 Help on package smart_open:
 
 NAME
-    smart_open
+    smart_open - Utilities for streaming to/from several file-like data storages.
 
 DESCRIPTION
-    Utilities for streaming to/from several file-like data storages: S3 / HDFS / local
-    filesystem / compressed files, and many more, using a simple, Pythonic API.
+    Supports S3 / HDFS / local filesystem / compressed files, and many more,
+    using a simple, Pythonic API.
 
     The streaming makes heavy use of generators and pipes, to avoid loading
     full file contents into memory, allowing work with arbitrarily large files.
@@ -47,411 +47,413 @@ FUNCTIONS
         - an instance of the pathlib.Path class
         - a stream (anything that implements io.IOBase-like functionality)
 
-        Parameters
-        ----------
-        uri: str or object
-            The object to open.
-        mode: str, optional
-            Mimicks built-in open parameter of the same name.
-        buffering: int, optional
-            Mimicks built-in open parameter of the same name.
-        encoding: str, optional
-            Mimicks built-in open parameter of the same name.
-        errors: str, optional
-            Mimicks built-in open parameter of the same name.
-        newline: str, optional
-            Mimicks built-in open parameter of the same name.
-        closefd: boolean, optional
-            Mimicks built-in open parameter of the same name.  Ignored.
-        opener: object, optional
-            Mimicks built-in open parameter of the same name.  Ignored.
-        compression: str, optional (see smart_open.compression.get_supported_compression_types)
-            Explicitly specify the compression/decompression behavior.
-        compression_kwargs: dict, optional
-            Keyword arguments forwarded to the registered compressor callback. Examples
-            of each library's max-compression option: {'compresslevel': 9} for
-            .gz/.bz2, {'preset': 9} for .xz, {'level': 22} for .zst,
-            {'compression_level': 12} for .lz4. Ignored when compression is 'disable'
-            or the URI's extension doesn't match a registered compressor.
-        transport_params: dict, optional
-            Additional parameters for the transport layer (see notes below).
+        Args:
+            uri: The object to open.
+            mode: Mimicks built-in open parameter of the same name.
+            buffering: Mimicks built-in open parameter of the same name.
+            encoding: Mimicks built-in open parameter of the same name.
+            errors: Mimicks built-in open parameter of the same name.
+            newline: Mimicks built-in open parameter of the same name.
+            closefd: Mimicks built-in open parameter of the same name.  Ignored.
+            opener: Mimicks built-in open parameter of the same name.  Ignored.
+            compression: Explicitly specify the compression/decompression behavior.
+                See ``smart_open.compression.get_supported_compression_types``.
+            compression_kwargs: Keyword arguments forwarded to the registered
+                compressor callback. Examples of each library's max-compression
+                option: ``{'compresslevel': 9}`` for .gz/.bz2, ``{'preset': 9}`` for
+                .xz, ``{'level': 22}`` for .zst, ``{'compression_level': 12}`` for
+                .lz4. Ignored when compression is 'disable' or the URI's extension
+                doesn't match a registered compressor.
+            transport_params: Additional parameters for the transport layer (see
+                notes below).
 
-        Returns
-        -------
-        A file-like object.
+        Returns:
+            A file-like object.
 
-        Notes
-        -----
-        smart_open has several implementations for its transport layer (e.g. S3, HTTP).
-        Each transport layer has a different set of keyword arguments for overriding
-        default behavior.  If you specify a keyword argument that is *not* supported
-        by the transport layer being used, smart_open will ignore that argument and
-        log a warning message.
+        Raises:
+            TypeError: If ``mode`` is not a string or if the URI type is not
+                recognized.
+            ValueError: If ``compression`` is not a supported value.
+            NotImplementedError: If ``mode`` cannot be parsed into a valid binary
+                mode.
 
-        smart_open supports the following transport mechanisms:
+        Note:
+            smart_open has several implementations for its transport layer
+            (e.g. S3, HTTP). Each transport layer has a different set of keyword
+            arguments for overriding default behavior. If you specify a keyword
+            argument that is *not* supported by the transport layer being used,
+            smart_open will ignore that argument and log a warning message.
 
-        azure (smart_open/azure.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        Implements file-like objects for reading and writing to/from Azure Blob Storage.
+        Transports:
 
-        container_id: str
-            The name of the container this object resides in.
-        blob_id: str
-            The name of the blob within the bucket.
-        mode: str
-            The mode for opening the object.  Must be either "rb", "wb", or "ab".
-        client: azure.storage.blob.BlobServiceClient, ContainerClient, or BlobClient
-            The Azure Blob Storage client to use when working with azure-storage-blob.
-        blob_kwargs: dict, optional
-            Additional parameters to pass to `BlobClient.commit_block_list` (for "wb")
-            or `BlobClient.upload_blob` (for "ab"). For writing only.
-        buffer_size: int, optional
-            The buffer size to use when performing I/O. For reading only.
-        min_part_size: int, optional
-            The minimum part size for multipart uploads. For writing only.
-        max_concurrency: int, optional
-            The number of parallel connections with which to download. For reading only.
+            azure (smart_open/azure.py)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Implements file-like objects for reading and writing to/from Azure Blob Storage.
 
-        file (smart_open/local_file.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        Implements the transport for the file:// schema.
+            container_id:
+                The name of the container this object resides in.
+            blob_id:
+                The name of the blob within the bucket.
+            mode:
+                The mode for opening the object.  Must be either "rb", "wb", or "ab".
+            client:
+                The Azure Blob Storage client to use when working with
+                azure-storage-blob. May be a BlobServiceClient, ContainerClient, or
+                BlobClient.
+            blob_kwargs:
+                Additional parameters to pass to
+                ``BlobClient.commit_block_list`` (for "wb") or
+                ``BlobClient.upload_blob`` (for "ab"). For writing only.
+            buffer_size:
+                The buffer size to use when performing I/O. For reading only.
+            min_part_size:
+                The minimum part size for multipart uploads. For writing
+                only.
+            max_concurrency:
+                The number of parallel connections with which to
+                download. For reading only.
 
-        ftp/ftps (smart_open/ftp.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        Implements I/O streams over FTP.
+            file (smart_open/local_file.py)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Implements the transport for the file:// schema.
 
-        path: str
-            The path on the remote server
-        mode: str
-            Must be "rb" or "wb"
-        host: str
-            The host to connect to
-        user: str
-            The username to use for the connection
-        password: str
-            The password for the specified username
-        port: int
-            The port to connect to
-        secure_connection: bool
-            True for FTPS, False for FTP
-        transport_params: dict
-            Additional parameters for the FTP connection.
-            Currently supported parameters: timeout, source_address, encoding.
+            ftp/ftps (smart_open/ftp.py)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Implements I/O streams over FTP.
 
-        gcs/gs (smart_open/gcs.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~
-        Implements file-like objects for reading and writing to/from GCS.
+            path:
+                The path on the remote server.
+            mode:
+                Must be "rb" or "wb".
+            host:
+                The host to connect to.
+            user:
+                The username to use for the connection.
+            password:
+                The password for the specified username.
+            port:
+                The port to connect to.
+            secure_connection:
+                True for FTPS, False for FTP.
+            transport_params:
+                Additional parameters for the FTP connection.
+                Currently supported parameters: timeout, source_address, encoding.
 
-        bucket_id: str
-            The name of the bucket this object resides in.
-        blob_id: str
-            The name of the blob within the bucket.
-        mode: str
-            The mode for opening the object. Must be either "rb" or "wb".
-        min_part_size: int, optional
-            The minimum part size for multipart uploads. For writing only.
-        client: google.cloud.storage.Client, optional
-            The GCS client to use when working with google-cloud-storage.
-        get_blob_kwargs: dict, optional
-            Additional keyword arguments to propagate to the bucket.get_blob
-            method of the google-cloud-storage library. For reading only.
-        blob_properties: dict, optional
-            Set properties on blob before writing. For writing only.
-        blob_open_kwargs: dict, optional
-            Additional keyword arguments to propagate to the blob.open method
-            of the google-cloud-storage library.
+            gcs/gs (smart_open/gcs.py)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Implements file-like objects for reading and writing to/from GCS.
 
-        hdfs/viewfs (smart_open/hdfs.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        Implements reading and writing to/from HDFS.
+            bucket_id:
+                The name of the bucket this object resides in.
+            blob_id:
+                The name of the blob within the bucket.
+            mode:
+                The mode for opening the object. Must be either "rb" or "wb".
+            min_part_size:
+                The minimum part size for multipart uploads. For writing only.
+            client:
+                The GCS client to use when working with google-cloud-storage.
+            get_blob_kwargs:
+                Additional keyword arguments to propagate to the bucket.get_blob
+                method of the google-cloud-storage library. For reading only.
+            blob_properties:
+                Set properties on blob before writing. For writing only.
+            blob_open_kwargs:
+                Additional keyword arguments to propagate to the blob.open method
+                of the google-cloud-storage library.
 
-        http/https (smart_open/http.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        Implements file-like objects for reading from http.
+            hdfs/viewfs (smart_open/hdfs.py)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Implements reading and writing to/from HDFS.
 
-        url: str
-            The URL to open.
-        mode: str
-            The mode to open using.
-        kerberos: boolean, optional
-            If True, will attempt to use the local Kerberos credentials
-        user: str, optional
-            The username for authenticating over HTTP
-        password: str, optional
-            The password for authenticating over HTTP
-        cert: str/tuple, optional
-            if String, path to ssl client cert file (.pem). If Tuple, (‘cert’, ‘key’)
-        headers: dict, optional
-            Any headers to send in the request. If ``None``, the default headers are sent:
-            ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
-            set this variable to an empty dict, ``{}``.
-        session: object, optional
-            The requests Session object to use with http get requests.
-            Can be used for OAuth2 clients.
-        buffer_size: int, optional
-            The buffer size to use when performing I/O.
+            http/https (smart_open/http.py)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Implements file-like objects for reading from http.
 
-        s3/s3n/s3a (smart_open/s3.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        Implements file-like objects for reading and writing from/to AWS S3.
+            uri:
+                The URL to open.
+            mode:
+                The mode to open using.
+            kerberos:
+                If True, will attempt to use the local Kerberos credentials.
+            user:
+                The username for authenticating over HTTP.
+            password:
+                The password for authenticating over HTTP.
+            cert:
+                If a string, path to ssl client cert file (``.pem``).
+                If a tuple, ``('cert', 'key')``.
+            headers:
+                Any headers to send in the request. If ``None``, the default headers
+                are sent: ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
+                set this variable to an empty dict, ``{}``.
+            timeout:
+                Request timeout in seconds.
+            session:
+                The ``requests.Session`` object to use with HTTP GET requests.
+                Can be used for OAuth2 clients.
+            buffer_size:
+                The buffer size to use when performing I/O.
 
-        bucket_id: str
-            The name of the bucket this object resides in.
-        key_id: str
-            The name of the key within the bucket.
-        mode: str
-            The mode for opening the object.  Must be either "rb" or "wb".
-        buffer_size: int, optional
-            Default: 128KB
-            The buffer size in bytes for reading. Controls memory usage. Data is streamed
-            from a S3 network stream in buffer_size chunks. Forward seeks within
-            the current buffer are satisfied without additional GET requests. Backward
-            seeks always open a new GET request. For forward seek-intensive workloads,
-            increase buffer_size to reduce GET requests at the cost of higher memory usage.
-        min_part_size: int, optional
-            The minimum part size for multipart uploads, in bytes.
-            When the writebuffer contains this many bytes, smart_open will upload
-            the bytes to S3 as a single part of a multi-part upload, freeing the
-            buffer either partially or entirely.  When you close the writer, it
-            will assemble the parts together.
-            The value determines the upper limit for the writebuffer.  If buffer
-            space is short (e.g. you are buffering to memory), then use a smaller
-            value for min_part_size, or consider buffering to disk instead (see
-            the writebuffer option).
-            The value must be between 5MB and 5GB.  If you specify a value outside
-            of this range, smart_open will adjust it for you, because otherwise the
-            upload _will_ fail.
-            For writing only.  Does not apply if you set multipart_upload=False.
-        multipart_upload: bool, optional
-            Default: `True`
-            If set to `True`, will use multipart upload for writing to S3. If set
-            to `False`, S3 upload will use the S3 Single-Part Upload API, which
-            is more ideal for small file sizes.
-            For writing only.
-        version_id: str, optional
-            Version of the object, used when reading object.
-            If None, will fetch the most recent version.
-        defer_seek: boolean, optional
-            Default: `False`
-            If set to `True` on a file opened for reading, GetObject will not be
-            called until the first seek() or read().
-            Avoids redundant API queries when seeking before reading.
-        range_chunk_size: int, optional
-            Default: `None`
-            Maximum byte range per S3 GET request when reading.
-            When None (default), a single GET request is made for the entire file,
-            and data is streamed from that single botocore.response.StreamingBody
-            in buffer_size chunks.
-            When set to a positive integer, multiple GET requests are made, each
-            limited to at most this many bytes via HTTP Range headers. Each GET
-            returns a new StreamingBody that is streamed in buffer_size chunks.
-            Useful for reading small portions of large files without forcing
-            S3-compatible systems like SeaweedFS/Ceph to load the entire file.
-            Larger values mean fewer billable GET requests but higher load on S3
-            servers. Smaller values mean more GET requests but less server load per request.
-            Values larger than the file size result in a single GET for the whole file.
-            Affects reading only. Does not affect memory usage (controlled by buffer_size).
-        client: object, optional
-            The S3 client to use when working with boto3.
-            If you don't specify this, then smart_open will create a new client for you.
-        client_kwargs: dict, optional
-            Additional parameters to pass to the relevant functions of the client.
-            The keys are fully qualified method names, e.g. `S3.Client.create_multipart_upload`.
-            The values are kwargs to pass to that method each time it is called.
-        writebuffer: IO[bytes], optional
-            By default, this module will buffer data in memory using io.BytesIO
-            when writing. Pass another binary IO instance here to use it instead.
-            For example, you may pass a file object to buffer to local disk instead
-            of in RAM. Use this to keep RAM usage low at the expense of additional
-            disk IO. If you pass in an open file, then you are responsible for
-            cleaning it up after writing completes.
+            s3/s3n/s3a (smart_open/s3.py)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Implements file-like objects for reading and writing from/to AWS S3.
 
-        ssh/scp/sftp (smart_open/ssh.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        Implements I/O streams over SSH.
+            bucket_id:
+                The name of the bucket this object resides in.
+            key_id:
+                The name of the key within the bucket.
+            mode:
+                The mode for opening the object.  Must be either "rb" or "wb".
+            version_id:
+                Version of the object, used when reading object.
+                If None, will fetch the most recent version.
+            buffer_size:
+                Default: 128KB.
+                The buffer size in bytes for reading. Controls memory usage. Data is
+                streamed from a S3 network stream in buffer_size chunks. Forward seeks
+                within the current buffer are satisfied without additional GET requests.
+                Backward seeks always open a new GET request. For forward seek-intensive
+                workloads, increase buffer_size to reduce GET requests at the cost of
+                higher memory usage.
+            min_part_size:
+                The minimum part size for multipart uploads, in bytes.
+                When the writebuffer contains this many bytes, smart_open will upload
+                the bytes to S3 as a single part of a multi-part upload, freeing the
+                buffer either partially or entirely.  When you close the writer, it
+                will assemble the parts together.
+                The value determines the upper limit for the writebuffer.  If buffer
+                space is short (e.g. you are buffering to memory), then use a smaller
+                value for min_part_size, or consider buffering to disk instead (see
+                the writebuffer option).
+                The value must be between 5MB and 5GB.  If you specify a value outside
+                of this range, smart_open will adjust it for you, because otherwise the
+                upload _will_ fail.
+                For writing only.  Does not apply if you set multipart_upload=False.
+            multipart_upload:
+                Default: `True`.
+                If set to `True`, will use multipart upload for writing to S3. If set
+                to `False`, S3 upload will use the S3 Single-Part Upload API, which
+                is more ideal for small file sizes.
+                For writing only.
+            defer_seek:
+                Default: `False`.
+                If set to `True` on a file opened for reading, GetObject will not be
+                called until the first seek() or read().
+                Avoids redundant API queries when seeking before reading.
+            client:
+                The S3 client to use when working with boto3.
+                If you don't specify this, then smart_open will create a new client for
+                you.
+            client_kwargs:
+                Additional parameters to pass to the relevant functions of
+                the client. The keys are fully qualified method names,
+                e.g. `S3.Client.create_multipart_upload`.
+                The values are kwargs to pass to that method each time it is called.
+            writebuffer:
+                By default, this module will buffer data in memory using
+                io.BytesIO when writing. Pass another binary IO instance here to use it
+                instead. For example, you may pass a file object to buffer to local disk
+                instead of in RAM. Use this to keep RAM usage low at the expense of
+                additional disk IO. If you pass in an open file, then you are
+                responsible for cleaning it up after writing completes.
+            range_chunk_size:
+                Default: `None`.
+                Maximum byte range per S3 GET request when reading.
+                When None (default), a single GET request is made for the entire file,
+                and data is streamed from that single botocore.response.StreamingBody
+                in buffer_size chunks.
+                When set to a positive integer, multiple GET requests are made, each
+                limited to at most this many bytes via HTTP Range headers. Each GET
+                returns a new StreamingBody that is streamed in buffer_size chunks.
+                Useful for reading small portions of large files without forcing
+                S3-compatible systems like SeaweedFS/Ceph to load the entire file.
+                Larger values mean fewer billable GET requests but higher load on S3
+                servers. Smaller values mean more GET requests but less server load per
+                request. Values larger than the file size result in a single GET for the
+                whole file. Affects reading only. Does not affect memory usage
+                (controlled by buffer_size).
 
-        path: str
-            The path to the file to open on the remote machine.
-        mode: str, optional
-            The mode to use for opening the file.
-        host: str, optional
-            The hostname of the remote machine. May not be None.
-        user: str, optional
-            The username to use to login to the remote machine.
-            If None, defaults to the name of the current user.
-        password: str, optional
-            The password to use to login to the remote machine.
-        port: int, optional
-            The port to connect to.
-        connect_kwargs: dict, optional
-            Any additional settings to be passed to paramiko.SSHClient.connect.
-        prefetch_kwargs: dict, optional
-            Any additional settings to be passed to paramiko.SFTPFile.prefetch.
-            The presence of this dict (even if empty) triggers prefetching.
-        buffer_size: int, optional
-            Passed to the bufsize argument of paramiko.SFTPClient.open.
+            ssh/scp/sftp (smart_open/ssh.py)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Implements I/O streams over SSH.
 
-        webhdfs (smart_open/webhdfs.py)
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        Implements reading and writing to/from WebHDFS.
+            path:
+                The path to the file to open on the remote machine.
+            mode:
+                The mode to use for opening the file.
+            host:
+                The hostname of the remote machine. May not be None.
+            user:
+                The username to use to login to the remote machine.
+                If None, defaults to the name of the current user.
+            password:
+                The password to use to login to the remote machine.
+            port:
+                The port to connect to.
+            connect_kwargs:
+                Any additional settings to be passed to paramiko.SSHClient.connect.
+            prefetch_kwargs:
+                Any additional settings to be passed to paramiko.SFTPFile.prefetch.
+                The presence of this dict (even if empty) triggers prefetching.
+            buffer_size:
+                Passed to the bufsize argument of paramiko.SFTPClient.open.
 
-        http_uri: str
-            webhdfs url converted to http REST url
-        min_part_size: int, optional
-            For writing only.
+            webhdfs (smart_open/webhdfs.py)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Implements reading and writing to/from WebHDFS.
 
-        Examples
-        --------
+            http_uri:
+                webhdfs url converted to http REST url.
+            mode:
+                The mode for opening the object. Must be either "rb" or "wb".
+            min_part_size:
+                For writing only.
 
-        >>> from smart_open import open
-        >>>
-        >>> # stream lines from an S3 object
-        >>> for line in open('s3://commoncrawl/robots.txt'):
-        ...    print(repr(line))
-        ...    break
-        'User-Agent: *\n'
+        Examples:
 
-        >>> # stream from/to compressed files, with transparent (de)compression:
-        >>> for line in open('tests/test_data/1984.txt.gz', encoding='utf-8'):
-        ...    print(repr(line))
-        'It was a bright cold day in April, and the clocks were striking thirteen.\n'
-        'Winston Smith, his chin nuzzled into his breast in an effort to escape the vile\n'
-        'wind, slipped quickly through the glass doors of Victory Mansions, though not\n'
-        'quickly enough to prevent a swirl of gritty dust from entering along with him.\n'
+            >>> from smart_open import open
+            >>>
+            >>> # stream lines from an S3 object
+            >>> for line in open('s3://commoncrawl/robots.txt'):
+            ...    print(repr(line))
+            ...    break
+            'User-Agent: *\n'
 
-        >>> # can use context managers too:
-        >>> with open('tests/test_data/1984.txt.gz') as fin:
-        ...    with open('tests/test_data/1984.txt.bz2', 'w') as fout:
-        ...        for line in fin:
-        ...           fout.write(line)
-        74
-        80
-        78
-        79
+            >>> # stream from/to compressed files, with transparent (de)compression:
+            >>> for line in open('tests/test_data/1984.txt.gz', encoding='utf-8'):
+            ...    print(repr(line))
+            'It was a bright cold day in April, and the clocks were striking thirteen.\n'
+            'Winston Smith, his chin nuzzled into his breast in an effort to escape the vile\n'
+            'wind, slipped quickly through the glass doors of Victory Mansions, though not\n'
+            'quickly enough to prevent a swirl of gritty dust from entering along with him.\n'
 
-        >>> # can use any IOBase operations, like seek
-        >>> with open('s3://commoncrawl/robots.txt', 'rb') as fin:
-        ...     for line in fin:
-        ...         print(repr(line.decode('utf-8')))
-        ...         break
-        ...     offset = fin.seek(0)  # seek to the beginning
-        ...     print(fin.read(4))
-        'User-Agent: *\n'
-        b'User'
+            >>> # can use context managers too:
+            >>> with open('tests/test_data/1984.txt.gz') as fin:
+            ...    with open('tests/test_data/1984.txt.bz2', 'w') as fout:
+            ...        for line in fin:
+            ...           fout.write(line)
+            74
+            80
+            78
+            79
 
-        >>> # stream from HTTP
-        >>> for line in open('http://example.com'):
-        ...     print(repr(line[:15]))
-        ...     break
+            >>> # can use any IOBase operations, like seek
+            >>> with open('s3://commoncrawl/robots.txt', 'rb') as fin:
+            ...     for line in fin:
+            ...         print(repr(line.decode('utf-8')))
+            ...         break
+            ...     offset = fin.seek(0)  # seek to the beginning
+            ...     print(fin.read(4))
+            'User-Agent: *\n'
+            b'User'
 
-        This function also supports transparent compression and decompression
-        using the following codecs:
+            >>> # stream from HTTP
+            >>> for line in open('http://example.com'):
+            ...     print(repr(line[:15]))
+            ...     break
 
-        * .bz2
-        * .gz
-        * .lz4
-        * .xz
-        * .zst
+        Codecs:
 
-        The function depends on the file extension to determine the appropriate codec.
+            smart_open supports transparent compression and decompression for files
+            with the following extensions:
+
+            * .bz2
+            * .gz
+            * .lz4
+            * .xz
+            * .zst
+
+            The codec is selected based on the file extension.
 
 
-        See Also
-        --------
-        - `Standard library reference <https://docs.python.org/3.14/library/functions.html#open>`__
-        - `smart_open README.rst
-          <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
+        See Also:
+            - `Standard library reference <https://docs.python.org/3.14/library/functions.html#open>`__
+            - `smart_open README.rst
+              <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
 
     parse_uri(uri_as_string)
         Parse the given URI from a string.
 
-        Parameters
-        ----------
-        uri_as_string: str
-            The URI to parse.
+        Args:
+            uri_as_string: The URI to parse.
 
-        Returns
-        -------
-        collections.namedtuple
-            The parsed URI.
+        Returns:
+            The parsed URI as a ``collections.namedtuple``.
 
-        Notes
-        -----
-        Supported URI schemes are:
+        Schemes:
 
-        * azure
-        * file
-        * ftp
-        * ftps
-        * gcs
-        * gs
-        * hdfs
-        * viewfs
-        * http
-        * https
-        * s3
-        * s3n
-        * s3a
-        * ssh
-        * scp
-        * sftp
-        * webhdfs
+            * azure
+            * file
+            * ftp
+            * ftps
+            * gcs
+            * gs
+            * hdfs
+            * viewfs
+            * http
+            * https
+            * s3
+            * s3n
+            * s3a
+            * ssh
+            * scp
+            * sftp
+            * webhdfs
 
-        Valid URI examples::
+        Examples:
 
-        * ./local/path/file
-        * ~/local/path/file
-        * local/path/file
-        * ./local/path/file.gz
-        * file:///home/user/file
-        * file:///home/user/file.bz2
-        * ftp://username@host/path/file
-        * ftp://username:password@host/path/file
-        * ftp://username:password@host:port/path/file
-        * ftps://username@host/path/file
-        * ftps://username:password@host/path/file
-        * ftps://username:password@host:port/path/file
-        * hdfs:///path/file
-        * hdfs://host/path/file
-        * hdfs://host:port/path/file
-        * viewfs:///path/file
-        * viewfs://host/path/file
-        * s3://my_bucket/my_key
-        * s3://my_key:my_secret@my_bucket/my_key
-        * ssh://username@host/path/file
-        * ssh://username@host//path/file
-        * scp://username@host/path/file
-        * sftp://username@host/path/file
-        * webhdfs://host:port/path/file
+            * ./local/path/file
+            * ~/local/path/file
+            * local/path/file
+            * ./local/path/file.gz
+            * file:///home/user/file
+            * file:///home/user/file.bz2
+            * ftp://username@host/path/file
+            * ftp://username:password@host/path/file
+            * ftp://username:password@host:port/path/file
+            * ftps://username@host/path/file
+            * ftps://username:password@host/path/file
+            * ftps://username:password@host:port/path/file
+            * hdfs:///path/file
+            * hdfs://host/path/file
+            * hdfs://host:port/path/file
+            * viewfs:///path/file
+            * viewfs://host/path/file
+            * s3://my_bucket/my_key
+            * s3://my_key:my_secret@my_bucket/my_key
+            * ssh://username@host/path/file
+            * ssh://username@host//path/file
+            * scp://username@host/path/file
+            * sftp://username@host/path/file
+            * webhdfs://host:port/path/file
 
     register_compressor(ext, callback)
         Register a callback for transparently decompressing files with a specific extension.
 
-        Parameters
-        ----------
-        ext: str
-            The extension.  Must include the leading period, e.g. `.gz`.
-        callback: callable
-            The callback.  It must accept two positional arguments, file_obj and mode,
-            and is recommended to also accept **kwargs so that whatever the caller passes
-            via smart_open.open(..., compression_kwargs={...}) reaches the underlying
-            library unchanged.  Callbacks with the legacy (file_obj, mode) signature still
-            work, but will raise TypeError if the caller supplies compression_kwargs
-            that the callback doesn't declare.
+        Args:
+            ext: The extension.  Must include the leading period, e.g. `.gz`.
+            callback: The callback.  It must accept two positional arguments, file_obj and mode,
+                and is recommended to also accept **kwargs so that whatever the caller passes
+                via smart_open.open(..., compression_kwargs={...}) reaches the underlying
+                library unchanged.  Callbacks with the legacy (file_obj, mode) signature still
+                work, but will raise TypeError if the caller supplies compression_kwargs
+                that the callback doesn't declare.
 
-        Examples
-        --------
+        Raises:
+            ValueError: If `ext` does not start with a period.
 
-        Instruct smart_open to use the `lzma` module whenever opening a file
-        with a .xz extension (see README.rst for the complete example showing I/O):
+        Example:
+            Instruct smart_open to use the `lzma` module whenever opening a file
+            with a .xz extension (see README.rst for the complete example showing I/O):
 
-        >>> def _handle_xz(file_obj, mode, **kwargs):
-        ...     import lzma
-        ...     return lzma.open(filename=file_obj, mode=mode, **kwargs)
-        >>>
-        >>> register_compressor('.xz', _handle_xz)
+            >>> def _handle_xz(file_obj, mode, **kwargs):
+            ...     import lzma
+            ...     return lzma.open(filename=file_obj, mode=mode, **kwargs)
+            >>>
+            >>> register_compressor('.xz', _handle_xz)
 
-        This is just an example: `lzma` is in the standard library and is registered by default.
+            This is just an example: `lzma` is in the standard library and is registered by default.
 
 DATA
     __all__ = ['open', 'parse_uri', 'register_compressor']

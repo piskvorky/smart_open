@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2020 Radim Rehurek <me@radimrehurek.com>
 #
@@ -17,11 +16,12 @@ import wrapt
 
 logger = logging.getLogger(__name__)
 
-WORKAROUND_SCHEMES = ['s3', 's3n', 's3a', 'gcs', 'gs']
-QUESTION_MARK_PLACEHOLDER = '///smart_open.utils.QUESTION_MARK_PLACEHOLDER///'
+WORKAROUND_SCHEMES = ["s3", "s3n", "s3a", "gcs", "gs"]
+QUESTION_MARK_PLACEHOLDER = "///smart_open.utils.QUESTION_MARK_PLACEHOLDER///"
 
 
 def inspect_kwargs(kallable):
+    """Return a ``{name: default}`` mapping for every default-valued kwarg of `kallable`."""
     signature = inspect.signature(kallable)
     return {
         name: param.default
@@ -33,17 +33,12 @@ def inspect_kwargs(kallable):
 def check_kwargs(kallable, kwargs):
     """Check which keyword arguments the callable supports.
 
-    Parameters
-    ----------
-    kallable: callable
-        A function or method to test
-    kwargs: dict
-        The keyword arguments to check.  If the callable doesn't support any
-        of these, a warning message will get printed.
+    Args:
+        kallable: A function or method to test.
+        kwargs: The keyword arguments to check.  If the callable doesn't support any
+            of these, a warning message will get printed.
 
-    Returns
-    -------
-    dict
+    Returns:
         A dictionary of argument names and values supported by the callable.
     """
     supported_keywords = sorted(inspect_kwargs(kallable))
@@ -51,7 +46,7 @@ def check_kwargs(kallable, kwargs):
     supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
 
     if unsupported_keywords:
-        logger.warning('ignoring unsupported keyword arguments: %r', unsupported_keywords)
+        logger.warning("ignoring unsupported keyword arguments: %r", unsupported_keywords)
 
     return supported_kwargs
 
@@ -59,54 +54,41 @@ def check_kwargs(kallable, kwargs):
 def clamp(value, minval=0, maxval=None):
     """Clamp a numeric value to a specific range.
 
-    Parameters
-    ----------
-    value: numeric
-        The value to clamp.
+    Args:
+        value: The value to clamp.
+        minval: The lower bound.
+        maxval: The upper bound.
 
-    minval: numeric
-        The lower bound.
-
-    maxval: numeric
-        The upper bound.
-
-    Returns
-    -------
-    numeric
+    Returns:
         The clamped value.  It will be in the range ``[minval, maxval]``.
-
     """
     if maxval is not None:
         value = min(value, maxval)
-    value = max(value, minval)
-    return value
+    return max(value, minval)
 
 
 def make_range_string(start=None, stop=None):
     """Create a byte range specifier in accordance with RFC-2616.
 
-    Parameters
-    ----------
-    start: int, optional
-        The start of the byte range.  If unspecified, stop indicated offset from EOF.
+    Args:
+        start: The start of the byte range.  If unspecified, stop indicated offset from EOF.
+        stop: The end of the byte range.  If unspecified, indicates EOF.
 
-    stop: int, optional
-        The end of the byte range.  If unspecified, indicates EOF.
-
-    Returns
-    -------
-    str
+    Returns:
         A byte range specifier.
 
+    Raises:
+        ValueError: If neither ``start`` nor ``stop`` are specified.
     """
     #
     # https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.35
     #
     if start is None and stop is None:
-        raise ValueError("make_range_string requires either a stop or start value")
-    start_str = '' if start is None else str(start)
-    stop_str = '' if stop is None else str(stop)
-    return 'bytes=%s-%s' % (start_str, stop_str)
+        msg = "make_range_string requires either a stop or start value"
+        raise ValueError(msg)
+    start_str = "" if start is None else str(start)
+    stop_str = "" if stop is None else str(stop)
+    return f"bytes={start_str}-{stop_str}"
 
 
 def parse_content_range(content_range):
@@ -115,20 +97,16 @@ def parse_content_range(content_range):
     Assumes a properly formatted content-range header from S3.
     See werkzeug.http.parse_content_range_header for a more robust version.
 
-    Parameters
-    ----------
-    content_range: str
-        The content-range header to parse.
+    Args:
+        content_range: The content-range header to parse.
 
-    Returns
-    -------
-    tuple (units: str, start: int, stop: int, length: int)
-        The units and three integers from the content-range header.
-
+    Returns:
+        A tuple ``(units, start, stop, length)`` of one string and three integers
+        from the content-range header.
     """
-    units, numbers = content_range.split(' ', 1)
-    range, length = numbers.split('/', 1)
-    start, stop = range.split('-', 1)
+    units, numbers = content_range.split(" ", 1)
+    range, length = numbers.split("/", 1)
+    start, stop = range.split("-", 1)
     return units, int(start), int(stop), int(length)
 
 
@@ -145,35 +123,36 @@ def safe_urlsplit(url):
     placeholder is already part of the URL.  If this affects you, consider
     changing the value of QUESTION_MARK_PLACEHOLDER to something more suitable.
 
-    See Also
-    --------
-    https://bugs.python.org/issue43882
-    https://github.com/python/cpython/blob/3.14/Lib/urllib/parse.py
-    https://github.com/piskvorky/smart_open/issues/285
-    https://github.com/piskvorky/smart_open/issues/458
-    smart_open/utils.py:QUESTION_MARK_PLACEHOLDER
+    See Also:
+        - https://bugs.python.org/issue43882
+        - https://github.com/python/cpython/blob/3.14/Lib/urllib/parse.py
+        - https://github.com/piskvorky/smart_open/issues/285
+        - https://github.com/piskvorky/smart_open/issues/458
+        - ``smart_open/utils.py:QUESTION_MARK_PLACEHOLDER``
     """
     sr = urllib.parse.urlsplit(url, allow_fragments=False)
 
     placeholder = None
-    if sr.scheme in WORKAROUND_SCHEMES and '?' in url and QUESTION_MARK_PLACEHOLDER not in url:
+    if sr.scheme in WORKAROUND_SCHEMES and "?" in url and QUESTION_MARK_PLACEHOLDER not in url:
         #
         # This is safe because people will _almost never_ use the below
         # substring in a URL.  If they do, then they're asking for trouble,
         # and this special handling will simply not happen for them.
         #
         placeholder = QUESTION_MARK_PLACEHOLDER
-        url = url.replace('?', placeholder)
+        url = url.replace("?", placeholder)
         sr = urllib.parse.urlsplit(url, allow_fragments=False)
 
     if placeholder is None:
         return sr
 
-    path = sr.path.replace(placeholder, '?')
-    return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, '', '')
+    path = sr.path.replace(placeholder, "?")
+    return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, "", "")
 
 
 class TextIOWrapper(io.TextIOWrapper):
+    """`io.TextIOWrapper` subclass that does not close the buffer on exceptions."""
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Call close on underlying buffer only when there was no exception.
 
@@ -187,6 +166,8 @@ class TextIOWrapper(io.TextIOWrapper):
 
 
 class FileLikeProxy(wrapt.ObjectProxy):
+    """Wrap an `outer` file-like object so that closing it also closes `inner`."""
+
     __inner = ...  # initialized before wrapt disallows __setattr__ on certain objects
 
     def __init__(self, outer, inner):
@@ -205,9 +186,11 @@ class FileLikeProxy(wrapt.ObjectProxy):
             self.__inner.__exit__(*args, **kwargs)
 
     def __next__(self):
+        """Delegate iteration to the wrapped file-like object."""
         return self.__wrapped__.__next__()
 
     def close(self):
+        """Close both the wrapped object and the inner object."""
         try:
             return self.__wrapped__.close()
         finally:

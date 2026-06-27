@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -10,10 +9,11 @@
 
 import logging
 import ssl
-import urllib.parse
-import smart_open.utils
-from ftplib import FTP, FTP_TLS, error_reply
 import types
+import urllib.parse
+from ftplib import FTP, FTP_TLS, error_reply
+
+import smart_open.utils
 
 logger = logging.getLogger(__name__)
 
@@ -38,24 +38,26 @@ def _unquote(text):
 
 
 def parse_uri(uri_as_string):
+    """Parse an ``ftp://`` or ``ftps://`` URI into connection components."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
-    assert split_uri.scheme in SCHEMES
-    return dict(
-        scheme=split_uri.scheme,
-        uri_path=_unquote(split_uri.path),
-        user=_unquote(split_uri.username),
-        host=split_uri.hostname,
-        port=int(split_uri.port or DEFAULT_PORT),
-        password=_unquote(split_uri.password),
-    )
+    assert split_uri.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
+    return {
+        "scheme": split_uri.scheme,
+        "uri_path": _unquote(split_uri.path),
+        "user": _unquote(split_uri.username),
+        "host": split_uri.hostname,
+        "port": int(split_uri.port or DEFAULT_PORT),
+        "password": _unquote(split_uri.password),
+    }
 
 
 def open_uri(uri, mode, transport_params):
+    """Open an FTP/FTPS URI using the given mode and transport params."""
     smart_open.utils.check_kwargs(open, transport_params)
     parsed_uri = parse_uri(uri)
     uri_path = parsed_uri.pop("uri_path")
     scheme = parsed_uri.pop("scheme")
-    secure_conn = True if scheme == "ftps" else False
+    secure_conn = scheme == "ftps"
     return open(
         uri_path,
         mode,
@@ -66,6 +68,7 @@ def open_uri(uri, mode, transport_params):
 
 
 def convert_transport_params_to_args(transport_params):
+    """Return the subset of `transport_params` that the FTP client accepts."""
     supported_keywords = [
         "timeout",
         "source_address",
@@ -75,73 +78,68 @@ def convert_transport_params_to_args(transport_params):
     kwargs = {k: v for (k, v) in transport_params.items() if k in supported_keywords}
 
     if unsupported_keywords:
-        logger.warning(
-            "ignoring unsupported ftp keyword arguments: %r", unsupported_keywords
-        )
+        logger.warning("ignoring unsupported ftp keyword arguments: %r", unsupported_keywords)
 
     return kwargs
 
 
-def _connect(hostname, username, port, password, secure_connection, transport_params):
+def _connect(hostname, username, port, password, secure_connection, transport_params):  # noqa: PLR0913  # legacy internal helper; refactor in a dedicated PR
     kwargs = convert_transport_params_to_args(transport_params)
     if secure_connection:
         ssl_context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
-        ftp = FTP_TLS(context=ssl_context, **kwargs)
+        ftp = FTP_TLS(context=ssl_context, **kwargs)  # noqa: S321  # this module's purpose
     else:
-        ftp = FTP(**kwargs)
+        ftp = FTP(**kwargs)  # noqa: S321  # this module's purpose
     try:
         ftp.connect(hostname, port)
-    except Exception as e:
-        logger.error("Unable to connect to FTP server: try checking the host and port!")
-        raise e
+    except Exception:
+        logger.exception("Unable to connect to FTP server: try checking the host and port!")
+        raise
     try:
         ftp.login(username, password)
-    except error_reply as e:
-        logger.error(
-            "Unable to login to FTP server: try checking the username and password!"
-        )
-        raise e
+    except error_reply:
+        logger.exception("Unable to login to FTP server: try checking the username and password!")
+        raise
     if secure_connection:
         ftp.prot_p()
     return ftp
 
 
-def open(
+def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     path,
     mode="rb",
     host=None,
     user=None,
     password=None,
     port=DEFAULT_PORT,
-    secure_connection=False,
+    secure_connection=False,  # noqa: FBT002  # public API
     transport_params=None,
 ):
     """Open a file for reading or writing via FTP/FTPS.
 
-    Parameters
-    ----------
-    path: str
-        The path on the remote server
-    mode: str
-        Must be "rb" or "wb"
-    host: str
-        The host to connect to
-    user: str
-        The username to use for the connection
-    password: str
-        The password for the specified username
-    port: int
-        The port to connect to
-    secure_connection: bool
-        True for FTPS, False for FTP
-    transport_params: dict
-        Additional parameters for the FTP connection.
-        Currently supported parameters: timeout, source_address, encoding.
+    Args:
+        path: The path on the remote server.
+        mode: Must be "rb" or "wb".
+        host: The host to connect to.
+        user: The username to use for the connection.
+        password: The password for the specified username.
+        port: The port to connect to.
+        secure_connection: True for FTPS, False for FTP.
+        transport_params: Additional parameters for the FTP connection.
+            Currently supported parameters: timeout, source_address, encoding.
+
+    Returns:
+        A file-like object for the remote FTP/FTPS file.
+
+    Raises:
+        ValueError: If `host` or `user` is not specified, or if `mode` is unsupported.
     """
     if not host:
-        raise ValueError("you must specify the host to connect to")
+        msg = "you must specify the host to connect to"
+        raise ValueError(msg)
     if not user:
-        raise ValueError("you must specify the user")
+        msg = "you must specify the user"
+        raise ValueError(msg)
     if not transport_params:
         transport_params = {}
     conn = _connect(host, user, port, password, secure_connection, transport_params)
@@ -152,8 +150,9 @@ def open(
     }
     try:
         ftp_mode, file_obj_mode = mode_to_ftp_cmds[mode]
-    except KeyError:
-        raise ValueError(f"unsupported mode: {mode!r}")
+    except KeyError as err:
+        msg = f"unsupported mode: {mode!r}"
+        raise ValueError(msg) from err
     ftp_mode, file_obj_mode = mode_to_ftp_cmds[mode]
     conn.voidcmd("TYPE I")
     socket = conn.transfercmd(f"{ftp_mode} {path}")

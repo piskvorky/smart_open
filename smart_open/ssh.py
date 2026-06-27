@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -8,30 +7,23 @@
 
 """Implements I/O streams over SSH.
 
-Examples
---------
-
->>> with open('/proc/version_signature', host='1.2.3.4') as conn:
-...     print(conn.read())
-b'Ubuntu 4.4.0-1061.70-aws 4.4.131'
-
-Similarly, from a command line::
-
-    $ python -c "from smart_open import ssh;print(ssh.open('/proc/version_signature', host='1.2.3.4').read())"
+Example:
+    >>> with open('/proc/version_signature', host='1.2.3.4') as conn:
+    ...     print(conn.read())
     b'Ubuntu 4.4.0-1061.70-aws 4.4.131'
 
+    Similarly, from a command line::
+
+        $ python -c "from smart_open import ssh;print(ssh.open('/proc/version_signature', host='1.2.3.4').read())"
+        b'Ubuntu 4.4.0-1061.70-aws 4.4.131'
 """
 
+import contextlib
 import getpass
-import os
 import logging
 import urllib.parse
-
-from typing import (
-    Dict,
-    Callable,
-    Tuple,
-)
+from collections.abc import Callable
+from pathlib import Path
 
 try:
     import paramiko
@@ -53,16 +45,16 @@ SCHEMES = ("ssh", "scp", "sftp")
 DEFAULT_PORT = 22
 
 URI_EXAMPLES = (
-    'ssh://username@host/path/file',
-    'ssh://username@host//path/file',
-    'scp://username@host/path/file',
-    'sftp://username@host/path/file',
+    "ssh://username@host/path/file",
+    "ssh://username@host//path/file",
+    "scp://username@host/path/file",
+    "sftp://username@host/path/file",
 )
 
 #
 # Global storage for SSH config files.
 #
-_SSH_CONFIG_FILES = [os.path.expanduser("~/.ssh/config")]
+_SSH_CONFIG_FILES = [str(Path("~/.ssh/config").expanduser())]
 
 
 def _unquote(text):
@@ -74,7 +66,8 @@ def _str2bool(string):
         return False
     if string == "yes":
         return True
-    raise ValueError(f"Expected 'yes' / 'no', got {string}.")
+    msg = f"Expected 'yes' / 'no', got {string}."
+    raise ValueError(msg)
 
 
 #
@@ -87,7 +80,7 @@ def _str2bool(string):
 # 1. their corresponding names in the ~/.ssh/config file
 # 2. a callable to convert the parameter value from a string to the appropriate type
 #
-_PARAMIKO_CONFIG_MAP: Dict[str, Tuple[str, Callable]] = {
+_PARAMIKO_CONFIG_MAP: dict[str, tuple[str, Callable]] = {
     "timeout": ("connecttimeout", float),
     "compress": ("compression", _str2bool),
     "gss_auth": ("gssapiauthentication", _str2bool),
@@ -98,23 +91,25 @@ _PARAMIKO_CONFIG_MAP: Dict[str, Tuple[str, Callable]] = {
 
 
 def parse_uri(uri_as_string):
+    """Parse an ``ssh://``/``scp://``/``sftp://`` URI into connection components."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
-    assert split_uri.scheme in SCHEMES
-    return dict(
-        scheme=split_uri.scheme,
-        uri_path=_unquote(split_uri.path),
-        user=_unquote(split_uri.username),
-        host=split_uri.hostname,
-        port=int(split_uri.port) if split_uri.port else None,
-        password=_unquote(split_uri.password),
-    )
+    assert split_uri.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
+    return {
+        "scheme": split_uri.scheme,
+        "uri_path": _unquote(split_uri.path),
+        "user": _unquote(split_uri.username),
+        "host": split_uri.hostname,
+        "port": int(split_uri.port) if split_uri.port else None,
+        "password": _unquote(split_uri.password),
+    }
 
 
 def open_uri(uri, mode, transport_params):
+    """Open an SSH/SCP/SFTP URI using the given mode and transport params."""
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
     parsed_uri = parse_uri(uri)
-    uri_path = parsed_uri.pop('uri_path')
-    parsed_uri.pop('scheme')
+    uri_path = parsed_uri.pop("uri_path")
+    parsed_uri.pop("scheme")
     final_params = {**parsed_uri, **kwargs}  # transport_params takes precedence over uri
     return open(uri_path, mode, **final_params)
 
@@ -122,22 +117,23 @@ def open_uri(uri, mode, transport_params):
 def _connect_ssh(hostname, username, port, password, connect_kwargs):
     ssh = paramiko.SSHClient()
     ssh.load_system_host_keys()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # noqa: S507  # documented smart_open default
     kwargs = (connect_kwargs or {}).copy()
-    if 'key_filename' not in kwargs:
-        kwargs.setdefault('password', password)
-    kwargs.setdefault('username', username)
+    if "key_filename" not in kwargs:
+        kwargs.setdefault("password", password)
+    kwargs.setdefault("username", username)
     ssh.connect(hostname, port, **kwargs)
     return ssh
 
 
-def _maybe_fetch_config(host, username=None, password=None, port=None, connect_kwargs=None):
+def _maybe_fetch_config(host, username=None, password=None, port=None, connect_kwargs=None):  # noqa: C901, PLR0912  # legacy internal helper; refactor in a dedicated PR
     # If all fields are set, return as-is.
     if not any(arg is None for arg in (host, username, password, port, connect_kwargs)):
         return host, username, password, port, connect_kwargs
 
     if not host:
-        raise ValueError('you must specify the host to connect to')
+        msg = "you must specify the host to connect to"
+        raise ValueError(msg)
 
     # Attempt to load an OpenSSH config.
     #
@@ -155,7 +151,7 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
     # - GSS configuration
     #
     connect_params = (connect_kwargs or {}).copy()
-    config_files = [f for f in _SSH_CONFIG_FILES if os.path.exists(f)]
+    config_files = [f for f in _SSH_CONFIG_FILES if Path(f).exists()]
     #
     # This is the actual name of the host.  The input host may actually be an
     # alias.
@@ -179,13 +175,9 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
             actual_hostname = cfg["hostname"]
 
         if port is None:
-            try:
+            # Nb. ignore missing/invalid port numbers
+            with contextlib.suppress(KeyError, ValueError):
                 port = int(cfg["port"])
-            except (KeyError, ValueError):
-                #
-                # Nb. ignore missing/invalid port numbers
-                #
-                pass
 
         #
         # Special case, as we can have multiple identity files, so we check
@@ -218,7 +210,7 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
     return host, username, password, port, connect_params
 
 
-def open(
+def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     path,
     mode="r",
     host=None,
@@ -233,40 +225,32 @@ def open(
 
     Expects authentication to be already set up via existing keys on the local machine.
 
-    Parameters
-    ----------
-    path: str
-        The path to the file to open on the remote machine.
-    mode: str, optional
-        The mode to use for opening the file.
-    host: str, optional
-        The hostname of the remote machine. May not be None.
-    user: str, optional
-        The username to use to login to the remote machine.
-        If None, defaults to the name of the current user.
-    password: str, optional
-        The password to use to login to the remote machine.
-    port: int, optional
-        The port to connect to.
-    connect_kwargs: dict, optional
-        Any additional settings to be passed to paramiko.SSHClient.connect.
-    prefetch_kwargs: dict, optional
-        Any additional settings to be passed to paramiko.SFTPFile.prefetch.
-        The presence of this dict (even if empty) triggers prefetching.
-    buffer_size: int, optional
-        Passed to the bufsize argument of paramiko.SFTPClient.open.
+    Args:
+        path: The path to the file to open on the remote machine.
+        mode: The mode to use for opening the file.
+        host: The hostname of the remote machine. May not be None.
+        user: The username to use to login to the remote machine.
+            If None, defaults to the name of the current user.
+        password: The password to use to login to the remote machine.
+        port: The port to connect to.
+        connect_kwargs: Any additional settings to be passed to paramiko.SSHClient.connect.
+        prefetch_kwargs: Any additional settings to be passed to paramiko.SFTPFile.prefetch.
+            The presence of this dict (even if empty) triggers prefetching.
+        buffer_size: Passed to the bufsize argument of paramiko.SFTPClient.open.
 
-    Returns
-    -------
-    A file-like object.
+    Returns:
+        A file-like object.
 
-    Important
-    ---------
-    If you specify a previously unseen host, then its host key will be added to
-    the local ~/.ssh/known_hosts *automatically*.
+    Raises:
+        paramiko.SSHException: If the SSH session is no longer active and
+            cannot be re-established within the retry limit.
 
-    If ``username`` or ``password`` are specified in *both* the uri and
-    ``transport_params``, ``transport_params`` will take precedence
+    Note:
+        If you specify a previously unseen host, then its host key will be added to
+        the local ~/.ssh/known_hosts *automatically*.
+
+        If ``username`` or ``password`` are specified in *both* the uri and
+        ``transport_params``, ``transport_params`` will take precedence.
     """
     host, user, password, port, connect_kwargs = _maybe_fetch_config(
         host, user, password, port, connect_kwargs
@@ -291,7 +275,7 @@ def open(
             sftp_client = transport.open_sftp_client()
             break
         except paramiko.SSHException as ex:
-            connection_timed_out = ex.args and ex.args[0] == 'SSH session not active'
+            connection_timed_out = ex.args and ex.args[0] == "SSH session not active"
             if attempt == attempts - 1 or not connection_timed_out:
                 raise
 

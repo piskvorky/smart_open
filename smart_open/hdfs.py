@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -17,49 +16,51 @@ from smart_open import utils
 
 logger = logging.getLogger(__name__)
 
-SCHEMES = ('hdfs', 'viewfs')
+SCHEMES = ("hdfs", "viewfs")
 
 URI_EXAMPLES = (
-    'hdfs:///path/file',
-    'hdfs://host/path/file',
-    'hdfs://host:port/path/file',
-    'viewfs:///path/file',
-    'viewfs://host/path/file',
+    "hdfs:///path/file",
+    "hdfs://host/path/file",
+    "hdfs://host:port/path/file",
+    "viewfs:///path/file",
+    "viewfs://host/path/file",
 )
 
 
 def parse_uri(uri_as_string):
+    """Parse an ``hdfs://`` or ``viewfs://`` URI into its path component."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
-    assert split_uri.scheme in SCHEMES
+    assert split_uri.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
 
-    if split_uri.netloc:
-        # Preserve the full URI so the hdfs CLI can route to the right cluster.
-        uri_path = uri_as_string
-    else:
-        # No netloc (e.g. "hdfs:///path/file") - pass the absolute path to the CLI.
-        uri_path = split_uri.path
-    if not uri_path or uri_path == '/':
-        raise RuntimeError("invalid HDFS URI: %r" % uri_as_string)
+    # Preserve the full URI when netloc is set so the hdfs CLI can route to
+    # the right cluster; otherwise (e.g. "hdfs:///path/file") pass the
+    # absolute path to the CLI.
+    uri_path = uri_as_string if split_uri.netloc else split_uri.path
+    if not uri_path or uri_path == "/":
+        msg = f"invalid HDFS URI: {uri_as_string!r}"
+        raise RuntimeError(msg)
 
-    return dict(scheme=split_uri.scheme, uri_path=uri_path)
+    return {"scheme": split_uri.scheme, "uri_path": uri_path}
 
 
 def open_uri(uri, mode, transport_params):
+    """Open an HDFS URI using the given mode and transport params."""
     utils.check_kwargs(open, transport_params)
 
     parsed_uri = parse_uri(uri)
-    fobj = open(parsed_uri['uri_path'], mode)
-    fobj.name = parsed_uri['uri_path'].split('/')[-1]
+    fobj = open(parsed_uri["uri_path"], mode)
+    fobj.name = parsed_uri["uri_path"].split("/")[-1]
     return fobj
 
 
 def open(uri, mode):
-    if mode == 'rb':
+    """Open an HDFS `uri` for reading (``"rb"``) or writing (``"wb"``)."""
+    if mode == "rb":
         return CliRawInputBase(uri)
-    elif mode == 'wb':
+    if mode == "wb":
         return CliRawOutputBase(uri)
-    else:
-        raise NotImplementedError('hdfs support for mode %r not implemented' % mode)
+    msg = f"hdfs support for mode {mode!r} not implemented"
+    raise NotImplementedError(msg)
 
 
 class CliRawInputBase(io.RawIOBase):
@@ -67,11 +68,12 @@ class CliRawInputBase(io.RawIOBase):
 
     Implements the io.RawIOBase interface of the standard library.
     """
+
     _sub = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(self, uri):
         self._uri = uri
-        self._sub = subprocess.Popen(["hdfs", "dfs", '-cat', self._uri], stdout=subprocess.PIPE)
+        self._sub = subprocess.Popen(["hdfs", "dfs", "-cat", self._uri], stdout=subprocess.PIPE)  # noqa: S603, S607  # invokes local hdfs CLI
 
     #
     # Override some methods from io.IOBase.
@@ -85,6 +87,7 @@ class CliRawInputBase(io.RawIOBase):
 
     @property
     def closed(self):
+        """Return True if the stream is closed."""
         return self._sub is None
 
     def readable(self):
@@ -92,7 +95,7 @@ class CliRawInputBase(io.RawIOBase):
         return self._sub is not None
 
     def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError."""
+        """Return False; HDFS streams do not support seeking."""
         return False
 
     #
@@ -111,12 +114,11 @@ class CliRawInputBase(io.RawIOBase):
         return self.read(size=size)
 
     def readinto(self, b):
-        """Read up to len(b) bytes into b, and return the number of bytes
-        read."""
+        """Read up to ``len(b)`` bytes into `b` and return the number of bytes read."""
         data = self.read(len(b))
         if not data:
             return 0
-        b[:len(data)] = data
+        b[: len(data)] = data
         return len(data)
 
 
@@ -125,14 +127,15 @@ class CliRawOutputBase(io.RawIOBase):
 
     Implements the io.RawIOBase interface of the standard library.
     """
+
     _sub = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(self, uri):
         self._uri = uri
-        self._sub = subprocess.Popen(["hdfs", "dfs", '-put', '-f', '-', self._uri],
-                                     stdin=subprocess.PIPE)
+        self._sub = subprocess.Popen(["hdfs", "dfs", "-put", "-f", "-", self._uri], stdin=subprocess.PIPE)  # noqa: S603, S607  # invokes local hdfs CLI
 
     def close(self):
+        """Flush and close this stream."""
         logger.debug("close: called")
         if not self.closed:
             self.flush()
@@ -142,9 +145,11 @@ class CliRawOutputBase(io.RawIOBase):
 
     @property
     def closed(self):
+        """Return True if the stream is closed."""
         return self._sub is None
 
     def flush(self):
+        """Flush the underlying ``hdfs dfs -put`` subprocess stdin."""
         self._sub.stdin.flush()
 
     def writeable(self):
@@ -152,7 +157,7 @@ class CliRawOutputBase(io.RawIOBase):
         return self._sub is not None
 
     def seekable(self):
-        """If False, seek(), tell() and truncate() will raise IOError."""
+        """Return False; HDFS streams do not support seeking."""
         return False
 
     def write(self, b):
@@ -172,4 +177,6 @@ class CliRawOutputBase(io.RawIOBase):
     # io.IOBase methods.
     #
     def detach(self):
-        raise io.UnsupportedOperation("detach() not supported")
+        """Unsupported."""
+        msg = "detach() not supported"
+        raise io.UnsupportedOperation(msg)

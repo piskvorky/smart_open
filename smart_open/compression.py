@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2020 Radim Rehurek <me@radimrehurek.com>
 #
@@ -6,17 +5,18 @@
 # from the MIT License (MIT).
 #
 """Implements the compression layer of the `smart_open` library."""
+
 import io
 import logging
-import os.path
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 _COMPRESSOR_REGISTRY = {}
 
-NO_COMPRESSION = 'disable'
+NO_COMPRESSION = "disable"
 """Use no compression. Read/write the data as-is."""
-INFER_FROM_EXTENSION = 'infer_from_extension'
+INFER_FROM_EXTENSION = "infer_from_extension"
 """Determine the compression to use from the file extension.
 
 See get_supported_extensions().
@@ -28,7 +28,7 @@ def get_supported_compression_types():
 
     See compression paratemeter to smart_open.open().
     """
-    return [NO_COMPRESSION, INFER_FROM_EXTENSION] + get_supported_extensions()
+    return [NO_COMPRESSION, INFER_FROM_EXTENSION, *get_supported_extensions()]
 
 
 def get_supported_extensions():
@@ -39,38 +39,36 @@ def get_supported_extensions():
 def register_compressor(ext, callback):
     """Register a callback for transparently decompressing files with a specific extension.
 
-    Parameters
-    ----------
-    ext: str
-        The extension.  Must include the leading period, e.g. `.gz`.
-    callback: callable
-        The callback.  It must accept two positional arguments, file_obj and mode,
-        and is recommended to also accept **kwargs so that whatever the caller passes
-        via smart_open.open(..., compression_kwargs={...}) reaches the underlying
-        library unchanged.  Callbacks with the legacy (file_obj, mode) signature still
-        work, but will raise TypeError if the caller supplies compression_kwargs
-        that the callback doesn't declare.
+    Args:
+        ext: The extension.  Must include the leading period, e.g. `.gz`.
+        callback: The callback.  It must accept two positional arguments, file_obj and mode,
+            and is recommended to also accept **kwargs so that whatever the caller passes
+            via smart_open.open(..., compression_kwargs={...}) reaches the underlying
+            library unchanged.  Callbacks with the legacy (file_obj, mode) signature still
+            work, but will raise TypeError if the caller supplies compression_kwargs
+            that the callback doesn't declare.
 
-    Examples
-    --------
+    Raises:
+        ValueError: If `ext` does not start with a period.
 
-    Instruct smart_open to use the `lzma` module whenever opening a file
-    with a .xz extension (see README.rst for the complete example showing I/O):
+    Example:
+        Instruct smart_open to use the `lzma` module whenever opening a file
+        with a .xz extension (see README.rst for the complete example showing I/O):
 
-    >>> def _handle_xz(file_obj, mode, **kwargs):
-    ...     import lzma
-    ...     return lzma.open(filename=file_obj, mode=mode, **kwargs)
-    >>>
-    >>> register_compressor('.xz', _handle_xz)
+        >>> def _handle_xz(file_obj, mode, **kwargs):
+        ...     import lzma
+        ...     return lzma.open(filename=file_obj, mode=mode, **kwargs)
+        >>>
+        >>> register_compressor('.xz', _handle_xz)
 
-    This is just an example: `lzma` is in the standard library and is registered by default.
-
+        This is just an example: `lzma` is in the standard library and is registered by default.
     """
-    if not (ext and ext[0] == '.'):
-        raise ValueError('ext must be a string starting with ., not %r' % ext)
+    if not (ext and ext[0] == "."):
+        msg = f"ext must be a string starting with ., not {ext!r}"
+        raise ValueError(msg)
     ext = ext.lower()
     if ext in _COMPRESSOR_REGISTRY:
-        logger.warning('overriding existing compression handler for %r', ext)
+        logger.warning("overriding existing compression handler for %r", ext)
     _COMPRESSOR_REGISTRY[ext] = callback
 
 
@@ -86,18 +84,21 @@ def _maybe_wrap_buffered(file_obj, mode):
 
 def _handle_bz2(file_obj, mode, **kwargs):
     import bz2
-    result = bz2.open(filename=file_obj, mode=mode, **kwargs)
+
+    result = bz2.open(filename=file_obj, mode=mode, **kwargs)  # noqa: SIM115  # returns the file object to caller
     return _maybe_wrap_buffered(result, mode)
 
 
 def _handle_gzip(file_obj, mode, **kwargs):
     import gzip
-    result = gzip.open(filename=file_obj, mode=mode, **kwargs)
+
+    result = gzip.open(filename=file_obj, mode=mode, **kwargs)  # noqa: SIM115  # returns the file object to caller
     return _maybe_wrap_buffered(result, mode)
 
 
 def _handle_zstd(file_obj, mode, **kwargs):
     import sys
+
     if sys.version_info >= (3, 14):
         from compression import zstd
     else:
@@ -108,12 +109,14 @@ def _handle_zstd(file_obj, mode, **kwargs):
 
 def _handle_xz(file_obj, mode, **kwargs):
     import lzma
-    result = lzma.open(filename=file_obj, mode=mode, **kwargs)
+
+    result = lzma.open(filename=file_obj, mode=mode, **kwargs)  # noqa: SIM115  # returns the file object to caller
     return _maybe_wrap_buffered(result, mode)
 
 
 def _handle_lz4(file_obj, mode, **kwargs):
     import lz4.frame
+
     result = lz4.frame.open(file_obj, mode=mode, **kwargs)
     return _maybe_wrap_buffered(result, mode)
 
@@ -125,8 +128,7 @@ def compression_wrapper(
     filename=None,
     compression_kwargs=None,
 ):
-    """
-    Wrap `file_obj` with an appropriate [de]compression mechanism based on its file extension.
+    """Wrap `file_obj` with an appropriate [de]compression mechanism based on its file extension.
 
     If the filename extension isn't recognized, simply return the original `file_obj` unchanged.
 
@@ -137,23 +139,22 @@ def compression_wrapper(
 
     If `compression_kwargs` is specified, its contents are forwarded as keyword
     arguments to the registered compressor callback.
-
     """
     if compression == NO_COMPRESSION:
         return file_obj
-    elif compression == INFER_FROM_EXTENSION:
+    if compression == INFER_FROM_EXTENSION:
         try:
             filename = (filename or file_obj.name).lower()
         except (AttributeError, TypeError):
             logger.warning(
-                'unable to transparently decompress %r because it '
-                'seems to lack a string-like .name', file_obj
+                "unable to transparently decompress %r because it seems to lack a string-like .name", file_obj
             )
             return file_obj
-        _, compression = os.path.splitext(filename)
+        compression = Path(filename).suffix
 
-    if compression in _COMPRESSOR_REGISTRY and mode.endswith('+'):
-        raise ValueError('transparent (de)compression unsupported for mode %r' % mode)
+    if compression in _COMPRESSOR_REGISTRY and mode.endswith("+"):
+        msg = f"transparent (de)compression unsupported for mode {mode!r}"
+        raise ValueError(msg)
 
     try:
         callback = _COMPRESSOR_REGISTRY[compression]
@@ -166,8 +167,8 @@ def compression_wrapper(
 #
 # NB. avoid using lambda here to make stack traces more readable.
 #
-register_compressor('.bz2', _handle_bz2)
-register_compressor('.gz', _handle_gzip)
-register_compressor('.zst', _handle_zstd)
-register_compressor('.xz', _handle_xz)
-register_compressor('.lz4', _handle_lz4)
+register_compressor(".bz2", _handle_bz2)
+register_compressor(".gz", _handle_gzip)
+register_compressor(".zst", _handle_zstd)
+register_compressor(".xz", _handle_xz)
+register_compressor(".lz4", _handle_lz4)

@@ -17,78 +17,85 @@ jobs:
       matrix:
         include:
           # sync with linting steps below
-          - {python-version: '3.10', os: ubuntu-24.04}
-          - {python-version: '3.14', os: ubuntu-24.04}
+        - {python-version: '3.10', os: ubuntu-24.04}
+        - {python-version: '3.14', os: ubuntu-24.04}
 
-          - {python-version: '3.10', os: windows-2025}
-          - {python-version: '3.14', os: windows-2025}
+        - {python-version: '3.10', os: windows-2025}
+        - {python-version: '3.14', os: windows-2025}
 
-          - {python-version: '3.10', os: macos-15}
-          - {python-version: '3.14', os: macos-15}
+        - {python-version: '3.10', os: macos-15}
+        - {python-version: '3.14', os: macos-15}
 
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0 # fetch git tags for setuptools_scm (smart_open.__version__)
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0   # fetch git tags for setuptools_scm (smart_open.__version__)
 
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-          activate-environment: true
-          enable-cache: true
-          cache-dependency-glob: "**/pyproject.toml"
+    - uses: astral-sh/setup-uv@v7
+      with:
+        python-version: ${{ matrix.python-version }}
+        activate-environment: true
+        enable-cache: true
+        cache-dependency-glob: '**/pyproject.toml'
 
-      - name: Install smart_open without dependencies
-        run: uv pip install -e .
+    - name: Load pre-commit cache
+      if: matrix.python-version == '3.10' && startsWith(matrix.os, 'ubuntu')
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/pre-commit
+        key: ${{ runner.os }}-pre-commit-${{ env.pythonLocation }}-${{ hashFiles('.pre-commit-config.yaml') }}
 
-      - name: Check that smart_open imports without dependencies
-        run: python -c 'import smart_open'
+    - name: Install smart_open without dependencies
+      run: uv pip install -e .
 
-      - name: Install smart_open and its dependencies
-        run: uv pip install -e .[test]
+    - name: Check that smart_open imports without dependencies
+      run: python -c 'import smart_open'
 
-      - name: Run flake8 linter (source)
-        if: matrix.python-version == '3.10' # sync with matrix above
-        run: flake8 --show-source smart_open
+    - name: Install smart_open and its dependencies
+      run: uv pip install -e .[dev]
 
-      - name: "Check whether help.txt update was forgotten"
-        if: matrix.python-version == '3.10' && github.event_name == 'pull_request' # sync with matrix above
-        run: |
-          python update_helptext.py
-          test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
+    - name: Run linters
+      if: matrix.python-version == '3.10' && startsWith(matrix.os, 'ubuntu')
+      run: make lint
 
-      - name: Run unit tests
-        # configuration in pyproject.toml
-        run: pytest tests -v
+    - name: Check whether help.txt update was forgotten
+      if: matrix.python-version == '3.10' && startsWith(matrix.os, 'ubuntu') && github.event_name == 'pull_request'
+      run: |
+        python update_helptext.py
+        test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
 
-      - name: Run doctests
-        if: startsWith(matrix.os, 'ubuntu')
-        run: python ci_helpers/doctest.py
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    - name: Run unit tests
+      # configuration in pyproject.toml
+      run: pytest tests -v
 
-      - name: Start vsftpd
-        if: startsWith(matrix.os, 'ubuntu')
-        timeout-minutes: 2
-        run: |
-          sudo apt-get install vsftpd
-          sudo bash ci_helpers/helpers.sh create_ftp_ftps_servers
+    - name: Run doctests
+      if: startsWith(matrix.os, 'ubuntu')
+      run: python ci_helpers/doctest.py
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Run integration tests
-        if: startsWith(matrix.os, 'ubuntu')
-        run: python ci_helpers/run_integration_tests.py
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    - name: Start vsftpd
+      if: startsWith(matrix.os, 'ubuntu')
+      timeout-minutes: 2
+      run: |
+        sudo apt-get install vsftpd
+        sudo bash ci_helpers/helpers.sh create_ftp_ftps_servers
 
-      - name: Run benchmarks
-        if: startsWith(matrix.os, 'ubuntu')
-        run: python ci_helpers/run_benchmarks.py
-        env:
-          SO_BUCKET: smart-open
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    - name: Run integration tests
+      if: startsWith(matrix.os, 'ubuntu')
+      run: python ci_helpers/run_integration_tests.py
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    - name: Run benchmarks
+      if: startsWith(matrix.os, 'ubuntu')
+      run: python ci_helpers/run_benchmarks.py
+      env:
+        SO_BUCKET: smart-open
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       #
       # The test_coverage environment in tox.ini generates coverage data and

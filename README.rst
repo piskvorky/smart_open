@@ -522,7 +522,7 @@ Testing ``smart_open``
 ``smart_open`` comes with a comprehensive suite of unit tests.
 Before you can run the test suite, install the test dependencies::
 
-    pip install -e .[test]
+    pip install -e .[dev]
 
 Now, you can run the unit tests::
 

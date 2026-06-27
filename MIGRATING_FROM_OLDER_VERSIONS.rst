@@ -1,5 +1,5 @@
-Migrating to v8.0.0
-===================
+v8.0.0
+======
 
 Version 8.0.0 drops several long-deprecated APIs and backwards-compat shims that had been emitting warnings (or were no-ops) for years.
 Tracked under `#926 <https://github.com/piskvorky/smart_open/issues/926>`_.
@@ -108,7 +108,7 @@ S3 ``open_uri`` deprecated transport-parameter warnings removed
 
 Tracked in `#937 <https://github.com/piskvorky/smart_open/pull/937>`_.
 The ``UserWarning`` that ``smart_open.s3.open_uri`` emitted for the legacy resource-API transport parameters (``multipart_upload_kwargs``, ``object_kwargs``, ``resource``, ``resource_kwargs``, ``session``, ``singlepart_upload_kwargs``) is gone.
-These parameters had already been unsupported since v5.0.0 — see `Migrating to the new client-based S3 API`_ below for the actual translation recipes.
+These parameters had already been unsupported since v5.0.0 — see `v5.0.0`_ below for the actual translation recipes.
 
 S3 URIs no longer accept embedded ``host[:port]`` or the ``s3u`` scheme
 ----------------------------------------------------------------------
@@ -162,33 +162,37 @@ Other ``?...`` content in the key is preserved as before (the ``QUESTION_MARK_PL
 If you have a legitimate ``?versionId=...`` substring in your S3 key, call ``smart_open.s3.open(bucket, key, ...)`` directly with the raw key to bypass URI parsing.
 
 
-Migrating to the new compression parameter
-==========================================
+v6.0.0
+======
 
 smart_open versions 6.0.0 and above no longer support the ``ignore_ext`` parameter.
 Use the ``compression`` parameter instead:
 
+.. code-block:: diff
+
+   - fin = smart_open.open("/path/file.gz", ignore_ext=True)
+   + fin = smart_open.open("/path/file.gz", compression="disable")
+
+   - fin = smart_open.open("/path/file.gz", ignore_ext=False)
+   + fin = smart_open.open("/path/file.gz")
+
+``compression`` also accepts a specific codec:
+
 .. code-block:: python
 
-    fin = smart_open.open("/path/file.gz", ignore_ext=True)  # No
-    fin = smart_open.open("/path/file.gz", compression="disable")  # Yes
-    
-    fin = smart_open.open("/path/file.gz", ignore_ext=False)  # No
-    fin = smart_open.open("/path/file.gz")  # Yes
-    fin = smart_open.open("/path/file.gz", compression="infer_from_extension")  # Yes, if you want to be explicit
-    
-    fin = smart_open.open("/path/file", compression=".gz")  # Yes
+    fin = smart_open.open("/path/file.gz", compression="infer_from_extension")  # the default; explicit if you prefer
+    fin = smart_open.open("/path/file", compression=".gz")
 
 
-Migrating to the new client-based S3 API
-========================================
+v5.0.0
+======
 
 Version of smart_open prior to 5.0.0 used the boto3 `resource API`_ for communicating with S3.
 This API was easy to integrate for smart_open developers, but this came at a cost: it was not thread- or multiprocess-safe.
 Furthermore, as smart_open supported more and more options, the transport parameter list grew, making it less maintainable.
 
 Starting with version 5.0.0, smart_open uses the `client API`_ instead of the resource API.
-Functionally, very little changes for the smart_open user. 
+Functionally, very little changes for the smart_open user.
 The only difference is in passing transport parameters to the S3 backend.
 
 More specifically, the following S3 transport parameters are no longer supported:
@@ -205,33 +209,21 @@ More specifically, the following S3 transport parameters are no longer supported
 However, if you were using any of the above, then you need to adjust your code.
 Here are some quick recipes below.
 
-If you were previously passing `session`, then construct an S3 client from the session and pass that instead.
-For example, before:
+If you were previously passing `session`, then construct an S3 client from the session and pass that instead:
 
-.. code-block:: python
+.. code-block:: diff
 
-    smart_open.open('s3://bucket/key', transport_params={'session': session})
+   - smart_open.open('s3://bucket/key', transport_params={'session': session})
+   + smart_open.open('s3://bucket/key', transport_params={'client': session.client('s3')})
 
-After:
+If you were passing `resource`, then replace the resource with a client, and pass that instead:
 
-.. code-block:: python
+.. code-block:: diff
 
-    smart_open.open('s3://bucket/key', transport_params={'client': session.client('s3')})
-
-If you were passing `resource`, then replace the resource with a client, and pass that instead.
-For example, before:
-
-.. code-block:: python
-
-    resource = session.resource('s3', **resource_kwargs)
-    smart_open.open('s3://bucket/key', transport_params={'resource': resource})
-
-After:
-
-.. code-block:: python
-
-    client = session.client('s3')
-    smart_open.open('s3://bucket/key', transport_params={'client': client})
+   - resource = session.resource('s3', **resource_kwargs)
+   - smart_open.open('s3://bucket/key', transport_params={'resource': resource})
+   + client = session.client('s3')
+   + smart_open.open('s3://bucket/key', transport_params={'client': client})
 
 If you were passing any of the `*_kwargs` parameters, you will need to include them in `client_kwargs`, keeping in mind the following transformations.
 
@@ -254,23 +246,16 @@ The `client_kwargs` dict can thus contain the following members:
 - `S3.Client.get_object`
 - `S3.Client.put_object`
 
-Here's a before-and-after example for connecting to a custom endpoint.  Before:
+Here's a before-and-after example for connecting to a custom endpoint:
 
-.. code-block:: python
+.. code-block:: diff
 
-    session = boto3.Session(profile_name='digitalocean')
-    resource_kwargs = {'endpoint_url': 'https://ams3.digitaloceanspaces.com'}
-    with open('s3://bucket/key.txt', 'wb', transport_params={'resource_kwarg': resource_kwargs}) as fout:
-        fout.write(b'here we stand')
-
-After:
-
-.. code-block:: python
-
-    session = boto3.Session(profile_name='digitalocean')
-    client = session.client('s3', endpoint_url='https://ams3.digitaloceanspaces.com')
-    with open('s3://bucket/key.txt', 'wb', transport_params={'client': client}) as fout:
-        fout.write(b'here we stand')
+     session = boto3.Session(profile_name='digitalocean')
+   - resource_kwargs = {'endpoint_url': 'https://ams3.digitaloceanspaces.com'}
+   - with open('s3://bucket/key.txt', 'wb', transport_params={'resource_kwarg': resource_kwargs}) as fout:
+   + client = session.client('s3', endpoint_url='https://ams3.digitaloceanspaces.com')
+   + with open('s3://bucket/key.txt', 'wb', transport_params={'client': client}) as fout:
+         fout.write(b'here we stand')
 
 See `README <README.rst>`_ and `HOWTO <howto.md>`_ for more examples.
 
@@ -285,18 +270,18 @@ See `README <README.rst>`_ and `HOWTO <howto.md>`_ for more examples.
 .. _S3.Client.get_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.get_object
 .. _S3.Client.put_object: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.put_object
 
-Migrating to the new dependency management subsystem
-====================================================
+v3.0.0
+======
 
 Smart_open has grown over the years to cover a lot of different storages, each with a different set of library dependencies. Not everybody needs *all* of them, so to make each smart_open installation leaner and faster, version 3.0.0 introduced a new, backward-incompatible installation method:
 
 * smart_open < 3.0.0: All dependencies were installed by default. No way to select just a subset during installation.
-* smart_open >= 3.0.0: No dependencies installed by default. Install the ones you need with e.g. ``pip install smart_open[s3]`` (only AWS), or ``smart_open[all]`` (install everything = same behaviour as < 3.0.0; use this for backward compatibility). 
+* smart_open >= 3.0.0: No dependencies installed by default. Install the ones you need with e.g. ``pip install smart_open[s3]`` (only AWS), or ``smart_open[all]`` (install everything = same behaviour as < 3.0.0; use this for backward compatibility).
 
 You can read more about the motivation and internal discussions for this change  `here <https://github.com/piskvorky/smart_open/issues/443>`_.
 
-Migrating to the new ``open`` function
-======================================
+v1.8.1
+======
 
 Since 1.8.1, there is a ``smart_open.open`` function that replaces ``smart_open.smart_open``.
 The new function offers several advantages over the old one:
@@ -311,10 +296,10 @@ The instructions below will help you migrate to the new function painlessly.
 
 First, update your imports:
 
-.. code-block:: python
+.. code-block:: diff
 
-  >>> from smart_open import smart_open  # before
-  >>> from smart_open import open  # after
+   - from smart_open import smart_open
+   + from smart_open import open
 
 In general, ``smart_open`` uses ``io.open`` directly, where possible, so if your
 code already uses ``open`` for local file I/O, then it will continue to work.
@@ -323,46 +308,28 @@ then you can ``import smart_open`` and use ``smart_open.open``.
 
 **The default read mode is now "r" (read text).**
 If your code was implicitly relying on the default mode being "rb" (read
-binary), you'll need to update it and pass "rb" explicitly.
+binary), you'll need to update it and pass "rb" explicitly:
 
-Before:
+.. code-block:: diff
 
-.. code-block:: python
-
-  >>> import smart_open
-  >>> smart_open.smart_open('s3://commoncrawl/robots.txt').read(32)  # 'rb' used to be the default
-  b'User-Agent: *\nDisallow: /'
-
-After:
-
-.. code-block:: python
-
-  >>> import smart_open
-  >>> smart_open.open('s3://commoncrawl/robots.txt', 'rb').read(32)
-  b'User-Agent: *\nDisallow: /'
+     import smart_open
+   - smart_open.smart_open('s3://commoncrawl/robots.txt').read(32)  # 'rb' used to be the default
+   + smart_open.open('s3://commoncrawl/robots.txt', 'rb').read(32)
 
 The ``ignore_extension`` keyword parameter is now called ``ignore_ext``.
 It behaves identically otherwise.
 
-The most significant change is in the handling on keyword parameters for the
-transport layer, e.g. HTTP, S3, etc. The old function accepted these directly:
+The most significant change is in the handling of keyword parameters for the
+transport layer, e.g. HTTP, S3, etc. The old function accepted these directly;
+the new function bundles them into a ``transport_params`` dict:
 
-.. code-block:: python
+.. code-block:: diff
 
-  >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-  >>> session = boto3.Session(profile_name='smart_open')
-  >>> smart_open.smart_open(url, 'r', session=session).read(32)
-  'first line\nsecond line\nthird lin'
-
-The new function accepts a ``transport_params`` keyword argument.  It's a dict.
-Put your transport parameters in that dictionary.
-
-.. code-block:: python
-
-  >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-  >>> params = {'session': boto3.Session(profile_name='smart_open')}
-  >>> open(url, 'r', transport_params=params).read(32)
-  'first line\nsecond line\nthird lin'
+     url = 's3://smart-open-py37-benchmark-results/test.txt'
+   - session = boto3.Session(profile_name='smart_open')
+   - smart_open.smart_open(url, 'r', session=session).read(32)
+   + params = {'session': boto3.Session(profile_name='smart_open')}
+   + open(url, 'r', transport_params=params).read(32)
 
 Renamed parameters:
 
@@ -374,24 +341,14 @@ Removed parameters:
 - ``profile_name``
 
 **The profile_name parameter has been removed.**
-Pass an entire ``boto3.Session`` object instead.
+Pass an entire ``boto3.Session`` object instead:
 
-Before:
+.. code-block:: diff
 
-.. code-block:: python
-
-  >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-  >>> smart_open.smart_open(url, 'r', profile_name='smart_open').read(32)
-  'first line\nsecond line\nthird lin'
-
-After:
-
-.. code-block:: python
-
-  >>> url = 's3://smart-open-py37-benchmark-results/test.txt'
-  >>> params = {'session': boto3.Session(profile_name='smart_open')}
-  >>> open(url, 'r', transport_params=params).read(32)
-  'first line\nsecond line\nthird lin'
+     url = 's3://smart-open-py37-benchmark-results/test.txt'
+   - smart_open.smart_open(url, 'r', profile_name='smart_open').read(32)
+   + params = {'session': boto3.Session(profile_name='smart_open')}
+   + open(url, 'r', transport_params=params).read(32)
 
 See ``help("smart_open.open")`` for the full list of acceptable parameter names,
 or view the help online `here <https://github.com/piskvorky/smart_open/blob/master/help.txt>`__.

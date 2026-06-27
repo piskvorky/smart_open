@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: EXE001  # release script run via python
 """Add a new section on the top of CHANGELOG.md.
 
 Usage:
@@ -18,7 +19,7 @@ repo = "smart_open"
 head_branch = "develop"
 
 # get the new version (used for the header only)
-if len(sys.argv) != 2:
+if len(sys.argv) != 2:  # CLI arg count
     msg = "Use `python release/update_changelog.py X.Y.Z` to generate a new CHANGELOG.md entry before releasing vX.Y.Z"
     raise ValueError(msg)
 new_version = sys.argv[1].removeprefix("v")
@@ -37,10 +38,12 @@ latest_version = changelog_lines[0].split(",", 1)[0].removeprefix("# ")
 def get_json(url):
     """Perform a GET + json.loads."""
     import requests
+
     print("Requesting", url)
-    resp = requests.get(url)
+    resp = requests.get(url)  # noqa: S113  # release script
     resp.raise_for_status()
     return json.loads(resp.text)
+
 
 # fetch diff for {latest_version}...{head_branch}
 diff = get_json(
@@ -61,13 +64,11 @@ for commit in diff["commits"]:
     pull_url = pull["html_url"]
     user_name = pull["user"]["login"]
     user_url = pull["user"]["html_url"]
-    new_changelog_lines.append(
-        f"- {title} (PR [#{pull_number}]({pull_url}), [@{user_name}]({user_url}))"
-    )
+    new_changelog_lines.append(f"- {title} (PR [#{pull_number}]({pull_url}), [@{user_name}]({user_url}))")
 
 if new_changelog_lines:
     print("Writing", changelog_path)
-    date = datetime.now().strftime("%Y-%m-%d")
+    date = datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005  # local release date
     new_changelog = [
         f"# {new_version}, {date}",
         "",

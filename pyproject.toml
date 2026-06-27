@@ -1,17 +1,9 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools_scm]
-fallback_version = "0.1.dev0+gitnotfound"
+requires = ["setuptools>=64", "setuptools_scm>=8"]
 
 [project]
-name = "smart_open"
-description = "Utils for streaming large files (S3, HDFS, GCS, SFTP, Azure Blob Storage, gzip, bz2, zst...)"
-readme = "README.rst"
-urls = {Repository = "https://github.com/piskvorky/smart_open"}
 authors = [{name = "Radim Rehurek", email = "me@radimrehurek.com"}]
-requires-python = ">=3.10,<4.0" # sync with classifiers below
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
@@ -26,25 +18,29 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Topic :: System :: Distributed Computing",
-  "Topic :: Database :: Front-Ends",
+  "Topic :: Database :: Front-Ends"
 ]
-dynamic = ["version"]
 dependencies = ["wrapt"]
+description = "Utils for streaming large files (S3, HDFS, GCS, SFTP, Azure Blob Storage, gzip, bz2, zst...)"
+dynamic = ["version"]
+name = "smart_open"
+readme = "README.rst"
+requires-python = ">=3.10,<4.0" # sync with classifiers above
+urls = {Repository = "https://github.com/piskvorky/smart_open"}
 
 [project.optional-dependencies]
-s3 = ["boto3>=1.9.17"]
-gcs = ["google-cloud-storage>=2.6.0", "google-api-core<2.28;python_version<'3.10'"] # https://github.com/googleapis/python-api-core/pull/832#issuecomment-3470137771
-azure = ["azure-storage-blob>=12.7.0", "azure-common", "azure-core"]
-http = ["requests"]
-webhdfs = ["requests"]
-ssh = ["paramiko"]
-zst = ["backports.zstd>=1.0.0;python_version<'3.14'"]
-lz4 = ["lz4"]
 all = ["smart_open[s3,gcs,azure,http,webhdfs,ssh,zst,lz4]"]
-test = [
+azure = ["azure-storage-blob>=12.7.0", "azure-common", "azure-core"]
+gcs = ["google-cloud-storage>=2.6.0"]
+http = ["requests"]
+lz4 = ["lz4"]
+s3 = ["boto3>=1.9.17"]
+ssh = ["paramiko"]
+dev = [
   "smart_open[all]",
   "moto[server]",
   "responses",
+  "pre-commit",
   "pytest",
   "pytest-rerunfailures",
   "pytest_benchmark",
@@ -52,12 +48,17 @@ test = [
   "pytest-xdist[psutil]",
   "awscli",
   "pyopenssl",
-  "numpy",
-  "flake8",
+  "numpy"
 ]
+webhdfs = ["requests"]
+zst = ["backports.zstd>=1.0.0;python_version<'3.14'"]
 
-[tool.setuptools.packages.find]
-include = ["smart_open"]
+[tool.pydoclint]
+arg-type-hints-in-docstring = false
+arg-type-hints-in-signature = false
+check-return-types = false
+check-yield-types = false
+style = "google"
 
 [tool.pytest.ini_options]
 addopts = [
@@ -65,10 +66,55 @@ addopts = [
   "-r=a",
   # https://pytest-xdist.readthedocs.io/en/latest/distribution.html
   # "--numprocesses=logical",
-  "--numprocesses=0",  # disabled for now, it was flaky
+  "--numprocesses=0", # disabled for now, it was flaky
   "--dist=worksteal",
   "--max-worker-restart=8",
   # https://github.com/pytest-dev/pytest-timeout
   "--timeout=60",
-  "--timeout-method=thread",
+  "--timeout-method=thread"
 ]
+
+[tool.ruff]
+line-length = 110 # historical smart_open style
+output-format = "concise"
+
+[tool.ruff.lint]
+ignore = [
+  "ANN", # we don't enforce type hints
+  "D107", # we have pydoclint with class docstring
+  "D203", # there is D211
+  "D213", # there is D212
+  "TRY003", # there is EM102
+  "FIX002", # there is TD002,TD003
+  "TC003", # clutters
+  "PLC0415", # local imports are necessary for optional dependencies
+  "COM812", # conflicts with ruff format
+  "E501", # line length handled by ruff-format
+  "A001", "A002", "A004", # smart_open intentionally shadows the builtin `open`
+  "ARG002" # io.IOBase overrides keep interface args even when unused
+]
+select = ["ALL"]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"{tests,integration-tests,benchmark,ci_helpers,release}/**/*.py" = [
+  "D100", # not a package
+  "D104", # modules don't need docstrings
+  "INP001", # not a namespace package
+  "PLR2004", # magic value comparisons are normal in tests/scripts
+  "S101", # assert is the whole point of tests
+  "S105", "S106", "S108", # hardcoded passwords/tmp paths are normal in tests/scripts
+  "SLF001", # tests/scripts reach into private state of the package they test
+  "T20" # print is the whole point of these helpers
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["smart_open", "tests"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.setuptools.packages.find]
+include = ["smart_open"]
+
+[tool.setuptools_scm]
+fallback_version = "0.1.dev0+gitnotfound"

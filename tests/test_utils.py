@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -13,49 +12,54 @@ import smart_open.utils
 
 
 @pytest.mark.parametrize(
-    'value,minval,maxval,expected',
+    ("value", "minval", "maxval", "expected"),
     [
         (5, 0, 10, 5),
         (11, 0, 10, 10),
         (-1, 0, 10, 0),
         (10, 0, None, 10),
         (-10, 0, None, 0),
-    ]
+    ],
 )
 def test_clamp(value, minval, maxval, expected):
+    """Clamp."""
     assert smart_open.utils.clamp(value, minval=minval, maxval=maxval) == expected
 
 
 @pytest.mark.parametrize(
-    'value,params,expected',
+    ("value", "params", "expected"),
     [
         (10, {}, 10),
         (-10, {}, 0),
-        (-10, {'minval': -5}, -5),
-        (10, {'maxval': 5}, 5),
-    ]
+        (-10, {"minval": -5}, -5),
+        (10, {"maxval": 5}, 5),
+    ],
 )
 def test_clamp_defaults(value, params, expected):
+    """Clamp defaults."""
     assert smart_open.utils.clamp(value, **params) == expected
 
 
 def test_check_kwargs():
+    """Check kwargs."""
     import smart_open.s3
+
     kallable = smart_open.s3.open
-    kwargs = {'client': 'foo', 'unsupported': 'bar', 'client_kwargs': 'boaz'}
+    kwargs = {"client": "foo", "unsupported": "bar", "client_kwargs": "boaz"}
     supported = smart_open.utils.check_kwargs(kallable, kwargs)
-    assert supported == {'client': 'foo', 'client_kwargs': 'boaz'}
+    assert supported == {"client": "foo", "client_kwargs": "boaz"}
 
 
 @pytest.mark.parametrize(
-    'url,expected',
+    ("url", "expected"),
     [
-        ('s3://bucket/key', ('s3', 'bucket', '/key', '', '')),
-        ('s3://bucket/key?', ('s3', 'bucket', '/key?', '', '')),
-        ('s3://bucket/???', ('s3', 'bucket', '/???', '', '')),
-        ('https://host/path?foo=bar', ('https', 'host', '/path', 'foo=bar', '')),
-    ]
+        ("s3://bucket/key", ("s3", "bucket", "/key", "", "")),
+        ("s3://bucket/key?", ("s3", "bucket", "/key?", "", "")),
+        ("s3://bucket/???", ("s3", "bucket", "/???", "", "")),
+        ("https://host/path?foo=bar", ("https", "host", "/path", "foo=bar", "")),
+    ],
 )
 def test_safe_urlsplit(url, expected):
+    """Safe urlsplit."""
     actual = smart_open.utils.safe_urlsplit(url)
     assert actual == urllib.parse.SplitResult(*expected)
