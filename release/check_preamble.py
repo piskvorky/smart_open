@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -27,20 +26,24 @@ Processing entire subdirectories with one command::
     find subdir1 subdir2 -iname "*.py" | xargs -n 1 python check_preamble.py --replace template.py
 
 """
+
 import argparse
 import logging
 import os
 import sys
 
+logger = logging.getLogger(__name__)
+
 
 def extract_preamble(fin):
+    """Split ``fin`` into preamble (leading `#` lines) and body lines."""
     end_preamble = False
     preamble, body = [], []
 
     for line in fin:
         if end_preamble:
             body.append(line)
-        elif line.startswith('#'):
+        elif line.startswith("#"):
             preamble.append(line)
         else:
             end_preamble = True
@@ -50,33 +53,34 @@ def extract_preamble(fin):
 
 
 def main():
+    """Check or replace the preamble of a Python source file."""
     parser = argparse.ArgumentParser()
-    parser.add_argument('path', help='the path of the file to check')
-    parser.add_argument('--replace', help='replace the preamble with the one from this file')
-    parser.add_argument('--loglevel', default=logging.INFO)
+    parser.add_argument("path", help="the path of the file to check")
+    parser.add_argument("--replace", help="replace the preamble with the one from this file")
+    parser.add_argument("--loglevel", default=logging.INFO)
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
 
-    with open(args.path) as fin:
+    with open(args.path) as fin:  # noqa: PTH123  # release script
         preamble, body = extract_preamble(fin)
 
     for line in preamble:
-        logging.info('%s: %s', args.path, line.rstrip())
+        logger.info("%s: %s", args.path, line.rstrip())
 
     if not args.replace:
         sys.exit(0)
 
-    with open(args.replace) as fin:
+    with open(args.replace) as fin:  # noqa: PTH123  # release script
         preamble, _ = extract_preamble(fin)
 
     if os.access(args.path, os.X_OK):
-        preamble.insert(0, '#!/usr/bin/env python\n')
+        preamble.insert(0, "#!/usr/bin/env python\n")
 
-    with open(args.path, 'w') as fout:
+    with open(args.path, "w") as fout:  # noqa: PTH123  # release script
         for line in preamble + body:
             fout.write(line)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

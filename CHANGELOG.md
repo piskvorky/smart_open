@@ -1,3 +1,29 @@
+# 8.0.0, 2026-06-27
+
+See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.md) for details on breaking changes.
+
+- Remove deprecated top-level smart_open() function (PR [#928](https://github.com/piskvorky/smart_open/pull/928), [@ddelange](https://github.com/ddelange))
+- Remove deprecated concurrency.create_pool and ConcurrentFuturesPool (PR [#931](https://github.com/piskvorky/smart_open/pull/931), [@ddelange](https://github.com/ddelange))
+- [hdfs] Support host and port in HDFS URIs (PR [#168](https://github.com/piskvorky/smart_open/pull/168), [@vvaten](https://github.com/vvaten))
+- Remove stale Python 2.7 references in comments and docstrings (PR [#932](https://github.com/piskvorky/smart_open/pull/932), [@ddelange](https://github.com/ddelange))
+- Remove deprecated compression.tweak_close() (PR [#933](https://github.com/piskvorky/smart_open/pull/933), [@ddelange](https://github.com/ddelange))
+- Simplify inspect_kwargs() by dropping getargspec fallback (PR [#934](https://github.com/piskvorky/smart_open/pull/934), [@ddelange](https://github.com/ddelange))
+- [s3] Pass session_kwargs as a dict to s3.iter_bucket (PR [#930](https://github.com/piskvorky/smart_open/pull/930), [@ddelange](https://github.com/ddelange))
+- [gcs] Remove deprecated buffer_size/line_terminator params (PR [#935](https://github.com/piskvorky/smart_open/pull/935), [@ddelange](https://github.com/ddelange))
+- [gcs] Remove no-op _blob.terminate shim in Writer (PR [#936](https://github.com/piskvorky/smart_open/pull/936), [@ddelange](https://github.com/ddelange))
+- [s3] Remove deprecated transport params from open_uri (PR [#937](https://github.com/piskvorky/smart_open/pull/937), [@ddelange](https://github.com/ddelange))
+- Remove smart_open_lib backwards-compat re-exports (PR [#929](https://github.com/piskvorky/smart_open/pull/929), [@ddelange](https://github.com/ddelange))
+- [s3] Remove deprecated smart_open.s3_iter_bucket shim (PR [#927](https://github.com/piskvorky/smart_open/pull/927), [@ddelange](https://github.com/ddelange))
+- Refresh stale RaRe-Technologies URLs and boto wording (PR [#938](https://github.com/piskvorky/smart_open/pull/938), [@ddelange](https://github.com/ddelange))
+- Document #926 breaking changes in MIGRATING (PR [#939](https://github.com/piskvorky/smart_open/pull/939), [@ddelange](https://github.com/ddelange))
+- Add compression_kwargs parameter to smart_open.open() (PR [#940](https://github.com/piskvorky/smart_open/pull/940), [@ddelange](https://github.com/ddelange))
+- [s3] Drop host/port from S3 URIs, drop s3u scheme (PR [#943](https://github.com/piskvorky/smart_open/pull/943), [@ddelange](https://github.com/ddelange))
+- [gcs] Use gcs:// as canonical GCS scheme, keep gs:// as alias (PR [#944](https://github.com/piskvorky/smart_open/pull/944), [@ddelange](https://github.com/ddelange))
+- Parse versionId from s3:// URIs into version_id (PR [#945](https://github.com/piskvorky/smart_open/pull/945), [@ddelange](https://github.com/ddelange))
+- Add pre-commit and migrate from flake8 to ruff (PR [#946](https://github.com/piskvorky/smart_open/pull/946), [@ddelange](https://github.com/ddelange))
+- Migrate RST docs to Markdown (PR [#947](https://github.com/piskvorky/smart_open/pull/947), [@ddelange](https://github.com/ddelange))
+- Add type annotations and ty type checker (PR [#948](https://github.com/piskvorky/smart_open/pull/948), [@ddelange](https://github.com/ddelange))
+
 # 7.7.1, 2026-06-26
 
 - [http,azure] Optimize forward seeks within buffered data to avoid redundant requests (PR [#923](https://github.com/piskvorky/smart_open/pull/923), [@ddelange](https://github.com/ddelange))
@@ -195,7 +221,7 @@ fin = smart_open.open("/path/file", compression=".gz")  # Yes
 ```
 
 - Make Python 3.7 the required minimum (PR [#688](https://github.com/RaRe-Technologies/smart_open/pull/688), [@mpenkov](https://github.com/mpenkov))
-- Drop deprecated ignore_ext parameter (PR [#661](https://github.com/RaRe-Technologies/smart_open/pull/661), [@mpenkov](https://github.com/mpenkov)) 
+- Drop deprecated ignore_ext parameter (PR [#661](https://github.com/RaRe-Technologies/smart_open/pull/661), [@mpenkov](https://github.com/mpenkov))
 - Drop support for passing buffers to smart_open.open (PR [#660](https://github.com/RaRe-Technologies/smart_open/pull/660), [@mpenkov](https://github.com/mpenkov))
 - Support working directly with file descriptors (PR [#659](https://github.com/RaRe-Technologies/smart_open/pull/659), [@mpenkov](https://github.com/mpenkov))
 - Added support for viewfs:// URLs (PR [#665](https://github.com/RaRe-Technologies/smart_open/pull/665), [@ChandanChainani](https://github.com/ChandanChainani))
@@ -233,7 +259,7 @@ You may continue to use `ignore_ext` parameter for now, but it will be deprecate
 # 5.0.0, 30 Mar 2021
 
 This release modifies the handling of transport parameters for the S3 back-end in a backwards-incompatible way.
-See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.rst) for details.
+See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.md) for details.
 
 - Refactor S3, replace high-level resource/session API with low-level client API (PR [#583](https://github.com/RaRe-Technologies/smart_open/pull/583), [@mpenkov](https://github.com/mpenkov))
 - Fix potential infinite loop when reading from webhdfs (PR [#597](https://github.com/RaRe-Technologies/smart_open/pull/597), [@traboukos](https://github.com/traboukos))
@@ -522,7 +548,7 @@ The old `smart_open.smart_open` function is deprecated, but continues to work as
 # 1.5.2, 12th Apr 2017
 
   - Enable compressed formats over http. Avoid filehandle leak. Fix #109 and #110. (PR #112, @robottwo )
-  - Make possible to change number of retries (PR #102, @shaform)	
+  - Make possible to change number of retries (PR #102, @shaform)
 
 # 1.5.1, 16th Mar 2017
 
@@ -534,11 +560,11 @@ The old `smart_open.smart_open` function is deprecated, but continues to work as
 
 # 1.4.0, 13th Feb 2017
 
-  - HdfsOpenWrite implementation similar to read (PR #106, @skibaa)  
+  - HdfsOpenWrite implementation similar to read (PR #106, @skibaa)
   - Support custom S3 server host, port, ssl. (PR #101, @robottwo)
-  - Add retry around `s3_iter_bucket_process_key` to address S3 Read Timeout errors. (PR #96, @bbbco)  
+  - Add retry around `s3_iter_bucket_process_key` to address S3 Read Timeout errors. (PR #96, @bbbco)
   - Include tests data in sdist + install them. (PR #105, @cournape)
-  
+
 # 1.3.5, 5th October 2016
 
 # - Add MANIFEST.in required for conda-forge recip (PR #90, @tmylk)

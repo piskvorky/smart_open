@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Radim Rehurek <me@radimrehurek.com>
 #
@@ -7,150 +6,153 @@
 #
 """Implements file-like objects for reading and writing to/from GCS."""
 
+from __future__ import annotations
+
 import logging
-import warnings
+from typing import TYPE_CHECKING, Any, TypedDict
 
 try:
+    import google.auth.transport.requests
     import google.cloud.exceptions
     import google.cloud.storage
-    import google.auth.transport.requests
 except ImportError:
     MISSING_DEPS = True
 
 import smart_open.bytebuffer
 import smart_open.utils
-
 from smart_open import constants
+
+if TYPE_CHECKING:
+    import io
+
+    from smart_open._typing import TransportParams
 
 logger = logging.getLogger(__name__)
 
-SCHEME = "gs"
-"""Supported scheme for GCS"""
+SCHEMES = ("gcs", "gs")
+"""Supported schemes for GCS.  ``gcs`` is canonical; ``gs`` is kept as a backwards-compatible alias."""
 
 _DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 """Default minimum part size for GCS multipart uploads"""
 
-_DEFAULT_WRITE_OPEN_KWARGS = {'ignore_flush': True}
+_DEFAULT_WRITE_OPEN_KWARGS = {"ignore_flush": True}
 
 
-def parse_uri(uri_as_string):
+class _GCSUri(TypedDict):
+    scheme: str
+    bucket_id: str
+    blob_id: str
+
+
+def parse_uri(uri_as_string: str) -> _GCSUri:
+    """Parse a ``gcs://`` or ``gs://`` URI into its bucket and blob components."""
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
-    assert sr.scheme == SCHEME
+    assert sr.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
     bucket_id = sr.netloc
-    blob_id = sr.path.lstrip('/')
-    return dict(scheme=SCHEME, bucket_id=bucket_id, blob_id=blob_id)
+    blob_id = sr.path.lstrip("/")
+    return {"scheme": sr.scheme, "bucket_id": bucket_id, "blob_id": blob_id}
 
 
-def open_uri(uri, mode, transport_params):
+def open_uri(uri: str, mode: str, transport_params: TransportParams) -> io.IOBase:
+    """Open a GCS URI using the given mode and transport params."""
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
-    return open(parsed_uri['bucket_id'], parsed_uri['blob_id'], mode, **kwargs)
+    return open(parsed_uri["bucket_id"], parsed_uri["blob_id"], mode, **kwargs)
 
 
-def warn_deprecated(parameter_name):
-    message = f"Parameter {parameter_name} is deprecated, this parameter no-longer has any effect"
-    warnings.warn(message, UserWarning)
-
-
-def open(
-    bucket_id,
-    blob_id,
-    mode,
-    buffer_size=None,
-    min_part_size=_DEFAULT_MIN_PART_SIZE,
-    client=None,  # type: google.cloud.storage.Client
-    get_blob_kwargs=None,
-    blob_properties=None,
-    blob_open_kwargs=None,
-):
+def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
+    bucket_id: str,
+    blob_id: str,
+    mode: str,
+    min_part_size: int = _DEFAULT_MIN_PART_SIZE,
+    client: google.cloud.storage.Client | None = None,
+    get_blob_kwargs: dict[str, Any] | None = None,
+    blob_properties: dict[str, Any] | None = None,
+    blob_open_kwargs: dict[str, Any] | None = None,
+) -> io.IOBase:
     """Open an GCS blob for reading or writing.
 
-    Parameters
-    ----------
-    bucket_id: str
-        The name of the bucket this object resides in.
-    blob_id: str
-        The name of the blob within the bucket.
-    mode: str
-        The mode for opening the object. Must be either "rb" or "wb".
-    buffer_size:
-        deprecated
-    min_part_size: int, optional
-        The minimum part size for multipart uploads. For writing only.
-    client: google.cloud.storage.Client, optional
-        The GCS client to use when working with google-cloud-storage.
-    get_blob_kwargs: dict, optional
-        Additional keyword arguments to propagate to the bucket.get_blob
-        method of the google-cloud-storage library. For reading only.
-    blob_properties: dict, optional
-        Set properties on blob before writing. For writing only.
-    blob_open_kwargs: dict, optional
-        Additional keyword arguments to propagate to the blob.open method
-        of the google-cloud-storage library.
+    Args:
+        bucket_id: The name of the bucket this object resides in.
+        blob_id: The name of the blob within the bucket.
+        mode: The mode for opening the object. Must be either "rb" or "wb".
+        min_part_size: The minimum part size for multipart uploads. For writing only.
+        client: The GCS client to use when working with google-cloud-storage.
+        get_blob_kwargs: Additional keyword arguments to propagate to the bucket.get_blob
+            method of the google-cloud-storage library. For reading only.
+        blob_properties: Set properties on blob before writing. For writing only.
+        blob_open_kwargs: Additional keyword arguments to propagate to the blob.open method
+            of the google-cloud-storage library.
 
+    Returns:
+        A file-like object for the GCS blob.
+
+    Raises:
+        NotImplementedError: If `mode` is not one of the supported modes.
     """
     if blob_open_kwargs is None:
         blob_open_kwargs = {}
 
-    if buffer_size is not None:
-        warn_deprecated('buffer_size')
+    if mode in (constants.READ_BINARY, "r", "rt"):
+        _blob = Reader(
+            bucket=bucket_id,
+            key=blob_id,
+            client=client,
+            get_blob_kwargs=get_blob_kwargs,
+            blob_open_kwargs=blob_open_kwargs,
+        )
 
-    if mode in (constants.READ_BINARY, 'r', 'rt'):
-        _blob = Reader(bucket=bucket_id,
-                       key=blob_id,
-                       client=client,
-                       get_blob_kwargs=get_blob_kwargs,
-                       blob_open_kwargs=blob_open_kwargs)
-
-    elif mode in (constants.WRITE_BINARY, 'w', 'wt'):
-        _blob = Writer(bucket=bucket_id,
-                       blob=blob_id,
-                       min_part_size=min_part_size,
-                       client=client,
-                       blob_properties=blob_properties,
-                       blob_open_kwargs=blob_open_kwargs)
+    elif mode in (constants.WRITE_BINARY, "w", "wt"):
+        _blob = Writer(
+            bucket=bucket_id,
+            blob=blob_id,
+            min_part_size=min_part_size,
+            client=client,
+            blob_properties=blob_properties,
+            blob_open_kwargs=blob_open_kwargs,
+        )
 
     else:
-        raise NotImplementedError(f'GCS support for mode {mode} not implemented')
+        msg = f"GCS support for mode {mode} not implemented"
+        raise NotImplementedError(msg)
 
     return _blob
 
 
-def Reader(bucket,
-           key,
-           buffer_size=None,
-           line_terminator=None,
-           client=None,
-           get_blob_kwargs=None,
-           blob_open_kwargs=None):
-
+def Reader(  # noqa: N802  # factory function named after returned class
+    bucket: str,
+    key: str,
+    client: google.cloud.storage.Client | None = None,
+    get_blob_kwargs: dict[str, Any] | None = None,
+    blob_open_kwargs: dict[str, Any] | None = None,
+) -> io.IOBase:
+    """Return a file-like object for reading the GCS blob `key` from `bucket`."""
     if get_blob_kwargs is None:
         get_blob_kwargs = {}
     if blob_open_kwargs is None:
         blob_open_kwargs = {}
     if client is None:
         client = google.cloud.storage.Client()
-    if buffer_size is not None:
-        warn_deprecated('buffer_size')
-    if line_terminator is not None:
-        warn_deprecated('line_terminator')
 
     bkt = client.bucket(bucket)
     blob = bkt.get_blob(key, **get_blob_kwargs)
 
     if blob is None:
-        raise google.cloud.exceptions.NotFound(f'blob {key} not found in {bucket}')
+        msg = f"blob {key} not found in {bucket}"
+        raise google.cloud.exceptions.NotFound(msg)
 
-    return blob.open('rb', **blob_open_kwargs)
+    return blob.open("rb", **blob_open_kwargs)
 
 
-def Writer(bucket,
-           blob,
-           min_part_size=None,
-           client=None,
-           blob_properties=None,
-           blob_open_kwargs=None):
-
+def Writer(  # noqa: N802, PLR0913  # factory function named after returned class; legacy public API
+    bucket: str,
+    blob: str,
+    min_part_size: int | None = None,
+    client: google.cloud.storage.Client | None = None,
+    blob_properties: dict[str, Any] | None = None,
+    blob_open_kwargs: dict[str, Any] | None = None,
+) -> io.IOBase:
+    """Return a file-like object for writing to GCS blob `blob` in `bucket`."""
     if blob_open_kwargs is None:
         blob_open_kwargs = {}
     if blob_properties is None:
@@ -168,9 +170,4 @@ def Writer(bucket,
     for k, v in blob_properties.items():
         setattr(g_blob, k, v)
 
-    _blob = g_blob.open('wb', **blob_open_kwargs)
-
-    # backwards-compatiblity, was deprecated upstream https://cloud.google.com/storage/docs/resumable-uploads
-    _blob.terminate = lambda: None
-
-    return _blob
+    return g_blob.open("wb", **blob_open_kwargs)

@@ -2,23 +2,25 @@ from smart_open import open
 
 
 def read_lines(url, limit):
+    """Read up to ``limit`` lines from ``url`` and return them as a list."""
     lines = []
-    with open(url, 'r', errors='ignore') as fin:
-        for i, l in enumerate(fin):
+    with open(url, "r", errors="ignore") as fin:
+        for i, line in enumerate(fin):
             if i == limit:
                 break
-            lines.append(l)
+            lines.append(line)
 
     return lines
 
 
 def test(benchmark):
+    """Benchmark readline performance against a large S3 object."""
     #
     # This file is around 850MB.
     #
     url = (
-        's3://commoncrawl/crawl-data/CC-MAIN-2019-51/segments/1575541319511.97'
-        '/warc/CC-MAIN-20191216093448-20191216121448-00559.warc.gz'
+        "s3://commoncrawl/crawl-data/CC-MAIN-2019-51/segments/1575541319511.97"
+        "/warc/CC-MAIN-20191216093448-20191216121448-00559.warc.gz"
     )
     limit = 1000000
     lines = benchmark(read_lines, url, limit)

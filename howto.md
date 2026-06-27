@@ -194,11 +194,19 @@ It is possible to save both CPU time and memory by sharing the same resource acr
 
 ```python
 >>> import boto3
+>>> import botocore.client
 >>> from smart_open import open
->>> tp = {'client': boto3.client('s3')}
+>>> # this mirrors the adaptive-retry config smart_open uses internally when it
+>>> # creates a thread-safe client for you (see smart_open.s3)
+>>> config = botocore.client.Config(
+...     max_pool_connections=64,
+...     tcp_keepalive=True,
+...     retries={'max_attempts': 6, 'mode': 'adaptive'},
+... )
+>>> transport_params = {'client': boto3.client('s3', config=config)}
 >>> for month in (1, 2, 3):
 ...     url = 's3://nyc-tlc/trip data/yellow_tripdata_2020-%02d.csv' % month
-...     with open(url, transport_params=tp) as fin:
+...     with open(url, transport_params=transport_params) as fin:
 ...         _ = fin.readline()  # skip CSV header
 ...         print(fin.readline().strip())
 1,2020-01-01 00:28:15,2020-01-01 00:33:03,1,1.20,1,N,238,239,1,6,3,0.5,1.47,0,0.3,11.27,2.5
@@ -207,7 +215,8 @@ It is possible to save both CPU time and memory by sharing the same resource acr
 
 ```
 
-Clients are thread-safe and multiprocess-safe, so you may share them between other threads and subprocesses.
+Clients are generally thread-safe, so you may share a single client across threads ([ref](https://github.com/boto/boto3/blob/1.38.41/docs/source/guide/clients.rst?plain=1#L111)); note they cannot be shared across processes.
+Note that long-lived clients can leak memory ([boto/boto3#1670](https://github.com/boto/boto3/issues/1670)), so prefer creating a client per operation (or periodically recreating it) for long-running processes.
 
 ## How to Write to S3 Efficiently
 
@@ -219,8 +228,9 @@ The first option is to use smaller part sizes (e.g. 5MB, the lowest value permit
 ```python
 import boto3
 from smart_open import open
-tp = {'min_part_size': 5 * 1024**2}
-with open('s3://bucket/key', 'w', transport_params=tp) as fout:
+
+tp = {"min_part_size": 5 * 1024**2}
+with open("s3://bucket/key", "w", transport_params=tp) as fout:
     fout.write(lots_of_data)
 ```
 
@@ -232,9 +242,10 @@ The second option is to use a temporary file as a buffer instead.
 ```python
 import boto3
 from smart_open import open
+
 with tempfile.NamedTemporaryFile() as tmp:
-    tp = {'writebuffer': tmp}
-    with open('s3://bucket/key', 'w', transport_params=tp) as fout:
+    transport_params = {"writebuffer": tmp}
+    with open("s3://bucket/key", "w", transport_params=transport_params) as fout:
         fout.write(lots_of_data)
 ```
 
@@ -284,7 +295,8 @@ To verify your settings have effect:
 
 ```python
 import logging
-logging.getLogger('smart_open.s3').setLevel(logging.DEBUG)
+
+logging.getLogger("smart_open.s3").setLevel(logging.DEBUG)
 ```
 
 and check the log output of your code.
@@ -331,9 +343,10 @@ More specifically, here's the direct method:
 ```python
 import boto3
 import smart_open
-with open('s3://bucket/key', 'wb') as fout:
-    fout.write(b'hello world!')
-client = boto3.client('s3')
+
+with open("s3://bucket/key", "wb") as fout:
+    fout.write(b"hello world!")
+client = boto3.client("s3")
 client.put_object_acl(ACL=acl_as_string)
 ```
 
@@ -341,17 +354,18 @@ Here's the same code that passes the above parameter via `smart_open`:
 
 ```python
 import smart_open
-tp = {'client_kwargs': {'S3.Client.create_multipart_upload': {'ACL': acl_as_string}}}
-with open('s3://bucket/key', 'wb', transport_params=tp) as fout:
-    fout.write(b'hello world!')
+
+tp = {"client_kwargs": {"S3.Client.create_multipart_upload": {"ACL": acl_as_string}}}
+with open("s3://bucket/key", "wb", transport_params=tp) as fout:
+    fout.write(b"hello world!")
 ```
 
 If passing everything via `smart_open` feels awkward, try passing part of the parameters directly to `boto3`.
 
 ## How to Read from Github API
 
-The Github API allows users access to, among many other things, read files from repositories that you have 
-access to. Below is an example for how users can read a file with smart_open. For more info, see the 
+The Github API allows users access to, among many other things, read files from repositories that you have
+access to. Below is an example for how users can read a file with smart_open. For more info, see the
 [Github API documentation](https://docs.github.com/en/rest/reference/repos#contents).
 
 ```python
@@ -426,7 +440,7 @@ for an explanation). To download all files in a directory you can do this:
 >>> bucket_name = "gcp-public-data-landsat"
 >>> prefix = "LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/"
 >>> for blob in client.list_blobs(client.get_bucket(bucket_name), prefix=prefix):
-...      with open(f"gs://{bucket_name}/{blob.name}") as f:
+...      with open(f"gcs://{bucket_name}/{blob.name}") as f:
 ...          print(f.name)
 ...          break # just show the first iteration for the test
 LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/LC08_L1GT_044034_20130330_20170310_01_T2_ANG.txt
@@ -442,7 +456,7 @@ If you would like to access GCS without using an account you need to explicitly 
 >>> from google.cloud import storage
 >>> from smart_open import open
 >>> client = storage.Client.create_anonymous_client()
->>> f = open("gs://gcp-public-data-landsat/index.csv.gz", transport_params=dict(client=client))
+>>> f = open("gcs://gcp-public-data-landsat/index.csv.gz", transport_params=dict(client=client))
 >>> f.readline()
 'SCENE_ID,PRODUCT_ID,SPACECRAFT_ID,SENSOR_ID,DATE_ACQUIRED,COLLECTION_NUMBER,COLLECTION_CATEGORY,SENSING_TIME,DATA_TYPE,WRS_PATH,WRS_ROW,CLOUD_COVER,NORTH_LAT,SOUTH_LAT,WEST_LON,EAST_LON,TOTAL_SIZE,BASE_URL\n'
 
