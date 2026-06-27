@@ -10,6 +10,8 @@
 For internal use only.
 """
 
+# ruff: noqa: T201  # this module builds the open()/parse_uri() docstrings by writing to sys.stdout
+
 import contextlib
 import inspect
 import io
