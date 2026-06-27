@@ -1312,10 +1312,10 @@ class AdversarialRetryTest(unittest.TestCase):
                         result = reader.read(read_size)
                         expected_data = expected_data[:read_size]
 
-            except Exception as e:
+            except Exception:
                 # Some failures are expected due to adversarial behavior: we just track success rate
                 if iteration < 10:
-                    print(f"Iteration {iteration} failed with: {type(e).__name__}: {e}")
+                    pass
             else:
                 success_count += 1
                 assert result == expected_data

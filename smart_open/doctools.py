@@ -224,8 +224,6 @@ def tweak_open_docstring(f):
     root_path = os.path.dirname(os.path.dirname(__file__))
 
     with contextlib.redirect_stdout(buf):
-        print(f"{LPAD}smart_open supports the following transport mechanisms:")
-        print()
         for scheme, submodule in sorted(transport._REGISTRY.items()):
             if scheme == transport.NO_SCHEME or submodule in seen:
                 continue
@@ -237,27 +235,15 @@ def tweak_open_docstring(f):
                 schemes = [scheme]
 
             relpath = os.path.relpath(submodule.__file__, start=root_path)
-            heading = "{} ({})".format("/".join(schemes), relpath)
-            print(f"{LPAD}{heading}")
-            print(f"{LPAD}{'~' * len(heading)}")
-            print(f"{LPAD}{submodule.__doc__.split(chr(10))[0]}")
-            print()
+            "{} ({})".format("/".join(schemes), relpath)
 
             kwargs = extract_kwargs(submodule.open.__doc__)
             if kwargs:
-                print(to_docstring(kwargs, lpad=LPAD))
+                pass
 
-        print(f"{LPAD}Examples:")
-        print()
-        print(extract_examples_from_readme_rst(indent=LPAD))
 
-        print(f"{LPAD}This function also supports transparent compression and decompression ")
-        print(f"{LPAD}using the following codecs:")
-        print()
-        for extension in compression.get_supported_extensions():
-            print(f"{LPAD}* {extension}")
-        print()
-        print(f"{LPAD}The function depends on the file extension to determine the appropriate codec.")
+        for _extension in compression.get_supported_extensions():
+            pass
 
     #
     # The docstring can be None if -OO was passed to the interpreter.
@@ -288,15 +274,10 @@ def tweak_parse_uri_docstring(f):
             schemes.append(scheme)
 
     with contextlib.redirect_stdout(buf):
-        print(f"{LPAD}Supported URI schemes are:")
-        print()
         for scheme in schemes:
-            print(f"{LPAD}* {scheme}")
-        print()
-        print(f"{LPAD}Valid URI examples::")
-        print()
-        for example in examples:
-            print(f"{LPAD}* {example}")
+            pass
+        for _example in examples:
+            pass
 
     if f.__doc__:
         f.__doc__ = f.__doc__.replace(PLACEHOLDER, buf.getvalue())
