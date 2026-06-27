@@ -43,7 +43,7 @@ DEFAULT_MAX_CONCURRENCY = 1
 def parse_uri(uri_as_string):
     """Parse an ``azure://`` URI into its container and blob components."""
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
-    assert sr.scheme == SCHEME
+    assert sr.scheme == SCHEME  # noqa: S101  # internal precondition; misuse should crash loudly
     first = sr.netloc
     second = sr.path.lstrip("/")
 
@@ -65,7 +65,7 @@ def open_uri(uri, mode, transport_params):
     return open(parsed_uri["container_id"], parsed_uri["blob_id"], mode, **kwargs)
 
 
-def open(
+def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     container_id,
     blob_id,
     mode,
@@ -211,7 +211,7 @@ class Reader(io.BufferedIOBase):
 
     _blob = None  # so `closed` property works in case __init__ fails and __del__ is called
 
-    def __init__(
+    def __init__(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         self,
         container,
         blob,
@@ -378,7 +378,7 @@ class Reader(io.BufferedIOBase):
         return part
 
     def _fill_buffer(self, size=-1):
-        size = max(size, self._current_part._chunk_size)
+        size = max(size, self._current_part._chunk_size)  # noqa: SLF001  # intra-package coupling
         while len(self._current_part) < size and self._position != self._size:
             bytes_read = self._current_part.fill(self._raw_reader)
             if bytes_read == 0:

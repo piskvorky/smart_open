@@ -63,7 +63,7 @@ def parse_uri(uri_as_string):
     # The conversion to a namedtuple is just to keep the old tests happy while
     # I'm still refactoring.
     #
-    Uri = collections.namedtuple("Uri", sorted(as_dict.keys()))
+    Uri = collections.namedtuple("Uri", sorted(as_dict.keys()))  # noqa: PYI024  # legacy public type
     return Uri(**as_dict)
 
 
@@ -75,14 +75,14 @@ _parse_uri = parse_uri
 _builtin_open = open
 
 
-def open(
+def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated PR
     uri,
     mode="r",
     buffering=-1,
     encoding=None,
     errors=None,
     newline=None,
-    closefd=True,
+    closefd=True,  # noqa: FBT002  # public API
     opener=None,
     compression=so_compression.INFER_FROM_EXTENSION,
     compression_kwargs=None,
@@ -243,7 +243,7 @@ def open(
     return so_utils.FileLikeProxy(decoded, binary)
 
 
-def _get_binary_mode(mode_str):
+def _get_binary_mode(mode_str):  # noqa: C901  # legacy public API; refactor in a dedicated PR
     #
     # https://docs.python.org/3/library/functions.html#open
     #
@@ -298,7 +298,7 @@ def _get_binary_mode(mode_str):
     return "".join(binmode)
 
 
-def _shortcut_open(
+def _shortcut_open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     uri,
     mode,
     compression,
@@ -341,7 +341,7 @@ def _shortcut_open(
 
     local_path = so_file.extract_local_path(uri)
     if compression == so_compression.INFER_FROM_EXTENSION:
-        _, extension = os.path.splitext(local_path)
+        extension = pathlib.Path(local_path).suffix
         if extension in so_compression.get_supported_extensions():
             return None
     elif compression != so_compression.NO_COMPRESSION:
@@ -453,7 +453,7 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
     )
 
 
-class patch_pathlib:
+class patch_pathlib:  # noqa: N801  # function-shaped name in public API
     """Replace `Path.open` with `smart_open.open`."""
 
     def __init__(self):

@@ -21,9 +21,9 @@ Example:
 import contextlib
 import getpass
 import logging
-import os
 import urllib.parse
 from collections.abc import Callable
+from pathlib import Path
 
 try:
     import paramiko
@@ -54,7 +54,7 @@ URI_EXAMPLES = (
 #
 # Global storage for SSH config files.
 #
-_SSH_CONFIG_FILES = [os.path.expanduser("~/.ssh/config")]
+_SSH_CONFIG_FILES = [str(Path("~/.ssh/config").expanduser())]
 
 
 def _unquote(text):
@@ -93,7 +93,7 @@ _PARAMIKO_CONFIG_MAP: dict[str, tuple[str, Callable]] = {
 def parse_uri(uri_as_string):
     """Parse an ``ssh://``/``scp://``/``sftp://`` URI into connection components."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
-    assert split_uri.scheme in SCHEMES
+    assert split_uri.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
     return {
         "scheme": split_uri.scheme,
         "uri_path": _unquote(split_uri.path),
@@ -117,7 +117,7 @@ def open_uri(uri, mode, transport_params):
 def _connect_ssh(hostname, username, port, password, connect_kwargs):
     ssh = paramiko.SSHClient()
     ssh.load_system_host_keys()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # noqa: S507  # documented smart_open default
     kwargs = (connect_kwargs or {}).copy()
     if "key_filename" not in kwargs:
         kwargs.setdefault("password", password)
@@ -126,7 +126,7 @@ def _connect_ssh(hostname, username, port, password, connect_kwargs):
     return ssh
 
 
-def _maybe_fetch_config(host, username=None, password=None, port=None, connect_kwargs=None):
+def _maybe_fetch_config(host, username=None, password=None, port=None, connect_kwargs=None):  # noqa: C901, PLR0912  # legacy public API; refactor in a dedicated PR
     # If all fields are set, return as-is.
     if not any(arg is None for arg in (host, username, password, port, connect_kwargs)):
         return host, username, password, port, connect_kwargs
@@ -151,7 +151,7 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
     # - GSS configuration
     #
     connect_params = (connect_kwargs or {}).copy()
-    config_files = [f for f in _SSH_CONFIG_FILES if os.path.exists(f)]
+    config_files = [f for f in _SSH_CONFIG_FILES if Path(f).exists()]
     #
     # This is the actual name of the host.  The input host may actually be an
     # alias.
@@ -210,7 +210,7 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
     return host, username, password, port, connect_params
 
 
-def open(
+def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     path,
     mode="r",
     host=None,

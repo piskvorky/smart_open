@@ -8,8 +8,8 @@
 
 import io
 import logging
-import os.path
 import urllib.parse
+from pathlib import PurePosixPath
 
 try:
     import requests
@@ -37,7 +37,7 @@ the client (us) has to decompress them with the appropriate algorithm.
 def parse_uri(uri_as_string):
     """Parse an ``http://`` or ``https://`` URI into its path component."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
-    assert split_uri.scheme in SCHEMES
+    assert split_uri.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
 
     uri_path = split_uri.netloc + split_uri.path
     uri_path = "/" + uri_path.lstrip("/")
@@ -50,10 +50,10 @@ def open_uri(uri, mode, transport_params):
     return open(uri, mode, **kwargs)
 
 
-def open(
+def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     uri,
     mode,
-    kerberos=False,
+    kerberos=False,  # noqa: FBT002  # public API
     user=None,
     password=None,
     cert=None,
@@ -105,7 +105,7 @@ def open(
             session=session,
             timeout=timeout,
         )
-        fobj.name = os.path.basename(urllib.parse.urlparse(uri).path)
+        fobj.name = PurePosixPath(urllib.parse.urlparse(uri).path).name
         return fobj
     msg = f"http support for mode {mode!r} not implemented"
     raise NotImplementedError(msg)
@@ -116,12 +116,12 @@ class BufferedInputBase(io.BufferedIOBase):
 
     response = None  # so `closed` property works in case __init__ fails and __del__ is called
 
-    def __init__(
+    def __init__(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         self,
         url,
         mode="r",
         buffer_size=DEFAULT_BUFFER_SIZE,
-        kerberos=False,
+        kerberos=False,  # noqa: FBT002  # public API
         user=None,
         password=None,
         cert=None,
@@ -246,12 +246,12 @@ class SeekableBufferedInputBase(BufferedInputBase):
     set, will connect unauthenticated.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         self,
         url,
         mode="r",
         buffer_size=DEFAULT_BUFFER_SIZE,
-        kerberos=False,
+        kerberos=False,  # noqa: FBT002  # public API
         user=None,
         password=None,
         cert=None,
@@ -269,7 +269,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         #
         self._seekable = self.response.headers.get("Accept-Ranges", "").lower() != "none"
 
-    def seek(self, offset, whence=0):
+    def seek(self, offset, whence=0):  # noqa: C901, PLR0912  # legacy public API; refactor in a dedicated PR
         """Seek to the specified position.
 
         Args:

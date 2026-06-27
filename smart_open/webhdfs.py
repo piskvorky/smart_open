@@ -110,7 +110,7 @@ class BufferedInputBase(io.BufferedIOBase):
         self._uri = uri
 
         payload = {"op": "OPEN", "offset": 0}
-        self._response = requests.get(self._uri, params=payload, stream=True)
+        self._response = requests.get(self._uri, params=payload, stream=True)  # noqa: S113  # WebHDFS server-side timeouts apply
         if self._response.status_code != httplib.OK:
             raise WebHdfsException.from_response(self._response)
         self._buf = b""
@@ -209,11 +209,11 @@ class BufferedOutputBase(io.BufferedIOBase):
         self.min_part_size = min_part_size
         # creating empty file first
         payload = {"op": "CREATE", "overwrite": True}
-        init_response = requests.put(self._uri, params=payload, allow_redirects=False)
+        init_response = requests.put(self._uri, params=payload, allow_redirects=False)  # noqa: S113  # WebHDFS server-side timeouts apply
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
             raise WebHdfsException.from_response(init_response)
         uri = init_response.headers["location"]
-        response = requests.put(uri, data="", headers={"content-type": "application/octet-stream"})
+        response = requests.put(uri, data="", headers={"content-type": "application/octet-stream"})  # noqa: S113  # WebHDFS server-side timeouts apply
         if not response.status_code == httplib.CREATED:
             raise WebHdfsException.from_response(response)
         self.lines = []
@@ -238,11 +238,11 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     def _upload(self, data):
         payload = {"op": "APPEND"}
-        init_response = requests.post(self._uri, params=payload, allow_redirects=False)
+        init_response = requests.post(self._uri, params=payload, allow_redirects=False)  # noqa: S113  # WebHDFS server-side timeouts apply
         if not init_response.status_code == httplib.TEMPORARY_REDIRECT:
             raise WebHdfsException.from_response(init_response)
         uri = init_response.headers["location"]
-        response = requests.post(uri, data=data, headers={"content-type": "application/octet-stream"})
+        response = requests.post(uri, data=data, headers={"content-type": "application/octet-stream"})  # noqa: S113  # WebHDFS server-side timeouts apply
         if not response.status_code == httplib.OK:
             raise WebHdfsException.from_response(response)
 
@@ -293,7 +293,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         return self._closed
 
 
-class WebHdfsException(Exception):
+class WebHdfsException(Exception):  # noqa: N818  # public name
     """Exception raised when WebHDFS returns an unexpected HTTP status code."""
 
     def __init__(self, msg="", status_code=None):

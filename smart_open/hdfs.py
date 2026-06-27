@@ -30,7 +30,7 @@ URI_EXAMPLES = (
 def parse_uri(uri_as_string):
     """Parse an ``hdfs://`` or ``viewfs://`` URI into its path component."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
-    assert split_uri.scheme in SCHEMES
+    assert split_uri.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
 
     # Preserve the full URI when netloc is set so the hdfs CLI can route to
     # the right cluster; otherwise (e.g. "hdfs:///path/file") pass the
@@ -73,7 +73,7 @@ class CliRawInputBase(io.RawIOBase):
 
     def __init__(self, uri):
         self._uri = uri
-        self._sub = subprocess.Popen(["hdfs", "dfs", "-cat", self._uri], stdout=subprocess.PIPE)
+        self._sub = subprocess.Popen(["hdfs", "dfs", "-cat", self._uri], stdout=subprocess.PIPE)  # noqa: S603, S607  # invokes local hdfs CLI
 
     #
     # Override some methods from io.IOBase.
@@ -132,7 +132,7 @@ class CliRawOutputBase(io.RawIOBase):
 
     def __init__(self, uri):
         self._uri = uri
-        self._sub = subprocess.Popen(["hdfs", "dfs", "-put", "-f", "-", self._uri], stdin=subprocess.PIPE)
+        self._sub = subprocess.Popen(["hdfs", "dfs", "-put", "-f", "-", self._uri], stdin=subprocess.PIPE)  # noqa: S603, S607  # invokes local hdfs CLI
 
     def close(self):
         """Flush and close this stream."""

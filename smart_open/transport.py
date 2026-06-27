@@ -62,10 +62,10 @@ def register_transport(submodule):
         raise ValueError(msg)
 
     for f in ("open", "open_uri", "parse_uri"):
-        assert hasattr(submodule, f), f"{submodule!r} is missing {f!r}"
+        assert hasattr(submodule, f), f"{submodule!r} is missing {f!r}"  # noqa: S101  # internal precondition; misuse should crash loudly
 
     for scheme in schemes:
-        assert scheme not in _REGISTRY
+        assert scheme not in _REGISTRY  # noqa: S101  # internal precondition; misuse should crash loudly
         if getattr(submodule, "MISSING_DEPS", False):
             _ERRORS[scheme] = module_name
         else:

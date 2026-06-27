@@ -94,7 +94,7 @@ class Retry:
         for attempt in range(self.attempts):
             try:
                 return fn()
-            except tuple(self.exceptions) as err:
+            except tuple(self.exceptions) as err:  # noqa: PERF203  # retry semantics require per-attempt try/except
                 logger.critical(
                     "Caught non-fatal %s, retrying %d more times",
                     err,
@@ -162,7 +162,7 @@ def parse_uri(uri_as_string):
     # let boto3 take care of that for us.
     #
     split_uri = smart_open.utils.safe_urlsplit(uri_as_string)
-    assert split_uri.scheme in SCHEMES
+    assert split_uri.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
 
     #
     # These defaults tell boto3 to look for credentials elsewhere
@@ -287,15 +287,15 @@ def open_uri(uri, mode, transport_params):
     return open(parsed_uri["bucket_id"], parsed_uri["key_id"], mode, **kwargs)
 
 
-def open(
+def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     bucket_id,
     key_id,
     mode,
     version_id=None,
     buffer_size=DEFAULT_BUFFER_SIZE,
     min_part_size=DEFAULT_PART_SIZE,
-    multipart_upload=True,
-    defer_seek=False,
+    multipart_upload=True,  # noqa: FBT002  # public API
+    defer_seek=False,  # noqa: FBT002  # public API
     client=None,
     client_kwargs=None,
     writebuffer=None,
@@ -536,7 +536,7 @@ class _SeekableRawReader:
 
         return self._position
 
-    def _open_body(self, start=None, stop=None):
+    def _open_body(self, start=None, stop=None):  # noqa: C901, PLR0912  # legacy public API; refactor in a dedicated PR
         """Open a connection to download the specified range of bytes.
 
         Store the open file handle in self._body.
@@ -727,11 +727,11 @@ def _initialize_boto3(rw, client, client_kwargs, bucket, key):
         # client with the config above and share it between threads using transport_params
         # https://github.com/boto/boto3/blob/1.38.41/docs/source/guide/clients.rst?plain=1#L111
         client = boto3.client("s3", **init_kwargs)
-    assert client
+    assert client  # noqa: S101  # internal precondition; misuse should crash loudly
 
-    rw._client = _ClientWrapper(client, client_kwargs)
-    rw._bucket = bucket
-    rw._key = key
+    rw._client = _ClientWrapper(client, client_kwargs)  # noqa: SLF001  # intra-package coupling
+    rw._bucket = bucket  # noqa: SLF001  # intra-package coupling
+    rw._key = key  # noqa: SLF001  # intra-package coupling
 
 
 class Reader(io.BufferedIOBase):
@@ -740,14 +740,14 @@ class Reader(io.BufferedIOBase):
     Implements the io.BufferedIOBase interface of the standard library.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         self,
         bucket,
         key,
         version_id=None,
         buffer_size=DEFAULT_BUFFER_SIZE,
         line_terminator=constants.BINARY_NEWLINE,
-        defer_seek=False,
+        defer_seek=False,  # noqa: FBT002  # public API
         client=None,
         client_kwargs=None,
         range_chunk_size=None,
@@ -792,7 +792,7 @@ class Reader(io.BufferedIOBase):
         if size < 0:
             # call read() before setting _current_pos to make sure _content_length is set
             out = self._read_from_buffer() + self._raw_reader.read()
-            self._current_pos = self._raw_reader._content_length
+            self._current_pos = self._raw_reader._content_length  # noqa: SLF001  # intra-package coupling
             return out
 
         #
@@ -888,7 +888,7 @@ class Reader(io.BufferedIOBase):
             self._current_pos = self._raw_reader.seek(offset, whence)
             self._buffer.empty()
 
-        self._eof = self._current_pos == self._raw_reader._content_length
+        self._eof = self._current_pos == self._raw_reader._content_length  # noqa: SLF001  # intra-package coupling
 
         self._seek_initialized = True
         return self._current_pos
@@ -920,7 +920,7 @@ class Reader(io.BufferedIOBase):
         Returns:
             A ``boto3.s3.Object`` (or ``ObjectVersion`` when ``version_id`` is set).
         """
-        assert resource, "resource must be a boto3.resource instance"
+        assert resource, "resource must be a boto3.resource instance"  # noqa: S101  # internal precondition; misuse should crash loudly
         obj = resource.Object(self._bucket, self._key)
         if self._version_id is not None:
             return obj.Version(self._version_id)
@@ -937,7 +937,7 @@ class Reader(io.BufferedIOBase):
         return part
 
     def _fill_buffer(self, size=-1):
-        size = max(size, self._buffer._chunk_size)
+        size = max(size, self._buffer._chunk_size)  # noqa: SLF001  # intra-package coupling
         while len(self._buffer) < size and not self._eof:
             bytes_read = self._buffer.fill(self._raw_reader)
             if bytes_read == 0:
@@ -961,7 +961,7 @@ class MultipartWriter(io.BufferedIOBase):
 
     _upload_id = None  # so `closed` property works in case __init__ fails and __del__ is called
 
-    def __init__(
+    def __init__(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         self,
         bucket,
         key,
@@ -987,7 +987,7 @@ class MultipartWriter(io.BufferedIOBase):
                 Bucket=bucket,
                 Key=key,
             )
-            self._upload_id = RETRY._do(partial)["UploadId"]
+            self._upload_id = RETRY._do(partial)["UploadId"]  # noqa: SLF001  # intra-package coupling
         except botocore.client.ClientError as error:
             msg = f"the bucket {bucket!r} does not exist, or is forbidden for access ({error!r})"
             raise ValueError(msg) from error
@@ -1025,7 +1025,7 @@ class MultipartWriter(io.BufferedIOBase):
                 UploadId=self._upload_id,
                 MultipartUpload={"Parts": self._parts},
             )
-            RETRY._do(partial)
+            RETRY._do(partial)  # noqa: SLF001  # intra-package coupling
             logger.debug("%s: completed multipart upload", self)
         elif self._upload_id:
             #
@@ -1109,7 +1109,7 @@ class MultipartWriter(io.BufferedIOBase):
                 # Not enough data to write a new part just yet. The assert
                 # ensures that we've consumed all of the input buffer.
                 #
-                assert end >= len(mv)
+                assert end >= len(mv)  # noqa: S101  # internal precondition; misuse should crash loudly
                 return len(mv)
 
             self._upload_next_part()
@@ -1141,7 +1141,7 @@ class MultipartWriter(io.BufferedIOBase):
         Returns:
             A ``boto3.s3.Object`` for the same bucket and key.
         """
-        assert resource, "resource must be a boto3.resource instance"
+        assert resource, "resource must be a boto3.resource instance"  # noqa: S101  # internal precondition; misuse should crash loudly
         return resource.Object(self._bucket, self._key)
 
     #
@@ -1164,7 +1164,7 @@ class MultipartWriter(io.BufferedIOBase):
         # of a temporary connection problem, so this part needs to be
         # especially robust.
         #
-        upload = RETRY._do(
+        upload = RETRY._do(  # noqa: SLF001  # intra-package coupling
             functools.partial(
                 self._client.upload_part,
                 Bucket=self._bucket,
@@ -1341,11 +1341,11 @@ class SinglepartWriter(io.BufferedIOBase):
         return f"smart_open.s3.SinglepartWriter(bucket={self._bucket!r}, key={self._key!r})"
 
 
-def _accept_all(key):
+def _accept_all(key):  # noqa: ARG001  # interface conformance
     return True
 
 
-def iter_bucket(
+def iter_bucket(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     bucket_name,
     prefix="",
     accept_key=None,
@@ -1482,7 +1482,7 @@ def _list_bucket(
     bucket_name,
     client,
     prefix="",
-    accept_key=lambda k: True,
+    accept_key=lambda k: True,  # noqa: ARG005  # interface conformance
 ):
     ctoken = None
 

@@ -40,7 +40,7 @@ def _unquote(text):
 def parse_uri(uri_as_string):
     """Parse an ``ftp://`` or ``ftps://`` URI into connection components."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
-    assert split_uri.scheme in SCHEMES
+    assert split_uri.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
     return {
         "scheme": split_uri.scheme,
         "uri_path": _unquote(split_uri.path),
@@ -83,13 +83,13 @@ def convert_transport_params_to_args(transport_params):
     return kwargs
 
 
-def _connect(hostname, username, port, password, secure_connection, transport_params):
+def _connect(hostname, username, port, password, secure_connection, transport_params):  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     kwargs = convert_transport_params_to_args(transport_params)
     if secure_connection:
         ssl_context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
-        ftp = FTP_TLS(context=ssl_context, **kwargs)
+        ftp = FTP_TLS(context=ssl_context, **kwargs)  # noqa: S321  # this module's purpose
     else:
-        ftp = FTP(**kwargs)
+        ftp = FTP(**kwargs)  # noqa: S321  # this module's purpose
     try:
         ftp.connect(hostname, port)
     except Exception:
@@ -105,14 +105,14 @@ def _connect(hostname, username, port, password, secure_connection, transport_pa
     return ftp
 
 
-def open(
+def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     path,
     mode="rb",
     host=None,
     user=None,
     password=None,
     port=DEFAULT_PORT,
-    secure_connection=False,
+    secure_connection=False,  # noqa: FBT002  # public API
     transport_params=None,
 ):
     """Open a file for reading or writing via FTP/FTPS.

@@ -31,10 +31,10 @@ def parse_uri(uri_as_string):
     return {"scheme": SCHEME, "uri_path": local_path}
 
 
-def open_uri(uri_as_string, mode, transport_params):
+def open_uri(uri_as_string, mode, transport_params):  # noqa: ARG001  # interface conformance
     """Open a local file URI using the given mode."""
     parsed_uri = parse_uri(uri_as_string)
-    return builtins.open(parsed_uri["uri_path"], mode)
+    return builtins.open(parsed_uri["uri_path"], mode)  # noqa: PTH123  # mirrors builtins.open signature exactly
 
 
 def extract_local_path(uri_as_string):
@@ -43,4 +43,4 @@ def extract_local_path(uri_as_string):
         local_path = uri_as_string.replace("file://", "", 1)
     else:
         local_path = uri_as_string
-    return os.path.expanduser(local_path)
+    return os.path.expanduser(local_path)  # noqa: PTH111  # pathlib collapses leading double slashes; preserve os.path semantics

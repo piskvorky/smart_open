@@ -8,7 +8,7 @@
 
 import io
 import logging
-import os.path
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -85,14 +85,14 @@ def _maybe_wrap_buffered(file_obj, mode):
 def _handle_bz2(file_obj, mode, **kwargs):
     import bz2
 
-    result = bz2.open(filename=file_obj, mode=mode, **kwargs)
+    result = bz2.open(filename=file_obj, mode=mode, **kwargs)  # noqa: SIM115  # returns the file object to caller
     return _maybe_wrap_buffered(result, mode)
 
 
 def _handle_gzip(file_obj, mode, **kwargs):
     import gzip
 
-    result = gzip.open(filename=file_obj, mode=mode, **kwargs)
+    result = gzip.open(filename=file_obj, mode=mode, **kwargs)  # noqa: SIM115  # returns the file object to caller
     return _maybe_wrap_buffered(result, mode)
 
 
@@ -110,7 +110,7 @@ def _handle_zstd(file_obj, mode, **kwargs):
 def _handle_xz(file_obj, mode, **kwargs):
     import lzma
 
-    result = lzma.open(filename=file_obj, mode=mode, **kwargs)
+    result = lzma.open(filename=file_obj, mode=mode, **kwargs)  # noqa: SIM115  # returns the file object to caller
     return _maybe_wrap_buffered(result, mode)
 
 
@@ -150,7 +150,7 @@ def compression_wrapper(
                 "unable to transparently decompress %r because it seems to lack a string-like .name", file_obj
             )
             return file_obj
-        _, compression = os.path.splitext(filename)
+        compression = Path(filename).suffix
 
     if compression in _COMPRESSOR_REGISTRY and mode.endswith("+"):
         msg = f"transparent (de)compression unsupported for mode {mode!r}"

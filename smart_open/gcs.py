@@ -33,7 +33,7 @@ _DEFAULT_WRITE_OPEN_KWARGS = {"ignore_flush": True}
 def parse_uri(uri_as_string):
     """Parse a ``gcs://`` or ``gs://`` URI into its bucket and blob components."""
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
-    assert sr.scheme in SCHEMES
+    assert sr.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
     bucket_id = sr.netloc
     blob_id = sr.path.lstrip("/")
     return {"scheme": sr.scheme, "bucket_id": bucket_id, "blob_id": blob_id}
@@ -46,7 +46,7 @@ def open_uri(uri, mode, transport_params):
     return open(parsed_uri["bucket_id"], parsed_uri["blob_id"], mode, **kwargs)
 
 
-def open(
+def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     bucket_id,
     blob_id,
     mode,
@@ -105,7 +105,7 @@ def open(
     return _blob
 
 
-def Reader(bucket, key, client=None, get_blob_kwargs=None, blob_open_kwargs=None):
+def Reader(bucket, key, client=None, get_blob_kwargs=None, blob_open_kwargs=None):  # noqa: N802  # factory function named after returned class
     """Return a file-like object for reading the GCS blob `key` from `bucket`."""
     if get_blob_kwargs is None:
         get_blob_kwargs = {}
@@ -124,7 +124,7 @@ def Reader(bucket, key, client=None, get_blob_kwargs=None, blob_open_kwargs=None
     return blob.open("rb", **blob_open_kwargs)
 
 
-def Writer(bucket, blob, min_part_size=None, client=None, blob_properties=None, blob_open_kwargs=None):
+def Writer(bucket, blob, min_part_size=None, client=None, blob_properties=None, blob_open_kwargs=None):  # noqa: N802, PLR0913  # factory function named after returned class; legacy public API
     """Return a file-like object for writing to GCS blob `blob` in `bucket`."""
     if blob_open_kwargs is None:
         blob_open_kwargs = {}

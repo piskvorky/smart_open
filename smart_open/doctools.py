@@ -13,9 +13,9 @@ For internal use only.
 import contextlib
 import inspect
 import io
-import os.path
 import re
 import sys
+from pathlib import Path
 
 from . import compression, transport
 
@@ -203,10 +203,9 @@ def extract_examples_from_readme_rst(indent=None):
     """
     if indent is None:
         indent = LPAD
-    curr_dir = os.path.dirname(os.path.abspath(__file__))
-    readme_path = os.path.join(curr_dir, "..", "README.rst")
+    readme_path = Path(__file__).resolve().parent.parent / "README.rst"
     try:
-        with open(readme_path) as fin:
+        with readme_path.open() as fin:
             lines = list(fin)
         start = lines.index(".. _doctools_before_examples:\n")
         end = lines.index(".. _doctools_after_examples:\n")
@@ -221,10 +220,10 @@ def tweak_open_docstring(f):
     buf = io.StringIO()
     seen = set()
 
-    root_path = os.path.dirname(os.path.dirname(__file__))
+    root_path = Path(__file__).parent.parent
 
     with contextlib.redirect_stdout(buf):
-        for scheme, submodule in sorted(transport._REGISTRY.items()):
+        for scheme, submodule in sorted(transport._REGISTRY.items()):  # noqa: SLF001  # intra-package coupling
             if scheme == transport.NO_SCHEME or submodule in seen:
                 continue
             seen.add(submodule)
@@ -234,13 +233,12 @@ def tweak_open_docstring(f):
             except AttributeError:
                 schemes = [scheme]
 
-            relpath = os.path.relpath(submodule.__file__, start=root_path)
+            relpath = Path(submodule.__file__).relative_to(root_path)
             "{} ({})".format("/".join(schemes), relpath)
 
             kwargs = extract_kwargs(submodule.open.__doc__)
             if kwargs:
                 pass
-
 
         for _extension in compression.get_supported_extensions():
             pass
@@ -259,7 +257,7 @@ def tweak_parse_uri_docstring(f):
     schemes = []
     examples = []
 
-    for scheme, submodule in sorted(transport._REGISTRY.items()):
+    for scheme, submodule in sorted(transport._REGISTRY.items()):  # noqa: SLF001  # intra-package coupling
         if scheme == transport.NO_SCHEME or submodule in seen:
             continue
 
@@ -274,7 +272,7 @@ def tweak_parse_uri_docstring(f):
             schemes.append(scheme)
 
     with contextlib.redirect_stdout(buf):
-        for scheme in schemes:
+        for _scheme in schemes:
             pass
         for _example in examples:
             pass
