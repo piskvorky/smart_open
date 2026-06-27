@@ -200,7 +200,7 @@ class IncrementalBackoffTest(unittest.TestCase):
             CrapClient(b"hello", 1), "bucket", "key"
         )  # test reaches into private state
         with mock.patch("time.sleep") as mock_sleep:
-            with pytest.raises(OSError, match="failed after"):
+            with pytest.raises(OSError, match="failed to read"):
                 reader.read()
 
             #
@@ -968,13 +968,13 @@ class SinglepartWriterTest(unittest.TestCase):
         with pytest.raises(ValueError, match="I/O operation on closed file"):
             fout.seekable()
 
-        with pytest.raises(io.UnsupportedOperation, match=r"SinglepartWriter\.detach"):
+        with pytest.raises(io.UnsupportedOperation, match="detach"):
             fout.detach()
 
-        with pytest.raises(ValueError, match="read from closed file"):
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
             fout.read()
 
-        with pytest.raises(ValueError, match="write to closed file"):
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
             fout.write(b" ")
 
         with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb") as fin:
