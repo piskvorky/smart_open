@@ -20,6 +20,7 @@ Please provide the output of:
 
 ```python
 import platform, sys, smart_open
+
 print(platform.platform())
 print("Python", sys.version)
 print("smart_open", smart_open.__version__)

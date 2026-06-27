@@ -53,13 +53,14 @@ def register_compressor(ext, callback):
 
     Example:
         Instruct smart_open to use the `lzma` module whenever opening a file
-        with a .xz extension (see README.rst for the complete example showing I/O):
+        with a .xz extension (see README.md for the complete example showing I/O):
 
         >>> def _handle_xz(file_obj, mode, **kwargs):
         ...     import lzma
+        ...
         ...     return lzma.open(filename=file_obj, mode=mode, **kwargs)
         >>>
-        >>> register_compressor('.xz', _handle_xz)
+        >>> register_compressor(".xz", _handle_xz)
 
         This is just an example: `lzma` is in the standard library and is registered by default.
     """

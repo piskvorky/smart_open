@@ -8,7 +8,7 @@
 """Implements I/O streams over SSH.
 
 Example:
-    >>> with open('/proc/version_signature', host='1.2.3.4') as conn:
+    >>> with open("/proc/version_signature", host="1.2.3.4") as conn:
     ...     print(conn.read())
     b'Ubuntu 4.4.0-1061.70-aws 4.4.131'
 

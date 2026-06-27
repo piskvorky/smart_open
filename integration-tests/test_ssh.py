@@ -22,7 +22,7 @@ def explode(*args, **kwargs):  # noqa: ARG001  # interface conformance
 @pytest.mark.skipif("SMART_OPEN_SSH" not in os.environ, reason="this test only works on the dev machine")
 def test():
     """Confirm the SSH connection cache reuses an existing connection."""
-    with smart_open.open("ssh://misha@localhost/Users/misha/git/smart_open/README.rst") as fin:
+    with smart_open.open("ssh://misha@localhost/Users/misha/git/smart_open/README.md") as fin:
         readme = fin.read()
 
     assert "smart_open — utils for streaming large files in Python" in readme

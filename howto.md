@@ -219,8 +219,9 @@ The first option is to use smaller part sizes (e.g. 5MB, the lowest value permit
 ```python
 import boto3
 from smart_open import open
-tp = {'min_part_size': 5 * 1024**2}
-with open('s3://bucket/key', 'w', transport_params=tp) as fout:
+
+tp = {"min_part_size": 5 * 1024**2}
+with open("s3://bucket/key", "w", transport_params=tp) as fout:
     fout.write(lots_of_data)
 ```
 
@@ -232,9 +233,10 @@ The second option is to use a temporary file as a buffer instead.
 ```python
 import boto3
 from smart_open import open
+
 with tempfile.NamedTemporaryFile() as tmp:
-    tp = {'writebuffer': tmp}
-    with open('s3://bucket/key', 'w', transport_params=tp) as fout:
+    tp = {"writebuffer": tmp}
+    with open("s3://bucket/key", "w", transport_params=tp) as fout:
         fout.write(lots_of_data)
 ```
 
@@ -284,7 +286,8 @@ To verify your settings have effect:
 
 ```python
 import logging
-logging.getLogger('smart_open.s3').setLevel(logging.DEBUG)
+
+logging.getLogger("smart_open.s3").setLevel(logging.DEBUG)
 ```
 
 and check the log output of your code.
@@ -331,9 +334,10 @@ More specifically, here's the direct method:
 ```python
 import boto3
 import smart_open
-with open('s3://bucket/key', 'wb') as fout:
-    fout.write(b'hello world!')
-client = boto3.client('s3')
+
+with open("s3://bucket/key", "wb") as fout:
+    fout.write(b"hello world!")
+client = boto3.client("s3")
 client.put_object_acl(ACL=acl_as_string)
 ```
 
@@ -341,9 +345,10 @@ Here's the same code that passes the above parameter via `smart_open`:
 
 ```python
 import smart_open
-tp = {'client_kwargs': {'S3.Client.create_multipart_upload': {'ACL': acl_as_string}}}
-with open('s3://bucket/key', 'wb', transport_params=tp) as fout:
-    fout.write(b'hello world!')
+
+tp = {"client_kwargs": {"S3.Client.create_multipart_upload": {"ACL": acl_as_string}}}
+with open("s3://bucket/key", "wb", transport_params=tp) as fout:
+    fout.write(b"hello world!")
 ```
 
 If passing everything via `smart_open` feels awkward, try passing part of the parameters directly to `boto3`.

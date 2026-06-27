@@ -128,10 +128,11 @@ For example:
 ```python
 def _handle_xz(file_obj, mode):
     import lzma
+
     return lzma.LZMAFile(filename=file_obj, mode=mode)
 
 
-register_compressor('.xz', _handle_xz)
+register_compressor(".xz", _handle_xz)
 ```
 
 There are many compression formats out there, and supporting all of them is beyond the scope of `smart_open`.
@@ -145,5 +146,5 @@ Once you've contributed your extension, please add it to the documentation so th
 Some notable files:
 
 - setup.py: See the `description` keyword.  Not all contributions will affect this.
-- README.rst
+- README.md
 - howto.md (if your extension solves a specific problem that doesn't get covered by other documentation)

@@ -29,19 +29,19 @@ class ByteBuffer:
             or iterable when filling the buffer.
 
     Example:
-        >>> buf = ByteBuffer(chunk_size = 8)
-        >>> message_bytes = iter([b'Hello, W', b'orld!'])
+        >>> buf = ByteBuffer(chunk_size=8)
+        >>> message_bytes = iter([b"Hello, W", b"orld!"])
         >>> buf.fill(message_bytes)
         8
-        >>> len(buf) # only chunk_size bytes are filled
+        >>> len(buf)  # only chunk_size bytes are filled
         8
         >>> buf.peek()
         b'Hello, W'
-        >>> len(buf) # peek() does not change read position
+        >>> len(buf)  # peek() does not change read position
         8
         >>> buf.read(6)
         b'Hello,'
-        >>> len(buf) # read() does change read position
+        >>> len(buf)  # read() does change read position
         2
         >>> buf.fill(message_bytes)
         5

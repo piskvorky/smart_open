@@ -138,8 +138,8 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
 
     See Also:
         - `Standard library reference <https://docs.python.org/3.14/library/functions.html#open>`__
-        - `smart_open README.rst
-          <https://github.com/piskvorky/smart_open/blob/master/README.rst>`__
+        - `smart_open README.md
+          <https://github.com/piskvorky/smart_open/blob/master/README.md>`__
     """
     logger.debug("%r", locals())
 
