@@ -26,6 +26,7 @@ HEADERS = {
 
 
 def request_callback(request, headers=HEADERS, data=BYTES):
+    """Request callback."""
     headers = headers.copy()
     range_string = request.headers.get("range", "bytes=0-")
 
@@ -40,8 +41,11 @@ def request_callback(request, headers=HEADERS, data=BYTES):
 
 
 class HttpTest(unittest.TestCase):
+    """Tests for Http."""
+
     @responses.activate
     def test_read_all(self):
+        """Read all."""
         responses.add(responses.GET, URL, body=BYTES)
         reader = smart_open.http.SeekableBufferedInputBase(URL)
         read_bytes = reader.read()
@@ -49,13 +53,14 @@ class HttpTest(unittest.TestCase):
 
     @responses.activate
     def test_seek_from_start(self):
+        """Seek from start."""
         responses.add_callback(responses.GET, URL, callback=request_callback)
         reader = smart_open.http.SeekableBufferedInputBase(URL)
 
         reader.seek(10)
-        assert reader.tell() == 10
+        assert reader.tell() == 10  # noqa: PLR2004  # test uses inline magic value
         read_bytes = reader.read(size=10)
-        assert reader.tell() == 20
+        assert reader.tell() == 20  # noqa: PLR2004  # test uses inline magic value
         assert BYTES[10:20] == read_bytes
 
         reader.seek(20)
@@ -68,6 +73,7 @@ class HttpTest(unittest.TestCase):
 
     @responses.activate
     def test_seek_from_current(self):
+        """Seek from current."""
         responses.add_callback(responses.GET, URL, callback=request_callback)
         reader = smart_open.http.SeekableBufferedInputBase(URL)
 
@@ -75,11 +81,11 @@ class HttpTest(unittest.TestCase):
         read_bytes = reader.read(size=10)
         assert BYTES[10:20] == read_bytes
 
-        assert reader.tell() == 20
+        assert reader.tell() == 20  # noqa: PLR2004  # test uses inline magic value
         reader.seek(10, whence=smart_open.constants.WHENCE_CURRENT)
-        assert reader.tell() == 30
+        assert reader.tell() == 30  # noqa: PLR2004  # test uses inline magic value
         read_bytes = reader.read(size=10)
-        assert reader.tell() == 40
+        assert reader.tell() == 40  # noqa: PLR2004  # test uses inline magic value
         assert BYTES[30:40] == read_bytes
 
     @responses.activate
@@ -93,18 +99,19 @@ class HttpTest(unittest.TestCase):
 
         # Forward seek within buffer using WHENCE_CURRENT - no new GET request
         reader.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-        assert reader.tell() == 6
+        assert reader.tell() == 6  # noqa: PLR2004  # test uses inline magic value
         assert reader.read(5) == BYTES[6:11]
 
         # Forward seek within buffer using WHENCE_START - no new GET request
         reader.seek(13, whence=smart_open.constants.WHENCE_START)
-        assert reader.tell() == 13
+        assert reader.tell() == 13  # noqa: PLR2004  # test uses inline magic value
         assert reader.read(3) == BYTES[13:16]
 
         assert len(responses.calls) == initial_calls
 
     @responses.activate
     def test_seek_from_end(self):
+        """Seek from end."""
         responses.add_callback(responses.GET, URL, callback=request_callback)
         reader = smart_open.http.SeekableBufferedInputBase(URL)
 
@@ -116,6 +123,7 @@ class HttpTest(unittest.TestCase):
 
     @responses.activate
     def test_headers_are_as_assigned(self):
+        """Headers are as assigned."""
         responses.add_callback(responses.GET, URL, callback=request_callback)
 
         # use default _HEADERS
@@ -172,6 +180,7 @@ class HttpTest(unittest.TestCase):
 
     @responses.activate
     def test_timeout_attribute(self):
+        """Timeout attribute."""
         timeout = 1
         responses.add_callback(responses.GET, URL, callback=request_callback)
         reader = smart_open.open(URL, "rb", transport_params={"timeout": timeout})
@@ -180,6 +189,7 @@ class HttpTest(unittest.TestCase):
 
     @responses.activate
     def test_session_attribute(self):
+        """Session attribute."""
         session = requests.Session()
         responses.add_callback(responses.GET, URL, callback=request_callback)
         reader = smart_open.open(URL, "rb", transport_params={"session": session})
@@ -189,8 +199,9 @@ class HttpTest(unittest.TestCase):
 
 
 @responses.activate
-def test_seek_implicitly_enabled(numbytes=10):
+def test_seek_implicitly_enabled():
     """Can we seek even if the server hasn't explicitly allowed it?"""
+    numbytes = 10
     callback = functools.partial(request_callback, headers={})
     responses.add_callback(responses.GET, HTTPS_URL, callback=callback)
     with smart_open.open(HTTPS_URL, "rb") as fin:
@@ -209,7 +220,7 @@ def test_seek_implicitly_disabled():
     with smart_open.open(HTTPS_URL, "rb") as fin:
         assert not fin.seekable()
         fin.read()
-        with pytest.raises(OSError):
+        with pytest.raises(OSError):  # noqa: PT011  # legacy broad pytest.raises
             fin.seek(0)
 
 
@@ -217,7 +228,7 @@ def test_seek_implicitly_disabled():
 def test_gzip_encoding_default_headers():
     """Does Accept-Encoding: identity prevent gzip compression?"""
 
-    def callback(request):
+    def callback(request):  # noqa: ARG001  # unused fn arg in fixture
         # Server respects Accept-Encoding: identity and sends uncompressed
         headers = HEADERS.copy()
         headers["Content-Length"] = str(len(BYTES))

@@ -39,7 +39,7 @@ from .test_s3 import patch_invalid_range_response
 
 logger = logging.getLogger(__name__)
 
-CURR_DIR = os.path.abspath(os.path.dirname(__file__))
+CURR_DIR = os.path.abspath(os.path.dirname(__file__))  # noqa: PTH100, PTH120  # test fixture abspath; test fixture dirname
 SAMPLE_TEXT = "Hello, world!"
 SAMPLE_BYTES = SAMPLE_TEXT.encode("utf-8")
 
@@ -54,26 +54,26 @@ _resource = functools.partial(boto3.resource, region_name="us-east-1")
 # https://stackoverflow.com/a/58955530
 #
 @contextlib.contextmanager
-def named_temporary_file(mode="w+b", prefix=None, suffix=None, delete=True):
+def named_temporary_file(mode="w+b", prefix=None, suffix=None, delete=True):  # noqa: FBT002
+    """Named temporary file."""
     filename = io.StringIO()
     if prefix:
         filename.write(prefix)
     filename.write(os.urandom(8).hex())
     if suffix:
         filename.write(suffix)
-    pathname = os.path.join(tempfile.gettempdir(), filename.getvalue())
-
-    with open(pathname, mode) as f:
+    pathname = os.path.join(tempfile.gettempdir(), filename.getvalue())  # noqa: PTH118  # test fixture path join
+    with open(pathname, mode) as f:  # noqa: PTH123  # test fixture path open
         yield f
 
     if delete:
         try:
-            os.unlink(pathname)
+            os.unlink(pathname)  # noqa: PTH108  # test fixture unlink
         except PermissionError as e:
             #
             # This can happen on Windows for unknown reasons.
             #
-            logger.exception(e)
+            logger.exception(e)  # noqa: TRY401  # verbose log in test
 
 
 def test_compression_kwargs_changes_gzip_output_size():
@@ -84,10 +84,11 @@ def test_compression_kwargs_changes_gzip_output_size():
             fout.write(payload)
         with smart_open.open(high_tmp.name, "wb", compression_kwargs={"compresslevel": 9}) as fout:
             fout.write(payload)
-        assert os.path.getsize(low_tmp.name) > os.path.getsize(high_tmp.name)
+        assert os.path.getsize(low_tmp.name) > os.path.getsize(high_tmp.name)  # noqa: PTH202  # test fixture getsize
 
 
 def test_compression_extensions():
+    """Compression extensions."""
     for extension in smart_open.compression.get_supported_extensions():
         with named_temporary_file(suffix=extension) as tmp:
             with smart_open.open(tmp.name, "wt") as fout:
@@ -138,20 +139,19 @@ class ParseUriTest(unittest.TestCase):
             "gs",
             "azure",
         ):
-            parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")
+            parsed_uri = smart_open_lib._parse_uri(scheme + "://mybucket/mykey")  # noqa: SLF001  # test reaches into private state
             assert parsed_uri.scheme == scheme
 
         # unsupported scheme => NotImplementedError
-        self.assertRaises(NotImplementedError, smart_open_lib._parse_uri, "foobar://mybucket/mykey")
-
+        self.assertRaises(NotImplementedError, smart_open_lib._parse_uri, "foobar://mybucket/mykey")  # noqa: PT027, SLF001  # legacy unittest assertRaises; test reaches into private state
         # unknown scheme => default_scheme
-        parsed_uri = smart_open_lib._parse_uri("blah blah")
+        parsed_uri = smart_open_lib._parse_uri("blah blah")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "file"
 
     def test_s3_uri(self):
         """Do S3 URIs parse correctly?"""
         # correct uri without credentials
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey")
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mykey"
@@ -159,7 +159,8 @@ class ParseUriTest(unittest.TestCase):
         assert parsed_uri.access_secret is None
 
     def test_s3_uri_contains_slash(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey")
+        """S3 uri contains slash."""
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mydir/mykey"
@@ -167,77 +168,88 @@ class ParseUriTest(unittest.TestCase):
         assert parsed_uri.access_secret is None
 
     def test_s3_uri_with_credentials(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")
+        """S3 uri with credentials."""
+        parsed_uri = smart_open_lib._parse_uri("s3://ACCESSID456:acces/sse_cr-et@mybucket/mykey")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mykey"
         assert parsed_uri.access_id == "ACCESSID456"
-        assert parsed_uri.access_secret == "acces/sse_cr-et"
+        assert parsed_uri.access_secret == "acces/sse_cr-et"  # noqa: S105  # fixture password literal
 
     def test_s3_uri_with_credentials2(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/mykey")
+        """S3 uri with credentials2."""
+        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/mykey")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mykey"
         assert parsed_uri.access_id == "accessid"
-        assert parsed_uri.access_secret == "access/secret"
+        assert parsed_uri.access_secret == "access/secret"  # noqa: S105  # fixture password literal
 
     def test_s3_uri_has_atmark_in_key_name(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/my@ke@y")
+        """S3 uri has atmark in key name."""
+        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret@mybucket/my@ke@y")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "my@ke@y"
         assert parsed_uri.access_id == "accessid"
-        assert parsed_uri.access_secret == "access/secret"
+        assert parsed_uri.access_secret == "access/secret"  # noqa: S105  # fixture password literal
 
     #
     # Nb. should never happen in theory, but if it does, we should avoid crashing
     #
     def test_s3_uri_has_colon_in_secret(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret:totally@mybucket/my@ke@y")
+        """S3 uri has colon in secret."""
+        parsed_uri = smart_open_lib._parse_uri("s3://accessid:access/secret:totally@mybucket/my@ke@y")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "my@ke@y"
         assert parsed_uri.access_id == "accessid"
-        assert parsed_uri.access_secret == "access/secret:totally"
+        assert parsed_uri.access_secret == "access/secret:totally"  # noqa: S105  # fixture password literal
 
     def test_s3_handles_fragments(self):
+        """S3 handles fragments."""
         uri_str = "s3://bucket-name/folder/picture #1.jpg"
-        parsed_uri = smart_open_lib._parse_uri(uri_str)
+        parsed_uri = smart_open_lib._parse_uri(uri_str)  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.key_id == "folder/picture #1.jpg"
 
     def test_s3_handles_querystring(self):
+        """S3 handles querystring."""
         uri_str = "s3://bucket-name/folder/picture1.jpg?bar"
-        parsed_uri = smart_open_lib._parse_uri(uri_str)
+        parsed_uri = smart_open_lib._parse_uri(uri_str)  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.key_id == "folder/picture1.jpg?bar"
 
     def test_webhdfs_uri_to_http(self):
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file")
+        """Webhdfs uri to http."""
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file")  # noqa: SLF001  # test reaches into private state
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path/file"
         assert actual == expected
 
     def test_webhdfs_uri_to_http_with_query(self):
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file?a=1")
+        """Webhdfs uri to http with query."""
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://host:14000/path/file?a=1")  # noqa: SLF001  # test reaches into private state
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path/file?a=1"
         assert actual == expected
 
     def test_webhdfs_uri_to_http_with_user(self):
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path")
+        """Webhdfs uri to http with user."""
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path")  # noqa: SLF001  # test reaches into private state
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path?user.name=user"
         assert actual == expected
 
     def test_webhdfs_uri_to_http_with_user_and_query(self):
-        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path?a=1")
+        """Webhdfs uri to http with user and query."""
+        parsed_uri = smart_open_lib._parse_uri("webhdfs://user@host:14000/path?a=1")  # noqa: SLF001  # test reaches into private state
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path?a=1&user.name=user"
         assert actual == expected
 
     def test_uri_from_issue_223_works(self):
+        """Uri from issue 223 works."""
         uri = "s3://:@omax-mis/twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6"
-        parsed_uri = smart_open_lib._parse_uri(uri)
+        parsed_uri = smart_open_lib._parse_uri(uri)  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "omax-mis"
         assert parsed_uri.key_id == "twilio-messages-media/final/MEcd7c36e75f87dc6dd9e33702cdcd8fb6"
@@ -246,7 +258,7 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_with_colon_in_key_name(self):
         """Correctly parse the s3 url if there is a colon in the key or dir."""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/my:key")
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/my:key")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mydir/my:key"
@@ -255,7 +267,7 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_with_at_symbol_in_key_name0(self):
         """Correctly parse the s3 url if there is an @ symbol (and colon) in the key or dir."""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir:my@key")
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir:my@key")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mydir:my@key"
@@ -264,7 +276,7 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_with_at_symbol_in_key_name1(self):
         """Correctly parse the s3 url if there is an @ symbol (and colon) in the key or dir."""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/my:dir@my/key")
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/my:dir@my/key")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "my:dir@my/key"
@@ -272,7 +284,8 @@ class ParseUriTest(unittest.TestCase):
         assert parsed_uri.access_secret is None
 
     def test_s3_uri_contains_question_mark(self):
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey?param")
+        """S3 uri contains question mark."""
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey?param")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mydir/mykey?param"
@@ -280,7 +293,7 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_version_id(self):
         """Does ?versionId=... in an S3 URI populate version_id?"""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey?versionId=v1")
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mydir/mykey?versionId=v1")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "s3"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.key_id == "mydir/mykey"
@@ -288,53 +301,57 @@ class ParseUriTest(unittest.TestCase):
 
     def test_s3_uri_version_id_with_other_params(self):
         """Are non-versionId query params preserved on the key?"""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey?versionId=v1&other=keep")
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey?versionId=v1&other=keep")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.key_id == "mykey?other=keep"
         assert parsed_uri.version_id == "v1"
 
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey?other=keep&versionId=v1")
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey?other=keep&versionId=v1")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.key_id == "mykey?other=keep"
         assert parsed_uri.version_id == "v1"
 
     def test_s3_uri_no_version_id_when_no_match(self):
         """``versionId`` is only extracted when the key matches exactly."""
-        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey?versionIdLookalike=foo")
+        parsed_uri = smart_open_lib._parse_uri("s3://mybucket/mykey?versionIdLookalike=foo")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.key_id == "mykey?versionIdLookalike=foo"
         assert parsed_uri.version_id is None
 
     def test_leading_slash_local_file(self):
+        """Leading slash local file."""
         path = "/home/misha/hello.txt"
-        uri = smart_open_lib._parse_uri(path)
+        uri = smart_open_lib._parse_uri(path)  # noqa: SLF001  # test reaches into private state
         assert uri.scheme == "file"
         assert uri.uri_path == path
 
-        uri = smart_open_lib._parse_uri("//" + path)
+        uri = smart_open_lib._parse_uri("//" + path)  # noqa: SLF001  # test reaches into private state
         assert uri.scheme == "file"
         assert uri.uri_path == "//" + path
 
     def test_ssh(self):
+        """Ssh."""
         as_string = "ssh://user@host:1234/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)
+        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
         assert uri.scheme == "ssh"
         assert uri.uri_path == "/path/to/file"
         assert uri.user == "user"
         assert uri.host == "host"
-        assert uri.port == 1234
+        assert uri.port == 1234  # noqa: PLR2004  # test uses inline magic value
         assert uri.password is None
 
     def test_ssh_with_pass(self):
+        """Ssh with pass."""
         as_string = "ssh://user:pass@host:1234/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)
+        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
         assert uri.scheme == "ssh"
         assert uri.uri_path == "/path/to/file"
         assert uri.user == "user"
         assert uri.host == "host"
-        assert uri.port == 1234
-        assert uri.password == "pass"
+        assert uri.port == 1234  # noqa: PLR2004  # test uses inline magic value
+        assert uri.password == "pass"  # noqa: S105  # fixture password literal
 
     def test_scp(self):
+        """Scp."""
         as_string = "scp://user@host:/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)
+        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
         assert uri.scheme == "scp"
         assert uri.uri_path == "/path/to/file"
         assert uri.user == "user"
@@ -343,18 +360,20 @@ class ParseUriTest(unittest.TestCase):
         assert uri.password is None
 
     def test_scp_with_pass(self):
+        """Scp with pass."""
         as_string = "scp://user:pass@host:/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)
+        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
         assert uri.scheme == "scp"
         assert uri.uri_path == "/path/to/file"
         assert uri.user == "user"
         assert uri.host == "host"
         assert uri.port is None
-        assert uri.password == "pass"
+        assert uri.password == "pass"  # noqa: S105  # fixture password literal
 
     def test_sftp(self):
+        """Sftp."""
         as_string = "sftp://host/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)
+        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
         assert uri.scheme == "sftp"
         assert uri.uri_path == "/path/to/file"
         assert uri.user is None
@@ -363,43 +382,47 @@ class ParseUriTest(unittest.TestCase):
         assert uri.password is None
 
     def test_sftp_with_user_and_pass(self):
+        """Sftp with user and pass."""
         as_string = "sftp://user:pass@host:2222/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)
+        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
         assert uri.scheme == "sftp"
         assert uri.uri_path == "/path/to/file"
         assert uri.user == "user"
         assert uri.host == "host"
-        assert uri.port == 2222
-        assert uri.password == "pass"
+        assert uri.port == 2222  # noqa: PLR2004  # test uses inline magic value
+        assert uri.password == "pass"  # noqa: S105  # fixture password literal
 
     def test_ssh_complex_password_with_colon(self):
+        """Ssh complex password with colon."""
         as_string = "sftp://user:some:complex@password$$@host:2222/path/to/file"
-        uri = smart_open_lib._parse_uri(as_string)
-        assert uri.password == "some:complex@password$$"
+        uri = smart_open_lib._parse_uri(as_string)  # noqa: SLF001  # test reaches into private state
+        assert uri.password == "some:complex@password$$"  # noqa: S105  # fixture password literal
 
     def test_gcs_uri(self):
         """Do GCS URIs parse correctly?"""
         # correct uri without credentials
-        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/myblob")
+        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/myblob")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "gcs"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.blob_id == "myblob"
 
     def test_gcs_uri_contains_slash(self):
-        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/mydir/myblob")
+        """Gcs uri contains slash."""
+        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/mydir/myblob")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "gcs"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.blob_id == "mydir/myblob"
 
     def test_gcs_uri_contains_question_mark(self):
-        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/mydir/myblob?param")
+        """Gcs uri contains question mark."""
+        parsed_uri = smart_open_lib._parse_uri("gcs://mybucket/mydir/myblob?param")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "gcs"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.blob_id == "mydir/myblob?param"
 
     def test_gs_uri_backwards_compat(self):
         """``gs://`` keeps working as a backwards-compat alias of ``gcs://``."""
-        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob")
+        parsed_uri = smart_open_lib._parse_uri("gs://mybucket/mydir/myblob")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "gs"
         assert parsed_uri.bucket_id == "mybucket"
         assert parsed_uri.blob_id == "mydir/myblob"
@@ -407,24 +430,27 @@ class ParseUriTest(unittest.TestCase):
     def test_azure_blob_uri(self):
         """Do Azure Blob URIs parse correctly?"""
         # correct uri without credentials
-        parsed_uri = smart_open_lib._parse_uri("azure://mycontainer/myblob")
+        parsed_uri = smart_open_lib._parse_uri("azure://mycontainer/myblob")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "azure"
         assert parsed_uri.container_id == "mycontainer"
         assert parsed_uri.blob_id == "myblob"
 
     def test_azure_blob_uri_root_container(self):
-        parsed_uri = smart_open_lib._parse_uri("azure://myblob")
+        """Azure blob uri root container."""
+        parsed_uri = smart_open_lib._parse_uri("azure://myblob")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "azure"
         assert parsed_uri.container_id == "$root"
         assert parsed_uri.blob_id == "myblob"
 
     def test_azure_blob_uri_contains_slash(self):
-        parsed_uri = smart_open_lib._parse_uri("azure://mycontainer/mydir/myblob")
+        """Azure blob uri contains slash."""
+        parsed_uri = smart_open_lib._parse_uri("azure://mycontainer/mydir/myblob")  # noqa: SLF001  # test reaches into private state
         assert parsed_uri.scheme == "azure"
         assert parsed_uri.container_id == "mycontainer"
         assert parsed_uri.blob_id == "mydir/myblob"
 
     def test_pathlib_monkeypatch(self):
+        """Pathlib monkeypatch."""
         from smart_open.smart_open_lib import pathlib
 
         assert pathlib.Path.open != smart_open.open
@@ -441,12 +467,13 @@ class ParseUriTest(unittest.TestCase):
         assert pathlib.Path.open != smart_open.open
 
     def test_pathlib_monkeypatch_read_gz(self):
+        """Pathlib monkeypatch read gz."""
         from smart_open.smart_open_lib import pathlib
 
         path = pathlib.Path(CURR_DIR) / "test_data" / "crime-and-punishment.txt.gz"
 
         # Check that standard implementation can't work with gzip
-        with path.open("r") as infile, pytest.raises(Exception):  # noqa: B017
+        with path.open("r") as infile, pytest.raises(Exception):  # noqa: B017, PT011  # legacy broad pytest.raises
             lines = infile.readlines()
 
         # Check that our implementation works with gzip
@@ -454,7 +481,7 @@ class ParseUriTest(unittest.TestCase):
         try:
             with path.open("r", encoding="utf-8") as infile:
                 lines = infile.readlines()
-            assert len(lines) == 3
+            assert len(lines) == 3  # noqa: PLR2004  # test uses inline magic value
         finally:
             _patch_pathlib(obj.old_impl)
 
@@ -462,7 +489,7 @@ class ParseUriTest(unittest.TestCase):
 class SmartOpenHttpTest(unittest.TestCase):
     """Test reading from HTTP connections in various ways."""
 
-    @mock.patch("smart_open.ssh.open", return_value=open(__file__))
+    @mock.patch("smart_open.ssh.open", return_value=open(__file__))  # noqa: PTH123, SIM115  # test fixture path open
     def test_read_ssh(self, mock_open):
         """Is SSH line iterator called correctly?"""
         obj = smart_open.open(
@@ -476,7 +503,7 @@ class SmartOpenHttpTest(unittest.TestCase):
             "rb",
             host="ip_address",
             user="ubuntu",
-            password="pass",
+            password="pass",  # noqa: S106  # fixture password kwarg
             port=1022,
         )
 
@@ -534,38 +561,42 @@ class SmartOpenHttpTest(unittest.TestCase):
 
     def test_http_gz(self):
         """Can open gzip via http?"""
-        self._test_compressed_http(".gz", False)
+        self._test_compressed_http(".gz", False)  # noqa: FBT003  # boolean positional in mock call
 
     def test_http_bz2(self):
         """Can open bzip2 via http?"""
-        self._test_compressed_http(".bz2", False)
+        self._test_compressed_http(".bz2", False)  # noqa: FBT003  # boolean positional in mock call
 
     def test_http_gz_query(self):
         """Can open gzip via http with a query appended to URI?"""
-        self._test_compressed_http(".gz", True)
+        self._test_compressed_http(".gz", True)  # noqa: FBT003  # boolean positional in mock call
 
     def test_http_bz2_query(self):
         """Can open bzip2 via http with a query appended to URI?"""
-        self._test_compressed_http(".bz2", True)
+        self._test_compressed_http(".bz2", True)  # noqa: FBT003  # boolean positional in mock call
 
 
 class RealFileSystemTests(unittest.TestCase):
     """Tests that touch the file system via temporary files."""
 
     def setUp(self):
+        """SetUp."""
         with named_temporary_file(prefix="test", delete=False) as fout:
             fout.write(SAMPLE_BYTES)
             self.temp_file = fout.name
 
     def tearDown(self):
-        os.unlink(self.temp_file)
+        """TearDown."""
+        os.unlink(self.temp_file)  # noqa: PTH108  # test fixture unlink
 
     def test_rt(self):
+        """Rt."""
         with smart_open.open(self.temp_file, "rt") as fin:
             data = fin.read()
         assert data == SAMPLE_TEXT
 
     def test_wt(self):
+        """Wt."""
         #
         # The file already contains SAMPLE_TEXT, so write something different.
         #
@@ -578,6 +609,7 @@ class RealFileSystemTests(unittest.TestCase):
         assert data == text
 
     def test_ab(self):
+        """Ab."""
         with smart_open.open(self.temp_file, "ab") as fout:
             fout.write(SAMPLE_BYTES)
         with smart_open.open(self.temp_file, "rb") as fin:
@@ -585,6 +617,7 @@ class RealFileSystemTests(unittest.TestCase):
         assert data == SAMPLE_BYTES * 2
 
     def test_aplus(self):
+        """Aplus."""
         with smart_open.open(self.temp_file, "a+") as fout:
             fout.write(SAMPLE_TEXT)
         with smart_open.open(self.temp_file, "rt") as fin:
@@ -592,6 +625,7 @@ class RealFileSystemTests(unittest.TestCase):
         assert text == SAMPLE_TEXT * 2
 
     def test_at(self):
+        """At."""
         with smart_open.open(self.temp_file, "at") as fout:
             fout.write(SAMPLE_TEXT)
         with smart_open.open(self.temp_file, "rt") as fin:
@@ -599,6 +633,7 @@ class RealFileSystemTests(unittest.TestCase):
         assert text == SAMPLE_TEXT * 2
 
     def test_atplus(self):
+        """Atplus."""
         with smart_open.open(self.temp_file, "at+") as fout:
             fout.write(SAMPLE_TEXT)
         with smart_open.open(self.temp_file, "rt") as fin:
@@ -610,16 +645,19 @@ class CompressionRealFileSystemTests(RealFileSystemTests):
     """Same as RealFileSystemTests but with a compressed file."""
 
     def setUp(self):
+        """SetUp."""
         with named_temporary_file(prefix="test", suffix=".zst", delete=False) as fout:
             self.temp_file = fout.name
         with smart_open.open(self.temp_file, "wb") as fout:
             fout.write(SAMPLE_BYTES)
 
     def test_aplus(self):
-        pass  # transparent (de)compression unsupported for mode 'ab+'
+        """Aplus."""
+        # transparent (de)compression unsupported for mode 'ab+'
 
     def test_atplus(self):
-        pass  # transparent (de)compression unsupported for mode 'ab+'
+        """Atplus."""
+        # transparent (de)compression unsupported for mode 'ab+'
 
 
 #
@@ -634,14 +672,16 @@ class SmartOpenReadTest(unittest.TestCase):
     """Test reading from files under various schemes."""
 
     def test_shortcut(self):
-        fpath = os.path.join(CURR_DIR, "test_data/crime-and-punishment.txt")
+        """Shortcut."""
+        fpath = os.path.join(CURR_DIR, "test_data/crime-and-punishment.txt")  # noqa: PTH118  # test fixture path join
         with mock.patch("smart_open.smart_open_lib._builtin_open") as mock_open:
             smart_open.open(fpath, "r").read()
         mock_open.assert_called_with(fpath, "r", buffering=-1)
 
     def test_open_binary(self):
-        fpath = os.path.join(CURR_DIR, "test_data/cp852.tsv.txt")
-        with open(fpath, "rb") as fin:
+        """Open binary."""
+        fpath = os.path.join(CURR_DIR, "test_data/cp852.tsv.txt")  # noqa: PTH118  # test fixture path join
+        with open(fpath, "rb") as fin:  # noqa: PTH123  # test fixture path open
             expected = fin.read()
         with smart_open.open(fpath, "rb") as fin:
             actual = fin.read()
@@ -649,16 +689,17 @@ class SmartOpenReadTest(unittest.TestCase):
 
     def test_open_with_keywords(self):
         """This test captures Issue #142."""
-        fpath = os.path.join(CURR_DIR, "test_data/cp852.tsv.txt")
-        with open(fpath, encoding="cp852") as fin:
+        fpath = os.path.join(CURR_DIR, "test_data/cp852.tsv.txt")  # noqa: PTH118  # test fixture path join
+        with open(fpath, encoding="cp852") as fin:  # noqa: PTH123  # test fixture path open
             expected = fin.read()
         with smart_open.open(fpath, encoding="cp852") as fin:
             actual = fin.read()
         assert expected == actual
 
     def test_open_with_keywords_explicit_r(self):
-        fpath = os.path.join(CURR_DIR, "test_data/cp852.tsv.txt")
-        with open(fpath, encoding="cp852") as fin:
+        """Open with keywords explicit r."""
+        fpath = os.path.join(CURR_DIR, "test_data/cp852.tsv.txt")  # noqa: PTH118  # test fixture path join
+        with open(fpath, encoding="cp852") as fin:  # noqa: PTH123  # test fixture path open
             expected = fin.read()
         with smart_open.open(fpath, mode="r", encoding="cp852") as fin:
             actual = fin.read()
@@ -668,8 +709,8 @@ class SmartOpenReadTest(unittest.TestCase):
         """If ``pathlib.Path`` is available we should be able to open and read."""
         from smart_open.smart_open_lib import pathlib
 
-        fpath = os.path.join(CURR_DIR, "test_data/cp852.tsv.txt")
-        with open(fpath, "rb") as fin:
+        fpath = os.path.join(CURR_DIR, "test_data/cp852.tsv.txt")  # noqa: PTH118  # test fixture path join
+        with open(fpath, "rb") as fin:  # noqa: PTH123  # test fixture path open
             expected = fin.read().decode("cp852")
         with smart_open.open(pathlib.Path(fpath), mode="r", encoding="cp852", newline="") as fin:
             actual = fin.read()
@@ -705,6 +746,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @mock_s3
     def test_read_newline_empty(self):
+        """Read newline empty."""
         _resource("s3").create_bucket(Bucket="mybucket")
         test_file = "line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
@@ -715,6 +757,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @mock_s3
     def test_read_newline_cr(self):
+        """Read newline cr."""
         _resource("s3").create_bucket(Bucket="mybucket")
         test_file = "line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
@@ -725,6 +768,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @mock_s3
     def test_read_newline_lf(self):
+        """Read newline lf."""
         _resource("s3").create_bucket(Bucket="mybucket")
         test_file = "line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
@@ -735,6 +779,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @mock_s3
     def test_read_newline_crlf(self):
+        """Read newline crlf."""
         _resource("s3").create_bucket(Bucket="mybucket")
         test_file = "line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
@@ -745,6 +790,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @mock_s3
     def test_read_newline_slurp(self):
+        """Read newline slurp."""
         _resource("s3").create_bucket(Bucket="mybucket")
         test_file = "line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
@@ -755,6 +801,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @mock_s3
     def test_read_newline_binary(self):
+        """Read newline binary."""
         _resource("s3").create_bucket(Bucket="mybucket")
         test_file = "line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
@@ -784,6 +831,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @mock_s3
     def test_write_newline_empty(self):
+        """Write newline empty."""
         _resource("s3").create_bucket(Bucket="mybucket")
         test_file = "line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='' nothing is changed
@@ -794,6 +842,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @mock_s3
     def test_write_newline_lf(self):
+        """Write newline lf."""
         _resource("s3").create_bucket(Bucket="mybucket")
         test_file = "line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='\n' nothing is changed
@@ -804,6 +853,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @mock_s3
     def test_write_newline_cr(self):
+        """Write newline cr."""
         _resource("s3").create_bucket(Bucket="mybucket")
         test_file = "line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='\r' all LF are replaced by CR
@@ -814,6 +864,7 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @mock_s3
     def test_write_newline_crlf(self):
+        """Write newline crlf."""
         _resource("s3").create_bucket(Bucket="mybucket")
         test_file = "line\u2028 LF\nline\x1c CR\rline\x85 CRLF\r\nlast line"
         # If newline='\r\n' all LF are replaced by CRLF
@@ -839,14 +890,14 @@ class SmartOpenReadTest(unittest.TestCase):
         """Does __iter__ return the correct file content?"""
         s3 = _resource("s3")
         s3.create_bucket(Bucket="mybucket")
-        lines = ["всем\u2028привет!\n", "что нового?"]
+        lines = ["всем\u2028привет!\n", "что нового?"]  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
         with smart_open.open("s3://mybucket/mykey", "wb") as fout:
             fout.write("".join(lines).encode("utf-8"))
 
         reader = smart_open.open("s3://mybucket/mykey", "rb")
 
         actual_lines = [line.decode("utf-8") for line in reader]
-        assert len(actual_lines) == 2
+        assert len(actual_lines) == 2  # noqa: PLR2004  # test uses inline magic value
         assert lines[0] == actual_lines[0]
         assert lines[1] == actual_lines[1]
 
@@ -878,22 +929,22 @@ class SmartOpenReadTest(unittest.TestCase):
         # call s3_iter_lines and check output
         reader = smart_open.open("s3://mybucket/mykey", "rb")
         output = list(reader)
-        assert len(output) == 2
+        assert len(output) == 2  # noqa: PLR2004  # test uses inline magic value
         assert b"".join(output) == test_string
 
-    # TODO: add more complex test for file://
+    # TODO: add more complex test for file://  # noqa: TD002, TD003  # legacy TODO
     @mock.patch("smart_open.smart_open_lib._builtin_open")
     def test_file(self, mock_smart_open):
         """Is file:// line iterator called correctly?"""
         prefix = "file://"
-        full_path = "/tmp/test.txt"
+        full_path = "/tmp/test.txt"  # noqa: S108  # tmp path in test
         read_mode = "rb"
         smart_open_object = smart_open.open(prefix + full_path, read_mode)
         smart_open_object.__iter__()
         # called with the correct path?
         mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
-        full_path = "/tmp/test#hash##more.txt"
+        full_path = "/tmp/test#hash##more.txt"  # noqa: S108  # tmp path in test
         read_mode = "rb"
         smart_open_object = smart_open.open(prefix + full_path, read_mode)
         smart_open_object.__iter__()
@@ -908,16 +959,16 @@ class SmartOpenReadTest(unittest.TestCase):
         mock_smart_open.assert_called_with(full_path, read_mode, buffering=-1)
 
         short_path = "~/tmp/test.txt"
-        full_path = os.path.expanduser(short_path)
+        full_path = os.path.expanduser(short_path)  # noqa: PTH111  # test fixture expanduser
 
     @mock.patch(_BUILTIN_OPEN)
     def test_file_errors(self, mock_smart_open):
+        """File errors."""
         prefix = "file://"
-        full_path = "/tmp/test.txt"
+        full_path = "/tmp/test.txt"  # noqa: S108  # tmp path in test
         read_mode = "r"
         short_path = "~/tmp/test.txt"
-        full_path = os.path.expanduser(short_path)
-
+        full_path = os.path.expanduser(short_path)  # noqa: PTH111  # test fixture expanduser
         smart_open_object = smart_open.open(prefix + short_path, read_mode, errors="strict")
         smart_open_object.__iter__()
         # called with the correct expanded path?
@@ -925,20 +976,22 @@ class SmartOpenReadTest(unittest.TestCase):
 
     @mock.patch(_BUILTIN_OPEN)
     def test_file_buffering(self, mock_smart_open):
-        smart_open_object = smart_open.open("/tmp/somefile", "rb", buffering=0)
+        """File buffering."""
+        smart_open_object = smart_open.open("/tmp/somefile", "rb", buffering=0)  # noqa: S108  # tmp path in test
         smart_open_object.__iter__()
         # called with the correct expanded path?
-        mock_smart_open.assert_called_with("/tmp/somefile", "rb", buffering=0)
+        mock_smart_open.assert_called_with("/tmp/somefile", "rb", buffering=0)  # noqa: S108  # tmp path in test
 
     @mock.patch(_BUILTIN_OPEN)
     def test_file_buffering2(self, mock_smart_open):
-        smart_open_object = smart_open.open("/tmp/somefile", "rb", 0)
+        """File buffering2."""
+        smart_open_object = smart_open.open("/tmp/somefile", "rb", 0)  # noqa: S108  # tmp path in test
         smart_open_object.__iter__()
         # called with the correct expanded path?
-        mock_smart_open.assert_called_with("/tmp/somefile", "rb", buffering=0)
+        mock_smart_open.assert_called_with("/tmp/somefile", "rb", buffering=0)  # noqa: S108  # tmp path in test
 
     # couldn't find any project for mocking up HDFS data
-    # TODO: we want to test also a content of the files, not just fnc call params
+    # TODO: we want to test also a content of the files, not just fnc call params  # noqa: TD002, TD003  # legacy TODO
     @mock.patch("smart_open.hdfs.subprocess")
     def test_hdfs(self, mock_subprocess):
         """Is HDFS line iterator called correctly?"""
@@ -947,7 +1000,7 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object.__iter__()
         # called with the correct params?
         mock_subprocess.Popen.assert_called_with(
-            ["hdfs", "dfs", "-cat", "/tmp/test.txt"],
+            ["hdfs", "dfs", "-cat", "/tmp/test.txt"],  # noqa: S108  # tmp path in test
             stdout=mock_subprocess.PIPE,
         )
 
@@ -1075,27 +1128,32 @@ class SmartOpenReadTest(unittest.TestCase):
             fout.write("test")
             # Note that tell() in general returns an opaque number for text files.
             # See https://docs.python.org/3/library/io.html#io.TextIOBase.tell
-            assert fout.tell() == 4
+            assert fout.tell() == 4  # noqa: PLR2004  # test uses inline magic value
 
 
 class SmartOpenS3KwargsTest(unittest.TestCase):
+    """Tests for Smart Open S3Kwargs."""
+
     @mock.patch("boto3.client")
     def test_no_kwargs(self, mock_client):
+        """No kwargs."""
         smart_open.open("s3://mybucket/mykey", transport_params={"defer_seek": True})
         mock_client.assert_called_with("s3", config=mock_client.call_args.kwargs["config"])
 
     @mock.patch("boto3.client")
     def test_credentials(self, mock_client):
+        """Credentials."""
         smart_open.open("s3://access_id:access_secret@mybucket/mykey", transport_params={"defer_seek": True})
         mock_client.assert_called_with(
             "s3",
             aws_access_key_id="access_id",
-            aws_secret_access_key="access_secret",
+            aws_secret_access_key="access_secret",  # noqa: S106  # fixture password kwarg
             config=mock_client.call_args.kwargs["config"],
         )
 
     @mock.patch("boto3.client")
     def test_host(self, mock_client):
+        """Host."""
         tp = {
             "client_kwargs": {
                 "S3.Client": {"endpoint_url": "http://aa.domain.com"},
@@ -1106,13 +1164,14 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         mock_client.assert_called_with(
             "s3",
             aws_access_key_id="access_id",
-            aws_secret_access_key="access_secret",
+            aws_secret_access_key="access_secret",  # noqa: S106  # fixture password kwarg
             endpoint_url="http://aa.domain.com",
             config=mock_client.call_args.kwargs["config"],
         )
 
     @mock.patch("boto3.client")
     def test_s3_upload(self, mock_client):
+        """S3 upload."""
         tp = {
             "client_kwargs": {
                 "S3.Client.create_multipart_upload": {
@@ -1134,7 +1193,8 @@ class SmartOpenTest(unittest.TestCase):
     """Test reading and writing from/into files."""
 
     def setUp(self):
-        self.as_text = "куда идём мы с пятачком - большой большой секрет"
+        """SetUp."""
+        self.as_text = "куда идём мы с пятачком - большой большой секрет"  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
         self.as_bytes = self.as_text.encode("utf-8")
         self.stringio = io.StringIO(self.as_text)
         self.bytesio = io.BytesIO(self.as_bytes)
@@ -1150,64 +1210,87 @@ class SmartOpenTest(unittest.TestCase):
         #
 
     def test_text(self):
-        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.open("blah", "r", encoding="utf-8") as fin:
-                assert fin.read() == self.as_text
-                mock_open.assert_called_with("blah", "r", buffering=-1, encoding="utf-8")
+        """Text."""
+        with (
+            mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open,
+            smart_open.open("blah", "r", encoding="utf-8") as fin,
+        ):
+            assert fin.read() == self.as_text
+            mock_open.assert_called_with("blah", "r", buffering=-1, encoding="utf-8")
 
     def test_binary(self):
-        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
-            with smart_open.open("blah", "rb") as fin:
-                assert fin.read() == self.as_bytes
-                mock_open.assert_called_with("blah", "rb", buffering=-1)
+        """Binary."""
+        with (
+            mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open,
+            smart_open.open("blah", "rb") as fin,
+        ):
+            assert fin.read() == self.as_bytes
+            mock_open.assert_called_with("blah", "rb", buffering=-1)
 
     def test_expanded_path(self):
+        """Expanded path."""
         short_path = "~/blah"
-        full_path = os.path.expanduser(short_path)
-        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.open(short_path, "rb"):
-                mock_open.assert_called_with(full_path, "rb", buffering=-1)
+        full_path = os.path.expanduser(short_path)  # noqa: PTH111  # test fixture expanduser
+        with (
+            mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open,
+            smart_open.open(short_path, "rb"),
+        ):
+            mock_open.assert_called_with(full_path, "rb", buffering=-1)
 
     def test_incorrect(self):
+        """Incorrect."""
         # incorrect file mode
-        self.assertRaises(NotImplementedError, smart_open.open, "s3://bucket/key", "x")
-
+        self.assertRaises(NotImplementedError, smart_open.open, "s3://bucket/key", "x")  # noqa: PT027  # legacy unittest assertRaises
         # correct write modes, incorrect scheme
-        self.assertRaises(NotImplementedError, smart_open.open, "hdfs:///blah.txt", "wb+")
-        self.assertRaises(NotImplementedError, smart_open.open, "http:///blah.txt", "w")
-        self.assertRaises(NotImplementedError, smart_open.open, "s3://bucket/key", "wb+")
+        self.assertRaises(NotImplementedError, smart_open.open, "hdfs:///blah.txt", "wb+")  # noqa: PT027  # legacy unittest assertRaises
+        self.assertRaises(NotImplementedError, smart_open.open, "http:///blah.txt", "w")  # noqa: PT027  # legacy unittest assertRaises
+        self.assertRaises(NotImplementedError, smart_open.open, "s3://bucket/key", "wb+")  # noqa: PT027  # legacy unittest assertRaises
 
     def test_write_utf8(self):
+        """Write utf8."""
         # correct write mode, correct file:// URI
-        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.open("blah", "w", encoding="utf-8") as fout:
-                mock_open.assert_called_with("blah", "w", buffering=-1, encoding="utf-8")
-                fout.write(self.as_text)
+        with (
+            mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open,
+            smart_open.open("blah", "w", encoding="utf-8") as fout,
+        ):
+            mock_open.assert_called_with("blah", "w", buffering=-1, encoding="utf-8")
+            fout.write(self.as_text)
 
     def test_write_utf8_absolute_path(self):
-        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.open("/some/file.txt", "w", encoding="utf-8") as fout:
-                mock_open.assert_called_with("/some/file.txt", "w", buffering=-1, encoding="utf-8")
-                fout.write(self.as_text)
+        """Write utf8 absolute path."""
+        with (
+            mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open,
+            smart_open.open("/some/file.txt", "w", encoding="utf-8") as fout,
+        ):
+            mock_open.assert_called_with("/some/file.txt", "w", buffering=-1, encoding="utf-8")
+            fout.write(self.as_text)
 
     def test_append_utf8(self):
-        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open:
-            with smart_open.open("/some/file.txt", "w+", encoding="utf-8") as fout:
-                mock_open.assert_called_with("/some/file.txt", "w+", buffering=-1, encoding="utf-8")
-                fout.write(self.as_text)
+        """Append utf8."""
+        with (
+            mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.stringio)) as mock_open,
+            smart_open.open("/some/file.txt", "w+", encoding="utf-8") as fout,
+        ):
+            mock_open.assert_called_with("/some/file.txt", "w+", buffering=-1, encoding="utf-8")
+            fout.write(self.as_text)
 
     def test_append_binary_absolute_path(self):
-        with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
-            with smart_open.open("/some/file.txt", "wb+") as fout:
-                mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1)
-                fout.write(self.as_bytes)
+        """Append binary absolute path."""
+        with (
+            mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open,
+            smart_open.open("/some/file.txt", "wb+") as fout,
+        ):
+            mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1)
+            fout.write(self.as_bytes)
 
     def test_newline(self):
+        """Newline."""
         with mock.patch(_BUILTIN_OPEN, mock.Mock(return_value=self.bytesio)) as mock_open:
             smart_open.open("/some/file.txt", "wb+", newline="\n")
             mock_open.assert_called_with("/some/file.txt", "wb+", buffering=-1, newline="\n")
 
     def test_newline_csv(self):
+        """Newline csv."""
         #
         # See https://github.com/piskvorky/smart_open/issues/477
         #
@@ -1223,7 +1306,7 @@ class SmartOpenTest(unittest.TestCase):
                 out.writeheader()
                 out.writerows(rows)
 
-            with open(tmp.name, encoding="utf-8", newline="") as fin:
+            with open(tmp.name, encoding="utf-8", newline="") as fin:  # noqa: PTH123  # test fixture path open
                 content = fin.read()
 
         assert content == expected
@@ -1251,7 +1334,8 @@ class SmartOpenTest(unittest.TestCase):
         smart_open_object.write("test")
         # called with the correct params?
         mock_subprocess.Popen.assert_called_with(
-            ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"], stdin=mock_subprocess.PIPE
+            ["hdfs", "dfs", "-put", "-f", "-", "/tmp/test.txt"],  # noqa: S108  # tmp path in test
+            stdin=mock_subprocess.PIPE,
         )
 
         # netloc host - pass the full URI so the CLI routes to the right cluster
@@ -1289,8 +1373,9 @@ class SmartOpenTest(unittest.TestCase):
 
     @mock_s3
     def test_s3_metadata_write(self):
+        """S3 metadata write."""
         # Read local file fixture
-        path = os.path.join(CURR_DIR, "test_data/crime-and-punishment.txt.gz")
+        path = os.path.join(CURR_DIR, "test_data/crime-and-punishment.txt.gz")  # noqa: PTH118  # test fixture path join
         data = ""
         with smart_open.open(path, "rb") as fd:
             data = fd.read()
@@ -1326,9 +1411,12 @@ class SmartOpenTest(unittest.TestCase):
         """Should abort on encoding error."""
         text = "欲しい気持ちが成長しすぎて"
 
-        with pytest.raises(UnicodeEncodeError), named_temporary_file("wb", delete=True) as infile:
-            with smart_open.open(infile.name, "w", encoding="koi8-r", errors="strict") as fout:
-                fout.write(text)
+        with (
+            pytest.raises(UnicodeEncodeError),
+            named_temporary_file("wb", delete=True) as infile,
+            smart_open.open(infile.name, "w", encoding="koi8-r", errors="strict") as fout,
+        ):
+            fout.write(text)
 
     @mock_s3
     def test_write_bad_encoding_replace(self):
@@ -1350,6 +1438,8 @@ class WebHdfsWriteTest(unittest.TestCase):
 
     @responses.activate
     def test_initialize_write(self):
+        """Initialize write."""
+
         def request_callback(_):
             resp_body = ""
             headers = {"location": "http://127.0.0.1:8440/file"}
@@ -1367,7 +1457,7 @@ class WebHdfsWriteTest(unittest.TestCase):
         )
         smart_open.open("webhdfs://127.0.0.1:8440/path/file", "wb")
 
-        assert len(responses.calls) == 2
+        assert len(responses.calls) == 2  # noqa: PLR2004  # test uses inline magic value
         path, params = responses.calls[0].request.url.split("?")
         assert path == "http://127.0.0.1:8440/webhdfs/v1/path/file"
         assert params in {"overwrite=True&op=CREATE", "op=CREATE&overwrite=True"}
@@ -1375,6 +1465,8 @@ class WebHdfsWriteTest(unittest.TestCase):
 
     @responses.activate
     def test_write(self):
+        """Write."""
+
         def request_callback(_):
             resp_body = ""
             headers = {"location": "http://127.0.0.1:8440/file"}
@@ -1407,7 +1499,7 @@ class WebHdfsWriteTest(unittest.TestCase):
         smart_open_object.write(test_string)
         smart_open_object.close()
 
-        assert len(responses.calls) == 4
+        assert len(responses.calls) == 4  # noqa: PLR2004  # test uses inline magic value
         assert responses.calls[2].request.url == "http://127.0.0.1:8440/webhdfs/v1/path/file?op=APPEND"
         assert responses.calls[3].request.url == "http://127.0.0.1:8440/file"
 
@@ -1417,6 +1509,7 @@ _MOCK_TIME = mock.Mock(return_value=1620256567)
 
 
 def gzip_compress(data, filename=None):
+    """Gzip compress."""
     #
     # gzip.compress is sensitive to the current time and the destination filename.
     # This function fixes those variables for consistent compression results.
@@ -1432,11 +1525,12 @@ class CompressionFormatTest(unittest.TestCase):
     """Test transparent (de)compression."""
 
     def write_read_assertion(self, suffix):
+        """Write read assertion."""
         with named_temporary_file(suffix=suffix) as tmp:
             with smart_open.open(tmp.name, "wb") as fout:
                 fout.write(SAMPLE_BYTES)
 
-            with open(tmp.name, "rb") as fin:
+            with open(tmp.name, "rb") as fin:  # noqa: PTH123  # test fixture path open
                 assert fin.read() != SAMPLE_BYTES  # is the content really compressed? (built-in fails)
 
             with smart_open.open(tmp.name, "rb") as fin:
@@ -1444,10 +1538,10 @@ class CompressionFormatTest(unittest.TestCase):
 
     def test_open_gz(self):
         """Can open gzip?"""
-        fpath = os.path.join(CURR_DIR, "test_data/crlf_at_1k_boundary.warc.gz")
+        fpath = os.path.join(CURR_DIR, "test_data/crlf_at_1k_boundary.warc.gz")  # noqa: PTH118  # test fixture path join
         with smart_open.open(fpath, "rb") as infile:
             data = infile.read()
-        m = hashlib.md5(data)
+        m = hashlib.md5(data)  # noqa: S324  # md5 in test is fine
         assert m.hexdigest() == "18473e60f8c7c98d29d65bf805736a0d", "Failed to read gzip"
 
     def test_write_read_gz(self):
@@ -1459,6 +1553,7 @@ class CompressionFormatTest(unittest.TestCase):
         self.write_read_assertion(".bz2")
 
     def test_gzip_text(self):
+        """Gzip text."""
         with named_temporary_file(suffix=".gz") as f:
             with smart_open.open(f.name, "wt") as fout:
                 fout.write("hello world")
@@ -1472,7 +1567,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
 
     # note: these tests are derived from the Python 3.x tip bz2 tests.
 
-    TEXT_LINES = [
+    TEXT_LINES = [  # noqa: RUF012  # mock class attribute
         b"root:x:0:0:root:/root:/bin/bash\n",
         b"bin:x:1:1:bin:/bin:\n",
         b"daemon:x:2:2:daemon:/sbin:\n",
@@ -1515,15 +1610,18 @@ class MultistreamsBZ2Test(unittest.TestCase):
     )
 
     def create_temp_bz2(self, streams=1):
+        """Create temp bz2."""
         with named_temporary_file("wb", suffix=".bz2", delete=False) as f:
             f.write(self.DATA * streams)
         return f.name
 
     def cleanup_temp_bz2(self, test_file):
-        if os.path.isfile(test_file):
-            os.unlink(test_file)
+        """Cleanup temp bz2."""
+        if os.path.isfile(test_file):  # noqa: PTH113  # test fixture isfile
+            os.unlink(test_file)  # noqa: PTH108  # test fixture unlink
 
     def test_can_read_multistream_bz2(self):
+        """Can read multistream bz2."""
         from bz2 import BZ2File
 
         test_file = self.create_temp_bz2(streams=5)
@@ -1532,6 +1630,7 @@ class MultistreamsBZ2Test(unittest.TestCase):
         self.cleanup_temp_bz2(test_file)
 
     def test_file_smart_open_can_read_multistream_bz2(self):
+        """File smart open can read multistream bz2."""
         test_file = self.create_temp_bz2(streams=5)
         with smart_open_lib.open(test_file, "rb") as bz2f:
             assert bz2f.read() == self.TEXT * 5
@@ -1539,6 +1638,8 @@ class MultistreamsBZ2Test(unittest.TestCase):
 
 
 class S3OpenTest(unittest.TestCase):
+    """Tests for S3Open."""
+
     @mock_s3
     def test_r(self):
         """Reading a UTF string should work."""
@@ -1557,8 +1658,8 @@ class S3OpenTest(unittest.TestCase):
 
     def test_bad_mode(self):
         """Bad mode should raise and exception."""
-        uri = smart_open_lib._parse_uri("s3://bucket/key")
-        self.assertRaises(NotImplementedError, smart_open.open, uri, "x")
+        uri = smart_open_lib._parse_uri("s3://bucket/key")  # noqa: SLF001  # test reaches into private state
+        self.assertRaises(NotImplementedError, smart_open.open, uri, "x")  # noqa: PT027  # legacy unittest assertRaises
 
     @mock_s3
     def test_rw_encoding(self):
@@ -1579,8 +1680,7 @@ class S3OpenTest(unittest.TestCase):
             assert text.encode("koi8-r") == fin.read()
 
         with smart_open.open(key, "r", encoding="euc-jp") as fin:
-            self.assertRaises(UnicodeDecodeError, fin.read)
-
+            self.assertRaises(UnicodeDecodeError, fin.read)  # noqa: PT027  # legacy unittest assertRaises
         with smart_open.open(key, "r", encoding="euc-jp", errors="replace") as fin:
             fin.read()
 
@@ -1615,7 +1715,7 @@ class S3OpenTest(unittest.TestCase):
         s3 = _resource("s3")
         s3.create_bucket(Bucket="bucket")
 
-        with mock.patch("smart_open.s3.open", return_value=open(__file__, "rb")) as mock_open:
+        with mock.patch("smart_open.s3.open", return_value=open(__file__, "rb")) as mock_open:  # noqa: PTH123  # test fixture path open
             smart_open.open("s3://bucket/key.gz", "wb")
             mock_open.assert_called_with("bucket", "key.gz", "wb")
 
@@ -1627,11 +1727,11 @@ class S3OpenTest(unittest.TestCase):
         s3.create_bucket(Bucket="bucket")
         key = "s3://bucket/key.gz"
 
-        text = "если-б я был султан и имел трёх жён, то тройной красотой был бы окружён"
+        text = "если-б я был султан и имел трёх жён, то тройной красотой был бы окружён"  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
         with smart_open.open(key, "wb") as fout:
             fout.write(text.encode("utf-8"))
 
-        with mock.patch("smart_open.s3.open", return_value=open(__file__)) as mock_open:
+        with mock.patch("smart_open.s3.open", return_value=open(__file__)) as mock_open:  # noqa: PTH123  # test fixture path open
             smart_open.open(key, "r")
             mock_open.assert_called_with("bucket", "key.gz", "rb")
 
@@ -1683,9 +1783,11 @@ class S3OpenTest(unittest.TestCase):
         key = "s3://bucket/key.txt"
         text = "欲しい気持ちが成長しすぎて"
 
-        with pytest.raises(UnicodeEncodeError):
-            with smart_open.open(key, "w", encoding="koi8-r", errors="strict") as fout:
-                fout.write(text)
+        with (
+            pytest.raises(UnicodeEncodeError),
+            smart_open.open(key, "w", encoding="koi8-r", errors="strict") as fout,
+        ):
+            fout.write(text)
 
     @mock_s3
     def test_write_bad_encoding_replace(self):
@@ -1718,6 +1820,7 @@ class S3OpenTest(unittest.TestCase):
 
     @mock.patch("smart_open.s3.Reader")
     def test_transport_params_is_not_mutable(self, mock_open):
+        """Transport params is not mutable."""
         smart_open.open("s3://access_key:secret_key@bucket/key")
         actual = mock_open.call_args_list[0][1]["client_kwargs"]
         expected = {
@@ -1749,11 +1852,14 @@ class S3OpenTest(unittest.TestCase):
 
 
 def function(a, b, c, foo="bar", baz="boz"):
-    pass
+    """Function."""
 
 
 class CheckKwargsTest(unittest.TestCase):
+    """Tests for Check Kwargs."""
+
     def test(self):
+        """Test."""
         kwargs = {"foo": 123, "bad": False}
         expected = {"foo": 123}
         actual = smart_open.utils.check_kwargs(function, kwargs)
@@ -1761,6 +1867,7 @@ class CheckKwargsTest(unittest.TestCase):
 
 
 def initialize_bucket():
+    """Initialize bucket."""
     s3 = _resource("s3")
     bucket = s3.create_bucket(Bucket="bucket")
     bucket.wait_until_exists()
@@ -1874,7 +1981,8 @@ def test_s3_disable_compression(url, _compression, expected):
     ],
 )
 def test_get_binary_mode(mode, expected):
-    actual = smart_open.smart_open_lib._get_binary_mode(mode)
+    """Get binary mode."""
+    actual = smart_open.smart_open_lib._get_binary_mode(mode)  # noqa: SLF001  # test reaches into private state
     assert actual == expected
 
 
@@ -1890,12 +1998,14 @@ def test_get_binary_mode(mode, expected):
     ],
 )
 def test_get_binary_mode_bad(mode):
-    with pytest.raises(ValueError):
-        smart_open.smart_open_lib._get_binary_mode(mode)
+    """Get binary mode bad."""
+    with pytest.raises(ValueError):  # noqa: PT011  # legacy broad pytest.raises
+        smart_open.smart_open_lib._get_binary_mode(mode)  # noqa: SLF001  # test reaches into private state
 
 
 @pytest.mark.skipif(os.name == "nt", reason="this test does not work on Windows")
 def test_read_file_descriptor():
+    """Read file descriptor."""
     with smart_open.open(__file__) as fin:
         expected = fin.read()
 
@@ -1908,6 +2018,7 @@ def test_read_file_descriptor():
 
 @pytest.mark.skipif(os.name == "nt", reason="this test does not work on Windows")
 def test_write_file_descriptor():
+    """Write file descriptor."""
     with named_temporary_file() as tmp:
         with smart_open.open(os.open(tmp.name, os.O_WRONLY), "wt") as fout:
             fout.write("hello world")
@@ -1918,6 +2029,7 @@ def test_write_file_descriptor():
 
 @mock_s3
 def test_to_boto3():
+    """To boto3."""
     resource = _resource("s3")
     resource.create_bucket(Bucket="mybucket")
     #
@@ -1926,7 +2038,7 @@ def test_to_boto3():
     # test under Windows on github actions.
     #
     with smart_open.open("s3://mybucket/key.txt", "wt", encoding="utf-8") as fout:
-        fout.write("я бегу по вызженной земле, гермошлем захлопнув на ходу")
+        fout.write("я бегу по вызженной земле, гермошлем захлопнув на ходу")  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
         obj = fout.to_boto3(resource)
     assert obj.bucket_name == "mybucket"
     assert obj.key == "key.txt"

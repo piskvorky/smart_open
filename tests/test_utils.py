@@ -22,6 +22,7 @@ import smart_open.utils
     ],
 )
 def test_clamp(value, minval, maxval, expected):
+    """Clamp."""
     assert smart_open.utils.clamp(value, minval=minval, maxval=maxval) == expected
 
 
@@ -35,10 +36,12 @@ def test_clamp(value, minval, maxval, expected):
     ],
 )
 def test_clamp_defaults(value, params, expected):
+    """Clamp defaults."""
     assert smart_open.utils.clamp(value, **params) == expected
 
 
 def test_check_kwargs():
+    """Check kwargs."""
     import smart_open.s3
 
     kallable = smart_open.s3.open
@@ -57,5 +60,6 @@ def test_check_kwargs():
     ],
 )
 def test_safe_urlsplit(url, expected):
+    """Safe urlsplit."""
     actual = smart_open.utils.safe_urlsplit(url)
     assert actual == urllib.parse.SplitResult(*expected)

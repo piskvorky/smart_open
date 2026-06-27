@@ -24,6 +24,7 @@ plain = "доброе утро планета!".encode()
 
 
 def label(thing, name):
+    """Label."""
     thing.name = name
     return thing
 
@@ -59,5 +60,6 @@ def label(thing, name):
     ],
 )
 def test_compression_wrapper_read(fileobj, compression, filename):
+    """Compression wrapper read."""
     wrapped = smart_open.compression.compression_wrapper(fileobj, "rb", compression, filename)
     assert wrapped.read() == plain

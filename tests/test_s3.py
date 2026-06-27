@@ -50,14 +50,14 @@ ENABLE_MOTO_SERVER = os.environ.get("SO_ENABLE_MOTO_SERVER") == "1"
 # See https://github.com/spulec/moto/issues/1941
 #
 os.environ["AWS_ACCESS_KEY_ID"] = "test"
-os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
-
+os.environ["AWS_SECRET_ACCESS_KEY"] = "test"  # noqa: S105  # fixture password literal
 logger = logging.getLogger(__name__)
 
 _resource = functools.partial(boto3.resource, region_name="us-east-1")
 
 
 def ignore_resource_warnings():
+    """Ignore resource warnings."""
     #
     # https://github.com/boto/boto3/issues/454
     # Py2 doesn't have ResourceWarning, so do nothing.
@@ -68,13 +68,13 @@ def ignore_resource_warnings():
 @contextmanager
 def patch_invalid_range_response(actual_size):
     """Work around moto bug returning the wrong status for invalid GetObject ranges (#2981)."""
-    _real_get = smart_open.s3._get
+    _real_get = smart_open.s3._get  # noqa: SLF001  # test reaches into private state
 
     def mock_get(*args, **kwargs):
         try:
             return _real_get(*args, **kwargs)
         except OSError as ioe:
-            error_response = smart_open.s3._unwrap_ioerror(ioe)
+            error_response = smart_open.s3._unwrap_ioerror(ioe)  # noqa: SLF001  # test reaches into private state
             if error_response and error_response.get("Message") == "Requested Range Not Satisfiable":
                 error_response["ActualObjectSize"] = actual_size
                 error_response["Code"] = "InvalidRange"
@@ -88,8 +88,10 @@ def patch_invalid_range_response(actual_size):
 
 
 class BaseTest(unittest.TestCase):
+    """Tests for Base."""
+
     @contextmanager
-    def assertApiCalls(self, **expected_api_calls):
+    def assertApiCalls(self, **expected_api_calls):  # noqa: N802  # intentional CamelCase
         """Track calls to S3 in self.api_calls by patching botocore.endpoint.Endpoint.make_request."""
         _real_make_request = botocore.endpoint.Endpoint.make_request
         api_calls = defaultdict(int)
@@ -102,14 +104,17 @@ class BaseTest(unittest.TestCase):
         patcher.start()
         try:
             yield api_calls
-            self.assertDictEqual(expected_api_calls, api_calls)
+            assert expected_api_calls == api_calls
         finally:
             patcher.stop()
 
 
 @unittest.skipUnless(ENABLE_MOTO_SERVER, "The test case needs a Moto server running on the local 5000 port.")
 class SeekableRawReaderTest(unittest.TestCase):
+    """Tests for Seekable Raw Reader."""
+
     def setUp(self):
+        """SetUp."""
         self._body = b"123456"
         self._local_resource = boto3.resource("s3", endpoint_url="http://localhost:5000")
         self._local_resource.Bucket(BUCKET_NAME).create()
@@ -117,13 +122,15 @@ class SeekableRawReaderTest(unittest.TestCase):
         self._local_client = boto3.client("s3", endpoint_url="http://localhost:5000")
 
     def tearDown(self):
+        """TearDown."""
         self._local_resource.Object(BUCKET_NAME, KEY_NAME).delete()
         self._local_resource.Bucket(BUCKET_NAME).delete()
 
     def test_read_from_a_closed_body(self):
-        reader = smart_open.s3._SeekableRawReader(self._local_client, BUCKET_NAME, KEY_NAME)
+        """Read from a closed body."""
+        reader = smart_open.s3._SeekableRawReader(self._local_client, BUCKET_NAME, KEY_NAME)  # noqa: SLF001  # test reaches into private state
         assert reader.read(1) == b"1"
-        reader._body.close()
+        reader._body.close()  # noqa: SLF001  # test reaches into private state
         assert reader.read(2) == b"23"
 
 
@@ -136,24 +143,28 @@ class CrapStream(io.BytesIO):
         self._modulus = modulus
 
     def read(self, size=-1):
+        """Read."""
         self._count += 1
         if self._count % self._modulus == 0:
             raise botocore.exceptions.BotoCoreError
         return super().read(size)
 
     def close(self):
+        """Close."""
         # we slightly bogusly return the same stream object from multiple
         # mock "requests" so we need to avoid .close from the first request
         # preventing us from using the stream in the second request.
-        pass
 
 
 class CrapClient:
+    """Cover Crap Client."""
+
     def __init__(self, data, modulus=2):
         self._datasize = len(data)
         self._body = CrapStream(data, modulus=modulus)
 
-    def get_object(self, *args, Range=None, **kwargs):
+    def get_object(self, *args, Range=None, **kwargs):  # noqa: N803
+        """Get object."""
         start = 0
         end = self._datasize
         if Range is not None:
@@ -179,10 +190,13 @@ class CrapClient:
 
 
 class IncrementalBackoffTest(unittest.TestCase):
+    """Tests for Incremental Backoff."""
+
     def test_every_read_fails(self):
-        reader = smart_open.s3._SeekableRawReader(CrapClient(b"hello", 1), "bucket", "key")
+        """Every read fails."""
+        reader = smart_open.s3._SeekableRawReader(CrapClient(b"hello", 1), "bucket", "key")  # noqa: SLF001  # test reaches into private state
         with mock.patch("time.sleep") as mock_sleep:
-            with pytest.raises(IOError):
+            with pytest.raises(IOError):  # noqa: PT011  # legacy broad pytest.raises
                 reader.read()
 
             #
@@ -192,7 +206,7 @@ class IncrementalBackoffTest(unittest.TestCase):
 
     def test_every_second_read_fails(self):
         """Can we read from a stream that raises exceptions from time to time?"""
-        reader = smart_open.s3._SeekableRawReader(CrapClient(b"hello"), "bucket", "key")
+        reader = smart_open.s3._SeekableRawReader(CrapClient(b"hello"), "bucket", "key")  # noqa: SLF001  # test reaches into private state
         with mock.patch("time.sleep") as mock_sleep:
             assert reader.read(1) == b"h"
             mock_sleep.assert_not_called()
@@ -215,7 +229,10 @@ class IncrementalBackoffTest(unittest.TestCase):
 
 @mock_s3
 class ReaderTest(BaseTest):
+    """Tests for Reader."""
+
     def setUp(self):
+        """SetUp."""
         # lower the multipart upload size, to speed up these tests
         self.old_min_part_size = smart_open.s3.DEFAULT_PART_SIZE
         smart_open.s3.DEFAULT_PART_SIZE = 5 * 1024**2
@@ -231,6 +248,7 @@ class ReaderTest(BaseTest):
         s3.Object(BUCKET_NAME, KEY_NAME).put(Body=self.body)
 
     def tearDown(self):
+        """TearDown."""
         smart_open.s3.DEFAULT_PART_SIZE = self.old_min_part_size
 
     def test_iter(self):
@@ -242,6 +260,7 @@ class ReaderTest(BaseTest):
         assert output == self.body.split(b"\n")
 
     def test_iter_context_manager(self):
+        """Iter context manager."""
         # same thing but using a context manager
         _resource("s3").create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
 
@@ -277,8 +296,8 @@ class ReaderTest(BaseTest):
         with self.assertApiCalls(GetObject=1):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
             seek = fin.seek(6)
-            assert seek == 6
-            assert fin.tell() == 6
+            assert seek == 6  # noqa: PLR2004  # test uses inline magic value
+            assert fin.tell() == 6  # noqa: PLR2004  # test uses inline magic value
             assert fin.read(6) == "wořld".encode()
 
     def test_seek_current(self):
@@ -289,7 +308,7 @@ class ReaderTest(BaseTest):
 
         with self.assertApiCalls():
             seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-            assert seek == 6
+            assert seek == 6  # noqa: PLR2004  # test uses inline magic value
             assert fin.read(6) == "wořld".encode()
 
     def test_seek_end(self):
@@ -317,6 +336,7 @@ class ReaderTest(BaseTest):
             assert fin.tell() == len(self.body)
 
     def test_seek_past_end(self):
+        """Seek past end."""
         with self.assertApiCalls(GetObject=1), patch_invalid_range_response(str(len(self.body))):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True)
             seek = fin.seek(60)
@@ -338,15 +358,16 @@ class ReaderTest(BaseTest):
 
             # Forward seek within buffer using WHENCE_CURRENT - should NOT make a new GET request
             seek = fin.seek(1, whence=smart_open.constants.WHENCE_CURRENT)
-            assert seek == 6
+            assert seek == 6  # noqa: PLR2004  # test uses inline magic value
             assert fin.read(6) == "wořld".encode()
 
             # Forward seek within buffer using WHENCE_START - should NOT make a new GET request
             seek = fin.seek(13, whence=smart_open.constants.WHENCE_START)
-            assert seek == 13
+            assert seek == 13  # noqa: PLR2004  # test uses inline magic value
             assert fin.read(3) == b"how"
 
     def test_detect_eof(self):
+        """Detect eof."""
         with self.assertApiCalls(GetObject=1):
             fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME)
             fin.read()
@@ -358,7 +379,8 @@ class ReaderTest(BaseTest):
             assert eof == fin.tell()
 
     def test_read_gzip(self):
-        expected = "раcцветали яблони и груши, поплыли туманы над рекой...".encode()
+        """Read gzip."""
+        expected = "раcцветали яблони и груши, поплыли туманы над рекой...".encode()  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
         buf = io.BytesIO()
         buf.close = lambda: None  # keep buffer open so that we can .getvalue()
         with gzip.GzipFile(fileobj=buf, mode="w") as zipfile:
@@ -380,13 +402,17 @@ class ReaderTest(BaseTest):
             assert zipfile.read() == expected
 
         logger.debug("starting actual test")
-        with self.assertApiCalls(GetObject=1), smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
-            with gzip.GzipFile(fileobj=fin) as zipfile:
-                actual = zipfile.read()
+        with (
+            self.assertApiCalls(GetObject=1),
+            smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin,
+            gzip.GzipFile(fileobj=fin) as zipfile,
+        ):
+            actual = zipfile.read()
 
         assert expected == actual
 
     def test_readline(self):
+        """Readline."""
         content = b"englishman\nin\nnew\nyork\n"
         _resource("s3").Object(BUCKET_NAME, KEY_NAME).put(Body=content)
 
@@ -402,35 +428,39 @@ class ReaderTest(BaseTest):
         assert expected == actual
 
     def test_readline_tiny_buffer(self):
+        """Readline tiny buffer."""
         content = b"englishman\nin\nnew\nyork\n"
         _resource("s3").Object(BUCKET_NAME, KEY_NAME).put(Body=content)
 
-        with self.assertApiCalls(GetObject=1):
-            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, buffer_size=8) as fin:
-                actual = list(fin)
+        with (
+            self.assertApiCalls(GetObject=1),
+            smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, buffer_size=8) as fin,
+        ):
+            actual = list(fin)
 
         expected = [b"englishman\n", b"in\n", b"new\n", b"york\n"]
         assert expected == actual
 
     def test_read0_does_not_return_data(self):
-        with self.assertApiCalls():
-            # set defer_seek to verify that read(0) doesn't trigger an unnecessary API call
-            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
-                data = fin.read(0)
+        """Read0 does not return data."""
+        # set defer_seek to verify that read(0) doesn't trigger an unnecessary API call
+        with self.assertApiCalls(), smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
+            data = fin.read(0)
 
         assert data == b""
 
     def test_to_boto3(self):
-        with self.assertApiCalls():
-            # set defer_seek to verify that to_boto3() doesn't trigger an unnecessary API call
-            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
-                returned_obj = fin.to_boto3(_resource("s3"))
+        """To boto3."""
+        # set defer_seek to verify that to_boto3() doesn't trigger an unnecessary API call
+        with self.assertApiCalls(), smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
+            returned_obj = fin.to_boto3(_resource("s3"))
 
         boto3_body = returned_obj.get()["Body"].read()
         assert self.body == boto3_body
 
     def test_binary_iterator(self):
-        expected = "выйду ночью в поле с конём".encode().split(b" ")
+        """Binary iterator."""
+        expected = "выйду ночью в поле с конём".encode().split(b" ")  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
         _resource("s3").Object(BUCKET_NAME, KEY_NAME).put(Body=b"\n".join(expected))
 
         # test the __iter__ method
@@ -444,7 +474,8 @@ class ReaderTest(BaseTest):
         assert expected[0] == first
 
     def test_text_iterator(self):
-        expected = ["выйду", "ночью", "в", "поле", "с", "конём"]
+        """Text iterator."""
+        expected = ["выйду", "ночью", "в", "поле", "с", "конём"]  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
         uri = f"s3://{BUCKET_NAME}/{KEY_NAME}.gz"
 
         with smart_open.open(uri, "w", encoding="utf-8") as fout:
@@ -461,6 +492,7 @@ class ReaderTest(BaseTest):
         assert expected[0] == first
 
     def test_defer_seek(self):
+        """Defer seek."""
         content = b"englishman\nin\nnew\nyork\n"
         _resource("s3").Object(BUCKET_NAME, KEY_NAME).put(Body=content)
 
@@ -476,28 +508,39 @@ class ReaderTest(BaseTest):
             assert fin.read() == content[10:]
 
     def test_read_empty_file(self):
+        """Read empty file."""
         _resource("s3").Object(BUCKET_NAME, KEY_NAME).put(Body=b"")
 
-        with self.assertApiCalls(GetObject=1), patch_invalid_range_response("0"):
-            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
-                assert fin.read() == b""
+        with (
+            self.assertApiCalls(GetObject=1),
+            patch_invalid_range_response("0"),
+            smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin,
+        ):
+            assert fin.read() == b""
 
     def test_read_empty_file_no_actual_size(self):
+        """Read empty file no actual size."""
         _resource("s3").Object(BUCKET_NAME, KEY_NAME).put(Body=b"")
 
-        with self.assertApiCalls(GetObject=1), patch_invalid_range_response(None):
-            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin:
-                assert fin.read() == b""
-                # a subsequent read does not call _open_body
-                assert fin.read() == b""
+        with (
+            self.assertApiCalls(GetObject=1),
+            patch_invalid_range_response(None),
+            smart_open.s3.Reader(BUCKET_NAME, KEY_NAME) as fin,
+        ):
+            assert fin.read() == b""
+            # a subsequent read does not call _open_body
+            assert fin.read() == b""
 
     def test_seek_empty_file_from_end(self):
         """Test seeking from end on an empty file."""
         _resource("s3").Object(BUCKET_NAME, KEY_NAME).put(Body=b"")
-        with self.assertApiCalls(GetObject=1), patch_invalid_range_response("0"):
-            with smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin:
-                seek = fin.seek(-10, whence=smart_open.constants.WHENCE_END)
-                assert seek == 0  # Should be at position 0 for empty file
+        with (
+            self.assertApiCalls(GetObject=1),
+            patch_invalid_range_response("0"),
+            smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, defer_seek=True) as fin,
+        ):
+            seek = fin.seek(-10, whence=smart_open.constants.WHENCE_END)
+            assert seek == 0  # Should be at position 0 for empty file
 
 
 @mock_s3
@@ -505,6 +548,7 @@ class MultipartWriterTest(unittest.TestCase):
     """Test writing into s3 files."""
 
     def setUp(self):
+        """SetUp."""
         ignore_resource_warnings()
 
         _resource("s3").create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
@@ -539,7 +583,7 @@ class MultipartWriterTest(unittest.TestCase):
         logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
             fout.write("testžížáč".encode())
-            assert fout.tell() == 14
+            assert fout.tell() == 14  # noqa: PLR2004  # test uses inline magic value
 
     #
     # Nb. Under Windows, the byte offsets are different for some reason
@@ -552,8 +596,8 @@ class MultipartWriterTest(unittest.TestCase):
         # We need this because moto behaves like S3; it refuses to upload
         # parts smaller than 5MB.
         #
-        data_dir = os.path.join(os.path.dirname(__file__), "test_data")
-        with open(os.path.join(data_dir, "crime-and-punishment.txt"), "rb") as fin:
+        data_dir = os.path.join(os.path.dirname(__file__), "test_data")  # noqa: PTH118, PTH120  # test fixture path join; test fixture dirname
+        with open(os.path.join(data_dir, "crime-and-punishment.txt"), "rb") as fin:  # noqa: PTH118, PTH123  # test fixture path join; test fixture path open
             crime = fin.read()
         data = b""
         ps = 5 * 1024 * 1024
@@ -568,29 +612,25 @@ class MultipartWriterTest(unittest.TestCase):
             # Write some data without triggering an upload
             #
             fout.write(title)
-            assert fout._total_parts == 0
-            assert fout._buf.tell() == 48
-
+            assert fout._total_parts == 0  # noqa: SLF001  # test reaches into private state
+            assert fout._buf.tell() == 48  # noqa: PLR2004, SLF001  # test uses inline magic value; test reaches into private state
             #
             # Trigger a part upload
             #
             fout.write(data)
-            assert fout._total_parts == 1
-            assert fout._buf.tell() == 661
-
+            assert fout._total_parts == 1  # noqa: SLF001  # test reaches into private state
+            assert fout._buf.tell() == 661  # noqa: PLR2004, SLF001  # test uses inline magic value; test reaches into private state
             #
             # Write _without_ triggering a part upload
             #
             fout.write(to_be_continued)
-            assert fout._total_parts == 1
-            assert fout._buf.tell() == 710
-
+            assert fout._total_parts == 1  # noqa: SLF001  # test reaches into private state
+            assert fout._buf.tell() == 710  # noqa: PLR2004, SLF001  # test uses inline magic value; test reaches into private state
         #
         # We closed the writer, so the final part must have been uploaded
         #
-        assert fout._buf.tell() == 0
-        assert fout._total_parts == 2
-
+        assert fout._buf.tell() == 0  # noqa: SLF001  # test reaches into private state
+        assert fout._total_parts == 2  # noqa: PLR2004, SLF001  # test uses inline magic value; test reaches into private state
         #
         # read back the same key and check its content
         #
@@ -602,7 +642,7 @@ class MultipartWriterTest(unittest.TestCase):
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
         smart_open_write = smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME)
-        with smart_open_write as fout:  # noqa: F841
+        with smart_open_write:
             pass
 
         # read back the same key and check its content
@@ -612,47 +652,58 @@ class MultipartWriterTest(unittest.TestCase):
         assert output == []
 
     def test_gzip(self):
-        expected = "а не спеть ли мне песню... о любви".encode()
-        with smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
-            with gzip.GzipFile(fileobj=fout, mode="w") as zipfile:
-                zipfile.write(expected)
+        """Gzip."""
+        expected = "а не спеть ли мне песню... о любви".encode()  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
+        with (
+            smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout,
+            gzip.GzipFile(fileobj=fout, mode="w") as zipfile,
+        ):
+            zipfile.write(expected)
 
-        with smart_open.s3.Reader(BUCKET_NAME, WRITE_KEY_NAME) as fin:
-            with gzip.GzipFile(fileobj=fin) as zipfile:
-                actual = zipfile.read()
+        with smart_open.s3.Reader(BUCKET_NAME, WRITE_KEY_NAME) as fin, gzip.GzipFile(fileobj=fin) as zipfile:
+            actual = zipfile.read()
 
         assert expected == actual
 
     def test_buffered_writer_wrapper_works(self):
         """Ensure that we can wrap a smart_open s3 stream in a `BufferedWriter`."""
-        expected = "не думай о секундах свысока"
+        expected = "не думай о секундах свысока"  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
+        with (
+            smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout,
+            io.BufferedWriter(fout) as sub_out,
+        ):
+            sub_out.write(expected.encode("utf-8"))
 
-        with smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
-            with io.BufferedWriter(fout) as sub_out:
-                sub_out.write(expected.encode("utf-8"))
-
-        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb") as fin:
-            with io.TextIOWrapper(fin, encoding="utf-8") as text:
-                actual = text.read()
+        with (
+            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb") as fin,
+            io.TextIOWrapper(fin, encoding="utf-8") as text,
+        ):
+            actual = text.read()
 
         assert expected == actual
 
     def test_nonexisting_bucket(self):
-        expected = "выйду ночью в поле с конём".encode()
-        with pytest.raises(ValueError, match="does not exist"):
-            with smart_open.s3.open("thisbucketdoesntexist", "mykey", "wb") as fout:
-                fout.write(expected)
+        """Nonexisting bucket."""
+        expected = "выйду ночью в поле с конём".encode()  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
+        with (
+            pytest.raises(ValueError, match="does not exist"),
+            smart_open.s3.open("thisbucketdoesntexist", "mykey", "wb") as fout,
+        ):
+            fout.write(expected)
 
-        with pytest.raises(ValueError, match="does not exist"):
-            with smart_open.s3.open("thisbucketdoesntexist", "mykey", "wb", multipart_upload=False) as fout:
-                fout.write(expected)
+        with (
+            pytest.raises(ValueError, match="does not exist"),
+            smart_open.s3.open("thisbucketdoesntexist", "mykey", "wb", multipart_upload=False) as fout,
+        ):
+            fout.write(expected)
 
     def test_read_nonexisting_key(self):
-        with pytest.raises(IOError):
-            with smart_open.s3.open(BUCKET_NAME, "my_nonexisting_key", "rb") as fin:
-                fin.read()
+        """Read nonexisting key."""
+        with pytest.raises(IOError), smart_open.s3.open(BUCKET_NAME, "my_nonexisting_key", "rb") as fin:  # noqa: PT011  # legacy broad pytest.raises
+            fin.read()
 
     def test_double_close(self):
+        """Double close."""
         text = "там за туманами, вечными, пьяными".encode()
         fout = smart_open.s3.open(BUCKET_NAME, "key", "wb")
         fout.write(text)
@@ -660,6 +711,7 @@ class MultipartWriterTest(unittest.TestCase):
         fout.close()
 
     def test_flush_close(self):
+        """Flush close."""
         text = "там за туманами, вечными, пьяными".encode()
         fout = smart_open.s3.open(BUCKET_NAME, "key", "wb")
         fout.write(text)
@@ -667,6 +719,7 @@ class MultipartWriterTest(unittest.TestCase):
         fout.close()
 
     def test_to_boto3(self):
+        """To boto3."""
         contents = b"the spice melange\n"
 
         with smart_open.s3.open(BUCKET_NAME, KEY_NAME, "wb") as fout:
@@ -728,8 +781,8 @@ class MultipartWriterTest(unittest.TestCase):
 
     def test_write_gz_with_error(self):
         """Does s3 multipart upload abort for a failed compressed file upload?"""
-        with (
-            pytest.raises(ValueError),
+        with (  # noqa: PT012  # multi-statement pytest.raises body
+            pytest.raises(ValueError),  # noqa: PT011  # legacy broad pytest.raises
             smart_open.open(
                 f"s3://{BUCKET_NAME}/{WRITE_KEY_NAME}",
                 mode="wb",
@@ -749,15 +802,15 @@ class MultipartWriterTest(unittest.TestCase):
 
         # no multipart upload was committed:
         # smart_open.s3.MultipartWriter.__exit__ was called
-        with pytest.raises(OSError) as cm:
+        with pytest.raises(OSError) as cm:  # noqa: PT011  # legacy broad pytest.raises
             smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb")
 
         assert "The specified key does not exist." in cm.value.args[0]
 
     def test_write_text_with_error(self):
         """Does s3 multipart upload abort for a failed text file upload?"""
-        with (
-            pytest.raises(ValueError),
+        with (  # noqa: PT012  # multi-statement pytest.raises body
+            pytest.raises(ValueError),  # noqa: PT011  # legacy broad pytest.raises
             smart_open.open(
                 f"s3://{BUCKET_NAME}/{WRITE_KEY_NAME}",
                 mode="w",
@@ -777,7 +830,7 @@ class MultipartWriterTest(unittest.TestCase):
 
         # no multipart upload was committed:
         # smart_open.s3.MultipartWriter.__exit__ was called
-        with pytest.raises(OSError) as cm:
+        with pytest.raises(OSError) as cm:  # noqa: PT011  # legacy broad pytest.raises
             smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb")
 
         assert "The specified key does not exist." in cm.value.args[0]
@@ -788,6 +841,7 @@ class SinglepartWriterTest(unittest.TestCase):
     """Test writing into s3 files using single part upload."""
 
     def setUp(self):
+        """SetUp."""
         ignore_resource_warnings()
 
         _resource("s3").create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
@@ -824,12 +878,12 @@ class SinglepartWriterTest(unittest.TestCase):
         logger.info("smart_open_write: %r", smart_open_write)
         with smart_open_write as fout:
             fout.write(test_string)
-            assert fout.tell() == 14
+            assert fout.tell() == 14  # noqa: PLR2004  # test uses inline magic value
 
     def test_write_04(self):
         """Does writing no data cause key with an empty value to be created?"""
         smart_open_write = smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME)
-        with smart_open_write as fout:  # noqa: F841
+        with smart_open_write:
             pass
 
         # read back the same key and check its content
@@ -839,25 +893,32 @@ class SinglepartWriterTest(unittest.TestCase):
 
     def test_buffered_writer_wrapper_works(self):
         """Ensure that we can wrap a smart_open s3 stream in a `BufferedWriter`."""
-        expected = "не думай о секундах свысока"
+        expected = "не думай о секундах свысока"  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
+        with (
+            smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout,
+            io.BufferedWriter(fout) as sub_out,
+        ):
+            sub_out.write(expected.encode("utf-8"))
 
-        with smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
-            with io.BufferedWriter(fout) as sub_out:
-                sub_out.write(expected.encode("utf-8"))
-
-        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb") as fin:
-            with io.TextIOWrapper(fin, encoding="utf-8") as text:
-                actual = text.read()
+        with (
+            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb") as fin,
+            io.TextIOWrapper(fin, encoding="utf-8") as text,
+        ):
+            actual = text.read()
 
         assert expected == actual
 
     def test_nonexisting_bucket(self):
-        expected = "выйду ночью в поле с конём".encode()
-        with pytest.raises(ValueError):
-            with smart_open.s3.open("thisbucketdoesntexist", "mykey", "wb", multipart_upload=False) as fout:
-                fout.write(expected)
+        """Nonexisting bucket."""
+        expected = "выйду ночью в поле с конём".encode()  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
+        with (
+            pytest.raises(ValueError),  # noqa: PT011  # legacy broad pytest.raises
+            smart_open.s3.open("thisbucketdoesntexist", "mykey", "wb", multipart_upload=False) as fout,
+        ):
+            fout.write(expected)
 
     def test_double_close(self):
+        """Double close."""
         text = "там за туманами, вечными, пьяными".encode()
         fout = smart_open.s3.open(BUCKET_NAME, "key", "wb", multipart_upload=False)
         fout.write(text)
@@ -865,6 +926,7 @@ class SinglepartWriterTest(unittest.TestCase):
         fout.close()
 
     def test_flush_close(self):
+        """Flush close."""
         text = "там за туманами, вечными, пьяными".encode()
         fout = smart_open.s3.open(BUCKET_NAME, "key", "wb", multipart_upload=False)
         fout.write(text)
@@ -894,20 +956,20 @@ class SinglepartWriterTest(unittest.TestCase):
             fout.seek(0)
             assert fout.tell() == 0
             fout.write(b"  ")
-            assert fout.tell() == 2
+            assert fout.tell() == 2  # noqa: PLR2004  # test uses inline magic value
             fout.seek(0)
             assert expected == fout.read()
 
-        with self.assertRaises(ValueError, msg="I/O operation on closed file"):
+        with self.assertRaises(ValueError, msg="I/O operation on closed file"):  # noqa: PT027  # legacy unittest assertRaises
             fout.seekable()
 
-        with self.assertRaises(io.UnsupportedOperation, msg="SinglepartWriter.detach() not supported"):
+        with self.assertRaises(io.UnsupportedOperation, msg="SinglepartWriter.detach() not supported"):  # noqa: PT027  # legacy unittest assertRaises
             fout.detach()
 
-        with self.assertRaises(ValueError, msg="read from closed file"):
+        with self.assertRaises(ValueError, msg="read from closed file"):  # noqa: PT027  # legacy unittest assertRaises
             fout.read()
 
-        with self.assertRaises(ValueError, msg="write to closed file"):
+        with self.assertRaises(ValueError, msg="write to closed file"):  # noqa: PT027  # legacy unittest assertRaises
             fout.write(b" ")
 
         with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb") as fin:
@@ -917,24 +979,28 @@ class SinglepartWriterTest(unittest.TestCase):
 
     def test_truncate(self):
         """Test that SinglepartWriter.truncate works."""
-        expected = "не думай о секундах свысока"
-
+        expected = "не думай о секундах свысока"  # noqa: RUF001  # fixture deliberately uses Cyrillic characters
         with smart_open.s3.SinglepartWriter(BUCKET_NAME, WRITE_KEY_NAME) as fout:
             fout.write(expected.encode("utf-8"))
             fout.write(b"42")
             fout.truncate(len(expected.encode("utf-8")))
 
-        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb") as fin:
-            with io.TextIOWrapper(fin, encoding="utf-8") as text:
-                actual = text.read()
+        with (
+            smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb") as fin,
+            io.TextIOWrapper(fin, encoding="utf-8") as text,
+        ):
+            actual = text.read()
 
         assert expected == actual
 
     def test_str(self):
+        """Str."""
         with smart_open.s3.open(BUCKET_NAME, "key", "wb", multipart_upload=False) as fout:
             assert str(fout) == "smart_open.s3.SinglepartWriter('test-smartopen', 'key')"
 
     def test_ensure_no_side_effects_on_exception(self):
+        """Ensure no side effects on exception."""
+
         class WriteError(Exception):
             pass
 
@@ -952,7 +1018,7 @@ class SinglepartWriterTest(unittest.TestCase):
         except WriteError:
             pass
         finally:
-            self.assertRaises(s3_resource.meta.client.exceptions.NoSuchKey, obj.get)
+            self.assertRaises(s3_resource.meta.client.exceptions.NoSuchKey, obj.get)  # noqa: PT027  # legacy unittest assertRaises
 
 
 ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operation_name="bar")
@@ -960,21 +1026,26 @@ ARBITRARY_CLIENT_ERROR = botocore.client.ClientError(error_response={}, operatio
 
 @mock_s3
 class IterBucketTest(unittest.TestCase):
+    """Tests for Iter Bucket."""
+
     def setUp(self):
+        """SetUp."""
         ignore_resource_warnings()
         s3 = _resource("s3")
         s3.create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
         self.client = s3.meta.client
 
     def test_iter_bucket(self):
+        """Iter bucket."""
         populate_bucket()
         results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
-        assert len(results) == 10
+        assert len(results) == 10  # noqa: PLR2004  # test uses inline magic value
 
     def test_iter_bucket_404(self):
+        """Iter bucket 404."""
         populate_bucket()
 
-        def throw_404_error_for_key_4(*args, **kwargs):
+        def throw_404_error_for_key_4(*args, **kwargs):  # noqa: ARG001  # unused fn arg in fixture
             if kwargs["key_name"] == "key_4":
                 raise botocore.exceptions.ClientError(
                     error_response={"Error": {"Code": "404", "Message": "Not Found"}},
@@ -984,33 +1055,39 @@ class IterBucketTest(unittest.TestCase):
 
         with mock.patch("smart_open.s3._download_fileobj", side_effect=throw_404_error_for_key_4):
             results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
-            assert len(results) == 9
+            assert len(results) == 9  # noqa: PLR2004  # test uses inline magic value
 
     def test_iter_bucket_non_404(self):
+        """Iter bucket non 404."""
         populate_bucket()
-        with mock.patch("smart_open.s3._download_fileobj", side_effect=ARBITRARY_CLIENT_ERROR):
-            with pytest.raises(botocore.exceptions.ClientError):
-                list(smart_open.s3.iter_bucket(BUCKET_NAME))
+        with (
+            mock.patch("smart_open.s3._download_fileobj", side_effect=ARBITRARY_CLIENT_ERROR),
+            pytest.raises(botocore.exceptions.ClientError),
+        ):
+            list(smart_open.s3.iter_bucket(BUCKET_NAME))
 
     def test_accepts_boto3_bucket(self):
+        """Accepts boto3 bucket."""
         populate_bucket()
         bucket = _resource("s3").Bucket(BUCKET_NAME)
         results = list(smart_open.s3.iter_bucket(bucket))
-        assert len(results) == 10
+        assert len(results) == 10  # noqa: PLR2004  # test uses inline magic value
 
     def test_list_bucket(self):
+        """List bucket."""
         num_keys = 10
         populate_bucket()
-        keys = list(smart_open.s3._list_bucket(bucket_name=BUCKET_NAME, client=self.client))
+        keys = list(smart_open.s3._list_bucket(bucket_name=BUCKET_NAME, client=self.client))  # noqa: SLF001  # test reaches into private state
         assert len(keys) == num_keys
 
         expected = [f"key_{x}" for x in range(num_keys)]
         assert sorted(keys) == sorted(expected)
 
     def test_list_bucket_long(self):
+        """List bucket long."""
         num_keys = 1010
         populate_bucket(num_keys=num_keys)
-        keys = list(smart_open.s3._list_bucket(bucket_name=BUCKET_NAME, client=self.client))
+        keys = list(smart_open.s3._list_bucket(bucket_name=BUCKET_NAME, client=self.client))  # noqa: SLF001  # test reaches into private state
         assert len(keys) == num_keys
 
         expected = [f"key_{x}" for x in range(num_keys)]
@@ -1023,7 +1100,10 @@ class IterBucketTest(unittest.TestCase):
 #
 @mock_s3
 class IterBucketCredentialsTest(unittest.TestCase):
+    """Tests for Iter Bucket Credentials."""
+
     def test(self):
+        """Test."""
         _resource("s3").create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
         num_keys = 10
         populate_bucket(num_keys=num_keys)
@@ -1042,7 +1122,10 @@ class IterBucketCredentialsTest(unittest.TestCase):
 
 @mock_s3
 class DownloadKeyTest(unittest.TestCase):
+    """Tests for Download Key."""
+
     def setUp(self):
+        """SetUp."""
         ignore_resource_warnings()
 
         s3 = _resource("s3")
@@ -1056,8 +1139,9 @@ class DownloadKeyTest(unittest.TestCase):
         self.transfer_config = boto3.s3.transfer.TransferConfig()
 
     def test_happy(self):
+        """Happy."""
         expected = (KEY_NAME, self.body)
-        actual = smart_open.s3._download_key(
+        actual = smart_open.s3._download_key(  # noqa: SLF001  # test reaches into private state
             key_name=KEY_NAME,
             bucket_name=BUCKET_NAME,
             retries=3,
@@ -1067,10 +1151,11 @@ class DownloadKeyTest(unittest.TestCase):
         assert expected == actual
 
     def test_intermittent_error(self):
+        """Intermittent error."""
         expected = (KEY_NAME, self.body)
         side_effect = [ARBITRARY_CLIENT_ERROR, ARBITRARY_CLIENT_ERROR, self.body]
         with mock.patch("smart_open.s3._download_fileobj", side_effect=side_effect):
-            actual = smart_open.s3._download_key(
+            actual = smart_open.s3._download_key(  # noqa: SLF001  # test reaches into private state
                 key_name=KEY_NAME,
                 bucket_name=BUCKET_NAME,
                 retries=3,
@@ -1080,6 +1165,7 @@ class DownloadKeyTest(unittest.TestCase):
         assert expected == actual
 
     def test_persistent_error(self):
+        """Persistent error."""
         side_effect = [
             ARBITRARY_CLIENT_ERROR,
             ARBITRARY_CLIENT_ERROR,
@@ -1087,9 +1173,9 @@ class DownloadKeyTest(unittest.TestCase):
             ARBITRARY_CLIENT_ERROR,
         ]
         with mock.patch("smart_open.s3._download_fileobj", side_effect=side_effect):
-            self.assertRaises(
+            self.assertRaises(  # noqa: PT027  # legacy unittest assertRaises
                 botocore.client.ClientError,
-                smart_open.s3._download_key,
+                smart_open.s3._download_key,  # noqa: SLF001  # test reaches into private state
                 key_name=KEY_NAME,
                 bucket_name=BUCKET_NAME,
                 retries=3,
@@ -1098,6 +1184,7 @@ class DownloadKeyTest(unittest.TestCase):
             )
 
     def test_intermittent_error_retries(self):
+        """Intermittent error retries."""
         expected = (KEY_NAME, self.body)
         side_effect = [
             ARBITRARY_CLIENT_ERROR,
@@ -1107,7 +1194,7 @@ class DownloadKeyTest(unittest.TestCase):
             self.body,
         ]
         with mock.patch("smart_open.s3._download_fileobj", side_effect=side_effect):
-            actual = smart_open.s3._download_key(
+            actual = smart_open.s3._download_key(  # noqa: SLF001  # test reaches into private state
                 key_name=KEY_NAME,
                 bucket_name=BUCKET_NAME,
                 retries=4,
@@ -1117,10 +1204,11 @@ class DownloadKeyTest(unittest.TestCase):
         assert expected == actual
 
     def test_propagates_other_exception(self):
+        """Propagates other exception."""
         with mock.patch("smart_open.s3._download_fileobj", side_effect=ValueError):
-            self.assertRaises(
+            self.assertRaises(  # noqa: PT027  # legacy unittest assertRaises
                 ValueError,
-                smart_open.s3._download_key,
+                smart_open.s3._download_key,  # noqa: SLF001  # test reaches into private state
                 key_name=KEY_NAME,
                 bucket_name=BUCKET_NAME,
                 retries=3,
@@ -1131,7 +1219,10 @@ class DownloadKeyTest(unittest.TestCase):
 
 @mock_s3
 class OpenTest(unittest.TestCase):
+    """Tests for Open."""
+
     def setUp(self):
+        """SetUp."""
         ignore_resource_warnings()
         _resource("s3").create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
 
@@ -1148,6 +1239,7 @@ class OpenTest(unittest.TestCase):
 
 
 def populate_bucket(num_keys=10):
+    """Populate bucket."""
     s3 = _resource("s3")
     for key_number in range(num_keys):
         key_name = f"key_{key_number}"
@@ -1155,39 +1247,48 @@ def populate_bucket(num_keys=10):
 
 
 class RetryIfFailedTest(unittest.TestCase):
+    """Tests for Retry If Failed."""
+
     def setUp(self):
+        """SetUp."""
         self.retry = smart_open.s3.Retry()
         self.retry.attempts = 3
         self.retry.sleep_seconds = 0
 
     def test_success(self):
+        """Success."""
         partial = mock.Mock(return_value=1)
-        result = self.retry._do(partial)
+        result = self.retry._do(partial)  # noqa: SLF001  # test reaches into private state
         assert result == 1
         assert partial.call_count == 1
 
     def test_failure_exception(self):
+        """Failure exception."""
         partial = mock.Mock(side_effect=ValueError)
         self.retry.exceptions = {ValueError: "Let us retry ValueError"}
-        with pytest.raises(IOError):
-            self.retry._do(partial)
-        assert partial.call_count == 3
+        with pytest.raises(IOError):  # noqa: PT011  # legacy broad pytest.raises
+            self.retry._do(partial)  # noqa: SLF001  # test reaches into private state
+        assert partial.call_count == 3  # noqa: PLR2004  # test uses inline magic value
 
     def test_failure_client_error(self):
+        """Failure client error."""
         partial = mock.Mock(
             side_effect=botocore.exceptions.ClientError({"Error": {"Code": "NoSuchUpload"}}, "NoSuchUpload")
         )
-        with pytest.raises(IOError):
-            self.retry._do(partial)
-        assert partial.call_count == 3
+        with pytest.raises(IOError):  # noqa: PT011  # legacy broad pytest.raises
+            self.retry._do(partial)  # noqa: SLF001  # test reaches into private state
+        assert partial.call_count == 3  # noqa: PLR2004  # test uses inline magic value
 
 
 class AdversarialClient:
+    """Cover Adversarial Client."""
+
     def __init__(self, body):
         self.body = body
         self.call_count = 0
 
     def get_object(self, **kwargs):
+        """Get object."""
         self.call_count += 1
         range_header = kwargs.get("Range", "")
 
@@ -1199,21 +1300,20 @@ class AdversarialClient:
                 requested_start = int(parts[0])
 
         # Randomly decide behavior
-        behavior = random.random()
-
-        if behavior < 0.15:
-            # 15% chance
+        behavior = random.random()  # noqa: S311  # random in test is fine
+        if behavior < 0.15:  # noqa: PLR2004  # test uses inline magic value
+            # 15% chance  # noqa: ERA001  # legacy commented snippet
             raise botocore.exceptions.BotoCoreError
-        if behavior < 0.18:
+        if behavior < 0.18:  # noqa: PLR2004  # test uses inline magic value
             # 3% chance: return OUT_OF_RANGE without ActualObjectSize, which triggers a full request
             error = botocore.exceptions.ClientError({"Error": {"Code": "InvalidRange"}}, "GetObject")
             raise OSError(str(error))
-        if behavior < 0.20 and requested_start is not None and requested_start >= len(self.body):
+        if behavior < 0.20 and requested_start is not None and requested_start >= len(self.body):  # noqa: PLR2004  # test uses inline magic value
             # 20% chance: return OUT_OF_RANGE with ActualObjectSize
             # Only do this if the requested range is actually past EOF
             error = {"Error": {"Code": "InvalidRange", "ActualObjectSize": str(len(self.body))}}
             raise OSError(str(botocore.exceptions.ClientError(error, "GetObject")))
-        if behavior < 0.40:
+        if behavior < 0.40:  # noqa: PLR2004  # test uses inline magic value
             # 20% chance: ignore range headers, return full response
             return {
                 "Body": io.BytesIO(self.body),
@@ -1248,7 +1348,7 @@ class AdversarialClient:
 class AdversarialRetryTest(unittest.TestCase):
     """Test retry logic with adversarial client behavior."""
 
-    def test_adversarial_client(self):
+    def test_adversarial_client(self):  # noqa: C901, PLR0912  # long unittest-style test
         """Test that we can successfully read despite various client failures."""
         test_body = b"0123456789"  # 10 bytes
         num_iterations = 1000
@@ -1259,31 +1359,30 @@ class AdversarialRetryTest(unittest.TestCase):
             random.seed(iteration)
 
             # Randomize chunk size (None or 3)
-            chunk_size = None if random.random() < 0.5 else 3
-
+            chunk_size = None if random.random() < 0.5 else 3  # noqa: PLR2004, S311  # test uses inline magic value; random in test is fine
             client = AdversarialClient(test_body)
 
             try:
                 with mock.patch("time.sleep"):  # Skip actual sleeping in tests
-                    reader = smart_open.s3._SeekableRawReader(
+                    reader = smart_open.s3._SeekableRawReader(  # noqa: SLF001  # test reaches into private state
                         client, "bucket", "key", range_chunk_size=chunk_size
                     )
 
                     # Randomize seek behavior
-                    seek_type = random.random()
+                    seek_type = random.random()  # noqa: S311  # random in test is fine
                     expected_data = test_body
 
-                    if seek_type < 0.25:
+                    if seek_type < 0.25:  # noqa: PLR2004  # test uses inline magic value
                         # 25%: No seek, read from start
                         pass
-                    elif seek_type < 0.5:
+                    elif seek_type < 0.5:  # noqa: PLR2004  # test uses inline magic value
                         # 25%: Seek to specific position
-                        pos = random.randint(0, len(test_body) - 1)
+                        pos = random.randint(0, len(test_body) - 1)  # noqa: S311  # random in test is fine
                         reader.seek(pos)
                         expected_data = test_body[pos:]
-                    elif seek_type < 0.75:
+                    elif seek_type < 0.75:  # noqa: PLR2004  # test uses inline magic value
                         # 25%: Seek from end
-                        offset = random.randint(1, len(test_body))
+                        offset = random.randint(1, len(test_body))  # noqa: S311  # random in test is fine
                         reader.seek(-offset, whence=2)
                         expected_data = test_body[-offset:]
                     else:
@@ -1292,12 +1391,12 @@ class AdversarialRetryTest(unittest.TestCase):
                         expected_data = b""
 
                     # Randomize read size
-                    read_size_type = random.random()
-                    if read_size_type < 0.25:
+                    read_size_type = random.random()  # noqa: S311  # random in test is fine
+                    if read_size_type < 0.25:  # noqa: PLR2004  # test uses inline magic value
                         read_size = -1  # Read all
-                    elif read_size_type < 0.5:
+                    elif read_size_type < 0.5:  # noqa: PLR2004  # test uses inline magic value
                         read_size = 0  # Read nothing
-                    elif read_size_type < 0.75:
+                    elif read_size_type < 0.75:  # noqa: PLR2004  # test uses inline magic value
                         read_size = 1  # Read 1 byte
                     else:
                         read_size = 2  # Read 2 bytes
@@ -1312,9 +1411,9 @@ class AdversarialRetryTest(unittest.TestCase):
                         result = reader.read(read_size)
                         expected_data = expected_data[:read_size]
 
-            except Exception:
+            except Exception:  # noqa: BLE001  # did-it-raise assertion
                 # Some failures are expected due to adversarial behavior: we just track success rate
-                if iteration < 10:
+                if iteration < 10:  # noqa: PLR2004  # test uses inline magic value
                     pass
             else:
                 success_count += 1
@@ -1324,7 +1423,7 @@ class AdversarialRetryTest(unittest.TestCase):
         # This test validates that the retry logic provides reasonable resilience
         # against adversarial conditions including random errors and incorrect responses
         success_rate = success_count / num_iterations
-        assert success_rate >= 0.7, f"Success rate {success_rate:.1%} is below 70% threshold"
+        assert success_rate >= 0.7, f"Success rate {success_rate:.1%} is below 70% threshold"  # noqa: PLR2004  # test uses inline magic value
 
 
 class RangeChunkSizeTest(unittest.TestCase):
@@ -1370,22 +1469,20 @@ class RangeChunkSizeTest(unittest.TestCase):
         """Test reading across chunk boundaries."""
         body = b"0123456789" * 100  # 1000 bytes
         client = self._make_mock_client(body)
-        reader = smart_open.s3._SeekableRawReader(client, "b", "k", range_chunk_size=100)
-
+        reader = smart_open.s3._SeekableRawReader(client, "b", "k", range_chunk_size=100)  # noqa: SLF001  # test reaches into private state
         # Read spans two chunks
         assert reader.read(50) == body[:50]
         assert client.calls[-1]["Range"] == "bytes=0-99"
 
         assert reader.read(80) == body[50:130]  # Crosses chunk boundary
-        assert len(client.calls) == 2
+        assert len(client.calls) == 2  # noqa: PLR2004  # test uses inline magic value
         assert client.calls[-1]["Range"] == "bytes=100-199"
 
     def test_default_unbounded_range(self):
         """Test that default behavior uses unbounded ranges."""
         body = b"test data"
         client = self._make_mock_client(body)
-        reader = smart_open.s3._SeekableRawReader(client, "b", "k")
-
+        reader = smart_open.s3._SeekableRawReader(client, "b", "k")  # noqa: SLF001  # test reaches into private state
         reader.read(5)
         assert client.calls[-1]["Range"] == "bytes=0-"
 
@@ -1393,8 +1490,7 @@ class RangeChunkSizeTest(unittest.TestCase):
         """Test seeking with chunked reading."""
         body = b"x" * 500
         client = self._make_mock_client(body)
-        reader = smart_open.s3._SeekableRawReader(client, "b", "k", range_chunk_size=100)
-
+        reader = smart_open.s3._SeekableRawReader(client, "b", "k", range_chunk_size=100)  # noqa: SLF001  # test reaches into private state
         reader.read(10)
         reader.seek(200)
         reader.read(10)
@@ -1405,8 +1501,7 @@ class RangeChunkSizeTest(unittest.TestCase):
         """Test that chunk_size doesn't interfere with seeking from end."""
         body = b"0123456789" * 100
         client = self._make_mock_client(body)
-        reader = smart_open.s3._SeekableRawReader(client, "b", "k", range_chunk_size=100)
-
+        reader = smart_open.s3._SeekableRawReader(client, "b", "k", range_chunk_size=100)  # noqa: SLF001  # test reaches into private state
         # Seek from end - should use the special "bytes=-N" format, not apply chunking
         reader.seek(-50, whence=2)  # 50 bytes from end
 
@@ -1417,20 +1512,18 @@ class RangeChunkSizeTest(unittest.TestCase):
         """Test that we don't request beyond EOF when content_length is known."""
         body = b"0123456789" * 10  # 100 bytes
         client = self._make_mock_client(body)
-        reader = smart_open.s3._SeekableRawReader(client, "b", "k", range_chunk_size=50)
-
+        reader = smart_open.s3._SeekableRawReader(client, "b", "k", range_chunk_size=50)  # noqa: SLF001  # test reaches into private state
         # First read establishes content_length
         assert reader.read(10) == body[:10]
         assert client.calls[-1]["Range"] == "bytes=0-49"
-        assert reader._content_length is not None
-
+        assert reader._content_length is not None  # noqa: SLF001  # test reaches into private state
         # Seek near end and read - should not request beyond EOF
         reader.seek(80)
         assert reader.read(30) == body[80:]
         # Should request bytes=80-99 (20 bytes), not bytes=80-129 (which would be 50 bytes)
         assert client.calls[-1]["Range"] == "bytes=80-99"
         # Verify we only made 2 requests total
-        assert len(client.calls) == 2
+        assert len(client.calls) == 2  # noqa: PLR2004  # test uses inline magic value
 
 
 @mock_s3
@@ -1452,8 +1545,8 @@ def test_client_propagation_singlepart():
         client=client,
         multipart_upload=False,
     ) as writer:
-        assert writer._client.client == client
-        assert id(writer._client.client) == id(client)
+        assert writer._client.client == client  # noqa: SLF001  # test reaches into private state
+        assert id(writer._client.client) == id(client)  # noqa: SLF001  # test reaches into private state
 
 
 @mock_s3
@@ -1471,8 +1564,8 @@ def test_client_propagation_multipart():
         client=client,
         multipart_upload=True,
     ) as writer:
-        assert writer._client.client == client
-        assert id(writer._client.client) == id(client)
+        assert writer._client.client == client  # noqa: SLF001  # test reaches into private state
+        assert id(writer._client.client) == id(client)  # noqa: SLF001  # test reaches into private state
 
 
 @mock_s3
@@ -1489,8 +1582,8 @@ def test_resource_propagation_reader():
         writer.write(b"hello world")
 
     with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, mode="rb", client=client) as reader:
-        assert reader._client.client == client
-        assert id(reader._client.client) == id(client)
+        assert reader._client.client == client  # noqa: SLF001  # test reaches into private state
+        assert id(reader._client.client) == id(client)  # noqa: SLF001  # test reaches into private state
 
 
 if __name__ == "__main__":

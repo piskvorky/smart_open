@@ -14,15 +14,18 @@ CHUNK_SIZE = 1024
 
 
 def int2byte(i):
+    """Int2byte."""
     return bytes((i,))
 
 
 def random_byte_string(length=CHUNK_SIZE):
-    rand_bytes = [int2byte(random.randint(0, 255)) for _ in range(length)]
+    """Random byte string."""
+    rand_bytes = [int2byte(random.randint(0, 255)) for _ in range(length)]  # noqa: S311  # random in test is fine
     return b"".join(rand_bytes)
 
 
 def bytebuffer_and_random_contents():
+    """Bytebuffer and random contents."""
     buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
     contents = random_byte_string(CHUNK_SIZE)
     content_reader = io.BytesIO(contents)
@@ -32,19 +35,23 @@ def bytebuffer_and_random_contents():
 
 
 class ByteBufferTest(unittest.TestCase):
+    """Tests for Byte Buffer."""
+
     def test_len(self):
+        """Len."""
         buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
         assert len(buf) == 0
 
         contents = b"foo bar baz"
-        buf._bytes = contents
+        buf._bytes = contents  # noqa: SLF001  # test reaches into private state
         assert len(buf) == len(contents)
 
         pos = 4
-        buf._pos = pos
+        buf._pos = pos  # noqa: SLF001  # test reaches into private state
         assert len(buf) == len(contents) - pos
 
     def test_fill_from_reader(self):
+        """Fill from reader."""
         buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
         contents = random_byte_string(CHUNK_SIZE)
         content_reader = io.BytesIO(contents)
@@ -52,9 +59,10 @@ class ByteBufferTest(unittest.TestCase):
         bytes_filled = buf.fill(content_reader)
         assert bytes_filled == CHUNK_SIZE
         assert len(buf) == CHUNK_SIZE
-        assert buf._bytes == contents
+        assert buf._bytes == contents  # noqa: SLF001  # test reaches into private state
 
     def test_fill_from_iterable(self):
+        """Fill from iterable."""
         buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
         contents = random_byte_string(CHUNK_SIZE)
         contents_iter = (contents[i : i + 8] for i in range(0, CHUNK_SIZE, 8))
@@ -62,9 +70,10 @@ class ByteBufferTest(unittest.TestCase):
         bytes_filled = buf.fill(contents_iter)
         assert bytes_filled == CHUNK_SIZE
         assert len(buf) == CHUNK_SIZE
-        assert buf._bytes == contents
+        assert buf._bytes == contents  # noqa: SLF001  # test reaches into private state
 
     def test_fill_from_list(self):
+        """Fill from list."""
         buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
         contents = random_byte_string(CHUNK_SIZE)
         contents_list = [contents[i : i + 7] for i in range(0, CHUNK_SIZE, 7)]
@@ -72,9 +81,10 @@ class ByteBufferTest(unittest.TestCase):
         bytes_filled = buf.fill(contents_list)
         assert bytes_filled == CHUNK_SIZE
         assert len(buf) == CHUNK_SIZE
-        assert buf._bytes == contents
+        assert buf._bytes == contents  # noqa: SLF001  # test reaches into private state
 
     def test_fill_multiple(self):
+        """Fill multiple."""
         buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
         long_contents = random_byte_string(CHUNK_SIZE * 4)
         long_content_reader = io.BytesIO(long_contents)
@@ -87,6 +97,7 @@ class ByteBufferTest(unittest.TestCase):
         assert len(buf) == 2 * CHUNK_SIZE
 
     def test_fill_size(self):
+        """Fill size."""
         buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
         contents = random_byte_string(CHUNK_SIZE * 2)
         content_reader = io.BytesIO(contents)
@@ -102,6 +113,7 @@ class ByteBufferTest(unittest.TestCase):
         assert len(buf) == fill_size + CHUNK_SIZE
 
     def test_fill_reader_exhaustion(self):
+        """Fill reader exhaustion."""
         buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
         short_content_size = int(CHUNK_SIZE / 4)
         short_contents = random_byte_string(short_content_size)
@@ -112,6 +124,7 @@ class ByteBufferTest(unittest.TestCase):
         assert len(buf) == short_content_size
 
     def test_fill_iterable_exhaustion(self):
+        """Fill iterable exhaustion."""
         buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
         short_content_size = int(CHUNK_SIZE / 4)
         short_contents = random_byte_string(short_content_size)
@@ -122,6 +135,7 @@ class ByteBufferTest(unittest.TestCase):
         assert len(buf) == short_content_size
 
     def test_empty(self):
+        """Empty."""
         buf, _ = bytebuffer_and_random_contents()
 
         assert len(buf) == CHUNK_SIZE
@@ -129,6 +143,7 @@ class ByteBufferTest(unittest.TestCase):
         assert len(buf) == 0
 
     def test_peek(self):
+        """Peek."""
         buf, contents = bytebuffer_and_random_contents()
 
         assert buf.peek() == contents
@@ -137,6 +152,7 @@ class ByteBufferTest(unittest.TestCase):
         assert buf.peek(CHUNK_SIZE * 10) == contents
 
     def test_read(self):
+        """Read."""
         buf, contents = bytebuffer_and_random_contents()
 
         assert buf.read() == contents
@@ -144,6 +160,7 @@ class ByteBufferTest(unittest.TestCase):
         assert buf.read() == b""
 
     def test_read_size(self):
+        """Read size."""
         buf, contents = bytebuffer_and_random_contents()
         read_size = 128
 
