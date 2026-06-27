@@ -48,14 +48,18 @@ dev = [
   "pytest-xdist[psutil]",
   "awscli",
   "pyopenssl",
-  "numpy"
+  "numpy",
+  # type-checking only: boto3 ships no inline types, and we use typing_extensions
+  # (Buffer/Self) under TYPE_CHECKING; needed so `ty`/pyright resolve them
+  "boto3-stubs[s3]",
+  "typing_extensions"
 ]
 webhdfs = ["requests"]
 zst = ["backports.zstd>=1.0.0;python_version<'3.14'"]
 
 [tool.pydoclint]
 arg-type-hints-in-docstring = false
-arg-type-hints-in-signature = false
+check-class-attributes = false # we document constructor Args, not class attributes
 check-return-types = false
 check-yield-types = false
 style = "google"
@@ -84,7 +88,9 @@ docstring-code-line-length = "dynamic"
 
 [tool.ruff.lint]
 ignore = [
-  "ANN", # we don't enforce type hints
+  "ANN002", # don't force annotating *args
+  "ANN003", # don't force annotating **kwargs
+  "ANN401", # Any is necessary for transport_params, **kwargs and optional-dependency objects
   "D107", # we have pydoclint with class docstring
   "D203", # there is D211
   "D213", # there is D212
@@ -101,6 +107,7 @@ select = ["ALL"]
 
 [tool.ruff.lint.extend-per-file-ignores]
 "{tests,integration-tests,benchmark,ci_helpers,release}/**/*.py" = [
+  "ANN", # tests and scripts don't need type annotations
   "D100", # not a package
   "D104", # modules don't need docstrings
   "INP001", # not a namespace package
@@ -117,8 +124,14 @@ known-first-party = ["smart_open", "tests"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.setuptools.package-data]
+smart_open = ["py.typed"]
+
 [tool.setuptools.packages.find]
 include = ["smart_open"]
 
 [tool.setuptools_scm]
 fallback_version = "0.1.dev0+gitnotfound"
+
+[tool.ty.src]
+include = ["smart_open"]

@@ -11,10 +11,15 @@ The main entry point is :class:`ThreadPoolExecutor`, which extends the
 standard library executor with a lazy ``imap`` method.
 """
 
+from __future__ import annotations
+
 import logging
 from collections import deque
-from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +27,13 @@ logger = logging.getLogger(__name__)
 class ThreadPoolExecutor(_ThreadPoolExecutor):
     """Subclass with a lazy consuming imap method."""
 
-    def imap(self, fn, *iterables, timeout=None, queued_tasks_per_worker=2) -> Iterator:
+    def imap(
+        self,
+        fn: Callable[..., Any],
+        *iterables: Iterable[Any],
+        timeout: float | None = None,
+        queued_tasks_per_worker: int = 2,
+    ) -> Iterator[Any]:
         """Ordered imap that consumes iterables just-in-time.
 
         References:
@@ -53,7 +64,7 @@ class ThreadPoolExecutor(_ThreadPoolExecutor):
         futures, maxlen = deque(), self._max_workers * (queued_tasks_per_worker + 1)
         popleft, append, submit = futures.popleft, futures.append, self.submit
 
-        def get():
+        def get() -> Any:
             """Block until the next task is done and return the result."""
             return popleft().result(timeout)
 

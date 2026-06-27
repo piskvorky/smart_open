@@ -6,7 +6,10 @@
 #
 """Implements file-like objects for reading and writing to/from GCS."""
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING, Any, TypedDict
 
 try:
     import google.auth.transport.requests
@@ -19,6 +22,11 @@ import smart_open.bytebuffer
 import smart_open.utils
 from smart_open import constants
 
+if TYPE_CHECKING:
+    import io
+
+    from smart_open._typing import TransportParams
+
 logger = logging.getLogger(__name__)
 
 SCHEMES = ("gcs", "gs")
@@ -30,7 +38,13 @@ _DEFAULT_MIN_PART_SIZE = 50 * 1024**2
 _DEFAULT_WRITE_OPEN_KWARGS = {"ignore_flush": True}
 
 
-def parse_uri(uri_as_string):
+class _GCSUri(TypedDict):
+    scheme: str
+    bucket_id: str
+    blob_id: str
+
+
+def parse_uri(uri_as_string: str) -> _GCSUri:
     """Parse a ``gcs://`` or ``gs://`` URI into its bucket and blob components."""
     sr = smart_open.utils.safe_urlsplit(uri_as_string)
     assert sr.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
@@ -39,7 +53,7 @@ def parse_uri(uri_as_string):
     return {"scheme": sr.scheme, "bucket_id": bucket_id, "blob_id": blob_id}
 
 
-def open_uri(uri, mode, transport_params):
+def open_uri(uri: str, mode: str, transport_params: TransportParams) -> io.IOBase:
     """Open a GCS URI using the given mode and transport params."""
     parsed_uri = parse_uri(uri)
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
@@ -47,15 +61,15 @@ def open_uri(uri, mode, transport_params):
 
 
 def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
-    bucket_id,
-    blob_id,
-    mode,
-    min_part_size=_DEFAULT_MIN_PART_SIZE,
-    client=None,  # type: google.cloud.storage.Client
-    get_blob_kwargs=None,
-    blob_properties=None,
-    blob_open_kwargs=None,
-):
+    bucket_id: str,
+    blob_id: str,
+    mode: str,
+    min_part_size: int = _DEFAULT_MIN_PART_SIZE,
+    client: google.cloud.storage.Client | None = None,
+    get_blob_kwargs: dict[str, Any] | None = None,
+    blob_properties: dict[str, Any] | None = None,
+    blob_open_kwargs: dict[str, Any] | None = None,
+) -> io.IOBase:
     """Open an GCS blob for reading or writing.
 
     Args:
@@ -105,7 +119,13 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     return _blob
 
 
-def Reader(bucket, key, client=None, get_blob_kwargs=None, blob_open_kwargs=None):  # noqa: N802  # factory function named after returned class
+def Reader(  # noqa: N802  # factory function named after returned class
+    bucket: str,
+    key: str,
+    client: google.cloud.storage.Client | None = None,
+    get_blob_kwargs: dict[str, Any] | None = None,
+    blob_open_kwargs: dict[str, Any] | None = None,
+) -> io.IOBase:
     """Return a file-like object for reading the GCS blob `key` from `bucket`."""
     if get_blob_kwargs is None:
         get_blob_kwargs = {}
@@ -124,7 +144,14 @@ def Reader(bucket, key, client=None, get_blob_kwargs=None, blob_open_kwargs=None
     return blob.open("rb", **blob_open_kwargs)
 
 
-def Writer(bucket, blob, min_part_size=None, client=None, blob_properties=None, blob_open_kwargs=None):  # noqa: N802, PLR0913  # factory function named after returned class; legacy public API
+def Writer(  # noqa: N802, PLR0913  # factory function named after returned class; legacy public API
+    bucket: str,
+    blob: str,
+    min_part_size: int | None = None,
+    client: google.cloud.storage.Client | None = None,
+    blob_properties: dict[str, Any] | None = None,
+    blob_open_kwargs: dict[str, Any] | None = None,
+) -> io.IOBase:
     """Return a file-like object for writing to GCS blob `blob` in `bucket`."""
     if blob_open_kwargs is None:
         blob_open_kwargs = {}

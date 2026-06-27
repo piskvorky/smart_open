@@ -7,6 +7,8 @@
 
 """Implements the majority of smart_open's top-level API."""
 
+from __future__ import annotations
+
 import collections
 import contextlib
 import locale
@@ -15,6 +17,7 @@ import os
 import os.path
 import pathlib
 import urllib.parse
+from typing import IO, TYPE_CHECKING, Any, BinaryIO, Literal, TextIO, cast, overload
 
 import smart_open.compression as so_compression
 
@@ -26,12 +29,19 @@ import smart_open.local_file as so_file
 import smart_open.utils as so_utils
 from smart_open import doctools, transport
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from typing_extensions import Self
+
+    from smart_open._typing import CompressionKwargs, TransportParams, Uri
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_ENCODING = locale.getpreferredencoding(do_setlocale=False)
 
 
-def _sniff_scheme(uri_as_string):
+def _sniff_scheme(uri_as_string: str) -> str:
     """Returns the scheme of the URL only, as a string."""
     #
     # urlsplit doesn't work on Windows -- it parses the drive as the scheme...
@@ -43,7 +53,7 @@ def _sniff_scheme(uri_as_string):
     return urllib.parse.urlsplit(uri_as_string).scheme
 
 
-def parse_uri(uri_as_string):
+def parse_uri(uri_as_string: str) -> tuple[Any, ...]:
     """Parse the given URI from a string.
 
     Args:
@@ -74,19 +84,68 @@ _parse_uri = parse_uri
 _builtin_open = open
 
 
+@overload
+def open(
+    uri: Uri,
+    mode: Literal["r", "w", "a", "x", "r+", "w+", "a+", "rt", "wt", "at", "xt"] = ...,
+    buffering: int = ...,
+    encoding: str | None = ...,
+    errors: str | None = ...,
+    newline: str | None = ...,
+    closefd: bool = ...,  # noqa: FBT001  # public API
+    opener: Callable[[str, int], int] | None = ...,
+    compression: str = ...,
+    compression_kwargs: CompressionKwargs | None = ...,
+    transport_params: TransportParams | None = ...,
+) -> TextIO: ...
+
+
+@overload
+def open(
+    uri: Uri,
+    mode: Literal["rb", "wb", "ab", "xb", "rb+", "wb+", "ab+", "br", "bw", "ba"],
+    buffering: int = ...,
+    *,
+    encoding: None = ...,
+    errors: str | None = ...,
+    newline: str | None = ...,
+    closefd: bool = ...,
+    opener: Callable[[str, int], int] | None = ...,
+    compression: str = ...,
+    compression_kwargs: CompressionKwargs | None = ...,
+    transport_params: TransportParams | None = ...,
+) -> BinaryIO: ...
+
+
+@overload
+def open(
+    uri: Uri,
+    mode: str = ...,
+    buffering: int = ...,
+    encoding: str | None = ...,
+    errors: str | None = ...,
+    newline: str | None = ...,
+    closefd: bool = ...,  # noqa: FBT001  # public API
+    opener: Callable[[str, int], int] | None = ...,
+    compression: str = ...,
+    compression_kwargs: CompressionKwargs | None = ...,
+    transport_params: TransportParams | None = ...,
+) -> IO[Any]: ...
+
+
 def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated PR
-    uri,
-    mode="r",
-    buffering=-1,
-    encoding=None,
-    errors=None,
-    newline=None,
-    closefd=True,  # noqa: FBT002  # public API
-    opener=None,
-    compression=so_compression.INFER_FROM_EXTENSION,
-    compression_kwargs=None,
-    transport_params=None,
-):
+    uri: Uri,
+    mode: str = "r",
+    buffering: int = -1,
+    encoding: str | None = None,
+    errors: str | None = None,
+    newline: str | None = None,
+    closefd: bool = True,  # noqa: FBT001, FBT002  # public API
+    opener: Callable[[str, int], int] | None = None,
+    compression: str = so_compression.INFER_FROM_EXTENSION,
+    compression_kwargs: CompressionKwargs | None = None,
+    transport_params: TransportParams | None = None,
+) -> IO[Any]:
     r"""Open the URI object, returning a file-like object.
 
     The URI is usually a string in a variety of formats.
@@ -202,13 +261,9 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
         raise NotImplementedError(ve.args[0]) from ve
 
     binary = _open_binary_stream(uri, binary_mode, transport_params)
-    filename = (
-        binary.name
-        # if name attribute is not string-like (e.g. ftp socket fileno)...
-        if isinstance(getattr(binary, "name", None), str | bytes)
-        # ...fall back to uri
-        else uri
-    )
+    name = getattr(binary, "name", None)
+    # prefer the stream's own name; if it's not string-like (e.g. ftp socket fileno), fall back to uri
+    filename = name if isinstance(name, str) else uri if isinstance(uri, str) else None
     decompressed = so_compression.compression_wrapper(
         binary,
         binary_mode,
@@ -239,10 +294,10 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
             with contextlib.suppress(AttributeError):
                 setattr(decoded, attr, getattr(binary, attr))
 
-    return so_utils.FileLikeProxy(decoded, binary)
+    return cast("IO[Any]", so_utils.FileLikeProxy(decoded, binary))
 
 
-def _get_binary_mode(mode_str):  # noqa: C901  # legacy internal helper; refactor in a dedicated PR
+def _get_binary_mode(mode_str: str) -> str:  # noqa: C901  # legacy internal helper; refactor in a dedicated PR
     #
     # https://docs.python.org/3/library/functions.html#open
     #
@@ -261,7 +316,7 @@ def _get_binary_mode(mode_str):  # noqa: C901  # legacy internal helper; refacto
         msg = "must have exactly one of create/read/write/append mode"
         raise ValueError(msg)
 
-    def transfer(char):
+    def transfer(char: str) -> None:
         binmode.append(mode.pop(mode.index(char)))
 
     if "a" in mode:
@@ -298,14 +353,14 @@ def _get_binary_mode(mode_str):  # noqa: C901  # legacy internal helper; refacto
 
 
 def _shortcut_open(  # noqa: PLR0913  # legacy internal helper; refactor in a dedicated PR
-    uri,
-    mode,
-    compression,
-    buffering=-1,
-    encoding=None,
-    errors=None,
-    newline=None,
-):
+    uri: Uri,
+    mode: str,
+    compression: str,
+    buffering: int = -1,
+    encoding: str | None = None,
+    errors: str | None = None,
+    newline: str | None = None,
+) -> IO[Any] | None:
     """Try to open the URI using the standard library io.open function.
 
     This can be much faster than the alternative of opening in binary mode and
@@ -346,7 +401,7 @@ def _shortcut_open(  # noqa: PLR0913  # legacy internal helper; refactor in a de
     elif compression != so_compression.NO_COMPRESSION:
         return None
 
-    open_kwargs = {}
+    open_kwargs: dict[str, Any] = {}
     if encoding is not None:
         open_kwargs["encoding"] = encoding
         mode = mode.replace("b", "")
@@ -362,7 +417,7 @@ def _shortcut_open(  # noqa: PLR0913  # legacy internal helper; refactor in a de
     return _builtin_open(local_path, mode, buffering=buffering, **open_kwargs)
 
 
-def _open_binary_stream(uri, mode, transport_params):
+def _open_binary_stream(uri: Uri, mode: str, transport_params: TransportParams) -> IO[bytes]:
     """Open an arbitrary URI in the specified binary mode.
 
     Not all modes are supported for all protocols.
@@ -410,7 +465,13 @@ def _open_binary_stream(uri, mode, transport_params):
     return fobj
 
 
-def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
+def _encoding_wrapper(
+    fileobj: IO[Any],
+    mode: str,
+    encoding: str | None = None,
+    errors: str | None = None,
+    newline: str | None = None,
+) -> IO[Any]:
     """Decode bytes into text, if necessary.
 
     If mode specifies binary access, does nothing, unless the encoding is
@@ -455,20 +516,20 @@ def _encoding_wrapper(fileobj, mode, encoding=None, errors=None, newline=None):
 class patch_pathlib:  # noqa: N801  # function-shaped name in public API
     """Replace `Path.open` with `smart_open.open`."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.old_impl = _patch_pathlib(open)
 
-    def __enter__(self):  # noqa: D105
+    def __enter__(self) -> Self:  # noqa: D105
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: D105
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:  # noqa: D105
         _patch_pathlib(self.old_impl)
 
 
-def _patch_pathlib(func):
+def _patch_pathlib(func: Callable[..., Any]) -> Callable[..., Any]:
     """Replace `Path.open` with `func`."""
     old_impl = pathlib.Path.open
-    pathlib.Path.open = func
+    pathlib.Path.open = func  # ty: ignore[invalid-assignment]  # intentional monkeypatch
     return old_impl
 
 

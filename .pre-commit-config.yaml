@@ -11,6 +11,12 @@ repos:
     args: [--preview]
     types_or: [markdown]
 
+- repo: https://github.com/astral-sh/ty-pre-commit
+  rev: v0.0.55
+  hooks:
+  - id: ty
+    args: [--isolated, --all-extras]
+
 # should be replaced in the future ref https://github.com/astral-sh/ruff/issues/12434
 - repo: https://github.com/jsh9/pydoclint
   rev: 0.8.7

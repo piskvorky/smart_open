@@ -6,13 +6,19 @@
 #
 """Implements the compression layer of the `smart_open` library."""
 
+from __future__ import annotations
+
 import io
 import logging
 from pathlib import Path
+from typing import IO, TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from smart_open._typing import CompressionKwargs, Compressor
 
 logger = logging.getLogger(__name__)
 
-_COMPRESSOR_REGISTRY = {}
+_COMPRESSOR_REGISTRY: dict[str, Compressor] = {}
 
 NO_COMPRESSION = "disable"
 """Use no compression. Read/write the data as-is."""
@@ -23,7 +29,7 @@ See get_supported_extensions().
 """
 
 
-def get_supported_compression_types():
+def get_supported_compression_types() -> list[str]:
     """Return the list of supported compression types available to open.
 
     See compression paratemeter to smart_open.open().
@@ -31,12 +37,12 @@ def get_supported_compression_types():
     return [NO_COMPRESSION, INFER_FROM_EXTENSION, *get_supported_extensions()]
 
 
-def get_supported_extensions():
+def get_supported_extensions() -> list[str]:
     """Return the list of file extensions for which we have registered compressors."""
     return sorted(_COMPRESSOR_REGISTRY.keys())
 
 
-def register_compressor(ext, callback):
+def register_compressor(ext: str, callback: Compressor) -> None:
     """Register a callback for transparently decompressing files with a specific extension.
 
     Args:
@@ -73,7 +79,7 @@ def register_compressor(ext, callback):
     _COMPRESSOR_REGISTRY[ext] = callback
 
 
-def _maybe_wrap_buffered(file_obj, mode):
+def _maybe_wrap_buffered(file_obj: Any, mode: str) -> IO[bytes]:
     # https://github.com/piskvorky/smart_open/issues/760#issuecomment-1553971657
     result = file_obj
     if "b" in mode and "w" in mode:
@@ -83,39 +89,41 @@ def _maybe_wrap_buffered(file_obj, mode):
     return result
 
 
-def _handle_bz2(file_obj, mode, **kwargs):
+def _handle_bz2(file_obj: IO[bytes], mode: str, **kwargs: Any) -> IO[Any]:
     import bz2
 
     result = bz2.open(filename=file_obj, mode=mode, **kwargs)  # noqa: SIM115  # returns the file object to caller
     return _maybe_wrap_buffered(result, mode)
 
 
-def _handle_gzip(file_obj, mode, **kwargs):
+def _handle_gzip(file_obj: IO[bytes], mode: str, **kwargs: Any) -> IO[Any]:
     import gzip
 
     result = gzip.open(filename=file_obj, mode=mode, **kwargs)  # noqa: SIM115  # returns the file object to caller
     return _maybe_wrap_buffered(result, mode)
 
 
-def _handle_zstd(file_obj, mode, **kwargs):
+def _handle_zstd(file_obj: IO[bytes], mode: str, **kwargs: Any) -> IO[Any]:
     import sys
 
     if sys.version_info >= (3, 14):
         from compression import zstd
     else:
         from backports import zstd
-    result = zstd.open(file_obj, mode=mode, **kwargs)
+    # dynamic **kwargs cannot be matched against zstd.open()'s overloads, so go through Any
+    zstd_open: Any = zstd.open
+    result = zstd_open(file_obj, mode=mode, **kwargs)
     return _maybe_wrap_buffered(result, mode)
 
 
-def _handle_xz(file_obj, mode, **kwargs):
+def _handle_xz(file_obj: IO[bytes], mode: str, **kwargs: Any) -> IO[Any]:
     import lzma
 
     result = lzma.open(filename=file_obj, mode=mode, **kwargs)  # noqa: SIM115  # returns the file object to caller
     return _maybe_wrap_buffered(result, mode)
 
 
-def _handle_lz4(file_obj, mode, **kwargs):
+def _handle_lz4(file_obj: IO[bytes], mode: str, **kwargs: Any) -> IO[Any]:
     import lz4.frame
 
     result = lz4.frame.open(file_obj, mode=mode, **kwargs)
@@ -123,12 +131,12 @@ def _handle_lz4(file_obj, mode, **kwargs):
 
 
 def compression_wrapper(
-    file_obj,
-    mode,
-    compression=INFER_FROM_EXTENSION,
-    filename=None,
-    compression_kwargs=None,
-):
+    file_obj: IO[Any],
+    mode: str,
+    compression: str = INFER_FROM_EXTENSION,
+    filename: str | None = None,
+    compression_kwargs: CompressionKwargs | None = None,
+) -> IO[Any]:
     """Wrap `file_obj` with an appropriate [de]compression mechanism based on its file extension.
 
     If the filename extension isn't recognized, simply return the original `file_obj` unchanged.
@@ -145,13 +153,13 @@ def compression_wrapper(
         return file_obj
     if compression == INFER_FROM_EXTENSION:
         try:
-            filename = (filename or file_obj.name).lower()
+            inferred_name = (filename or file_obj.name).lower()
         except (AttributeError, TypeError):
             logger.warning(
                 "unable to transparently decompress %r because it seems to lack a string-like .name", file_obj
             )
             return file_obj
-        compression = Path(filename).suffix
+        compression = Path(inferred_name).suffix
 
     if compression in _COMPRESSOR_REGISTRY and mode.endswith("+"):
         msg = f"transparent (de)compression unsupported for mode {mode!r}"

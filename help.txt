@@ -17,6 +17,7 @@ DESCRIPTION
     * `register_compressor()`, which registers callbacks for transparent compressor handling
 
 PACKAGE CONTENTS
+    _typing
     azure
     bytebuffer
     compression
@@ -36,7 +37,7 @@ PACKAGE CONTENTS
     webhdfs
 
 FUNCTIONS
-    open(uri, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, compression='infer_from_extension', compression_kwargs=None, transport_params=None)
+    open(uri: 'Uri', mode: 'str' = 'r', buffering: 'int' = -1, encoding: 'str | None' = None, errors: 'str | None' = None, newline: 'str | None' = None, closefd: 'bool' = True, opener: 'Callable[[str, int], int] | None' = None, compression: 'str' = 'infer_from_extension', compression_kwargs: 'CompressionKwargs | None' = None, transport_params: 'TransportParams | None' = None) -> 'IO[Any]'
         Open the URI object, returning a file-like object.
 
         The URI is usually a string in a variety of formats.
@@ -373,7 +374,7 @@ FUNCTIONS
             - `smart_open README.md
               <https://github.com/piskvorky/smart_open/blob/master/README.md>`__
 
-    parse_uri(uri_as_string)
+    parse_uri(uri_as_string: 'str') -> 'tuple[Any, ...]'
         Parse the given URI from a string.
 
         Args:
@@ -429,7 +430,7 @@ FUNCTIONS
             * sftp://username@host/path/file
             * webhdfs://host:port/path/file
 
-    register_compressor(ext, callback)
+    register_compressor(ext: 'str', callback: 'Compressor') -> 'None'
         Register a callback for transparently decompressing files with a specific extension.
 
         Args:

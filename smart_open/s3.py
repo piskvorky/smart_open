@@ -20,10 +20,15 @@ from collections.abc import Callable, Iterator
 from math import inf
 from typing import (
     TYPE_CHECKING,
+    Any,
+    TypedDict,
+    cast,
 )
 
 try:
     import boto3
+    import boto3.s3.transfer
+    import boto3.session
     import botocore.client
     import botocore.exceptions
     import urllib3.exceptions
@@ -36,8 +41,15 @@ import smart_open.utils
 from smart_open import constants
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
+    from _typeshed import WriteableBuffer
+    from botocore.response import StreamingBody
     from mypy_boto3_s3.client import S3Client
-    from typing_extensions import Buffer
+    from mypy_boto3_s3.type_defs import CompletedMultipartUploadTypeDef
+    from typing_extensions import Buffer, Self
+
+    from smart_open._typing import TransportParams
 
 logger = logging.getLogger(__name__)
 
@@ -80,16 +92,25 @@ _OUT_OF_RANGE = "InvalidRange"
 _VERSION_ID_RE = re.compile(r"(?P<sep>[?&])versionId=(?P<value>[^&]*)")
 
 
+class _S3Uri(TypedDict):
+    scheme: str
+    bucket_id: str
+    key_id: str
+    access_id: str | None
+    access_secret: str | None
+    version_id: str | None
+
+
 class Retry:
     """Retry policy used by the S3 transport for transient client/network errors."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.attempts: int = 6
         self.sleep_seconds: int = 10
-        self.exceptions: list[Exception] = [botocore.exceptions.EndpointConnectionError]
+        self.exceptions: list[type[BaseException]] = [botocore.exceptions.EndpointConnectionError]
         self.client_error_codes: list[str] = ["NoSuchUpload"]
 
-    def _do(self, fn: Callable):
+    def _do(self, fn: functools.partial[Any]) -> Any:
         for attempt in range(self.attempts):
             try:
                 return fn()
@@ -136,17 +157,17 @@ class _ClientWrapper:
     This wrapper behaves identically to the client otherwise.
     """
 
-    def __init__(self, client, kwargs):
+    def __init__(self, client: S3Client, kwargs: dict[str, Any]) -> None:
         self.client = client
         self.kwargs = kwargs
 
-    def __getattr__(self, method_name):
+    def __getattr__(self, method_name: str) -> Callable[..., Any]:
         method = getattr(self.client, method_name)
         kwargs = self.kwargs.get(f"S3.Client.{method_name}", {})
         return functools.partial(method, **kwargs)
 
 
-def parse_uri(uri_as_string):
+def parse_uri(uri_as_string: str) -> _S3Uri:
     """Parse an ``s3://`` URI into bucket, key, credential, and version components."""
     #
     # Restrictions on bucket names and labels:
@@ -221,7 +242,7 @@ def parse_uri(uri_as_string):
     }
 
 
-def _consolidate_params(uri, transport_params):
+def _consolidate_params(uri: _S3Uri, transport_params: TransportParams) -> tuple[_S3Uri, TransportParams]:
     """Consolidates the parsed Uri with the additional parameters.
 
     This is necessary because the user can pass some of the parameters can in
@@ -236,7 +257,7 @@ def _consolidate_params(uri, transport_params):
     """
     transport_params = dict(transport_params)
 
-    def inject(**kwargs):
+    def inject(**kwargs: Any) -> None:
         try:
             client_kwargs = transport_params["client_kwargs"]
         except KeyError:
@@ -278,7 +299,7 @@ def _consolidate_params(uri, transport_params):
     return uri, transport_params
 
 
-def open_uri(uri, mode, transport_params):
+def open_uri(uri: str, mode: str, transport_params: TransportParams) -> io.BufferedIOBase:
     """Open an S3 URI using the given mode and transport params."""
     parsed_uri = parse_uri(uri)
     parsed_uri, transport_params = _consolidate_params(parsed_uri, transport_params)
@@ -287,19 +308,19 @@ def open_uri(uri, mode, transport_params):
 
 
 def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
-    bucket_id,
-    key_id,
-    mode,
-    version_id=None,
-    buffer_size=DEFAULT_BUFFER_SIZE,
-    min_part_size=DEFAULT_PART_SIZE,
-    multipart_upload=True,  # noqa: FBT002  # public API
-    defer_seek=False,  # noqa: FBT002  # public API
-    client=None,
-    client_kwargs=None,
-    writebuffer=None,
-    range_chunk_size=None,
-):
+    bucket_id: str,
+    key_id: str,
+    mode: str,
+    version_id: str | None = None,
+    buffer_size: int = DEFAULT_BUFFER_SIZE,
+    min_part_size: int = DEFAULT_PART_SIZE,
+    multipart_upload: bool = True,  # noqa: FBT001, FBT002  # public API
+    defer_seek: bool = False,  # noqa: FBT001, FBT002  # public API
+    client: S3Client | None = None,
+    client_kwargs: dict[str, Any] | None = None,
+    writebuffer: io.BytesIO | None = None,
+    range_chunk_size: int | None = None,
+) -> io.BufferedIOBase:
     """Open an S3 object for reading or writing.
 
     Args:
@@ -420,27 +441,33 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     return fileobj
 
 
-def _get(client, bucket, key, version, range_string):
+def _get(
+    client: S3Client,
+    bucket: str,
+    key: str,
+    version: str | None,
+    range_string: str | None,
+) -> dict[str, Any]:
     try:
-        params = {"Bucket": bucket, "Key": key}
+        params: dict[str, Any] = {"Bucket": bucket, "Key": key}
         if version:
             params["VersionId"] = version
         if range_string:
             params["Range"] = range_string
 
-        return client.get_object(**params)
+        return cast("dict[str, Any]", client.get_object(**params))
     except botocore.client.ClientError as error:
         wrapped_error = OSError(
             f"unable to access bucket: {bucket!r} key: {key!r} version: {version!r} error: {error}"
         )
-        wrapped_error.backend_error = error
+        wrapped_error.backend_error = error  # ty: ignore[unresolved-attribute]  # smuggle the botocore error through
         raise wrapped_error from error
 
 
-def _unwrap_ioerror(ioe):
+def _unwrap_ioerror(ioe: OSError) -> dict[str, Any] | None:
     """Given an IOError from _get, return the 'Error' dictionary from botocore."""
     try:
-        return ioe.backend_error.response["Error"]
+        return ioe.backend_error.response["Error"]  # ty: ignore[unresolved-attribute]  # set by _get
     except (AttributeError, KeyError):
         return None
 
@@ -453,32 +480,33 @@ class _SeekableRawReader:
 
     def __init__(
         self,
-        client,
-        bucket,
-        key,
-        version_id=None,
-        range_chunk_size=None,
-    ):
+        client: S3Client,
+        bucket: str,
+        key: str,
+        version_id: str | None = None,
+        range_chunk_size: int | None = None,
+    ) -> None:
         self._client = client
         self._bucket = bucket
         self._key = key
         self._version_id = version_id
         self._range_chunk_size = range_chunk_size
 
-        self._content_length = None
+        self._content_length: int | None = None
         self._position = 0
-        self._body = None
+        self._body: StreamingBody | io.BytesIO | None = None
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         return self._body is None
 
-    def close(self):
-        if not self.closed:
-            self._body.close()
+    def close(self) -> None:
+        body = self._body
+        if body is not None:
+            body.close()
             self._body = None
 
-    def seek(self, offset, whence=constants.WHENCE_START):
+    def seek(self, offset: int, whence: int = constants.WHENCE_START) -> int:
         """Seek to the specified position.
 
         Args:
@@ -529,13 +557,14 @@ class _SeekableRawReader:
 
         if reached_eof:
             self._body = io.BytesIO()
+            assert self._content_length is not None  # noqa: S101  # reached_eof implies _content_length is set
             self._position = self._content_length
         else:
             self._open_body(start, stop)
 
         return self._position
 
-    def _open_body(self, start=None, stop=None):  # noqa: C901, PLR0912  # legacy internal helper; refactor in a dedicated PR
+    def _open_body(self, start: int | None = None, stop: int | None = None) -> None:  # noqa: C901, PLR0912  # legacy internal helper; refactor in a dedicated PR
         """Open a connection to download the specified range of bytes.
 
         Store the open file handle in self._body.
@@ -556,6 +585,7 @@ class _SeekableRawReader:
 
         # Apply chunking: limit the stop position if range_chunk_size is set
         if stop is None and self._range_chunk_size is not None:
+            assert start is not None  # noqa: S101  # stop is None implies start was set above
             stop = start + self._range_chunk_size - 1
             # Don't request beyond known content length
             if self._content_length is not None:
@@ -615,17 +645,19 @@ class _SeekableRawReader:
             self._body = response["Body"]
         elif status_code == http.HTTPStatus.OK:
             # 200 guarantees the response body contains the full file (server ignored range header)
+            content_length = response["ContentLength"]
+            body = response["Body"]
             self._position = 0
-            self._content_length = response["ContentLength"]
-            self._body = response["Body"]
+            self._content_length = content_length
+            self._body = body
             #
             # If we got a full request when we were actually expecting a range, we need to
             # read some data to ensure that the body starts in the place that the caller expects
             #
             if start is not None:
-                expected_position = min(self._content_length, start)
+                expected_position = min(content_length, start)
             elif start is None and stop is not None:
-                expected_position = max(0, self._content_length - stop)
+                expected_position = max(0, content_length - stop)
             else:
                 expected_position = 0
             if expected_position > 0:
@@ -634,19 +666,18 @@ class _SeekableRawReader:
                     self,
                     expected_position,
                 )
-                self._position = len(self._body.read(expected_position))
+                self._position = len(body.read(expected_position))
         else:
             msg = f"Unexpected status code {status_code!r}"
             raise ValueError(msg)
 
-    def read(self, size=-1):
+    def read(self, size: int = -1) -> bytes:
         """Read from the continuous connection with the remote peer."""
         if size < -1:
             msg = f"size must be >= -1, got {size}"
             raise ValueError(msg)
 
-        if size == -1:
-            size = inf  # makes for a simple while-condition below
+        size_limit: int | float = inf if size == -1 else size  # makes for a simple while-condition below
 
         binary_collected = io.BytesIO()
 
@@ -663,14 +694,16 @@ class _SeekableRawReader:
         # HTTP connection and try again.  Usually, a single retry attempt is
         # enough to recover, but we try multiple times "just in case".
         #
-        def retry_read(attempts=(1, 2, 4, 8, 16)) -> bytes:
+        def retry_read(attempts: tuple[int, ...] = (1, 2, 4, 8, 16)) -> bytes:
             for seconds in attempts:
                 if self.closed:
                     self._open_body()
+                body = self._body
+                assert body is not None  # noqa: S101  # _open_body (re)opens the body when closed
                 try:
-                    if size == inf:
-                        return self._body.read()
-                    return self._body.read(size - binary_collected.tell())
+                    if size_limit == inf:
+                        return body.read()
+                    return body.read(size - binary_collected.tell())
                 except (
                     ConnectionResetError,
                     botocore.exceptions.BotoCoreError,
@@ -680,12 +713,12 @@ class _SeekableRawReader:
                         "%s: caught %r while reading %d bytes, sleeping %ds before retry",
                         self,
                         err,
-                        -1 if size == inf else size,
+                        -1 if size_limit == inf else size,
                         seconds,
                     )
                     self.close()
                     time.sleep(seconds)
-            msg = f"{self}: failed to read {-1 if size == inf else size} bytes after {len(attempts)} attempts"
+            msg = f"{self}: failed to read {-1 if size_limit == inf else size} bytes after {len(attempts)} attempts"
             raise OSError(
                 msg,
             )
@@ -694,7 +727,7 @@ class _SeekableRawReader:
             self._content_length is None  # very first read call
             or (
                 self._position < self._content_length  # not yet end of file
-                and binary_collected.tell() < size  # not yet read enough
+                and binary_collected.tell() < size_limit  # not yet read enough
             )
         ):
             binary = retry_read()
@@ -705,12 +738,18 @@ class _SeekableRawReader:
 
         return binary_collected.getvalue()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return a short human-readable description of the seekable reader."""
         return f"smart_open.s3._SeekableReader({self._bucket!r}, {self._key!r})"
 
 
-def _initialize_boto3(rw, client, client_kwargs, bucket, key):
+def _initialize_boto3(
+    rw: Reader | MultipartWriter | SinglepartWriter,
+    client: S3Client | None,
+    client_kwargs: dict[str, Any] | None,
+    bucket: str,
+    key: str,
+) -> None:
     """Create the boto3 client/bucket/key wrappers required for accessing S3."""
     if client_kwargs is None:
         client_kwargs = {}
@@ -728,7 +767,9 @@ def _initialize_boto3(rw, client, client_kwargs, bucket, key):
         client = boto3.client("s3", **init_kwargs)
     assert client  # noqa: S101  # internal precondition; misuse should crash loudly
 
-    rw._client = _ClientWrapper(client, client_kwargs)  # noqa: SLF001  # intra-package coupling
+    # _ClientWrapper delegates to a real S3Client via __getattr__; present it as
+    # S3Client so callers type-check against the genuine boto3 method signatures.
+    rw._client = cast("S3Client", _ClientWrapper(client, client_kwargs))  # noqa: SLF001  # intra-package coupling
     rw._bucket = bucket  # noqa: SLF001  # intra-package coupling
     rw._key = key  # noqa: SLF001  # intra-package coupling
 
@@ -739,18 +780,23 @@ class Reader(io.BufferedIOBase):
     Implements the io.BufferedIOBase interface of the standard library.
     """
 
+    name: str
+    _client: S3Client
+    _bucket: str
+    _key: str
+
     def __init__(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         self,
-        bucket,
-        key,
-        version_id=None,
-        buffer_size=DEFAULT_BUFFER_SIZE,
-        line_terminator=constants.BINARY_NEWLINE,
-        defer_seek=False,  # noqa: FBT002  # public API
-        client=None,
-        client_kwargs=None,
-        range_chunk_size=None,
-    ):
+        bucket: str,
+        key: str,
+        version_id: str | None = None,
+        buffer_size: int = DEFAULT_BUFFER_SIZE,
+        line_terminator: bytes = constants.BINARY_NEWLINE,
+        defer_seek: bool = False,  # noqa: FBT001, FBT002  # public API
+        client: S3Client | None = None,
+        client_kwargs: dict[str, Any] | None = None,
+        range_chunk_size: int | None = None,
+    ) -> None:
         self._version_id = version_id
         self._buffer_size = buffer_size
 
@@ -776,22 +822,26 @@ class Reader(io.BufferedIOBase):
     # io.BufferedIOBase methods.
     #
 
-    def close(self):
+    def close(self) -> None:
         """Flush and close this stream."""
         logger.debug("close: called")
 
-    def readable(self):
+    def readable(self) -> bool:
         """Return True if the stream can be read from."""
         return True
 
-    def read(self, size=-1):
+    def read(self, size: int | None = -1) -> bytes:
         """Read up to size bytes from the object and return them."""
+        if size is None:
+            size = -1
         if size == 0:
             return b""
         if size < 0:
             # call read() before setting _current_pos to make sure _content_length is set
             out = self._read_from_buffer() + self._raw_reader.read()
-            self._current_pos = self._raw_reader._content_length  # noqa: SLF001  # intra-package coupling
+            content_length = self._raw_reader._content_length  # noqa: SLF001  # intra-package coupling
+            assert content_length is not None  # noqa: S101  # read() populates _content_length
+            self._current_pos = content_length
             return out
 
         #
@@ -809,11 +859,11 @@ class Reader(io.BufferedIOBase):
         self._fill_buffer(size)
         return self._read_from_buffer(size)
 
-    def read1(self, size=-1):
+    def read1(self, size: int | None = -1) -> bytes:
         """This is the same as read()."""
         return self.read(size=size)
 
-    def readinto(self, b):
+    def readinto(self, b: WriteableBuffer) -> int:
         """Read up to len(b) bytes into b, and return the number of bytes read.
 
         Args:
@@ -822,13 +872,14 @@ class Reader(io.BufferedIOBase):
         Returns:
             The number of bytes read.
         """
-        data = self.read(len(b))
+        mv = memoryview(b).cast("B")
+        data = self.read(len(mv))
         if not data:
             return 0
-        b[: len(data)] = data
+        mv[: len(data)] = data
         return len(data)
 
-    def readline(self, limit=-1):
+    def readline(self, limit: int | None = -1) -> bytes:
         """Read up to and including the next newline.  Returns the bytes read."""
         if limit != -1:
             msg = "limits other than -1 not implemented yet"
@@ -849,14 +900,14 @@ class Reader(io.BufferedIOBase):
 
         return line.getvalue()
 
-    def seekable(self):
+    def seekable(self) -> bool:
         """If False, seek(), tell() and truncate() will raise IOError.
 
         We offer only seek support, and no truncate support.
         """
         return True
 
-    def seek(self, offset, whence=constants.WHENCE_START):
+    def seek(self, offset: int, whence: int = constants.WHENCE_START) -> int:
         """Seek to the specified position.
 
         Args:
@@ -892,22 +943,22 @@ class Reader(io.BufferedIOBase):
         self._seek_initialized = True
         return self._current_pos
 
-    def tell(self):
+    def tell(self) -> int:
         """Return the current position within the file."""
         return self._current_pos
 
-    def truncate(self, size=None):
+    def truncate(self, size: int | None = None) -> int:
         """Unsupported."""
         raise io.UnsupportedOperation
 
-    def detach(self):
+    def detach(self) -> io.RawIOBase:
         """Unsupported."""
         raise io.UnsupportedOperation
 
-    def terminate(self):
+    def terminate(self) -> None:
         """Do nothing."""
 
-    def to_boto3(self, resource):
+    def to_boto3(self, resource: Any) -> Any:
         """Create an **independent** `boto3.s3.Object` instance.
 
         The returned object points to the same S3 object as this instance.
@@ -928,26 +979,27 @@ class Reader(io.BufferedIOBase):
     #
     # Internal methods.
     #
-    def _read_from_buffer(self, size=-1):
+    def _read_from_buffer(self, size: int = -1) -> bytes:
         """Remove at most size bytes from our buffer and return them."""
         size = size if size >= 0 else len(self._buffer)
         part = self._buffer.read(size)
         self._current_pos += len(part)
         return part
 
-    def _fill_buffer(self, size=-1):
+    def _fill_buffer(self, size: int = -1) -> None:
         size = max(size, self._buffer._chunk_size)  # noqa: SLF001  # intra-package coupling
         while len(self._buffer) < size and not self._eof:
-            bytes_read = self._buffer.fill(self._raw_reader)
+            # _SeekableRawReader is duck-typed to ByteBuffer.fill's read-based protocol
+            bytes_read = self._buffer.fill(cast("io.IOBase", self._raw_reader))
             if bytes_read == 0:
                 logger.debug("%s: reached EOF while filling buffer", self)
                 self._eof = True
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return a short human-readable description of the reader."""
         return f"smart_open.s3.Reader({self._bucket!r}, {self._key!r})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return an unambiguous representation of the reader."""
         return f"smart_open.s3.Reader(bucket={self._bucket!r}, key={self._key!r}, version_id={self._version_id!r}, buffer_size={self._buffer_size!r}, line_terminator={self._line_terminator!r})"
 
@@ -958,17 +1010,21 @@ class MultipartWriter(io.BufferedIOBase):
     Implements the io.BufferedIOBase interface of the standard library.
     """
 
-    _upload_id = None  # so `closed` property works in case __init__ fails and __del__ is called
+    name: str
+    _client: S3Client
+    _bucket: str
+    _key: str
+    _upload_id: str | None = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         self,
-        bucket,
-        key,
-        part_size=DEFAULT_PART_SIZE,
-        client=None,
-        client_kwargs=None,
+        bucket: str,
+        key: str,
+        part_size: int = DEFAULT_PART_SIZE,
+        client: S3Client | None = None,
+        client_kwargs: dict[str, Any] | None = None,
         writebuffer: io.BytesIO | None = None,
-    ):
+    ) -> None:
         adjusted_ps = smart_open.utils.clamp(part_size, MIN_PART_SIZE, MAX_PART_SIZE)
         if part_size != adjusted_ps:
             logger.warning("adjusting part_size from %s to %s", part_size, adjusted_ps)
@@ -976,9 +1032,6 @@ class MultipartWriter(io.BufferedIOBase):
         self._part_size = part_size
 
         _initialize_boto3(self, client, client_kwargs, bucket, key)
-        self._client: S3Client
-        self._bucket: str
-        self._key: str
 
         try:
             partial = functools.partial(
@@ -998,15 +1051,15 @@ class MultipartWriter(io.BufferedIOBase):
 
         self._total_bytes = 0
         self._total_parts = 0
-        self._parts: list[dict[str, object]] = []
+        self._parts: list[dict[str, Any]] = []
 
-    def flush(self):
+    def flush(self) -> None:
         """No-op flush; data is buffered until ``close`` or ``_upload_next_part``."""
 
     #
     # Override some methods from io.IOBase.
     #
-    def close(self):
+    def close(self) -> None:
         """Complete the multipart upload (or abort) and close the stream."""
         logger.debug("close: called")
         if self.closed:
@@ -1022,7 +1075,7 @@ class MultipartWriter(io.BufferedIOBase):
                 Bucket=self._bucket,
                 Key=self._key,
                 UploadId=self._upload_id,
-                MultipartUpload={"Parts": self._parts},
+                MultipartUpload=cast("CompletedMultipartUploadTypeDef", {"Parts": self._parts}),
             )
             RETRY._do(partial)  # noqa: SLF001  # intra-package coupling
             logger.debug("%s: completed multipart upload", self)
@@ -1048,34 +1101,34 @@ class MultipartWriter(io.BufferedIOBase):
         self._upload_id = None
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         """Return True if the stream is closed."""
         return self._upload_id is None
 
-    def writable(self):
+    def writable(self) -> bool:
         """Return True if the stream supports writing."""
         return True
 
-    def seekable(self):
+    def seekable(self) -> bool:
         """Return True; we support `tell` but not `seek` or `truncate`."""
         return True
 
-    def seek(self, offset, whence=constants.WHENCE_START):
+    def seek(self, offset: int, whence: int = constants.WHENCE_START) -> int:
         """Unsupported."""
         raise io.UnsupportedOperation
 
-    def truncate(self, size=None):
+    def truncate(self, size: int | None = None) -> int:
         """Unsupported."""
         raise io.UnsupportedOperation
 
-    def tell(self):
+    def tell(self) -> int:
         """Return the current stream position."""
         return self._total_bytes
 
     #
     # io.BufferedIOBase methods.
     #
-    def detach(self):
+    def detach(self) -> io.RawIOBase:
         """Unsupported."""
         msg = "detach() not supported"
         raise io.UnsupportedOperation(msg)
@@ -1115,20 +1168,21 @@ class MultipartWriter(io.BufferedIOBase):
             offset = end
         return len(mv)
 
-    def terminate(self):
+    def terminate(self) -> None:
         """Cancel the underlying multipart upload."""
-        if self.closed:
+        upload_id = self._upload_id
+        if upload_id is None:
             return
         logger.debug("%s: terminating multipart upload", self)
         self._client.abort_multipart_upload(
             Bucket=self._bucket,
             Key=self._key,
-            UploadId=self._upload_id,
+            UploadId=upload_id,
         )
         self._upload_id = None
         logger.debug("%s: terminated multipart upload", self)
 
-    def to_boto3(self, resource):
+    def to_boto3(self, resource: Any) -> Any:
         """Create an **independent** `boto3.s3.Object` instance.
 
         The returned object points to the same S3 object as this instance.
@@ -1147,6 +1201,7 @@ class MultipartWriter(io.BufferedIOBase):
     # Internal methods.
     #
     def _upload_next_part(self) -> None:
+        assert self._upload_id is not None  # noqa: S101  # only called during an active upload
         part_num = self._total_parts + 1
         logger.info(
             "%s: uploading part_num: %i, %i bytes (total %.3fGB)",
@@ -1182,22 +1237,27 @@ class MultipartWriter(io.BufferedIOBase):
         self._buf.seek(0)
         self._buf.truncate(0)
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         """Enter the multipart writer context manager."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Close or terminate the multipart writer on context exit."""
         if exc_type is not None:
             self.terminate()
         else:
             self.close()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return a short human-readable description of the writer."""
         return f"smart_open.s3.MultipartWriter({self._bucket!r}, {self._key!r})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return an unambiguous representation of the writer."""
         return f"smart_open.s3.MultipartWriter(bucket={self._bucket!r}, key={self._key!r}, part_size={self._part_size!r})"
 
@@ -1211,16 +1271,20 @@ class SinglepartWriter(io.BufferedIOBase):
     the data be written to S3 and the buffer is released.
     """
 
-    _buf = None  # so `closed` property works in case __init__ fails and __del__ is called
+    name: str
+    _client: S3Client
+    _bucket: str
+    _key: str
+    _buf: io.BytesIO | None = None  # so `closed` property works in case __init__ fails and __del__ is called
 
     def __init__(
         self,
-        bucket,
-        key,
-        client=None,
-        client_kwargs=None,
-        writebuffer=None,
-    ):
+        bucket: str,
+        key: str,
+        client: S3Client | None = None,
+        client_kwargs: dict[str, Any] | None = None,
+        writebuffer: io.BytesIO | None = None,
+    ) -> None:
         _initialize_boto3(self, client, client_kwargs, bucket, key)
 
         if writebuffer is None:
@@ -1231,13 +1295,20 @@ class SinglepartWriter(io.BufferedIOBase):
         else:
             self._buf = writebuffer
 
-    def flush(self):
+    @property
+    def _writebuffer(self) -> io.BytesIO:
+        """Return the active write buffer, asserting the stream is still open."""
+        buf = self._buf
+        assert buf is not None  # noqa: S101  # buffer is set in __init__ and only cleared on close
+        return buf
+
+    def flush(self) -> None:
         """No-op flush; data is buffered until `close`."""
 
     #
     # Override some methods from io.IOBase.
     #
-    def close(self):
+    def close(self) -> None:
         """Upload the buffered bytes as a single-part PUT and close the stream."""
         logger.debug("close: called")
         if self.closed:
@@ -1245,11 +1316,12 @@ class SinglepartWriter(io.BufferedIOBase):
 
         self.seek(0)
 
+        buf = self._writebuffer
         try:
             self._client.put_object(
                 Bucket=self._bucket,
                 Key=self._key,
-                Body=self._buf,
+                Body=buf,
             )
         except botocore.client.ClientError as e:
             msg = f"the bucket {self._bucket!r} does not exist, or is forbidden for access"
@@ -1257,38 +1329,38 @@ class SinglepartWriter(io.BufferedIOBase):
         else:
             logger.debug("%s: direct upload finished", self)
         finally:
-            self._buf.close()
+            buf.close()
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         """Return True if the stream is closed."""
         return self._buf is None or self._buf.closed
 
-    def readable(self):
+    def readable(self) -> bool:
         """Propagate."""
-        return self._buf.readable()
+        return self._writebuffer.readable()
 
-    def writable(self):
+    def writable(self) -> bool:
         """Propagate."""
-        return self._buf.writable()
+        return self._writebuffer.writable()
 
-    def seekable(self):
+    def seekable(self) -> bool:
         """Propagate."""
-        return self._buf.seekable()
+        return self._writebuffer.seekable()
 
-    def seek(self, offset, whence=constants.WHENCE_START):
+    def seek(self, offset: int, whence: int = constants.WHENCE_START) -> int:
         """Propagate."""
-        return self._buf.seek(offset, whence)
+        return self._writebuffer.seek(offset, whence)
 
-    def truncate(self, size=None):
+    def truncate(self, size: int | None = None) -> int:
         """Propagate."""
-        return self._buf.truncate(size)
+        return self._writebuffer.truncate(size)
 
-    def tell(self):
+    def tell(self) -> int:
         """Propagate."""
-        return self._buf.tell()
+        return self._writebuffer.tell()
 
-    def write(self, b):
+    def write(self, b: Buffer) -> int:
         """Write the given buffer into the in-memory buffer.
 
         The buffer can be bytes, bytearray, memoryview or any buffer interface
@@ -1302,58 +1374,63 @@ class SinglepartWriter(io.BufferedIOBase):
         Returns:
             The number of bytes written.
         """
-        return self._buf.write(b)
+        return self._writebuffer.write(b)
 
-    def read(self, size=-1):
+    def read(self, size: int | None = -1) -> bytes:
         """Propagate."""
-        return self._buf.read(size)
+        return self._writebuffer.read(size)
 
-    def read1(self, size=-1):
+    def read1(self, size: int | None = -1) -> bytes:
         """Propagate."""
-        return self._buf.read1(size)
+        return self._writebuffer.read1(size)
 
-    def terminate(self):
+    def terminate(self) -> None:
         """Close buffer and skip upload."""
-        self._buf.close()
+        self._writebuffer.close()
         logger.debug("%s: terminated singlepart upload", self)
 
     #
     # Internal methods.
     #
-    def __enter__(self):
+    def __enter__(self) -> Self:
         """Enter the singlepart writer context manager."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Close or terminate the singlepart writer on context exit."""
         if exc_type is not None:
             self.terminate()
         else:
             self.close()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return a short human-readable description of the writer."""
         return f"smart_open.s3.SinglepartWriter({self._bucket!r}, {self._key!r})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return an unambiguous representation of the writer."""
         return f"smart_open.s3.SinglepartWriter(bucket={self._bucket!r}, key={self._key!r})"
 
 
-def _accept_all(key):  # noqa: ARG001  # interface conformance
+def _accept_all(key: str) -> bool:  # noqa: ARG001  # interface conformance
     return True
 
 
 def iter_bucket(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
-    bucket_name,
-    prefix="",
-    accept_key=None,
-    key_limit=None,
-    workers=16,
-    retries=3,
-    max_threads_per_fileobj=4,
-    client_kwargs=None,
-    session_kwargs=None,
+    bucket_name: str,
+    prefix: str = "",
+    accept_key: Callable[[str], bool] | None = None,
+    key_limit: int | None = None,
+    workers: int = 16,
+    retries: int = 3,
+    max_threads_per_fileobj: int = 4,
+    client_kwargs: dict[str, Any] | None = None,
+    session_kwargs: dict[str, Any] | None = None,
 ) -> Iterator[tuple[str, bytes]]:
     """Iterate and download all S3 objects under `s3://bucket_name/prefix`.
 
@@ -1408,12 +1485,14 @@ def iter_bucket(  # noqa: PLR0913  # legacy public API; refactor in a dedicated 
     # If people insist on giving us bucket instances, silently extract the name
     # before moving on.  Works for boto3 as well as boto.
     #
+    bucket: Any = bucket_name
     with contextlib.suppress(AttributeError):
-        bucket_name = bucket_name.name
+        bucket = bucket.name
 
-    if bucket_name is None:
+    if bucket is None:
         msg = "bucket_name may not be None"
         raise ValueError(msg)
+    bucket_name = bucket
 
     total_size, key_no = 0, 0
 
@@ -1478,36 +1557,39 @@ def iter_bucket(  # noqa: PLR0913  # legacy public API; refactor in a dedicated 
 
 def _list_bucket(
     *,
-    bucket_name,
-    client,
-    prefix="",
-    accept_key=lambda k: True,  # noqa: ARG005  # interface conformance
-):
-    ctoken = None
+    bucket_name: str,
+    client: S3Client,
+    prefix: str = "",
+    accept_key: Callable[[str], bool] = lambda k: True,  # noqa: ARG005  # interface conformance
+) -> Iterator[str]:
+    ctoken: str | None = None
 
     while True:
         # list_objects_v2 doesn't like a None value for ContinuationToken
         # so we don't set it if we don't have one.
+        kwargs: dict[str, Any]
         if ctoken:
             kwargs = {"Bucket": bucket_name, "Prefix": prefix, "ContinuationToken": ctoken}
         else:
             kwargs = {"Bucket": bucket_name, "Prefix": prefix}
         response = client.list_objects_v2(**kwargs)
-        try:
-            content = response["Contents"]
-        except KeyError:
-            pass
-        else:
-            for c in content:
-                key = c["Key"]
-                if accept_key(key):
-                    yield key
+        for c in response.get("Contents", []):
+            key = c["Key"]
+            if accept_key(key):
+                yield key
         ctoken = response.get("NextContinuationToken", None)
         if not ctoken:
             break
 
 
-def _download_key(key_name, *, client, bucket_name, retries, transfer_config):
+def _download_key(
+    key_name: str,
+    *,
+    client: S3Client,
+    bucket_name: str,
+    retries: int,
+    transfer_config: Any,
+) -> tuple[str, bytes] | tuple[None, None] | None:
     # Sometimes, https://github.com/boto/boto/issues/2409 can happen
     # because of network issues on either side.
     # Retry up to 3 times to ensure its not a transient issue.
@@ -1536,7 +1618,13 @@ def _download_key(key_name, *, client, bucket_name, retries, transfer_config):
     return None
 
 
-def _download_fileobj(*, client, bucket_name, key_name, transfer_config):
+def _download_fileobj(
+    *,
+    client: S3Client,
+    bucket_name: str,
+    key_name: str,
+    transfer_config: Any,
+) -> bytes:
     #
     # This is a separate function only because it makes it easier to inject
     # exceptions during tests.

@@ -7,12 +7,20 @@
 
 """Implements reading and writing to/from HDFS."""
 
+from __future__ import annotations
+
 import io
 import logging
 import subprocess
 import urllib.parse
+from typing import TYPE_CHECKING, TypedDict
 
-from smart_open import utils
+import smart_open.utils
+
+if TYPE_CHECKING:
+    from _typeshed import ReadableBuffer, WriteableBuffer
+
+    from smart_open._typing import TransportParams
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +35,12 @@ URI_EXAMPLES = (
 )
 
 
-def parse_uri(uri_as_string):
+class _HDFSUri(TypedDict):
+    scheme: str
+    uri_path: str
+
+
+def parse_uri(uri_as_string: str) -> _HDFSUri:
     """Parse an ``hdfs://`` or ``viewfs://`` URI into its path component."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
@@ -43,9 +56,9 @@ def parse_uri(uri_as_string):
     return {"scheme": split_uri.scheme, "uri_path": uri_path}
 
 
-def open_uri(uri, mode, transport_params):
+def open_uri(uri: str, mode: str, transport_params: TransportParams) -> CliRawInputBase | CliRawOutputBase:
     """Open an HDFS URI using the given mode and transport params."""
-    utils.check_kwargs(open, transport_params)
+    smart_open.utils.check_kwargs(open, transport_params)
 
     parsed_uri = parse_uri(uri)
     fobj = open(parsed_uri["uri_path"], mode)
@@ -53,7 +66,7 @@ def open_uri(uri, mode, transport_params):
     return fobj
 
 
-def open(uri, mode):
+def open(uri: str, mode: str) -> CliRawInputBase | CliRawOutputBase:
     """Open an HDFS `uri` for reading (``"rb"``) or writing (``"wb"``)."""
     if mode == "rb":
         return CliRawInputBase(uri)
@@ -69,56 +82,64 @@ class CliRawInputBase(io.RawIOBase):
     Implements the io.RawIOBase interface of the standard library.
     """
 
-    _sub = None  # so `closed` property works in case __init__ fails and __del__ is called
+    name: str
+    _sub: subprocess.Popen[bytes] | None = None  # so `closed` works if __init__ fails and __del__ runs
 
-    def __init__(self, uri):
+    def __init__(self, uri: str) -> None:
         self._uri = uri
         self._sub = subprocess.Popen(["hdfs", "dfs", "-cat", self._uri], stdout=subprocess.PIPE)  # noqa: S603, S607  # invokes local hdfs CLI
 
     #
     # Override some methods from io.IOBase.
     #
-    def close(self):
+    def close(self) -> None:
         """Flush and close this stream."""
         logger.debug("close: called")
-        if not self.closed:
-            self._sub.terminate()
+        sub = self._sub
+        if sub is not None:
+            sub.terminate()
             self._sub = None
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         """Return True if the stream is closed."""
         return self._sub is None
 
-    def readable(self):
+    def readable(self) -> bool:
         """Return True if the stream can be read from."""
         return self._sub is not None
 
-    def seekable(self):
+    def seekable(self) -> bool:
         """Return False; HDFS streams do not support seeking."""
         return False
 
     #
     # io.RawIOBase methods.
     #
-    def detach(self):
+    def detach(self) -> io.RawIOBase:
         """Unsupported."""
         raise io.UnsupportedOperation
 
-    def read(self, size=-1):
+    def read(self, size: int | None = -1) -> bytes:
         """Read up to size bytes from the object and return them."""
-        return self._sub.stdout.read(size)
+        sub = self._sub
+        assert sub is not None  # noqa: S101  # subprocess started in __init__
+        assert sub.stdout is not None  # noqa: S101  # stdout=PIPE set in __init__
+        if size is None:
+            size = -1
+        return sub.stdout.read(size)
 
-    def read1(self, size=-1):
+    def read1(self, size: int | None = -1) -> bytes:
         """This is the same as read()."""
         return self.read(size=size)
 
-    def readinto(self, b):
+    def readinto(self, b: WriteableBuffer) -> int:
         """Read up to ``len(b)`` bytes into `b` and return the number of bytes read."""
-        data = self.read(len(b))
+        mv = memoryview(b).cast("B")
+        data = self.read(len(mv))
         if not data:
             return 0
-        b[: len(data)] = data
+        mv[: len(data)] = data
         return len(data)
 
 
@@ -128,39 +149,45 @@ class CliRawOutputBase(io.RawIOBase):
     Implements the io.RawIOBase interface of the standard library.
     """
 
-    _sub = None  # so `closed` property works in case __init__ fails and __del__ is called
+    name: str
+    _sub: subprocess.Popen[bytes] | None = None  # so `closed` works if __init__ fails and __del__ runs
 
-    def __init__(self, uri):
+    def __init__(self, uri: str) -> None:
         self._uri = uri
         self._sub = subprocess.Popen(["hdfs", "dfs", "-put", "-f", "-", self._uri], stdin=subprocess.PIPE)  # noqa: S603, S607  # invokes local hdfs CLI
 
-    def close(self):
+    def close(self) -> None:
         """Flush and close this stream."""
         logger.debug("close: called")
-        if not self.closed:
+        sub = self._sub
+        if sub is not None:
+            assert sub.stdin is not None  # noqa: S101  # stdin=PIPE set in __init__
             self.flush()
-            self._sub.stdin.close()
-            self._sub.wait()
+            sub.stdin.close()
+            sub.wait()
             self._sub = None
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         """Return True if the stream is closed."""
         return self._sub is None
 
-    def flush(self):
+    def flush(self) -> None:
         """Flush the underlying ``hdfs dfs -put`` subprocess stdin."""
-        self._sub.stdin.flush()
+        sub = self._sub
+        assert sub is not None  # noqa: S101  # subprocess started in __init__
+        assert sub.stdin is not None  # noqa: S101  # stdin=PIPE set in __init__
+        sub.stdin.flush()
 
-    def writeable(self):
+    def writeable(self) -> bool:
         """Return True if this object is writeable."""
         return self._sub is not None
 
-    def seekable(self):
+    def seekable(self) -> bool:
         """Return False; HDFS streams do not support seeking."""
         return False
 
-    def write(self, b):
+    def write(self, b: ReadableBuffer) -> int:
         """Write the given buffer to the underlying raw stream.
 
         Returns the number of bytes written, as required by
@@ -171,12 +198,15 @@ class CliRawOutputBase(io.RawIOBase):
         ``AssertionError`` because ``write`` would otherwise implicitly
         return ``None``.
         """
-        return self._sub.stdin.write(b)
+        sub = self._sub
+        assert sub is not None  # noqa: S101  # subprocess started in __init__
+        assert sub.stdin is not None  # noqa: S101  # stdin=PIPE set in __init__
+        return sub.stdin.write(b)
 
     #
     # io.IOBase methods.
     #
-    def detach(self):
+    def detach(self) -> io.RawIOBase:
         """Unsupported."""
         msg = "detach() not supported"
         raise io.UnsupportedOperation(msg)

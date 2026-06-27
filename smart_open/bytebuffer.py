@@ -6,7 +6,13 @@
 #
 """Implements ByteBuffer class for amortizing network transfer overhead."""
 
+from __future__ import annotations
+
 import io
+from typing import IO, TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class ByteBuffer:
@@ -51,15 +57,15 @@ class ByteBuffer:
         0
     """
 
-    def __init__(self, chunk_size=io.DEFAULT_BUFFER_SIZE):
+    def __init__(self, chunk_size: int = io.DEFAULT_BUFFER_SIZE) -> None:
         self._chunk_size = chunk_size
         self.empty()
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Return the number of unread bytes in the buffer as an int."""
         return len(self._bytes) - self._pos
 
-    def read(self, size=-1):
+    def read(self, size: int = -1) -> bytes:
         """Read bytes from the buffer and advance the read position.
 
         Args:
@@ -73,7 +79,7 @@ class ByteBuffer:
         self._pos += len(part)
         return part
 
-    def peek(self, size=-1):
+    def peek(self, size: int = -1) -> bytes:
         """Get bytes from the buffer without advancing the read position.
 
         Args:
@@ -88,12 +94,12 @@ class ByteBuffer:
 
         return bytes(self._bytes[self._pos : self._pos + size])
 
-    def empty(self):
+    def empty(self) -> None:
         """Remove all bytes from the buffer."""
         self._bytes = bytearray()
         self._pos = 0
 
-    def fill(self, source, size=-1):
+    def fill(self, source: IO[bytes] | Iterable[bytes], size: int = -1) -> int:
         """Fill the buffer with bytes from source.
 
         Reads from ``source`` until one of these conditions is met:
@@ -128,7 +134,7 @@ class ByteBuffer:
             self._pos = 0
 
         if hasattr(source, "read"):
-            new_bytes = source.read(size)
+            new_bytes = cast("IO[bytes]", source).read(size)
         else:
             new_bytes = bytearray()
             for more_bytes in source:
@@ -139,7 +145,7 @@ class ByteBuffer:
         self._bytes += new_bytes
         return len(new_bytes)
 
-    def readline(self, terminator):
+    def readline(self, terminator: bytes) -> bytes:
         """Read a line from this buffer efficiently.
 
         A line is a contiguous sequence of bytes that ends with either:
