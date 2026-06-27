@@ -9,9 +9,9 @@ test:
 	python -m pytest tests -v
 
 .PHONY: install
-## Install this repo, plus test extras, in editable mode
+## Install this repo, plus dev extras, in editable mode
 install:
-	pip install -e .[test]
+	pip install -e .[dev]
 	pre-commit install
 
 .PHONY: help

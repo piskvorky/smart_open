@@ -126,7 +126,7 @@ def _connect_ssh(hostname, username, port, password, connect_kwargs):
     return ssh
 
 
-def _maybe_fetch_config(host, username=None, password=None, port=None, connect_kwargs=None):  # noqa: C901, PLR0912  # legacy public API; refactor in a dedicated PR
+def _maybe_fetch_config(host, username=None, password=None, port=None, connect_kwargs=None):  # noqa: C901, PLR0912  # legacy internal helper; refactor in a dedicated PR
     # If all fields are set, return as-is.
     if not any(arg is None for arg in (host, username, password, port, connect_kwargs)):
         return host, username, password, port, connect_kwargs

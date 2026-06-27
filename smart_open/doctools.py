@@ -34,30 +34,19 @@ else:
 
 
 def extract_kwargs(docstring):
-    """Extract keyword argument documentation from a function's docstring.
-
-    Supports both NumPy-style (underlined ``Parameters``) and Google-style
-    (``Args:``) sections, so transport submodules can migrate independently.
+    """Extract keyword argument documentation from a Google-style ``Args:`` section.
 
     Args:
         docstring: The docstring to extract keyword arguments from.
 
     Returns:
-        A list of ``[name, type, description_lines]`` triples. ``name`` is the
-        name of the keyword argument, ``type`` is its type (may be an empty
-        string when missing) and ``description_lines`` is its documentation as
-        a list of lines.
+        A list of ``[name, type, description_lines]`` triples. ``type`` is
+        always an empty string since Google-style docstrings in this codebase
+        don't carry argument types, and ``description_lines`` is a list of
+        lines.
 
     Note:
-        The implementation is rather fragile. For NumPy style it expects:
-
-        1. The parameters are under an underlined Parameters section
-        2. Keyword parameters have the literal ", optional" after the type
-        3. Names and types are not indented
-        4. Descriptions are indented with 4 spaces
-        5. The Parameters section ends with an empty line.
-
-        For Google style it expects:
+        The implementation expects:
 
         1. The parameters are under an ``Args:`` header
         2. Argument lines start with 4 spaces of indent (``    name: desc``)
@@ -80,64 +69,14 @@ def extract_kwargs(docstring):
 
     lines = inspect.cleandoc(docstring).split("\n")
 
-    #
-    # Detect the section style by scanning for a header.
-    #
     for idx, line in enumerate(lines):
-        if line == "Parameters" and idx + 1 < len(lines) and lines[idx + 1].startswith("---"):
-            return _extract_kwargs_numpy(lines[idx:])
         if line.rstrip() == "Args:":
-            return _extract_kwargs_google(lines[idx:])
-
-    return []
-
-
-def _extract_kwargs_numpy(lines):
-    """Parse a NumPy-style ``Parameters`` section into kwargs triples.
-
-    Args:
-        lines: Cleaned docstring lines beginning with the ``Parameters`` header.
-
-    Returns:
-        A list of ``[name, type, description_lines]`` triples.
-    """
-    kwargs = []
-    # Drop the 'Parameters' header and the '----------' underline.
-    lines = lines[2:]
-
-    for line in lines:
-        if not line.strip():  # stop at the first empty line encountered
+            lines = lines[idx + 1 :]
             break
-        is_arg_line = not line.startswith(" ")
-        if is_arg_line:
-            name, type_ = line.split(":", 1)
-            name, type_, description = name.strip(), type_.strip(), []
-            kwargs.append([name, type_, description])
-            continue
-        is_description_line = line.startswith("    ")
-        if is_description_line:
-            kwargs[-1][-1].append(line.strip())
+    else:
+        return []
 
-    return kwargs
-
-
-def _extract_kwargs_google(lines):
-    """Parse a Google-style ``Args:`` section into kwargs triples.
-
-    Type information is not extracted (returned as an empty string) since
-    Google-style docstrings in this codebase don't include argument types in
-    the docstring.
-
-    Args:
-        lines: Cleaned docstring lines beginning with the ``Args:`` header.
-
-    Returns:
-        A list of ``[name, type, description_lines]`` triples.
-    """
     kwargs = []
-    # Drop the 'Args:' header.
-    lines = lines[1:]
-
     for line in lines:
         if not line.strip():  # stop at the first empty line encountered
             break

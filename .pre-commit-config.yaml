@@ -35,7 +35,6 @@ repos:
   - id: check-merge-conflict
   - id: check-json
   - id: check-toml
-  - id: check-xml
   - id: check-yaml
   - id: debug-statements
 

@@ -8,8 +8,8 @@
 
 import io
 import logging
+import posixpath
 import urllib.parse
-from pathlib import PurePosixPath
 
 try:
     import requests
@@ -105,7 +105,7 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
             session=session,
             timeout=timeout,
         )
-        fobj.name = PurePosixPath(urllib.parse.urlparse(uri).path).name
+        fobj.name = posixpath.basename(urllib.parse.urlparse(uri).path)
         return fobj
     msg = f"http support for mode {mode!r} not implemented"
     raise NotImplementedError(msg)

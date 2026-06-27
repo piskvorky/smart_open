@@ -83,7 +83,7 @@ def convert_transport_params_to_args(transport_params):
     return kwargs
 
 
-def _connect(hostname, username, port, password, secure_connection, transport_params):  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
+def _connect(hostname, username, port, password, secure_connection, transport_params):  # noqa: PLR0913  # legacy internal helper; refactor in a dedicated PR
     kwargs = convert_transport_params_to_args(transport_params)
     if secure_connection:
         ssl_context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)

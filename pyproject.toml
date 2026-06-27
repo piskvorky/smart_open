@@ -36,7 +36,7 @@ http = ["requests"]
 lz4 = ["lz4"]
 s3 = ["boto3>=1.9.17"]
 ssh = ["paramiko"]
-test = [
+dev = [
   "smart_open[all]",
   "moto[server]",
   "responses",
@@ -90,7 +90,6 @@ ignore = [
   "PLC0415", # local imports are necessary for optional dependencies
   "COM812", # conflicts with ruff format
   "E501", # line length handled by ruff-format
-  "E731", # lambda assignment is widely used in smart_open
   "A001", "A002", "A004", # smart_open intentionally shadows the builtin `open`
   "ARG002" # io.IOBase overrides keep interface args even when unused
 ]

@@ -314,3 +314,21 @@ def test_read_with_invalid_size():
 
     with pytest.raises(ValueError, match="size must be >= -1"):
         reader.read(-2)
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("/a/b.gz", "b.gz"),
+        ("/foo/", ""),  # trailing slash -> empty, not "foo" (regression: PurePosixPath.name diverges)
+        ("/", ""),
+        ("", ""),
+    ],
+)
+@responses.activate
+def test_open_sets_fobj_name(path, expected):
+    """`http.open` derives `fobj.name` from the URL path, posix-basename style."""
+    url = HTTPS_URL + path
+    responses.add_callback(responses.GET, url, callback=request_callback)
+    fobj = smart_open.http.open(url, "rb")
+    assert fobj.name == expected

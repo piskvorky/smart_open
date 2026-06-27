@@ -242,7 +242,7 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
     return so_utils.FileLikeProxy(decoded, binary)
 
 
-def _get_binary_mode(mode_str):  # noqa: C901  # legacy public API; refactor in a dedicated PR
+def _get_binary_mode(mode_str):  # noqa: C901  # legacy internal helper; refactor in a dedicated PR
     #
     # https://docs.python.org/3/library/functions.html#open
     #
@@ -297,7 +297,7 @@ def _get_binary_mode(mode_str):  # noqa: C901  # legacy public API; refactor in 
     return "".join(binmode)
 
 
-def _shortcut_open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
+def _shortcut_open(  # noqa: PLR0913  # legacy internal helper; refactor in a dedicated PR
     uri,
     mode,
     compression,
@@ -458,12 +458,10 @@ class patch_pathlib:  # noqa: N801  # function-shaped name in public API
     def __init__(self):
         self.old_impl = _patch_pathlib(open)
 
-    def __enter__(self):
-        """Enter the patched-pathlib context manager."""
+    def __enter__(self):  # noqa: D105
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Restore the original ``Path.open`` implementation."""
+    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: D105
         _patch_pathlib(self.old_impl)
 
 

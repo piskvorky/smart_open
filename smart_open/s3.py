@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import http
 import io
@@ -28,8 +29,6 @@ try:
     import urllib3.exceptions
 except ImportError:
     MISSING_DEPS = True
-
-import contextlib
 
 import smart_open.bytebuffer
 import smart_open.concurrency
@@ -114,8 +113,8 @@ class Retry:
                 logger.exception("retryable error")
                 time.sleep(self.sleep_seconds)
         logger.critical("encountered too many non-fatal errors, giving up")
-        msg = "%s failed after %d attempts"
-        raise OSError(msg, fn.func, self.attempts)
+        msg = f"{fn.func} failed after {self.attempts} attempts"
+        raise OSError(msg)
 
 
 #
@@ -536,7 +535,7 @@ class _SeekableRawReader:
 
         return self._position
 
-    def _open_body(self, start=None, stop=None):  # noqa: C901, PLR0912  # legacy public API; refactor in a dedicated PR
+    def _open_body(self, start=None, stop=None):  # noqa: C901, PLR0912  # legacy internal helper; refactor in a dedicated PR
         """Open a connection to download the specified range of bytes.
 
         Store the open file handle in self._body.
