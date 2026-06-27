@@ -18,12 +18,14 @@ Example:
         b'Ubuntu 4.4.0-1061.70-aws 4.4.131'
 """
 
+from __future__ import annotations
+
 import contextlib
 import getpass
 import logging
 import urllib.parse
-from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, TypedDict
 
 try:
     import paramiko
@@ -32,12 +34,17 @@ except ImportError:
 
 import smart_open.utils
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from smart_open._typing import TransportParams
+
 logger = logging.getLogger(__name__)
 
 #
 # Global storage for SSH connections.
 #
-_SSH = {}
+_SSH: dict[tuple[str, str], paramiko.SSHClient] = {}
 
 SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""
@@ -57,11 +64,11 @@ URI_EXAMPLES = (
 _SSH_CONFIG_FILES = [str(Path("~/.ssh/config").expanduser())]
 
 
-def _unquote(text):
+def _unquote(text: str | None) -> str | None:
     return text and urllib.parse.unquote(text)
 
 
-def _str2bool(string):
+def _str2bool(string: str) -> bool:
     if string == "no":
         return False
     if string == "yes":
@@ -90,7 +97,16 @@ _PARAMIKO_CONFIG_MAP: dict[str, tuple[str, Callable]] = {
 }
 
 
-def parse_uri(uri_as_string):
+class _SSHUri(TypedDict):
+    scheme: str
+    uri_path: str | None
+    user: str | None
+    host: str | None
+    port: int | None
+    password: str | None
+
+
+def parse_uri(uri_as_string: str) -> _SSHUri:
     """Parse an ``ssh://``/``scp://``/``sftp://`` URI into connection components."""
     split_uri = urllib.parse.urlsplit(uri_as_string)
     assert split_uri.scheme in SCHEMES  # noqa: S101  # internal precondition; misuse should crash loudly
@@ -104,17 +120,23 @@ def parse_uri(uri_as_string):
     }
 
 
-def open_uri(uri, mode, transport_params):
+def open_uri(uri: str, mode: str, transport_params: TransportParams) -> paramiko.SFTPFile:
     """Open an SSH/SCP/SFTP URI using the given mode and transport params."""
     kwargs = smart_open.utils.check_kwargs(open, transport_params)
-    parsed_uri = parse_uri(uri)
+    parsed_uri: dict[str, Any] = dict(parse_uri(uri))
     uri_path = parsed_uri.pop("uri_path")
     parsed_uri.pop("scheme")
     final_params = {**parsed_uri, **kwargs}  # transport_params takes precedence over uri
     return open(uri_path, mode, **final_params)
 
 
-def _connect_ssh(hostname, username, port, password, connect_kwargs):
+def _connect_ssh(
+    hostname: str,
+    username: str | None,
+    port: int | None,
+    password: str | None,
+    connect_kwargs: dict[str, Any] | None,
+) -> paramiko.SSHClient:
     ssh = paramiko.SSHClient()
     ssh.load_system_host_keys()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # noqa: S507  # documented smart_open default
@@ -122,11 +144,17 @@ def _connect_ssh(hostname, username, port, password, connect_kwargs):
     if "key_filename" not in kwargs:
         kwargs.setdefault("password", password)
     kwargs.setdefault("username", username)
-    ssh.connect(hostname, port, **kwargs)
+    ssh.connect(hostname, port if port is not None else DEFAULT_PORT, **kwargs)
     return ssh
 
 
-def _maybe_fetch_config(host, username=None, password=None, port=None, connect_kwargs=None):  # noqa: C901, PLR0912  # legacy internal helper; refactor in a dedicated PR
+def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refactor in a dedicated PR
+    host: str | None,
+    username: str | None = None,
+    password: str | None = None,
+    port: int | None = None,
+    connect_kwargs: dict[str, Any] | None = None,
+) -> tuple[str | None, str | None, str | None, int | None, dict[str, Any] | None]:
     # If all fields are set, return as-is.
     if not any(arg is None for arg in (host, username, password, port, connect_kwargs)):
         return host, username, password, port, connect_kwargs
@@ -211,16 +239,16 @@ def _maybe_fetch_config(host, username=None, password=None, port=None, connect_k
 
 
 def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
-    path,
-    mode="r",
-    host=None,
-    user=None,
-    password=None,
-    port=None,
-    connect_kwargs=None,
-    prefetch_kwargs=None,
-    buffer_size=-1,
-):
+    path: str | None,
+    mode: str = "r",
+    host: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
+    port: int | None = None,
+    connect_kwargs: dict[str, Any] | None = None,
+    prefetch_kwargs: dict[str, Any] | None = None,
+    buffer_size: int = -1,
+) -> paramiko.SFTPFile:
     """Open a file on a remote machine over SSH.
 
     Expects authentication to be already set up via existing keys on the local machine.
@@ -255,16 +283,22 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     host, user, password, port, connect_kwargs = _maybe_fetch_config(
         host, user, password, port, connect_kwargs
     )
+    assert host is not None  # noqa: S101  # _maybe_fetch_config raises if host is falsy
+    assert user is not None  # noqa: S101  # _maybe_fetch_config defaults user via getpass.getuser()
+    assert path is not None  # noqa: S101  # callers always provide a remote path to open
 
     key = (host, user)
 
+    sftp_client: paramiko.SFTPClient | None = None
     attempts = 2
     for attempt in range(attempts):
         try:
             ssh = _SSH[key]
             # Validate that the cached connection is still an active connection
             #   and if not, refresh the connection
-            if not ssh.get_transport().active:
+            transport = ssh.get_transport()
+            assert transport is not None  # noqa: S101  # a cached connection has a transport
+            if not transport.active:
                 ssh.close()
                 ssh = _SSH[key] = _connect_ssh(host, user, port, password, connect_kwargs)
         except KeyError:
@@ -272,6 +306,7 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
 
         try:
             transport = ssh.get_transport()
+            assert transport is not None  # noqa: S101  # _connect_ssh established an active transport
             sftp_client = transport.open_sftp_client()
             break
         except paramiko.SSHException as ex:
@@ -285,6 +320,7 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
             #
             del _SSH[key]
 
+    assert sftp_client is not None  # noqa: S101  # the loop above either sets this or raises
     fobj = sftp_client.open(path, mode=mode, bufsize=buffer_size)
     fobj.name = path
     if prefetch_kwargs is not None:

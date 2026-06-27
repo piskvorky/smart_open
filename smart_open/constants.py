@@ -7,21 +7,25 @@
 
 """Some universal constants that are common to I/O operations."""
 
-READ_BINARY = "rb"
+from __future__ import annotations
 
-WRITE_BINARY = "wb"
+from typing import Final
 
-APPEND_BINARY = "ab"
+READ_BINARY: Final = "rb"
+
+WRITE_BINARY: Final = "wb"
+
+APPEND_BINARY: Final = "ab"
 
 # APPEND_BINARY intentionally excluded: only Azure supports it, other transports should error.
-BINARY_MODES = (READ_BINARY, WRITE_BINARY)
+BINARY_MODES: Final = (READ_BINARY, WRITE_BINARY)
 
-BINARY_NEWLINE = b"\n"
+BINARY_NEWLINE: Final = b"\n"
 
-WHENCE_START = 0
+WHENCE_START: Final = 0
 
-WHENCE_CURRENT = 1
+WHENCE_CURRENT: Final = 1
 
-WHENCE_END = 2
+WHENCE_END: Final = 2
 
-WHENCE_CHOICES = (WHENCE_START, WHENCE_CURRENT, WHENCE_END)
+WHENCE_CHOICES: Final = (WHENCE_START, WHENCE_CURRENT, WHENCE_END)

@@ -7,12 +7,19 @@
 
 """Helper functions for documentation, etc."""
 
+from __future__ import annotations
+
 import inspect
 import io
 import logging
 import urllib.parse
+from typing import IO, TYPE_CHECKING, Any
 
 import wrapt
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from types import TracebackType
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +27,7 @@ WORKAROUND_SCHEMES = ["s3", "s3n", "s3a", "gcs", "gs"]
 QUESTION_MARK_PLACEHOLDER = "///smart_open.utils.QUESTION_MARK_PLACEHOLDER///"
 
 
-def inspect_kwargs(kallable):
+def inspect_kwargs(kallable: Callable[..., Any]) -> dict[str, Any]:
     """Return a ``{name: default}`` mapping for every default-valued kwarg of `kallable`."""
     signature = inspect.signature(kallable)
     return {
@@ -30,7 +37,7 @@ def inspect_kwargs(kallable):
     }
 
 
-def check_kwargs(kallable, kwargs):
+def check_kwargs(kallable: Callable[..., Any], kwargs: dict[str, Any]) -> dict[str, Any]:
     """Check which keyword arguments the callable supports.
 
     Args:
@@ -51,7 +58,7 @@ def check_kwargs(kallable, kwargs):
     return supported_kwargs
 
 
-def clamp(value, minval=0, maxval=None):
+def clamp(value: int, minval: int = 0, maxval: int | None = None) -> int:
     """Clamp a numeric value to a specific range.
 
     Args:
@@ -67,7 +74,7 @@ def clamp(value, minval=0, maxval=None):
     return max(value, minval)
 
 
-def make_range_string(start=None, stop=None):
+def make_range_string(start: int | None = None, stop: int | None = None) -> str:
     """Create a byte range specifier in accordance with RFC-2616.
 
     Args:
@@ -91,7 +98,7 @@ def make_range_string(start=None, stop=None):
     return f"bytes={start_str}-{stop_str}"
 
 
-def parse_content_range(content_range):
+def parse_content_range(content_range: str) -> tuple[str, int, int, int]:
     """Extract units, start, stop, and length from a content range header like "bytes 0-846981/846982".
 
     Assumes a properly formatted content-range header from S3.
@@ -110,7 +117,7 @@ def parse_content_range(content_range):
     return units, int(start), int(stop), int(length)
 
 
-def safe_urlsplit(url):
+def safe_urlsplit(url: str) -> urllib.parse.SplitResult:
     """This is a hack to prevent the regular urlsplit from splitting around question marks.
 
     A question mark (?) in a URL typically indicates the start of a
@@ -153,7 +160,12 @@ def safe_urlsplit(url):
 class TextIOWrapper(io.TextIOWrapper):
     """`io.TextIOWrapper` subclass that does not close the buffer on exceptions."""
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Call close on underlying buffer only when there was no exception.
 
         Without this patch, TextIOWrapper would call self.buffer.close() during
@@ -168,28 +180,33 @@ class TextIOWrapper(io.TextIOWrapper):
 class FileLikeProxy(wrapt.ObjectProxy):
     """Wrap an `outer` file-like object so that closing it also closes `inner`."""
 
-    __inner = ...  # initialized before wrapt disallows __setattr__ on certain objects
+    __inner: Any = ...  # initialized before wrapt disallows __setattr__ on certain objects
 
-    def __init__(self, outer, inner):
+    def __init__(self, outer: IO[Any], inner: IO[Any]) -> None:
         super().__init__(outer)
         self.__inner = inner
 
-    def __enter__(self):
+    def __enter__(self) -> Any:
         """This explicit proxy method is only required for pylance ref #916."""
         return self.__wrapped__.__enter__()
 
-    def __exit__(self, *args, **kwargs):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> Any:
         """Exit inner after exiting outer."""
         try:
-            return super().__exit__(*args, **kwargs)
+            return super().__exit__(exc_type, exc_value, traceback)
         finally:
-            self.__inner.__exit__(*args, **kwargs)
+            self.__inner.__exit__(exc_type, exc_value, traceback)
 
-    def __next__(self):
+    def __next__(self) -> Any:
         """Delegate iteration to the wrapped file-like object."""
         return self.__wrapped__.__next__()
 
-    def close(self):
+    def close(self) -> None:
         """Close both the wrapped object and the inner object."""
         try:
             return self.__wrapped__.close()

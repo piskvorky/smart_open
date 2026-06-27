@@ -12,13 +12,19 @@ For internal use only.
 
 # ruff: noqa: T201  # this module builds the open()/parse_uri() docstrings by writing to sys.stdout
 
+from __future__ import annotations
+
 import contextlib
 import inspect
 import io
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 from . import compression, transport
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 #
 # Python 3.13+ automatically trims docstrings (like inspect.cleandoc),
@@ -32,7 +38,7 @@ else:
     LPAD = "    "
 
 
-def extract_kwargs(docstring):
+def extract_kwargs(docstring: str | None) -> list[list[Any]]:
     """Extract keyword argument documentation from a Google-style ``Args:`` section.
 
     Args:
@@ -75,7 +81,7 @@ def extract_kwargs(docstring):
     else:
         return []
 
-    kwargs = []
+    kwargs: list[list[Any]] = []
     for line in lines:
         if not line.strip():  # stop at the first empty line encountered
             break
@@ -94,7 +100,7 @@ def extract_kwargs(docstring):
     return kwargs
 
 
-def to_docstring(kwargs, lpad=""):
+def to_docstring(kwargs: list[Any], lpad: str = "") -> str:
     """Reconstruct a docstring from keyword argument info.
 
     Basically reverses :func:`extract_kwargs`.
@@ -128,7 +134,7 @@ def to_docstring(kwargs, lpad=""):
     return buf.getvalue()
 
 
-def extract_examples_from_readme(indent=None):
+def extract_examples_from_readme(indent: str | None = None) -> str:
     """Extract examples from this project's README.md file.
 
     Args:
@@ -157,7 +163,7 @@ def extract_examples_from_readme(indent=None):
         return indent + "See README.md"
 
 
-def tweak_open_docstring(f):
+def tweak_open_docstring(f: Callable[..., Any]) -> None:
     """Inject transport, compression and example sections into ``f``'s docstring."""
     buf = io.StringIO()
     seen = set()
@@ -178,11 +184,11 @@ def tweak_open_docstring(f):
             except AttributeError:
                 schemes = [scheme]
 
-            relpath = Path(submodule.__file__).relative_to(root_path)
+            relpath = Path(cast("str", submodule.__file__)).relative_to(root_path)
             heading = "{} ({})".format("/".join(schemes), relpath)
             print(f"{body_pad}{heading}")
             print(f"{body_pad}{'~' * len(heading)}")
-            print(f"{body_pad}{submodule.__doc__.split(chr(10))[0]}")
+            print(f"{body_pad}{(submodule.__doc__ or '').split(chr(10))[0]}")
             print()
 
             kwargs = extract_kwargs(submodule.open.__doc__)
@@ -210,7 +216,7 @@ def tweak_open_docstring(f):
         f.__doc__ = f.__doc__.replace(PLACEHOLDER, buf.getvalue())
 
 
-def tweak_parse_uri_docstring(f):
+def tweak_parse_uri_docstring(f: Callable[..., Any]) -> None:
     """Inject supported schemes and example URIs into ``f``'s docstring."""
     buf = io.StringIO()
     seen = set()

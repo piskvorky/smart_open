@@ -10,17 +10,23 @@ The main entrypoint is :func:`get_transport`.  See also :file:`extending.md`.
 
 """
 
+from __future__ import annotations
+
 import importlib
 import logging
+from typing import TYPE_CHECKING
 
 import smart_open.local_file
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 logger = logging.getLogger(__name__)
 
 NO_SCHEME = ""
 
-_REGISTRY = {NO_SCHEME: smart_open.local_file}
-_ERRORS = {}
+_REGISTRY: dict[str, ModuleType] = {NO_SCHEME: smart_open.local_file}
+_ERRORS: dict[str, str] = {}
 _MISSING_DEPS_ERROR = """You are trying to use the %(module)s functionality of smart_open
 but you do not have the correct %(module)s dependencies installed. Try:
 
@@ -29,7 +35,7 @@ but you do not have the correct %(module)s dependencies installed. Try:
 """
 
 
-def register_transport(submodule):
+def register_transport(submodule: str | ModuleType) -> None:
     """Register a submodule as a transport mechanism for ``smart_open``.
 
     This module **must** have:
@@ -42,8 +48,8 @@ def register_transport(submodule):
     Once registered, you can get the submodule by calling :func:`get_transport`.
 
     """
-    module_name = submodule
     if isinstance(submodule, str):
+        module_name = submodule
         try:
             submodule = importlib.import_module(submodule)
         except ImportError:
@@ -72,7 +78,7 @@ def register_transport(submodule):
             _REGISTRY[scheme] = submodule
 
 
-def get_transport(scheme):
+def get_transport(scheme: str) -> ModuleType:
     """Get the submodule that handles transport for the specified scheme.
 
     This submodule must have been previously registered via :func:`register_transport`.
