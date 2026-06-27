@@ -40,7 +40,7 @@ jobs:
         cache-dependency-glob: '**/pyproject.toml'
 
     - name: Load pre-commit cache
-      if: matrix.python-version == '3.10'   # sync with matrix above
+      if: matrix.python-version == '3.10' && startsWith(matrix.os, 'ubuntu')
       uses: actions/cache@v5
       with:
         path: ~/.cache/pre-commit
@@ -56,11 +56,11 @@ jobs:
       run: uv pip install -e .[test]
 
     - name: Run linters
-      if: matrix.python-version == '3.10'   # sync with matrix above
+      if: matrix.python-version == '3.10' && startsWith(matrix.os, 'ubuntu')
       run: make lint
 
     - name: Check whether help.txt update was forgotten
-      if: matrix.python-version == '3.10' && github.event_name == 'pull_request'   # sync with matrix above
+      if: matrix.python-version == '3.10' && startsWith(matrix.os, 'ubuntu') && github.event_name == 'pull_request'
       run: |
         python update_helptext.py
         test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
