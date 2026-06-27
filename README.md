@@ -382,7 +382,7 @@ fout = open(
 
 ### Iterating Over an S3 Bucket's Contents
 
-Since going over all (or select) keys in an S3 bucket is a very common operation, there's also an extra function `smart_open.s3.iter_bucket()` that does this efficiently, **processing the bucket keys in parallel** (using multiprocessing):
+Since going over all (or select) keys in an S3 bucket is a very common operation, there's also an extra function `smart_open.s3.iter_bucket()` that does this efficiently, **processing the bucket keys in parallel** (using multithreading):
 
 ```python
 >>> from smart_open import s3

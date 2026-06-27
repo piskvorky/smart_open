@@ -194,11 +194,19 @@ It is possible to save both CPU time and memory by sharing the same resource acr
 
 ```python
 >>> import boto3
+>>> import botocore.client
 >>> from smart_open import open
->>> tp = {'client': boto3.client('s3')}
+>>> # this mirrors the adaptive-retry config smart_open uses internally when it
+>>> # creates a thread-safe client for you (see smart_open.s3)
+>>> config = botocore.client.Config(
+...     max_pool_connections=64,
+...     tcp_keepalive=True,
+...     retries={'max_attempts': 6, 'mode': 'adaptive'},
+... )
+>>> transport_params = {'client': boto3.client('s3', config=config)}
 >>> for month in (1, 2, 3):
 ...     url = 's3://nyc-tlc/trip data/yellow_tripdata_2020-%02d.csv' % month
-...     with open(url, transport_params=tp) as fin:
+...     with open(url, transport_params=transport_params) as fin:
 ...         _ = fin.readline()  # skip CSV header
 ...         print(fin.readline().strip())
 1,2020-01-01 00:28:15,2020-01-01 00:33:03,1,1.20,1,N,238,239,1,6,3,0.5,1.47,0,0.3,11.27,2.5
@@ -207,7 +215,8 @@ It is possible to save both CPU time and memory by sharing the same resource acr
 
 ```
 
-Clients are thread-safe and multiprocess-safe, so you may share them between other threads and subprocesses.
+Clients are generally thread-safe, so you may share a single client across threads ([ref](https://github.com/boto/boto3/blob/1.38.41/docs/source/guide/clients.rst?plain=1#L111)); note they cannot be shared across processes.
+Note that long-lived clients can leak memory ([boto/boto3#1670](https://github.com/boto/boto3/issues/1670)), so prefer creating a client per operation (or periodically recreating it) for long-running processes.
 
 ## How to Write to S3 Efficiently
 
@@ -235,8 +244,8 @@ import boto3
 from smart_open import open
 
 with tempfile.NamedTemporaryFile() as tmp:
-    tp = {"writebuffer": tmp}
-    with open("s3://bucket/key", "w", transport_params=tp) as fout:
+    transport_params = {"writebuffer": tmp}
+    with open("s3://bucket/key", "w", transport_params=transport_params) as fout:
         fout.write(lots_of_data)
 ```
 

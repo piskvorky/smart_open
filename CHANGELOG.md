@@ -1,3 +1,29 @@
+# 8.0.0, 2026-06-27
+
+See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.md) for details on breaking changes.
+
+- Remove deprecated top-level smart_open() function (PR [#928](https://github.com/piskvorky/smart_open/pull/928), [@ddelange](https://github.com/ddelange))
+- Remove deprecated concurrency.create_pool and ConcurrentFuturesPool (PR [#931](https://github.com/piskvorky/smart_open/pull/931), [@ddelange](https://github.com/ddelange))
+- [hdfs] Support host and port in HDFS URIs (PR [#168](https://github.com/piskvorky/smart_open/pull/168), [@vvaten](https://github.com/vvaten))
+- Remove stale Python 2.7 references in comments and docstrings (PR [#932](https://github.com/piskvorky/smart_open/pull/932), [@ddelange](https://github.com/ddelange))
+- Remove deprecated compression.tweak_close() (PR [#933](https://github.com/piskvorky/smart_open/pull/933), [@ddelange](https://github.com/ddelange))
+- Simplify inspect_kwargs() by dropping getargspec fallback (PR [#934](https://github.com/piskvorky/smart_open/pull/934), [@ddelange](https://github.com/ddelange))
+- [s3] Pass session_kwargs as a dict to s3.iter_bucket (PR [#930](https://github.com/piskvorky/smart_open/pull/930), [@ddelange](https://github.com/ddelange))
+- [gcs] Remove deprecated buffer_size/line_terminator params (PR [#935](https://github.com/piskvorky/smart_open/pull/935), [@ddelange](https://github.com/ddelange))
+- [gcs] Remove no-op _blob.terminate shim in Writer (PR [#936](https://github.com/piskvorky/smart_open/pull/936), [@ddelange](https://github.com/ddelange))
+- [s3] Remove deprecated transport params from open_uri (PR [#937](https://github.com/piskvorky/smart_open/pull/937), [@ddelange](https://github.com/ddelange))
+- Remove smart_open_lib backwards-compat re-exports (PR [#929](https://github.com/piskvorky/smart_open/pull/929), [@ddelange](https://github.com/ddelange))
+- [s3] Remove deprecated smart_open.s3_iter_bucket shim (PR [#927](https://github.com/piskvorky/smart_open/pull/927), [@ddelange](https://github.com/ddelange))
+- Refresh stale RaRe-Technologies URLs and boto wording (PR [#938](https://github.com/piskvorky/smart_open/pull/938), [@ddelange](https://github.com/ddelange))
+- Document #926 breaking changes in MIGRATING (PR [#939](https://github.com/piskvorky/smart_open/pull/939), [@ddelange](https://github.com/ddelange))
+- Add compression_kwargs parameter to smart_open.open() (PR [#940](https://github.com/piskvorky/smart_open/pull/940), [@ddelange](https://github.com/ddelange))
+- [s3] Drop host/port from S3 URIs, drop s3u scheme (PR [#943](https://github.com/piskvorky/smart_open/pull/943), [@ddelange](https://github.com/ddelange))
+- [gcs] Use gcs:// as canonical GCS scheme, keep gs:// as alias (PR [#944](https://github.com/piskvorky/smart_open/pull/944), [@ddelange](https://github.com/ddelange))
+- Parse versionId from s3:// URIs into version_id (PR [#945](https://github.com/piskvorky/smart_open/pull/945), [@ddelange](https://github.com/ddelange))
+- Add pre-commit and migrate from flake8 to ruff (PR [#946](https://github.com/piskvorky/smart_open/pull/946), [@ddelange](https://github.com/ddelange))
+- Migrate RST docs to Markdown (PR [#947](https://github.com/piskvorky/smart_open/pull/947), [@ddelange](https://github.com/ddelange))
+- Add type annotations and ty type checker (PR [#948](https://github.com/piskvorky/smart_open/pull/948), [@ddelange](https://github.com/ddelange))
+
 # 7.7.1, 2026-06-26
 
 - [http,azure] Optimize forward seeks within buffered data to avoid redundant requests (PR [#923](https://github.com/piskvorky/smart_open/pull/923), [@ddelange](https://github.com/ddelange))
