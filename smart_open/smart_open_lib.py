@@ -52,8 +52,7 @@ def parse_uri(uri_as_string):
     Returns:
         The parsed URI as a ``collections.namedtuple``.
 
-    Note:
-        smart_open/doctools.py magic goes here
+    smart_open/doctools.py magic goes here
     """
     scheme = _sniff_scheme(uri_as_string)
     submodule = transport.get_transport(scheme)
@@ -135,7 +134,7 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
         argument that is *not* supported by the transport layer being used,
         smart_open will ignore that argument and log a warning message.
 
-        smart_open/doctools.py magic goes here
+    smart_open/doctools.py magic goes here
 
     See Also:
         - `Standard library reference <https://docs.python.org/3.14/library/functions.html#open>`__
