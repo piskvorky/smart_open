@@ -6,7 +6,7 @@
 #
 """Maintains a registry of transport mechanisms.
 
-The main entrypoint is :func:`get_transport`.  See also :file:`extending.md`.
+The main entrypoint is :func:`get_transport`.  See also :file:`EXTENDING.md`.
 
 """
 
