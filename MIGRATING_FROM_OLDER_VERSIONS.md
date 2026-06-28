@@ -247,7 +247,7 @@ Here's a before-and-after example for connecting to a custom endpoint:
       fout.write(b'here we stand')
 ```
 
-See [README](README.md) and [HOWTO](howto.md) for more examples.
+See [README](README.md) and [HOWTO](HOWTO.md) for more examples.
 
 # v4.0.0
 

@@ -510,11 +510,11 @@ This can be helpful when e.g. working with compressed files.
 
 ## How do I ...?
 
-See [this document](howto.md).
+See [HOWTO.md](HOWTO.md).
 
 ## Extending `smart_open`
 
-See [this document](extending.md).
+See [EXTENDING.md](EXTENDING.md).
 
 ## Testing `smart_open`
 

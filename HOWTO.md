@@ -23,7 +23,7 @@ Some tips:
 
 Finally, ensure all the guides still work by running:
 
-    python -m doctest howto.md
+    python -m doctest HOWTO.md
 
 The above command shouldn't print anything to standard output/error and return zero, provided your local environment is set up correctly:
 
@@ -374,14 +374,14 @@ access to. Below is an example for how users can read a file with smart_open. Fo
 >>> import json
 >>> import os
 >>> from smart_open import open
->>> owner, repo, path = "RaRe-Technologies", "smart_open", "howto.md"
+>>> owner, repo, path = "RaRe-Technologies", "smart_open", "HOWTO.md"
 >>> github_token = os.environ['GITHUB_TOKEN']
 >>> url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
 >>> params = {"headers" : {"Authorization" : "Bearer " + github_token}}
 >>> with open(url, 'rb', transport_params=params) as fin:
 ...     response = json.loads(gzip.decompress(fin.read()))
 >>> response["path"]
-'howto.md'
+'HOWTO.md'
 
 ```
 
