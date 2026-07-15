@@ -5,7 +5,7 @@
 # from the MIT License (MIT).
 #
 
-"""Implements I/O streams over SSH.
+"""Implements I/O streams over SSH; GSSAPI auth (``gss_*`` options) needs ``paramiko[gssapi]``.
 
 Example:
     >>> with open("/proc/version_signature", host="1.2.3.4") as conn:

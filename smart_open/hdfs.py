@@ -5,7 +5,7 @@
 # from the MIT License (MIT).
 #
 
-"""Implements reading and writing to/from HDFS."""
+"""Implements reading and writing to/from HDFS via the Hadoop ``hdfs`` CLI (must be on your ``$PATH``)."""
 
 from __future__ import annotations
 
@@ -67,7 +67,18 @@ def open_uri(uri: str, mode: str, transport_params: TransportParams) -> CliRawIn
 
 
 def open(uri: str, mode: str) -> CliRawInputBase | CliRawOutputBase:
-    """Open an HDFS `uri` for reading (``"rb"``) or writing (``"wb"``)."""
+    """Open an HDFS `uri` for reading or writing.
+
+    Args:
+        uri: The HDFS path to open.
+        mode: The mode for opening the object. Must be either "rb" or "wb".
+
+    Returns:
+        A file-like object for reading from or writing to the HDFS file.
+
+    Raises:
+        NotImplementedError: If ``mode`` is not supported.
+    """
     if mode == "rb":
         return CliRawInputBase(uri)
     if mode == "wb":
