@@ -147,4 +147,4 @@ Some notable files:
 
 - setup.py: See the `description` keyword.  Not all contributions will affect this.
 - README.md
-- howto.md (if your extension solves a specific problem that doesn't get covered by other documentation)
+- HOWTO.md (if your extension solves a specific problem that doesn't get covered by other documentation)

@@ -158,21 +158,24 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
 
     Args:
         uri: The object to open.
-        mode: Mimicks built-in open parameter of the same name.
-        buffering: Mimicks built-in open parameter of the same name.
-        encoding: Mimicks built-in open parameter of the same name.
-        errors: Mimicks built-in open parameter of the same name.
-        newline: Mimicks built-in open parameter of the same name.
-        closefd: Mimicks built-in open parameter of the same name.  Ignored.
-        opener: Mimicks built-in open parameter of the same name.  Ignored.
+        mode: Mimics built-in open parameter of the same name.
+        buffering: Mimics built-in open parameter of the same name.
+        encoding: Mimics built-in open parameter of the same name.
+        errors: Mimics built-in open parameter of the same name.
+        newline: Mimics built-in open parameter of the same name.
+        closefd: Mimics built-in open parameter of the same name.  Ignored.
+        opener: Mimics built-in open parameter of the same name.  Ignored.
         compression: Explicitly specify the compression/decompression behavior.
             See ``smart_open.compression.get_supported_compression_types``.
         compression_kwargs: Keyword arguments forwarded to the registered
-            compressor callback. Examples of each library's max-compression
-            option: ``{'compresslevel': 9}`` for .gz/.bz2, ``{'preset': 9}`` for
-            .xz, ``{'level': 22}`` for .zst, ``{'compression_level': 12}`` for
-            .lz4. Ignored when compression is 'disable' or the URI's extension
-            doesn't match a registered compressor.
+            compressor callback. When omitted, each library's own default level
+            applies: .gz and .bz2 default to 9 (already their maximum), while
+            .xz defaults to 6 (max 9), .zst to 3 (max 22), and .lz4 to 0 (max
+            16). To request maximum compression, pass ``{'compresslevel': 9}``
+            for .gz/.bz2, ``{'preset': 9}`` for .xz, ``{'level': 22}`` for .zst,
+            or ``{'compression_level': 16}`` for .lz4. Ignored when compression
+            is 'disable' or the URI's extension doesn't match a registered
+            compressor.
         transport_params: Additional parameters for the transport layer (see
             notes below).
 
@@ -378,10 +381,10 @@ def _shortcut_open(  # noqa: PLR0913  # legacy internal helper; refactor in a de
         uri: A string indicating what to open.
         mode: The mode to pass to the open function.
         compression: The compression type selected.
-        buffering: Mimicks built-in open parameter of the same name.
-        encoding: Mimicks built-in open parameter of the same name.
-        errors: Mimicks built-in open parameter of the same name.
-        newline: Mimicks built-in open parameter of the same name.
+        buffering: Mimics built-in open parameter of the same name.
+        encoding: Mimics built-in open parameter of the same name.
+        errors: Mimics built-in open parameter of the same name.
+        newline: Mimics built-in open parameter of the same name.
 
     Returns:
         The opened file, or None if no shortcut is possible.

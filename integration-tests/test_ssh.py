@@ -36,7 +36,7 @@ def test():
         connect_ssh = smart_open.ssh._connect_ssh  # integration test reaches into private state
         smart_open.ssh._connect_ssh = explode  # integration test reaches into private state
 
-        with smart_open.open("ssh://misha@localhost/Users/misha/git/smart_open/howto.md") as fin:
+        with smart_open.open("ssh://misha@localhost/Users/misha/git/smart_open/HOWTO.md") as fin:
             howto = fin.read()
 
         assert "How-to Guides" in howto

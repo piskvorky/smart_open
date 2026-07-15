@@ -147,6 +147,14 @@ Other `?...` content in the key is preserved as before (the `QUESTION_MARK_PLACE
 
 If you have a legitimate `?versionId=...` substring in your S3 key, call `smart_open.s3.open(bucket, key, ...)` directly with the raw key to bypass URI parsing.
 
+# v7.0.0
+
+Tracked in [#786](https://github.com/piskvorky/smart_open/pull/786) (fixes [#684](https://github.com/piskvorky/smart_open/issues/684)).
+`smart_open.open()` now propagates `__exit__`/`close()` down to the underlying transport stream.
+Previously the compression layer swallowed the `__exit__` call on the wrapped filestream, so e.g. an interrupted S3 multipart upload was never aborted, leaving billable orphan parts behind.
+
+If you hand your own file object to `smart_open.open()` (for example to add a compression layer), note that closing the returned object now also closes the object you passed in.
+
 # v6.0.0
 
 smart_open versions 6.0.0 and above no longer support the `ignore_ext` parameter.
@@ -239,7 +247,20 @@ Here's a before-and-after example for connecting to a custom endpoint:
       fout.write(b'here we stand')
 ```
 
-See [README](README.md) and [HOWTO](howto.md) for more examples.
+See [README](README.md) and [HOWTO](HOWTO.md) for more examples.
+
+# v4.0.0
+
+Tracked in [#562](https://github.com/piskvorky/smart_open/pull/562).
+Version 4.0.0 drops Python 3.5; the minimum supported version is now Python 3.6.
+
+As of [4.0.1](https://github.com/piskvorky/smart_open/commit/53c1317), `requests` is no longer installed by default.
+Install the relevant extra if you open `http://`, `https://`, or `webhdfs://` URLs:
+
+```diff
+- pip install smart_open
++ pip install smart_open[http]
+```
 
 # v3.0.0
 
@@ -249,6 +270,13 @@ Smart_open has grown over the years to cover a lot of different storages, each w
 - smart_open >= 3.0.0: No dependencies installed by default. Install the ones you need with e.g. `pip install smart_open[s3]` (only AWS), or `smart_open[all]` (install everything = same behaviour as < 3.0.0; use this for backward compatibility).
 
 You can read more about the motivation and internal discussions for this change [here](https://github.com/piskvorky/smart_open/issues/443).
+
+# v2.0.0
+
+Tracked in [#471](https://github.com/piskvorky/smart_open/pull/471).
+Version 2.0.0 drops Python 2; only Python 3.5 and above is supported.
+No pin is needed if you are still on Python 2.7: `pip install smart_open` resolves to `1.10.1`, the last version that supports it.
+The `python_requires` specifier was only added in 2.0.0, so the intermediate 1.11.0 and 1.11.1 releases are yanked on PyPI to keep pip from installing them on Python 2.7.
 
 # v1.8.1
 

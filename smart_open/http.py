@@ -4,7 +4,7 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
-"""Implements file-like objects for reading from http."""
+"""Implements file-like objects for reading from http; ``kerberos=True`` needs the ``requests-kerberos`` package."""
 
 from __future__ import annotations
 
@@ -149,7 +149,7 @@ class BufferedInputBase(io.BufferedIOBase):
         self.session = session or requests
 
         if kerberos:
-            import requests_kerberos  # ty: ignore[unresolved-import]  # optional, install separately for kerberos=True
+            import requests_kerberos  # ty: ignore[unresolved-import]  # optional, install requests-kerberos for kerberos=True
 
             self.auth = requests_kerberos.HTTPKerberosAuth()
         elif user is not None and password is not None:

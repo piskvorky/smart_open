@@ -1,3 +1,10 @@
+# 8.0.1, 2026-07-15
+
+- Document missing major versions (v2, v4, v7) in MIGRATING (PR [#949](https://github.com/piskvorky/smart_open/pull/949), [@ddelange](https://github.com/ddelange))
+- Bump the github-actions group with 3 updates (PR [#950](https://github.com/piskvorky/smart_open/pull/950), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Fix compression_kwargs docstring (PR [#951](https://github.com/piskvorky/smart_open/pull/951), [@ddelange](https://github.com/ddelange))
+- Surface transport external dependencies in help.txt (PR [#952](https://github.com/piskvorky/smart_open/pull/952), [@ddelange](https://github.com/ddelange))
+
 # 8.0.0, 2026-06-27
 
 See [the migration docs](MIGRATING_FROM_OLDER_VERSIONS.md) for details on breaking changes.
