@@ -76,4 +76,4 @@ if new_changelog_lines:
         "",
         *changelog_lines,
     ]
-    changelog_path.write_text("\n".join(new_changelog))
+    changelog_path.write_text("\n".join(new_changelog) + "\n")
