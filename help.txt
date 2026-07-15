@@ -168,11 +168,16 @@ FUNCTIONS
 
             hdfs/viewfs (smart_open/hdfs.py)
             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            Implements reading and writing to/from HDFS.
+            Implements reading and writing to/from HDFS via the Hadoop ``hdfs`` CLI (must be on your ``$PATH``).
+
+            uri:
+                The HDFS path to open.
+            mode:
+                The mode for opening the object. Must be either "rb" or "wb".
 
             http/https (smart_open/http.py)
             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            Implements file-like objects for reading from http.
+            Implements file-like objects for reading from http; ``kerberos=True`` needs the ``requests-kerberos`` package.
 
             uri:
                 The URL to open.
@@ -280,7 +285,7 @@ FUNCTIONS
 
             ssh/scp/sftp (smart_open/ssh.py)
             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            Implements I/O streams over SSH.
+            Implements I/O streams over SSH; GSSAPI auth (``gss_*`` options) needs ``paramiko[gssapi]``.
 
             path:
                 The path to the file to open on the remote machine.

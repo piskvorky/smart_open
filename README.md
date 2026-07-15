@@ -108,6 +108,12 @@ Or, if you don't mind installing a large number of third party libraries, you ca
 pip install 'smart_open[all]'
 ```
 
+Some transports have external dependencies that are not `smart_open` extras:
+
+- HTTP Kerberos auth (`kerberos=True`) needs the `requests-kerberos` package: `pip install requests-kerberos`
+- SSH GSSAPI/Kerberos auth (`gss_*` options) needs paramiko's GSSAPI support: `pip install 'paramiko[gssapi]'`
+- The `hdfs://` and `viewfs://` transports shell out to the Hadoop `hdfs` command-line client, which must be installed separately and available on `$PATH`
+
 ### Built-in help
 
 To view the API reference, use the `help` python builtin:
