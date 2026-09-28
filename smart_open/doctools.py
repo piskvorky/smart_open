@@ -10,8 +10,6 @@
 For internal use only.
 """
 
-# ruff: noqa: T201  # this module builds the open()/parse_uri() docstrings by writing to sys.stdout
-
 from __future__ import annotations
 
 import contextlib
@@ -171,43 +169,42 @@ def tweak_open_docstring(f: Callable[..., Any]) -> None:
     root_path = Path(__file__).parent.parent
     body_pad = LPAD + "    "
 
-    with contextlib.redirect_stdout(buf):
-        print(f"{LPAD}Transports:")  # builds docstring via redirect_stdout
-        print()
-        for scheme, submodule in sorted(transport._REGISTRY.items()):  # noqa: SLF001  # intra-package coupling
-            if scheme == transport.NO_SCHEME or submodule in seen:
-                continue
-            seen.add(submodule)
+    print(f"{LPAD}Transports:", file=buf)
+    print(file=buf)
+    for scheme, submodule in sorted(transport._REGISTRY.items()):  # noqa: SLF001  # intra-package coupling
+        if scheme == transport.NO_SCHEME or submodule in seen:
+            continue
+        seen.add(submodule)
 
-            try:
-                schemes = submodule.SCHEMES
-            except AttributeError:
-                schemes = [scheme]
+        try:
+            schemes = submodule.SCHEMES
+        except AttributeError:
+            schemes = [scheme]
 
-            relpath = Path(cast("str", submodule.__file__)).relative_to(root_path)
-            heading = "{} ({})".format("/".join(schemes), relpath)
-            print(f"{body_pad}{heading}")
-            print(f"{body_pad}{'~' * len(heading)}")
-            print(f"{body_pad}{(submodule.__doc__ or '').split(chr(10))[0]}")
-            print()
+        relpath = Path(cast("str", submodule.__file__)).relative_to(root_path)
+        heading = "{} ({})".format("/".join(schemes), relpath)
+        print(f"{body_pad}{heading}", file=buf)
+        print(f"{body_pad}{'~' * len(heading)}", file=buf)
+        print(f"{body_pad}{(submodule.__doc__ or '').split(chr(10))[0]}", file=buf)
+        print(file=buf)
 
-            kwargs = extract_kwargs(submodule.open.__doc__)
-            if kwargs:
-                print(to_docstring(kwargs, lpad=body_pad))
+        kwargs = extract_kwargs(submodule.open.__doc__)
+        if kwargs:
+            print(to_docstring(kwargs, lpad=body_pad), file=buf)
 
-        print(f"{LPAD}Examples:")
-        print()
-        print(extract_examples_from_readme(indent=body_pad))
+    print(f"{LPAD}Examples:", file=buf)
+    print(file=buf)
+    print(extract_examples_from_readme(indent=body_pad), file=buf)
 
-        print(f"{LPAD}Codecs:")
-        print()
-        print(f"{body_pad}smart_open supports transparent compression and decompression for files")
-        print(f"{body_pad}with the following extensions:")
-        print()
-        for extension in compression.get_supported_extensions():
-            print(f"{body_pad}* {extension}")
-        print()
-        print(f"{body_pad}The codec is selected based on the file extension.")
+    print(f"{LPAD}Codecs:", file=buf)
+    print(file=buf)
+    print(f"{body_pad}smart_open supports transparent compression and decompression for files", file=buf)
+    print(f"{body_pad}with the following extensions:", file=buf)
+    print(file=buf)
+    for extension in compression.get_supported_extensions():
+        print(f"{body_pad}* {extension}", file=buf)
+    print(file=buf)
+    print(f"{body_pad}The codec is selected based on the file extension.", file=buf)
 
     #
     # The docstring can be None if -OO was passed to the interpreter.
@@ -239,16 +236,15 @@ def tweak_parse_uri_docstring(f: Callable[..., Any]) -> None:
 
     body_pad = LPAD + "    "
 
-    with contextlib.redirect_stdout(buf):
-        print(f"{LPAD}Schemes:")
-        print()
-        for scheme in schemes:
-            print(f"{body_pad}* {scheme}")
-        print()
-        print(f"{LPAD}Examples:")
-        print()
-        for example in examples:
-            print(f"{body_pad}* {example}")
+    print(f"{LPAD}Schemes:", file=buf)
+    print(file=buf)
+    for scheme in schemes:
+        print(f"{body_pad}* {scheme}", file=buf)
+    print(file=buf)
+    print(f"{LPAD}Examples:", file=buf)
+    print(file=buf)
+    for example in examples:
+        print(f"{body_pad}* {example}", file=buf)
 
     if f.__doc__:
         f.__doc__ = f.__doc__.replace(PLACEHOLDER, buf.getvalue())
