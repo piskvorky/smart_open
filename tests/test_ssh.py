@@ -28,10 +28,17 @@ class SSHOpen(unittest.TestCase):
         """SetUp."""
         self._cfg_files = smart_open.ssh._SSH_CONFIG_FILES  # test reaches into private state
         smart_open.ssh._SSH_CONFIG_FILES = [_CONFIG_PATH]  # test reaches into private state
+        # paramiko's SSHConfig.lookup() tokenizes config values, which evaluates a
+        # LazyFqdn whose __str__ calls socket.getfqdn(). That triggers a reverse DNS
+        # lookup that can hang on CI runners (e.g. macos-15), so keep these unit tests
+        # hermetic by stubbing it out.
+        self._getfqdn_patcher = mock.patch("socket.getfqdn", return_value="localhost")
+        self._getfqdn_patcher.start()
 
     def tearDown(self):
         """TearDown."""
         smart_open.ssh._SSH_CONFIG_FILES = self._cfg_files  # test reaches into private state
+        self._getfqdn_patcher.stop()
 
     @mock_ssh
     def test_open(self, mock_connect, get_transp_mock):

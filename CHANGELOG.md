@@ -1,3 +1,10 @@
+# 8.0.2, 2026-09-29
+
+- Fix update_changelog.py triggering lint (PR [#953](https://github.com/piskvorky/smart_open/pull/953), [@ddelange](https://github.com/ddelange))
+- Bump the github-actions group with 3 updates (PR [#954](https://github.com/piskvorky/smart_open/pull/954), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Bump softprops/action-gh-release from 3.0.2 to 3.0.3 in the github-actions group (PR [#955](https://github.com/piskvorky/smart_open/pull/955), [@dependabot[bot]](https://github.com/apps/dependabot))
+- Build the open() and parse_uri() docstrings without redirecting sys.stdout (PR [#956](https://github.com/piskvorky/smart_open/pull/956), [@losha-ant](https://github.com/losha-ant))
+
 # 8.0.1, 2026-07-15
 
 - Document missing major versions (v2, v4, v7) in MIGRATING (PR [#949](https://github.com/piskvorky/smart_open/pull/949), [@ddelange](https://github.com/ddelange))
