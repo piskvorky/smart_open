@@ -198,8 +198,21 @@ class BufferedInputBase(io.BufferedIOBase):
         return self.read(size=size)
 
     def readinto(self, b: WriteableBuffer) -> int:
-        """Read up to ``len(b)`` bytes into `b` and return the number of bytes read."""
+        """Read up to ``len(b)`` bytes into `b` and return the number of bytes read.
+
+        Args:
+            b: The buffer to read into.
+
+        Returns:
+            The number of bytes read.
+
+        Raises:
+            TypeError: If the destination buffer is read-only.
+        """
         mv = memoryview(b).cast("B")
+        if mv.readonly:
+            msg = "readinto requires a writable buffer"
+            raise TypeError(msg)
         data = self.read(len(mv))
         if not data:
             return 0

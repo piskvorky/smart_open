@@ -871,8 +871,14 @@ class Reader(io.BufferedIOBase):
 
         Returns:
             The number of bytes read.
+
+        Raises:
+            TypeError: If the destination buffer is read-only.
         """
         mv = memoryview(b).cast("B")
+        if mv.readonly:
+            msg = "readinto requires a writable buffer"
+            raise TypeError(msg)
         data = self.read(len(mv))
         if not data:
             return 0
