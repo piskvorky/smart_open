@@ -210,6 +210,10 @@ class BufferedInputBase(io.BufferedIOBase):
         """Read and return one line from the WebHDFS stream."""
         buf = self._buf
         assert buf is not None  # noqa: S101  # readline on a closed stream is unsupported
+        newline = buf.find(b"\n")
+        if newline >= 0:
+            self._buf, retval = buf[newline + 1 :], buf[: newline + 1]
+            return retval
         self._buf, retval = b"", buf + self._response.raw.readline()
         return retval
 

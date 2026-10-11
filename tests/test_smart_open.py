@@ -1093,6 +1093,31 @@ class SmartOpenReadTest(unittest.TestCase):
         smart_open_object = smart_open.open("webhdfs://127.0.0.1:8440/path/file", "rb")
         assert smart_open_object.read().decode("utf-8") == "line1\nline2"
 
+    @responses.activate
+    def test_webhdfs_readline_after_buffered_read(self):
+        """Return one buffered line at a time after a partial read."""
+        responses.add(
+            responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file", body=b"first\nsecond\nlast"
+        )
+        with smart_open.open("webhdfs://127.0.0.1:8440/path/file", "rb") as reader:
+            assert reader.read(1) == b"f"
+            assert reader.readline() == b"irst\n"
+            assert reader.readline() == b"second\n"
+            assert reader.readline() == b"last"
+            assert reader.readline() == b""
+
+    @responses.activate
+    def test_webhdfs_readline_across_buffer_boundary(self):
+        """Complete a buffered partial line from the response stream."""
+        prefix = b"a" * io.DEFAULT_BUFFER_SIZE
+        responses.add(
+            responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file", body=prefix + b"tail\nnext\n"
+        )
+        with smart_open.open("webhdfs://127.0.0.1:8440/path/file", "rb") as reader:
+            assert reader.read(1) == b"a"
+            assert reader.readline() == prefix[1:] + b"tail\n"
+            assert reader.readline() == b"next\n"
+
     @mock_s3
     def test_s3_iter_moto(self):
         """Are S3 files iterated over correctly?"""
