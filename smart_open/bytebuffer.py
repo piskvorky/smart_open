@@ -133,6 +133,9 @@ class ByteBuffer:
             self._bytes = self._bytes[self._pos :]
             self._pos = 0
 
+        if size == 0:
+            return 0
+
         if hasattr(source, "read"):
             new_bytes = cast("IO[bytes]", source).read(size)
         else:
