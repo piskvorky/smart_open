@@ -190,9 +190,11 @@ class CliRawOutputBase(io.RawIOBase):
         assert sub.stdin is not None  # noqa: S101  # stdin=PIPE set in __init__
         sub.stdin.flush()
 
-    def writeable(self) -> bool:
-        """Return True if this object is writeable."""
+    def writable(self) -> bool:
+        """Return True if this object is writable."""
         return self._sub is not None
+
+    writeable = writable
 
     def seekable(self) -> bool:
         """Return False; HDFS streams do not support seeking."""

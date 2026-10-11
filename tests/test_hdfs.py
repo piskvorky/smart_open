@@ -5,6 +5,7 @@
 # from the MIT License (MIT).
 #
 import gzip
+import io
 import os
 import os.path
 import subprocess
@@ -157,6 +158,22 @@ def test_write(schema):
 
     actual = mocked_cat.stdout.read().decode("utf-8")
     assert actual == expected
+
+
+def test_write_buffered():
+    """Allow the HDFS raw output stream to be wrapped in a buffered writer."""
+    mocked_cat = cat()
+    payload = b"buffered HDFS output"
+    with mock.patch("subprocess.Popen", return_value=mocked_cat):
+        raw = smart_open.hdfs.CliRawOutputBase("hdfs://dummy/url")
+        with io.BufferedWriter(raw) as fout:
+            assert raw.writable()
+            assert raw.writeable()
+            assert fout.write(payload) == len(payload)
+    assert raw.closed
+    assert not raw.writable()
+    assert not raw.writeable()
+    assert mocked_cat.stdout.read() == payload
 
 
 @pytest.mark.parametrize("schema", [("hdfs",), ("viewfs",)])
