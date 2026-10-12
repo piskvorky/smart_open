@@ -880,25 +880,10 @@ class Reader(io.BufferedIOBase):
         return len(data)
 
     def readline(self, limit: int | None = -1) -> bytes:
-        """Read up to and including the next newline.  Returns the bytes read."""
-        if limit != -1:
-            msg = "limits other than -1 not implemented yet"
-            raise NotImplementedError(msg)
-
-        #
-        # A single line may span multiple buffers.
-        #
-        line = io.BytesIO()
-        while not (self._eof and len(self._buffer) == 0):
-            line_part = self._buffer.readline(self._line_terminator)
-            line.write(line_part)
-            self._current_pos += len(line_part)
-
-            if line_part.endswith(self._line_terminator):
-                break
-            self._fill_buffer()
-
-        return line.getvalue()
+        """Read up to and including the next newline, or up to ``limit`` bytes.  Returns the bytes read."""
+        line = self._buffer.readline(self._line_terminator, limit, self._fill_buffer)
+        self._current_pos += len(line)
+        return line
 
     def seekable(self) -> bool:
         """If False, seek(), tell() and truncate() will raise IOError.
