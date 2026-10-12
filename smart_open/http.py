@@ -244,6 +244,21 @@ class BufferedInputBase(io.BufferedIOBase):
         """This is the same as read()."""
         return self.read(size=size)
 
+    def readline(self, size: int | None = -1) -> bytes:
+        """Read and return one line, filling the buffer in chunks like the S3 and Azure readers."""
+        buf, response = self._read_buffer, self.response
+        if buf is None or response is None or (size is not None and size >= 0):
+            return super().readline(
+                size
+            )  # io.IOBase reads byte by byte: fine for closed streams and size limits
+        line = io.BytesIO()
+        while True:
+            line_part = buf.readline(b"\n")
+            line.write(line_part)
+            self._current_pos += len(line_part)
+            if line_part.endswith(b"\n") or buf.fill(response.raw) == 0:
+                return line.getvalue()
+
     def readinto(self, b: WriteableBuffer) -> int:
         """Read up to ``len(b)`` bytes into ``b``, and return the number of bytes read."""
         mv = memoryview(b).cast("B")

@@ -206,12 +206,12 @@ class BufferedInputBase(io.BufferedIOBase):
         mv[: len(data)] = data
         return len(data)
 
-    def readline(self) -> bytes:  # ty: ignore[invalid-method-override]  # never accepted a size argument
-        """Read and return one line from the WebHDFS stream."""
-        buf = self._buf
-        assert buf is not None  # noqa: S101  # readline on a closed stream is unsupported
-        self._buf, retval = b"", buf + self._response.raw.readline()
-        return retval
+    def peek(self, size: int = 0) -> bytes:  # io.IOBase.readline uses peek() to find the next newline
+        """Return buffered bytes without advancing the position, reading one chunk if the buffer is empty."""
+        assert self._buf is not None  # noqa: S101  # peek on a closed stream is unsupported
+        if not self._buf:
+            self._buf = self._response.raw.read(io.DEFAULT_BUFFER_SIZE)
+        return self._buf
 
 
 class BufferedOutputBase(io.BufferedIOBase):
