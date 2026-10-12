@@ -146,7 +146,9 @@ class CliRawInputBase(io.RawIOBase):
         if sub is None or sub.stdout is None:
             msg = "I/O operation on closed file"
             raise ValueError(msg)
-        return sub.stdout.readline(-1 if size is None else size)
+        if size is None:
+            size = -1
+        return sub.stdout.readline(size)
 
     def read1(self, size: int | None = -1) -> bytes:
         """This is the same as read()."""
