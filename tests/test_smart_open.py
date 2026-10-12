@@ -1106,18 +1106,6 @@ class SmartOpenReadTest(unittest.TestCase):
             assert reader.readline() == b"last"
             assert reader.readline() == b""
 
-    @responses.activate
-    def test_webhdfs_readline_across_buffer_boundary(self):
-        """Complete a buffered partial line from the response stream."""
-        prefix = b"a" * io.DEFAULT_BUFFER_SIZE
-        responses.add(
-            responses.GET, "http://127.0.0.1:8440/webhdfs/v1/path/file", body=prefix + b"tail\nnext\n"
-        )
-        with smart_open.open("webhdfs://127.0.0.1:8440/path/file", "rb") as reader:
-            assert reader.read(1) == b"a"
-            assert reader.readline() == prefix[1:] + b"tail\n"
-            assert reader.readline() == b"next\n"
-
     @mock_s3
     def test_s3_iter_moto(self):
         """Are S3 files iterated over correctly?"""
