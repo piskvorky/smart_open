@@ -13,7 +13,7 @@ import io
 import logging
 import subprocess
 import urllib.parse
-from typing import TYPE_CHECKING, TypedDict
+from typing import IO, TYPE_CHECKING, TypedDict
 
 import smart_open.utils
 
@@ -133,22 +133,17 @@ class CliRawInputBase(io.RawIOBase):
 
     def read(self, size: int | None = -1) -> bytes:
         """Read up to size bytes from the object and return them."""
-        sub = self._sub
-        assert sub is not None  # noqa: S101  # subprocess started in __init__
-        assert sub.stdout is not None  # noqa: S101  # stdout=PIPE set in __init__
-        if size is None:
-            size = -1
-        return sub.stdout.read(size)
+        return self._stdout().read(-1 if size is None else size)
 
     def readline(self, size: int | None = -1) -> bytes:
         """Read and return one line from the subprocess's buffered stdout."""
-        sub = self._sub
-        if sub is None or sub.stdout is None:
+        return self._stdout().readline(-1 if size is None else size)
+
+    def _stdout(self) -> IO[bytes]:
+        if self._sub is None or self._sub.stdout is None:
             msg = "I/O operation on closed file"
             raise ValueError(msg)
-        if size is None:
-            size = -1
-        return sub.stdout.readline(size)
+        return self._sub.stdout
 
     def read1(self, size: int | None = -1) -> bytes:
         """This is the same as read()."""

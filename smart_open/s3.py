@@ -880,7 +880,7 @@ class Reader(io.BufferedIOBase):
         return len(data)
 
     def readline(self, limit: int | None = -1) -> bytes:
-        """Read up to and including the next newline, or up to ``limit`` bytes.  Returns the bytes read."""
+        """Read up to and including the next line terminator, or up to ``limit`` bytes.  Returns the bytes read."""
         line = self._buffer.readline(self._line_terminator, limit, self._fill_buffer)
         self._current_pos += len(line)
         return line

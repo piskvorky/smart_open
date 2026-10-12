@@ -165,7 +165,7 @@ class ByteBuffer:
         Args:
             terminator: The line terminator byte.
             limit: Maximum number of bytes to return. If negative or None, no limit.
-            fill: Called when the buffer runs out mid-line, to add more bytes.
+            fill: Called when the buffer runs out mid line, to add more bytes.
                 A buffer still empty afterwards means the end of the source.
 
         Returns:
@@ -174,15 +174,14 @@ class ByteBuffer:
         if limit is None:
             limit = -1
         parts: list[bytes] = []
-        length = 0
         while True:
             index = self._bytes.find(terminator, self._pos)
             size = len(self) if index == -1 else index - self._pos + 1
             if limit >= 0:
-                size = min(size, limit - length)
+                size = min(size, limit)
+                limit -= size
             parts.append(self.read(size))
-            length += size
-            if parts[-1].endswith(terminator) or length == limit or fill is None:
+            if parts[-1].endswith(terminator) or limit == 0 or fill is None:
                 break
             fill()
             if not len(self):
