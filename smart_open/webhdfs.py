@@ -180,9 +180,8 @@ class BufferedInputBase(io.BufferedIOBase):
         return self._open_reader().readline(size)
 
     def _open_reader(self) -> io.BufferedReader:
-        if self._reader is None:
-            msg = "I/O operation on closed file"
-            raise ValueError(msg)
+        self._checkClosed()
+        assert self._reader is not None  # noqa: S101  # not closed implies _reader is set
         return self._reader
 
 
@@ -203,7 +202,6 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     def __init__(self, uri: str, min_part_size: int = MIN_PART_SIZE) -> None:
         self._uri = uri
-        self._closed = False
         self.min_part_size = min_part_size
         # creating empty file first
         payload = {"op": "CREATE", "overwrite": True}
@@ -246,9 +244,7 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     def write(self, b: ReadableBuffer) -> int:
         """Write the given bytes (binary string) into the WebHDFS file from constructor."""
-        if self._closed:
-            msg = "I/O operation on closed file"
-            raise ValueError(msg)
+        self._checkClosed()
 
         if not isinstance(b, bytes):
             msg = "input must be a binary string"
@@ -275,6 +271,8 @@ class BufferedOutputBase(io.BufferedIOBase):
 
     def close(self) -> None:
         """Flush any remaining buffered bytes to WebHDFS and close the stream."""
+        if self.closed:
+            return
         buff = b"".join(self.lines)
         if buff:
             logger.info(
@@ -285,12 +283,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             )
             self._upload(buff)
             logger.debug("upload of last part #%i finished", self.parts)
-        self._closed = True
-
-    @property
-    def closed(self) -> bool:
-        """Return True if the stream is closed."""
-        return self._closed
+        super().close()
 
 
 class WebHdfsException(Exception):  # noqa: N818  # public name
