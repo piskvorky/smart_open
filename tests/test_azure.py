@@ -683,6 +683,37 @@ class ReaderTest(unittest.TestCase):
             fin.read()
 
 
+@pytest.mark.parametrize("mode", ["wb", "ab"])
+@pytest.mark.parametrize("min_part_size", [8, 64])
+@pytest.mark.parametrize(
+    "data",
+    [
+        b"abcdefghijklmnop",
+        bytearray(b"abcdefghijklmnop"),
+        memoryview(b"abcdefghijklmnop"),
+        memoryview(b"abcdefghijklmnop").cast("I"),
+        memoryview(b"abcdefghijklmnop").cast("I", shape=[2, 2]),
+    ],
+    ids=["bytes", "bytearray", "byte-view", "integer-view", "multidimensional-view"],
+)
+def test_write_buffer_byte_count(mode, min_part_size, data):
+    """Count bytes written to Azure rather than buffer elements."""
+    client = FakeBlobServiceClient("https://account.blob.core.windows.net")
+    client.create_container("container")
+    expected = io.BytesIO()
+    uri = "azure://container/blob"
+    with smart_open.open(
+        uri, mode, transport_params={"client": client, "min_part_size": min_part_size}
+    ) as fout:
+        assert fout.write(data) == expected.write(data)
+        assert fout.tell() == expected.tell()
+        assert fout.write(data) == expected.write(data)
+        assert fout.tell() == expected.tell()
+
+    with smart_open.open(uri, "rb", transport_params={"client": client}) as fin:
+        assert fin.read() == expected.getvalue()
+
+
 class WriterTest(unittest.TestCase):
     """Test writing into Azure Blob files."""
 

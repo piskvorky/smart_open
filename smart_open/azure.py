@@ -547,8 +547,7 @@ class Writer(io.BufferedIOBase):
             msg = f"input must be one of {_BINARY_TYPES!r}, got: {type(b)!r}"
             raise TypeError(msg)
 
-        length = len(memoryview(b))
-        self._current_part.write(b)
+        length = self._current_part.write(b)
         self._total_size += length
 
         if self._current_part.tell() >= self._min_part_size:
@@ -694,8 +693,7 @@ class AppendWriter(io.BufferedIOBase):
         if not isinstance(b, _BINARY_TYPES):
             msg = f"input must be one of {_BINARY_TYPES!r}, got: {type(b)!r}"
             raise TypeError(msg)
-        length = len(memoryview(b))
-        self._current_part.write(b)
+        length = self._current_part.write(b)
         self._total_size += length
         if self._current_part.tell() >= self._min_part_size:
             self._upload_part()
