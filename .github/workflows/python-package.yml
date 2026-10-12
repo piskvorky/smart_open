@@ -18,13 +18,13 @@ jobs:
         include:
           # sync with linting steps below
         - {python-version: '3.10', os: ubuntu-24.04}
-        - {python-version: '3.14', os: ubuntu-24.04}
+        - {python-version: '3.15', os: ubuntu-24.04}
 
         - {python-version: '3.10', os: windows-2025}
-        - {python-version: '3.14', os: windows-2025}
+        - {python-version: '3.15', os: windows-2025}
 
         - {python-version: '3.10', os: macos-15}
-        - {python-version: '3.14', os: macos-15}
+        - {python-version: '3.15', os: macos-15}
 
     steps:
     - uses: actions/checkout@v7
@@ -39,7 +39,7 @@ jobs:
         cache-dependency-glob: '**/pyproject.toml'
 
     - name: Load pre-commit cache
-      if: matrix.python-version == '3.10' && startsWith(matrix.os, 'ubuntu')
+      if: matrix.python-version == '3.15' && startsWith(matrix.os, 'ubuntu')
       uses: actions/cache@v6
       with:
         path: ~/.cache/pre-commit
@@ -55,7 +55,7 @@ jobs:
       run: uv pip install -e .[dev]
 
     - name: Run linters
-      if: matrix.python-version == '3.10' && startsWith(matrix.os, 'ubuntu')
+      if: matrix.python-version == '3.15' && startsWith(matrix.os, 'ubuntu')
       run: make lint
 
     - name: Check whether help.txt update was forgotten
