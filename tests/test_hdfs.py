@@ -168,11 +168,9 @@ def test_write_buffered():
         raw = smart_open.hdfs.CliRawOutputBase("hdfs://dummy/url")
         with io.BufferedWriter(raw) as fout:
             assert raw.writable()
-            assert raw.writeable()
             assert fout.write(payload) == len(payload)
     assert raw.closed
     assert not raw.writable()
-    assert not raw.writeable()
     assert mocked_cat.stdout.read() == payload
 
 

@@ -194,8 +194,6 @@ class CliRawOutputBase(io.RawIOBase):
         """Return True if this object is writable."""
         return self._sub is not None
 
-    writeable = writable
-
     def seekable(self) -> bool:
         """Return False; HDFS streams do not support seeking."""
         return False
