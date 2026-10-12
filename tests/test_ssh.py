@@ -1,9 +1,10 @@
 import logging
 import os
 import unittest
+from pathlib import Path
 from unittest import mock
 
-from paramiko import SSHConfig, SSHException
+from paramiko import SSHException
 
 import smart_open.ssh
 
@@ -124,24 +125,56 @@ class SSHOpen(unittest.TestCase):
     @mock_ssh
     def test_open_with_wildcard_config(self, mock_connect, get_transp_mock):
         """Wildcard Host patterns supply connection settings just like exact aliases."""
-        config = SSHConfig.from_text(
-            "Host *.example\n  HostName storage.internal\n  User storage-user\n  Port 2222\n"
-        )
-        with mock.patch.object(SSHConfig, "from_path", return_value=config):
-            smart_open.open("ssh://files.example/data")
+        smart_open.ssh._SSH_CONFIG_FILES = [str(Path(_TEST_DATA_PATH) / "ssh-wildcard.cfg")]
+        smart_open.open("ssh://files.example/data")
         mock_connect.assert_called_once_with("storage.internal", 2222, username="storage-user", password=None)
 
     @mock_ssh
     def test_unmatched_config_does_not_hide_later_alias(self, mock_connect, get_transp_mock):
         """An unrelated config file must not hide HostName from a later file."""
-        configs = [
-            SSHConfig.from_text("Host unrelated\n  HostName unrelated.internal\n"),
-            SSHConfig.from_text("Host files.example\n  HostName storage.internal\n"),
+        smart_open.ssh._SSH_CONFIG_FILES = [
+            _CONFIG_PATH,
+            str(Path(_TEST_DATA_PATH) / "ssh-wildcard.cfg"),
         ]
-        smart_open.ssh._SSH_CONFIG_FILES = [_CONFIG_PATH, _CONFIG_PATH]
-        with mock.patch.object(SSHConfig, "from_path", side_effect=configs):
-            smart_open.open("ssh://user@files.example/data")
+        smart_open.open("ssh://user@files.example:22/data")
         mock_connect.assert_called_once_with("storage.internal", 22, username="user", password=None)
+
+    def test_self_hostname_keeps_earlier_file_precedence(self):
+        """An explicit self HostName retains precedence in literal and wildcard stanzas."""
+        for filename in ["ssh-self-hostname.cfg", "ssh-self-wildcard.cfg"]:
+            with self.subTest(filename=filename):
+                smart_open.ssh._SSH_CONFIG_FILES = [
+                    str(Path(_TEST_DATA_PATH) / filename),
+                    str(Path(_TEST_DATA_PATH) / "ssh-wildcard.cfg"),
+                ]
+                host, *_ = smart_open.ssh._maybe_fetch_config("files.example", username="user")
+                assert host == "files.example"
+
+    def test_default_only_config_does_not_hide_later_alias(self):
+        """Global defaults retain precedence without introducing a synthesized HostName."""
+        smart_open.ssh._SSH_CONFIG_FILES = [
+            str(Path(_TEST_DATA_PATH) / "ssh-defaults.cfg"),
+            str(Path(_TEST_DATA_PATH) / "ssh-wildcard.cfg"),
+        ]
+        host, user, _, port, _ = smart_open.ssh._maybe_fetch_config("files.example")
+        assert (host, user, port) == ("storage.internal", "default-user", 2222)
+
+    def test_unreadable_config_does_not_hide_later_alias(self):
+        """Unreadable config files are skipped before resolving the readable files."""
+        smart_open.ssh._SSH_CONFIG_FILES = [
+            _CONFIG_PATH,
+            str(Path(_TEST_DATA_PATH) / "ssh-wildcard.cfg"),
+        ]
+        original_open = Path.open
+
+        def open_readable_file(path, *args, **kwargs):
+            if path == Path(_CONFIG_PATH):
+                raise PermissionError
+            return original_open(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "open", open_readable_file):
+            host, *_ = smart_open.ssh._maybe_fetch_config("files.example", username="user")
+        assert host == "storage.internal"
 
     @mock_ssh
     def test_open_with_openssh_config_override_port(self, mock_connect, get_transp_mock):
