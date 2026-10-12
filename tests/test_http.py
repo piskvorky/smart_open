@@ -301,6 +301,16 @@ def test_read_after_seek_to_eof():
     result = reader.read()
     assert result == b""
 
+
+@responses.activate
+def test_readline_after_seek_to_eof():
+    """Readline after seeking to EOF should return empty bytes, like read()."""
+    responses.add_callback(responses.GET, URL, callback=request_callback)
+    reader = smart_open.http.SeekableBufferedInputBase(URL)
+    reader.seek(0, whence=smart_open.constants.WHENCE_END)
+    assert reader.readline() == b""
+    assert reader.readline(10) == b""
+
     # Read with size should also return empty bytes
     result = reader.read(10)
     assert result == b""

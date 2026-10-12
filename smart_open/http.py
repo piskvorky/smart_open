@@ -244,6 +244,15 @@ class BufferedInputBase(io.BufferedIOBase):
         """This is the same as read()."""
         return self.read(size=size)
 
+    def readline(self, size: int | None = -1) -> bytes:
+        """Read and return one line, refilling the buffer from the response in chunks."""
+        buf, response = self._read_buffer, self.response
+        if buf is None or response is None:
+            return b""
+        line = buf.readline(b"\n", size, lambda: buf.fill(response.raw))
+        self._current_pos += len(line)
+        return line
+
     def readinto(self, b: WriteableBuffer) -> int:
         """Read up to ``len(b)`` bytes into ``b``, and return the number of bytes read."""
         mv = memoryview(b).cast("B")

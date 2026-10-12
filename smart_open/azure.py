@@ -384,27 +384,10 @@ class Reader(io.BufferedIOBase):
         return len(data)
 
     def readline(self, limit: int | None = -1) -> bytes:
-        """Read up to and including the next newline.  Returns the bytes read."""
-        if limit is None:
-            limit = -1
-        if limit != -1:
-            msg = "limits other than -1 not implemented yet"
-            raise NotImplementedError(msg)
-
-        #
-        # A single line may span multiple buffers.
-        #
-        line = io.BytesIO()
-        while not (self._position == self._size and len(self._current_part) == 0):
-            line_part = self._current_part.readline(self._line_terminator)
-            line.write(line_part)
-            self._position += len(line_part)
-
-            if line_part.endswith(self._line_terminator):
-                break
-            self._fill_buffer()
-
-        return line.getvalue()
+        """Read up to and including the next line terminator, or up to ``limit`` bytes.  Returns the bytes read."""
+        line = self._current_part.readline(self._line_terminator, limit, self._fill_buffer)
+        self._position += len(line)
+        return line
 
     #
     # Internal methods.
