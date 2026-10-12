@@ -192,14 +192,11 @@ def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refac
         except PermissionError:
             continue
 
-        if host not in cfg.get_hostnames():
-            continue
-
         cfg = cfg.lookup(host)
         if username is None:
             username = cfg.get("user", None)
 
-        if not actual_hostname:
+        if not actual_hostname and cfg["hostname"] != host:
             actual_hostname = cfg["hostname"]
 
         if port is None:

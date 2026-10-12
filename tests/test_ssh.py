@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest import mock
 
-from paramiko import SSHException
+from paramiko import SSHConfig, SSHException
 
 import smart_open.ssh
 
@@ -120,6 +120,28 @@ class SSHOpen(unittest.TestCase):
             gss_deleg_creds=False,
             gss_trust_dns=False,
         )
+
+    @mock_ssh
+    def test_open_with_wildcard_config(self, mock_connect, get_transp_mock):
+        """Wildcard Host patterns supply connection settings just like exact aliases."""
+        config = SSHConfig.from_text(
+            "Host *.example\n  HostName storage.internal\n  User storage-user\n  Port 2222\n"
+        )
+        with mock.patch.object(SSHConfig, "from_path", return_value=config):
+            smart_open.open("ssh://files.example/data")
+        mock_connect.assert_called_once_with("storage.internal", 2222, username="storage-user", password=None)
+
+    @mock_ssh
+    def test_unmatched_config_does_not_hide_later_alias(self, mock_connect, get_transp_mock):
+        """An unrelated config file must not hide HostName from a later file."""
+        configs = [
+            SSHConfig.from_text("Host unrelated\n  HostName unrelated.internal\n"),
+            SSHConfig.from_text("Host files.example\n  HostName storage.internal\n"),
+        ]
+        smart_open.ssh._SSH_CONFIG_FILES = [_CONFIG_PATH, _CONFIG_PATH]
+        with mock.patch.object(SSHConfig, "from_path", side_effect=configs):
+            smart_open.open("ssh://user@files.example/data")
+        mock_connect.assert_called_once_with("storage.internal", 22, username="user", password=None)
 
     @mock_ssh
     def test_open_with_openssh_config_override_port(self, mock_connect, get_transp_mock):
