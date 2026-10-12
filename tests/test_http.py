@@ -342,3 +342,60 @@ def test_open_sets_fobj_name(path, expected):
     responses.add_callback(responses.GET, url, callback=request_callback)
     fobj = smart_open.http.open(url, "rb")
     assert fobj.name == expected
+
+
+@pytest.mark.parametrize(
+    "reader_class", [smart_open.http.BufferedInputBase, smart_open.http.SeekableBufferedInputBase]
+)
+@responses.activate
+def test_close_releases_response(reader_class):
+    """Release a partially read response when closing its reader."""
+    responses.add(responses.GET, URL, body=BYTES)
+    reader = reader_class(URL, buffer_size=1)
+    response = reader.response
+    assert reader.read(1) == BYTES[:1]
+    assert not response.raw.closed
+    reader.close()
+    assert response.raw.closed
+    assert reader.closed
+    reader.close()
+
+
+@pytest.mark.parametrize("offset", [10, len(BYTES)])
+@responses.activate
+def test_seek_releases_response(offset):
+    """Release the previous response before a range request or a seek to EOF."""
+    responses.add_callback(responses.GET, URL, callback=request_callback)
+    reader = smart_open.http.SeekableBufferedInputBase(URL, buffer_size=1)
+    response = reader.response
+    assert reader.read(1) == BYTES[:1]
+    assert not response.raw.closed
+    reader.seek(offset)
+    assert response.raw.closed
+    assert reader.read(1) == BYTES[offset : offset + 1]
+    reader.close()
+
+
+@responses.activate
+def test_buffered_seek_keeps_response_open():
+    """A seek within buffered data keeps the current response usable."""
+    responses.add_callback(responses.GET, URL, callback=request_callback)
+    with smart_open.http.SeekableBufferedInputBase(URL, buffer_size=32) as reader:
+        response = reader.response
+        assert reader.read(1) == BYTES[:1]
+        reader.seek(1)
+        reader.seek(5)
+        assert not response.raw.closed
+        assert reader.read() == BYTES[5:]
+        assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_seek_releases_failed_response():
+    """Release a range response that cannot be used for reading."""
+    responses.add(responses.GET, URL, body=BYTES)
+    responses.add(responses.GET, URL, status=404, body=b"not found")
+    with smart_open.http.SeekableBufferedInputBase(URL, buffer_size=1) as reader:
+        reader.seek(10)
+        assert responses.calls[-1].response.raw.closed
+        assert reader.read() == b""

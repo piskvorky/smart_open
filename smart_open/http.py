@@ -190,8 +190,13 @@ class BufferedInputBase(io.BufferedIOBase):
         """Flush and close this stream."""
         logger.debug("close: called")
         if not self.closed:
+            self._close_response()
             self.response = None
             self._read_buffer = None
+
+    def _close_response(self) -> None:
+        if self.response is not None:
+            self.response.close()
 
     @property
     def closed(self) -> bool:
@@ -350,6 +355,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         logger.debug("http seeking from current_pos: %d to new_pos: %d", self._current_pos, new_pos)
 
+        self._close_response()
         self._current_pos = new_pos
 
         if new_pos == self.content_length:
@@ -361,6 +367,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
                 self.response = response
                 buf.empty()
             else:
+                response.close()
                 self.response = None
 
         return self._current_pos
