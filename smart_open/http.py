@@ -248,9 +248,8 @@ class BufferedInputBase(io.BufferedIOBase):
         """Read and return one line, filling the buffer in chunks like the S3 and Azure readers."""
         buf, response = self._read_buffer, self.response
         if buf is None or response is None or (size is not None and size >= 0):
-            return super().readline(
-                size
-            )  # io.IOBase reads byte by byte: fine for closed streams and size limits
+            # io.IOBase reads byte by byte: fine for closed streams and size limits
+            return super().readline(size)
         line = io.BytesIO()
         while True:
             line_part = buf.readline(b"\n")

@@ -208,7 +208,9 @@ class BufferedInputBase(io.BufferedIOBase):
 
     def peek(self, size: int = 0) -> bytes:  # io.IOBase.readline uses peek() to find the next newline
         """Return buffered bytes without advancing the position, reading one chunk if the buffer is empty."""
-        assert self._buf is not None  # noqa: S101  # peek on a closed stream is unsupported
+        if self._buf is None:
+            msg = "I/O operation on closed file"
+            raise ValueError(msg)
         if not self._buf:
             self._buf = self._response.raw.read(io.DEFAULT_BUFFER_SIZE)
         return self._buf

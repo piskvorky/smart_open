@@ -143,11 +143,10 @@ class CliRawInputBase(io.RawIOBase):
     def readline(self, size: int | None = -1) -> bytes:
         """Read and return one line from the subprocess's buffered stdout."""
         sub = self._sub
-        assert sub is not None  # noqa: S101  # subprocess started in __init__
-        assert sub.stdout is not None  # noqa: S101  # stdout=PIPE set in __init__
-        if size is None:
-            size = -1
-        return sub.stdout.readline(size)
+        if sub is None or sub.stdout is None:
+            msg = "I/O operation on closed file"
+            raise ValueError(msg)
+        return sub.stdout.readline(-1 if size is None else size)
 
     def read1(self, size: int | None = -1) -> bytes:
         """This is the same as read()."""

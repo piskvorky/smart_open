@@ -52,16 +52,20 @@ def test_http(source):
 
 @responses.activate
 def test_webhdfs(source):
-    """Read lines over WebHDFS."""
+    """Read lines over WebHDFS, and refuse once closed."""
     responses.add(responses.GET, "http://host:1/webhdfs/v1/file", body=source)
     with smart_open.open("webhdfs://host:1/file", "rb") as fin:
         check_lines(fin, source)
+    with pytest.raises(ValueError, match="closed file"):
+        fin.readline()
 
 
 def test_hdfs(source):
-    """Read lines from the ``hdfs dfs -cat`` subprocess."""
+    """Read lines from the ``hdfs dfs -cat`` subprocess, and refuse once closed."""
     with (
         mock.patch("subprocess.Popen", return_value=mock.Mock(stdout=source)),
         smart_open.open("hdfs://host/file", "rb") as fin,
     ):
         check_lines(fin, source)
+    with pytest.raises(ValueError, match="closed file"):
+        fin.readline()
