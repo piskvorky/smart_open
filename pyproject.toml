@@ -17,6 +17,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Topic :: System :: Distributed Computing",
   "Topic :: Database :: Front-Ends"
 ]
@@ -135,3 +136,7 @@ fallback_version = "0.1.dev0+gitnotfound"
 
 [tool.ty.src]
 include = ["smart_open"]
+
+[tool.ty.analysis]
+# backports.zstd is only installed below 3.14, while ty checks the requires-python floor
+allowed-unresolved-imports = ["backports"]
