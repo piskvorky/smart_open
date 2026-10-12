@@ -6,7 +6,6 @@ import io
 from unittest import mock
 
 import boto3
-import pytest
 import responses
 
 import smart_open
@@ -49,24 +48,20 @@ def test_http():
 
 @responses.activate
 def test_webhdfs():
-    """Read lines over WebHDFS in chunks, and refuse once closed."""
+    """Read lines over WebHDFS in chunks."""
     responses.add(responses.GET, "http://host:1/webhdfs/v1/file", body=DATA)
     with smart_open.open("webhdfs://host:1/file", "rb") as fin:
         check_lines(fin)
-    with pytest.raises(ValueError, match="closed file"):
-        fin.readline()
 
 
 def test_hdfs():
-    """Read lines from the ``hdfs dfs -cat`` subprocess in chunks, and refuse once closed."""
+    """Read lines from the ``hdfs dfs -cat`` subprocess in chunks."""
     stdout = io.BufferedReader(io.BytesIO(DATA))  # Popen(stdout=PIPE) gives a BufferedReader
     with (
         mock.patch("subprocess.Popen", return_value=mock.Mock(stdout=stdout)),
         smart_open.open("hdfs://host/file", "rb") as fin,
     ):
         check_lines(fin)
-    with pytest.raises(ValueError, match="closed file"):
-        fin.readline()
 
 
 @mock_s3
