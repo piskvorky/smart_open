@@ -19,67 +19,52 @@ try:
 except ImportError:
     from moto import mock_aws as mock_s3
 
-LINE = b"x" * 20_000 + b"\n"
-DATA = b"first\n" + LINE + b"next\n"
-BUFFER_SIZE = 4096  # smaller than LINE, so reading LINE refills the buffer
-
-
-class CountingReader(io.BufferedReader):
-    """Source stream that counts read calls, so byte-at-a-time line reading shows up."""
-
-    reads = 0
-
-    def read(self, size=-1):
-        """Count the call and read."""
-        self.reads += 1
-        return super().read(size)
-
-
-@pytest.fixture
-def source():
-    """Return the source stream behind the transport."""
-    return CountingReader(io.BytesIO(DATA))
+BUFFER_SIZE = 4096
+LINE = b"x" * (io.DEFAULT_BUFFER_SIZE + BUFFER_SIZE) + b"\n"  # longer than any transport's read chunk
+DATA = b"first\n" + LINE + b"next"  # no trailing newline, so the last line ends at EOF
 
 
 def check_lines(fin):
-    """Read lines after a partial read, with and without a size limit."""
-    assert fin.read(1) == b"f"
-    assert fin.readline() == b"irst\n"
-    assert fin.readline(3) == b"xxx"
-    assert fin.readline(BUFFER_SIZE + 1) == b"x" * (BUFFER_SIZE + 1)
-    assert fin.readline() == LINE[BUFFER_SIZE + 4 :]
-    assert list(fin) == [b"next\n"]
+    """Read lines after a partial read, with and without a size limit, in chunks rather than read(1) per byte."""
+    with mock.patch.object(fin, "read", wraps=fin.read) as read:
+        assert fin.read(1) == b"f"
+        assert fin.readline(0) == b""
+        assert fin.readline() == b"irst\n"
+        assert fin.readline(3) == b"xxx"
+        assert fin.readline(len(LINE) - 4) == LINE[3:-1]  # the limit spans a refill
+        assert fin.readline() == b"\n"
+        assert fin.read(2) == b"ne"
+        assert list(fin) == [b"xt"]
+    assert read.call_count < 100  # io.IOBase.readline falls back to read(1) per byte
 
 
 @responses.activate
-def test_http(source):
+def test_http():
     """Read lines over HTTP in chunks, and keep the position for seeking."""
-    responses.add(responses.GET, "http://host/file", body=source)
+    responses.add(responses.GET, "http://host/file", body=DATA)
     with smart_open.open("http://host/file", "rb", transport_params={"buffer_size": BUFFER_SIZE}) as fin:
         check_lines(fin)
         assert fin.tell() == len(DATA)
-    assert source.reads < 100  # reading byte by byte takes over 20000
 
 
 @responses.activate
-def test_webhdfs(source):
+def test_webhdfs():
     """Read lines over WebHDFS in chunks, and refuse once closed."""
-    responses.add(responses.GET, "http://host:1/webhdfs/v1/file", body=source)
+    responses.add(responses.GET, "http://host:1/webhdfs/v1/file", body=DATA)
     with smart_open.open("webhdfs://host:1/file", "rb") as fin:
         check_lines(fin)
-    assert source.reads < 100  # reading byte by byte takes over 20000
     with pytest.raises(ValueError, match="closed file"):
         fin.readline()
 
 
-def test_hdfs(source):
+def test_hdfs():
     """Read lines from the ``hdfs dfs -cat`` subprocess in chunks, and refuse once closed."""
+    stdout = io.BufferedReader(io.BytesIO(DATA))  # Popen(stdout=PIPE) gives a BufferedReader
     with (
-        mock.patch("subprocess.Popen", return_value=mock.Mock(stdout=source)),
+        mock.patch("subprocess.Popen", return_value=mock.Mock(stdout=stdout)),
         smart_open.open("hdfs://host/file", "rb") as fin,
     ):
         check_lines(fin)
-    assert source.reads < 100  # reading byte by byte takes over 20000
     with pytest.raises(ValueError, match="closed file"):
         fin.readline()
 

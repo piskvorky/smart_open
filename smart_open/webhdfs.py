@@ -123,7 +123,7 @@ class BufferedInputBase(io.BufferedIOBase):
     """Buffered WebHDFS reader implementing the `io.BufferedIOBase` interface."""
 
     name: str
-    _buf: bytes | None = None  # so `closed` property works in case __init__ fails and __del__ is called
+    _reader: io.BufferedReader | None = None  # so `closed` works if __init__ fails and __del__ runs
 
     def __init__(self, uri: str) -> None:
         self._uri = uri
@@ -132,7 +132,8 @@ class BufferedInputBase(io.BufferedIOBase):
         self._response = requests.get(self._uri, params=payload, stream=True)  # noqa: S113  # WebHDFS server-side timeouts apply
         if self._response.status_code != httplib.OK:
             raise WebHdfsException.from_response(self._response)
-        self._buf = b""
+        self._response.raw.auto_close = False  # else urllib3 closes at EOF and BufferedReader raises
+        self._reader = io.BufferedReader(self._response.raw)
 
     #
     # Override some methods from io.IOBase.
@@ -140,13 +141,12 @@ class BufferedInputBase(io.BufferedIOBase):
     def close(self) -> None:
         """Flush and close this stream."""
         logger.debug("close: called")
-        if not self.closed:
-            self._buf = None
+        self._reader = None
 
     @property
     def closed(self) -> bool:
         """Return True if the stream is closed."""
-        return self._buf is None
+        return self._reader is None
 
     def readable(self) -> bool:
         """Return True if the stream can be read from."""
@@ -165,33 +165,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
     def read(self, size: int | None = None) -> bytes:
         """Read up to `size` bytes (or all remaining bytes if `size` is None)."""
-        buf = self._buf
-        assert buf is not None  # noqa: S101  # read on a closed stream is unsupported
-        if size is None or size < 0:
-            self._buf, retval = b"", buf + self._response.raw.read()
-            return retval
-        if size < len(buf):
-            self._buf, retval = buf[size:], buf[:size]
-            return retval
-
-        buffers = [buf]
-        try:
-            total_read = 0
-            while total_read < size:
-                raw_data = self._response.raw.read(io.DEFAULT_BUFFER_SIZE)
-                # some times read returns 0 length data without throwing a
-                # StopIteration exception. We break here if this happens.
-                if len(raw_data) == 0:
-                    break
-
-                total_read += len(raw_data)
-                buffers.append(raw_data)
-        except StopIteration:
-            pass
-
-        merged = b"".join(buffers)
-        self._buf, retval = merged[size:], merged[:size]
-        return retval
+        return self._open_reader().read(size)
 
     def read1(self, size: int | None = -1) -> bytes:
         """This is the same as read()."""
@@ -199,21 +173,17 @@ class BufferedInputBase(io.BufferedIOBase):
 
     def readinto(self, b: WriteableBuffer) -> int:
         """Read up to ``len(b)`` bytes into `b` and return the number of bytes read."""
-        mv = memoryview(b).cast("B")
-        data = self.read(len(mv))
-        if not data:
-            return 0
-        mv[: len(data)] = data
-        return len(data)
+        return self._open_reader().readinto(b)
 
-    def peek(self, size: int = 0) -> bytes:  # io.IOBase.readline uses peek() to find the next newline
-        """Return buffered bytes without advancing the position, reading one chunk if the buffer is empty."""
-        if self._buf is None:
+    def readline(self, size: int | None = -1) -> bytes:
+        """Read and return one line from the WebHDFS stream."""
+        return self._open_reader().readline(size)
+
+    def _open_reader(self) -> io.BufferedReader:
+        if self._reader is None:
             msg = "I/O operation on closed file"
             raise ValueError(msg)
-        if not self._buf:
-            self._buf = self._response.raw.read(io.DEFAULT_BUFFER_SIZE)
-        return self._buf
+        return self._reader
 
 
 class BufferedOutputBase(io.BufferedIOBase):
