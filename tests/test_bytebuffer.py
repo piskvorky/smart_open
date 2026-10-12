@@ -112,6 +112,28 @@ class ByteBufferTest(unittest.TestCase):
         assert second_bytes_filled == CHUNK_SIZE
         assert len(buf) == fill_size + CHUNK_SIZE
 
+    def test_fill_zero_size_from_iterable(self):
+        """A zero-size fill must not advance an iterable source."""
+        buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
+        buf.fill(io.BytesIO(b"existing"))
+        buf.read(3)
+        source = iter([b"first", b"second"])
+
+        assert buf.fill(source, size=0) == 0
+        assert buf.peek() == b"sting"
+        assert next(source) == b"first"
+
+    def test_fill_zero_size_from_reader(self):
+        """A zero-size fill preserves unread bytes and the reader position."""
+        buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)
+        buf.fill(io.BytesIO(b"existing"))
+        buf.read(3)
+        source = io.BytesIO(b"new data")
+
+        assert buf.fill(source, size=0) == 0
+        assert buf.peek() == b"sting"
+        assert source.tell() == 0
+
     def test_fill_reader_exhaustion(self):
         """Fill reader exhaustion."""
         buf = smart_open.bytebuffer.ByteBuffer(CHUNK_SIZE)

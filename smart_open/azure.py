@@ -311,6 +311,7 @@ class Reader(io.BufferedIOBase):
             ValueError: If ``whence`` is not one of the accepted values.
         """
         logger.debug("seeking to offset: %r whence: %r", offset, whence)
+        self._checkClosed()
         if whence not in smart_open.constants.WHENCE_CHOICES:
             msg = f"invalid whence {whence}, expected one of {smart_open.constants.WHENCE_CHOICES!r}"
             raise ValueError(msg)
@@ -340,6 +341,7 @@ class Reader(io.BufferedIOBase):
 
     def tell(self) -> int:
         """Return the current position within the file."""
+        self._checkClosed()
         return self._position
 
     def truncate(self, size: int | None = None) -> int:
@@ -348,6 +350,7 @@ class Reader(io.BufferedIOBase):
 
     def read(self, size: int | None = -1) -> bytes:
         """Read up to size bytes from the object and return them."""
+        self._checkClosed()
         if size is None:
             size = -1
         raw_reader = self._raw_reader
@@ -384,27 +387,11 @@ class Reader(io.BufferedIOBase):
         return len(data)
 
     def readline(self, limit: int | None = -1) -> bytes:
-        """Read up to and including the next newline.  Returns the bytes read."""
-        if limit is None:
-            limit = -1
-        if limit != -1:
-            msg = "limits other than -1 not implemented yet"
-            raise NotImplementedError(msg)
-
-        #
-        # A single line may span multiple buffers.
-        #
-        line = io.BytesIO()
-        while not (self._position == self._size and len(self._current_part) == 0):
-            line_part = self._current_part.readline(self._line_terminator)
-            line.write(line_part)
-            self._position += len(line_part)
-
-            if line_part.endswith(self._line_terminator):
-                break
-            self._fill_buffer()
-
-        return line.getvalue()
+        """Read up to and including the next line terminator, or up to ``limit`` bytes.  Returns the bytes read."""
+        self._checkClosed()
+        line = self._current_part.readline(self._line_terminator, limit, self._fill_buffer)
+        self._position += len(line)
+        return line
 
     #
     # Internal methods.
@@ -481,6 +468,7 @@ class Writer(io.BufferedIOBase):
 
     def flush(self) -> None:
         """No-op flush; data is buffered until `close` or `_upload_part`."""
+        self._checkClosed()
 
     def terminate(self) -> None:
         """Do not commit block list on abort.
@@ -537,6 +525,7 @@ class Writer(io.BufferedIOBase):
 
     def tell(self) -> int:
         """Return the current stream position."""
+        self._checkClosed()
         return self._total_size
 
     #
@@ -553,12 +542,12 @@ class Writer(io.BufferedIOBase):
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away.
         """
+        self._checkClosed()
         if not isinstance(b, _BINARY_TYPES):
             msg = f"input must be one of {_BINARY_TYPES!r}, got: {type(b)!r}"
             raise TypeError(msg)
 
-        length = len(memoryview(b))
-        self._current_part.write(b)
+        length = self._current_part.write(b)
         self._total_size += length
 
         if self._current_part.tell() >= self._min_part_size:
@@ -650,6 +639,7 @@ class AppendWriter(io.BufferedIOBase):
 
     def flush(self) -> None:
         """No-op flush; data is buffered until `close` or `_upload_part`."""
+        self._checkClosed()
 
     def terminate(self) -> None:
         """AppendBlob cannot be aborted, so we do nothing here."""
@@ -689,6 +679,7 @@ class AppendWriter(io.BufferedIOBase):
 
     def tell(self) -> int:
         """Return the current stream position."""
+        self._checkClosed()
         return self._total_size
 
     def detach(self) -> io.RawIOBase:
@@ -698,11 +689,11 @@ class AppendWriter(io.BufferedIOBase):
 
     def write(self, b: ReadableBuffer) -> int:
         """Append `b` to the AppendBlob, buffering until ``min_part_size``."""
+        self._checkClosed()
         if not isinstance(b, _BINARY_TYPES):
             msg = f"input must be one of {_BINARY_TYPES!r}, got: {type(b)!r}"
             raise TypeError(msg)
-        length = len(memoryview(b))
-        self._current_part.write(b)
+        length = self._current_part.write(b)
         self._total_size += length
         if self._current_part.tell() >= self._min_part_size:
             self._upload_part()

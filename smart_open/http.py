@@ -128,7 +128,8 @@ class BufferedInputBase(io.BufferedIOBase):
     """Buffered HTTP reader implementing the `io.BufferedIOBase` interface."""
 
     name: str
-    response: requests.Response | None = None  # so `closed` works if __init__ fails and __del__ runs
+    response: requests.Response | None = None
+    _read_buffer: bytebuffer.ByteBuffer | None = None  # so `closed` works if __init__ fails and __del__ runs
 
     def __init__(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         self,
@@ -179,7 +180,7 @@ class BufferedInputBase(io.BufferedIOBase):
         if not self.response.ok:
             self.response.raise_for_status()
 
-        self._read_buffer: bytebuffer.ByteBuffer | None = bytebuffer.ByteBuffer(buffer_size)
+        self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
         self._current_pos = 0
 
     #
@@ -189,13 +190,18 @@ class BufferedInputBase(io.BufferedIOBase):
         """Flush and close this stream."""
         logger.debug("close: called")
         if not self.closed:
+            self._close_response()
             self.response = None
             self._read_buffer = None
+
+    def _close_response(self) -> None:
+        if self.response is not None:
+            self.response.close()
 
     @property
     def closed(self) -> bool:
         """Return True if the stream is closed."""
-        return self.response is None
+        return self._read_buffer is None  # response is also None at EOF after a seek
 
     def readable(self) -> bool:
         """Return True if the stream can be read from."""
@@ -214,6 +220,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
     def read(self, size: int | None = -1) -> bytes:
         """Mimic the read call to a filehandle object."""
+        self._checkClosed()
         if size is None:
             size = -1
         if size < -1:
@@ -243,6 +250,16 @@ class BufferedInputBase(io.BufferedIOBase):
     def read1(self, size: int | None = -1) -> bytes:
         """This is the same as read()."""
         return self.read(size=size)
+
+    def readline(self, size: int | None = -1) -> bytes:
+        """Read and return one line, refilling the buffer from the response in chunks."""
+        self._checkClosed()
+        buf, response = self._read_buffer, self.response
+        if buf is None or response is None:
+            return b""
+        line = buf.readline(b"\n", size, lambda: buf.fill(response.raw))
+        self._current_pos += len(line)
+        return line
 
     def readinto(self, b: WriteableBuffer) -> int:
         """Read up to ``len(b)`` bytes into ``b``, and return the number of bytes read."""
@@ -288,7 +305,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         #
         self._seekable = self.response.headers.get("Accept-Ranges", "").lower() != "none"
 
-    def seek(self, offset: int, whence: int = 0) -> int:  # noqa: C901, PLR0912  # legacy public API; refactor in a dedicated PR
+    def seek(self, offset: int, whence: int = 0) -> int:  # noqa: PLR0912  # legacy public API; refactor in a dedicated PR
         """Seek to the specified position.
 
         Args:
@@ -303,6 +320,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             OSError: If the stream is not seekable.
         """
         logger.debug("seeking to offset: %r whence: %r", offset, whence)
+        self._checkClosed()
         if whence not in constants.WHENCE_CHOICES:
             msg = f"invalid whence, expected one of {constants.WHENCE_CHOICES!r}"
             raise ValueError(msg)
@@ -312,9 +330,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             raise OSError(msg)
 
         buf = self._read_buffer
-        if buf is None:
-            msg = "seek on closed stream"
-            raise OSError(msg)
+        assert buf is not None  # noqa: S101  # not closed implies buf is set
 
         if whence == constants.WHENCE_START:
             new_pos = offset
@@ -339,6 +355,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         logger.debug("http seeking from current_pos: %d to new_pos: %d", self._current_pos, new_pos)
 
+        self._close_response()
         self._current_pos = new_pos
 
         if new_pos == self.content_length:
@@ -350,12 +367,14 @@ class SeekableBufferedInputBase(BufferedInputBase):
                 self.response = response
                 buf.empty()
             else:
+                response.close()
                 self.response = None
 
         return self._current_pos
 
     def tell(self) -> int:
         """Return the current stream position."""
+        self._checkClosed()
         return self._current_pos
 
     def seekable(self, *args: object, **kwargs: object) -> bool:

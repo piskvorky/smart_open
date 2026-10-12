@@ -825,6 +825,9 @@ class Reader(io.BufferedIOBase):
     def close(self) -> None:
         """Flush and close this stream."""
         logger.debug("close: called")
+        if hasattr(self, "_raw_reader"):  # unset if __init__ failed, and __del__ still calls close
+            self._raw_reader.close()
+        super().close()
 
     def readable(self) -> bool:
         """Return True if the stream can be read from."""
@@ -832,6 +835,7 @@ class Reader(io.BufferedIOBase):
 
     def read(self, size: int | None = -1) -> bytes:
         """Read up to size bytes from the object and return them."""
+        self._checkClosed()
         if size is None:
             size = -1
         if size == 0:
@@ -880,25 +884,11 @@ class Reader(io.BufferedIOBase):
         return len(data)
 
     def readline(self, limit: int | None = -1) -> bytes:
-        """Read up to and including the next newline.  Returns the bytes read."""
-        if limit != -1:
-            msg = "limits other than -1 not implemented yet"
-            raise NotImplementedError(msg)
-
-        #
-        # A single line may span multiple buffers.
-        #
-        line = io.BytesIO()
-        while not (self._eof and len(self._buffer) == 0):
-            line_part = self._buffer.readline(self._line_terminator)
-            line.write(line_part)
-            self._current_pos += len(line_part)
-
-            if line_part.endswith(self._line_terminator):
-                break
-            self._fill_buffer()
-
-        return line.getvalue()
+        """Read up to and including the next line terminator, or up to ``limit`` bytes.  Returns the bytes read."""
+        self._checkClosed()
+        line = self._buffer.readline(self._line_terminator, limit, self._fill_buffer)
+        self._current_pos += len(line)
+        return line
 
     def seekable(self) -> bool:
         """If False, seek(), tell() and truncate() will raise IOError.
@@ -917,6 +907,7 @@ class Reader(io.BufferedIOBase):
         Returns:
             The position after seeking.
         """
+        self._checkClosed()
         # Convert relative offset to absolute, since self._raw_reader
         # doesn't know our current position.
         if whence == constants.WHENCE_CURRENT:
@@ -945,6 +936,7 @@ class Reader(io.BufferedIOBase):
 
     def tell(self) -> int:
         """Return the current position within the file."""
+        self._checkClosed()
         return self._current_pos
 
     def truncate(self, size: int | None = None) -> int:
@@ -1014,7 +1006,7 @@ class MultipartWriter(io.BufferedIOBase):
     _client: S3Client
     _bucket: str
     _key: str
-    _upload_id: str | None = None  # so `closed` property works in case __init__ fails and __del__ is called
+    _upload_id: str | None = None  # so `closed` works if __init__ fails and __del__ runs
 
     def __init__(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         self,
@@ -1055,6 +1047,7 @@ class MultipartWriter(io.BufferedIOBase):
 
     def flush(self) -> None:
         """No-op flush; data is buffered until ``close`` or ``_upload_next_part``."""
+        self._checkClosed()
 
     #
     # Override some methods from io.IOBase.
@@ -1123,6 +1116,7 @@ class MultipartWriter(io.BufferedIOBase):
 
     def tell(self) -> int:
         """Return the current stream position."""
+        self._checkClosed()
         return self._total_bytes
 
     #
@@ -1143,6 +1137,7 @@ class MultipartWriter(io.BufferedIOBase):
         There's buffering happening under the covers, so this may not actually
         do any HTTP transfer right away.
         """
+        self._checkClosed()
         offset = 0
         mv = memoryview(b)
         self._total_bytes += len(mv)
@@ -1275,7 +1270,7 @@ class SinglepartWriter(io.BufferedIOBase):
     _client: S3Client
     _bucket: str
     _key: str
-    _buf: io.BytesIO | None = None  # so `closed` property works in case __init__ fails and __del__ is called
+    _buf: io.BytesIO | None = None  # so `closed` works if __init__ fails and __del__ runs
 
     def __init__(
         self,
@@ -1304,6 +1299,7 @@ class SinglepartWriter(io.BufferedIOBase):
 
     def flush(self) -> None:
         """No-op flush; data is buffered until `close`."""
+        self._checkClosed()
 
     #
     # Override some methods from io.IOBase.

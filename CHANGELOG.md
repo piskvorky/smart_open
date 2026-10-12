@@ -1,3 +1,13 @@
+# 8.0.3, 2026-10-12
+
+- Avoid consuming source data during zero-size buffer fills (PR [#958](https://github.com/piskvorky/smart_open/pull/958), [@xiehuanyi](https://github.com/xiehuanyi))
+- Report HDFS output streams as writable to buffered writers (PR [#961](https://github.com/piskvorky/smart_open/pull/961), [@xiehuanyi](https://github.com/xiehuanyi))
+- Speed up binary readline for http, webhdfs and hdfs, and support readline(size) on S3 and Azure (PR [#962](https://github.com/piskvorky/smart_open/pull/962), [@ddelange](https://github.com/ddelange))
+- Raise ValueError like io.IOBase from every closed stream (PR [#963](https://github.com/piskvorky/smart_open/pull/963), [@ddelange](https://github.com/ddelange))
+- Add Python 3.15 to CI and run linters on it (PR [#964](https://github.com/piskvorky/smart_open/pull/964), [@ddelange](https://github.com/ddelange))
+- Close streamed HTTP responses when closing or seeking (PR [#966](https://github.com/piskvorky/smart_open/pull/966), [@zhechen-cs](https://github.com/zhechen-cs))
+- Count Azure writer memoryview inputs in bytes (PR [#965](https://github.com/piskvorky/smart_open/pull/965), [@zhechen-cs](https://github.com/zhechen-cs))
+
 # 8.0.2, 2026-09-29
 
 - Fix update_changelog.py triggering lint (PR [#953](https://github.com/piskvorky/smart_open/pull/953), [@ddelange](https://github.com/ddelange))

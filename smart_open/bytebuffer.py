@@ -12,7 +12,7 @@ import io
 from typing import IO, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
 
 class ByteBuffer:
@@ -133,6 +133,9 @@ class ByteBuffer:
             self._bytes = self._bytes[self._pos :]
             self._pos = 0
 
+        if size == 0:
+            return 0
+
         if hasattr(source, "read"):
             new_bytes = cast("IO[bytes]", source).read(size)
         else:
@@ -145,20 +148,42 @@ class ByteBuffer:
         self._bytes += new_bytes
         return len(new_bytes)
 
-    def readline(self, terminator: bytes) -> bytes:
+    def readline(
+        self,
+        terminator: bytes,
+        limit: int | None = -1,
+        fill: Callable[[], object] | None = None,
+    ) -> bytes:
         """Read a line from this buffer efficiently.
 
         A line is a contiguous sequence of bytes that ends with either:
 
         1. The ``terminator`` character
-        2. The end of the buffer itself
+        2. ``limit`` bytes, if ``limit`` is not negative
+        3. The end of the buffer itself, or with ``fill``, the end of the source
 
         Args:
             terminator: The line terminator byte.
+            limit: Maximum number of bytes to return. If negative or None, no limit.
+            fill: Called when the buffer runs out mid line, to add more bytes.
+                A buffer still empty afterwards means the end of the source.
 
         Returns:
             The line bytes (including the terminator if present).
         """
-        index = self._bytes.find(terminator, self._pos)
-        size = len(self) if index == -1 else index - self._pos + 1
-        return self.read(size)
+        if limit is None:
+            limit = -1
+        parts: list[bytes] = []
+        while True:
+            index = self._bytes.find(terminator, self._pos)
+            size = len(self) if index == -1 else index - self._pos + 1
+            if limit >= 0:
+                size = min(size, limit)
+                limit -= size
+            parts.append(self.read(size))
+            if parts[-1].endswith(terminator) or limit == 0 or fill is None:
+                break
+            fill()
+            if not len(self):
+                break
+        return b"".join(parts)

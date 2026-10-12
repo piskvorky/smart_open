@@ -13,7 +13,7 @@ import io
 import logging
 import subprocess
 import urllib.parse
-from typing import TYPE_CHECKING, TypedDict
+from typing import IO, TYPE_CHECKING, TypedDict
 
 import smart_open.utils
 
@@ -133,12 +133,18 @@ class CliRawInputBase(io.RawIOBase):
 
     def read(self, size: int | None = -1) -> bytes:
         """Read up to size bytes from the object and return them."""
+        return self._stdout().read(-1 if size is None else size)
+
+    def readline(self, size: int | None = -1) -> bytes:
+        """Read and return one line from the subprocess's buffered stdout."""
+        return self._stdout().readline(-1 if size is None else size)
+
+    def _stdout(self) -> IO[bytes]:
+        self._checkClosed()
         sub = self._sub
-        assert sub is not None  # noqa: S101  # subprocess started in __init__
+        assert sub is not None  # noqa: S101  # not closed implies sub is set
         assert sub.stdout is not None  # noqa: S101  # stdout=PIPE set in __init__
-        if size is None:
-            size = -1
-        return sub.stdout.read(size)
+        return sub.stdout
 
     def read1(self, size: int | None = -1) -> bytes:
         """This is the same as read()."""
@@ -185,13 +191,10 @@ class CliRawOutputBase(io.RawIOBase):
 
     def flush(self) -> None:
         """Flush the underlying ``hdfs dfs -put`` subprocess stdin."""
-        sub = self._sub
-        assert sub is not None  # noqa: S101  # subprocess started in __init__
-        assert sub.stdin is not None  # noqa: S101  # stdin=PIPE set in __init__
-        sub.stdin.flush()
+        self._stdin().flush()
 
-    def writeable(self) -> bool:
-        """Return True if this object is writeable."""
+    def writable(self) -> bool:
+        """Return True if this object is writable."""
         return self._sub is not None
 
     def seekable(self) -> bool:
@@ -209,10 +212,14 @@ class CliRawOutputBase(io.RawIOBase):
         ``AssertionError`` because ``write`` would otherwise implicitly
         return ``None``.
         """
+        return self._stdin().write(b)
+
+    def _stdin(self) -> IO[bytes]:
+        self._checkClosed()
         sub = self._sub
-        assert sub is not None  # noqa: S101  # subprocess started in __init__
+        assert sub is not None  # noqa: S101  # not closed implies sub is set
         assert sub.stdin is not None  # noqa: S101  # stdin=PIPE set in __init__
-        return sub.stdin.write(b)
+        return sub.stdin
 
     #
     # io.IOBase methods.
