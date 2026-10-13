@@ -182,9 +182,16 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     fobj: Any = socket.makefile(cast("Any", file_obj_mode))
 
     def full_close(self: Any) -> None:
-        self.orig_close()
-        self.socket.close()
-        self.conn.close()
+        if self.closed:
+            return
+        try:
+            try:
+                self.orig_close()
+            finally:
+                self.socket.close()
+            self.conn.voidresp()
+        finally:
+            self.conn.close()
 
     fobj.orig_close = fobj.close
     fobj.socket = socket
