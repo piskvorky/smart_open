@@ -87,7 +87,7 @@ def open(
         msg = f"webhdfs support for mode {mode!r} not implemented"
         raise NotImplementedError(msg)
 
-    fobj.name = http_uri.split("/")[-1]
+    fobj.name = urllib.parse.urlsplit(http_uri).path.rsplit("/", 1)[-1]
     return fobj
 
 
@@ -102,11 +102,17 @@ def _convert_to_http_uri(webhdfs_url: str) -> str:
     """
     split_uri = urllib.parse.urlsplit(webhdfs_url)
     netloc = split_uri.hostname or ""
+    if ":" in netloc:
+        netloc = f"[{netloc}]"
     if split_uri.port:
         netloc += f":{split_uri.port}"
     query = split_uri.query
     if split_uri.username:
-        query += ("&" if query else "") + "user.name=" + urllib.parse.quote(split_uri.username)
+        query += (
+            ("&" if query else "")
+            + "user.name="
+            + urllib.parse.quote(urllib.parse.unquote(split_uri.username))
+        )
 
     return urllib.parse.urlunsplit(("http", netloc, "/webhdfs/v1" + split_uri.path, query, ""))
 
