@@ -724,7 +724,7 @@ def test_local_compression_extension_case(tmp_path, codec, uppercase, uri_kind, 
     if uppercase:
         extension = extension.upper()
     path = tmp_path / f"payload.{extension}"
-    uri = str(path) if uri_kind == "path" else path.as_uri()
+    uri = str(path) if uri_kind == "path" else f"file://{path}"
     if mode == "rb":
         path.write_bytes(codec.compress(SAMPLE_BYTES))
         with smart_open.open(uri, mode) as stream:
