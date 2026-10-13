@@ -196,9 +196,12 @@ class FileLikeProxy(wrapt.ObjectProxy):
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> Any:
-        """Exit inner after exiting outer."""
+        """Exit inner with any exception raised while exiting outer."""
         try:
             return super().__exit__(exc_type, exc_value, traceback)
+        except BaseException as error:
+            exc_type, exc_value, traceback = type(error), error, error.__traceback__
+            raise
         finally:
             self.__inner.__exit__(exc_type, exc_value, traceback)
 
