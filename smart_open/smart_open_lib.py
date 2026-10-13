@@ -398,7 +398,7 @@ def _shortcut_open(  # noqa: PLR0913  # legacy internal helper; refactor in a de
 
     local_path = so_file.extract_local_path(uri)
     if compression == so_compression.INFER_FROM_EXTENSION:
-        extension = pathlib.Path(local_path).suffix
+        extension = pathlib.Path(local_path).suffix.lower()
         if extension in so_compression.get_supported_extensions():
             return None
     elif compression != so_compression.NO_COMPRESSION:
