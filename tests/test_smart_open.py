@@ -2097,3 +2097,33 @@ def test_to_boto3():
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s : %(levelname)s : %(message)s", level=logging.DEBUG)
     unittest.main()
+
+
+@pytest.mark.parametrize("min_part_size", [1, 64])
+@pytest.mark.parametrize("kind", ["bytes", "bytearray", "memoryview", "integer", "multidimensional"])
+@responses.activate
+def test_webhdfs_bytes_like_write(min_part_size, kind):
+    """Write byte-oriented snapshots of readable buffers to WebHDFS."""
+    payload = bytearray(b"abcdefghijklmnop")
+    if kind == "bytes":
+        data = bytes(payload)
+    elif kind == "bytearray":
+        data = payload
+    elif kind == "memoryview":
+        data = memoryview(payload)
+    elif kind == "integer":
+        data = memoryview(payload).cast("I")
+    else:
+        data = memoryview(payload).cast("I", shape=[2, 2])
+    expected = io.BytesIO()
+    uri = "http://host:1/webhdfs/v1/file"
+    responses.add(responses.PUT, uri, status=307, headers={"location": "http://node/file"})
+    responses.add(responses.PUT, "http://node/file", status=201)
+    responses.add(responses.POST, uri, status=307, headers={"location": "http://node/file"})
+    responses.add(responses.POST, "http://node/file", status=200)
+    with smart_open.open(
+        "webhdfs://host:1/file", "wb", transport_params={"min_part_size": min_part_size}
+    ) as fout:
+        assert fout.write(data) == expected.write(data)
+        payload[:] = b"x" * len(payload)
+    assert responses.calls[-1].request.body == expected.getvalue()

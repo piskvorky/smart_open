@@ -247,8 +247,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         self._checkClosed()
 
         if not isinstance(b, bytes):
-            msg = "input must be a binary string"
-            raise TypeError(msg)
+            b = memoryview(b).tobytes()
 
         self.lines.append(b)
         self.chunk_bytes += len(b)
