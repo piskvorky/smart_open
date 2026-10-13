@@ -187,6 +187,8 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         try:
             try:
                 self.orig_close()
+                if isinstance(self.socket, ssl.SSLSocket):
+                    self.socket.unwrap()
             finally:
                 self.socket.close()
             self.conn.voidresp()
