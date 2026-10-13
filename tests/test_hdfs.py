@@ -193,6 +193,50 @@ def test_write_zip(schema):
     assert actual == expected
 
 
+@pytest.mark.parametrize("method", ["read", "read1", "readline", "readinto"])
+def test_read_command_failure(method):
+    """Report a failed cat command rather than returning truncated content."""
+    command = [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'partial'); sys.exit(7)"]
+    with (
+        subprocess.Popen(command, stdout=subprocess.PIPE) as process,  # noqa: S603  # controlled CLI stand-in
+        mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
+        smart_open.open("hdfs:///missing/file", "rb") as reader,
+    ):
+        argument = bytearray(64) if method == "readinto" else 64
+        with pytest.raises(OSError, match="exit status 7"):
+            getattr(reader, method)(argument)
+
+
+@pytest.mark.parametrize("method", ["read", "read1", "readline", "readinto"])
+def test_zero_read_before_command_failure(method):
+    """A zero-size read does not consume data or observe the command status."""
+    command = [sys.executable, "-c", "import sys; sys.exit(7)"]
+    with subprocess.Popen(command, stdout=subprocess.PIPE) as process:  # noqa: S603  # controlled CLI stand-in
+        process.wait()
+        with (
+            mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
+            smart_open.open("hdfs:///missing/file", "rb") as reader,
+        ):
+            argument = bytearray() if method == "readinto" else 0
+            expected = 0 if method == "readinto" else b""
+            assert getattr(reader, method)(argument) == expected
+
+
+def test_write_command_failure():
+    """Report a put failure that occurs after consuming all input."""
+    command = [sys.executable, "-c", "import sys; sys.stdin.buffer.read(); sys.exit(7)"]
+    with (
+        subprocess.Popen(command, stdin=subprocess.PIPE) as process,  # noqa: S603  # controlled CLI stand-in
+        mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
+    ):
+        writer = smart_open.open("hdfs:///failed/file", "wb")
+        assert writer.write(b"payload") == len(b"payload")
+        with pytest.raises(OSError, match="exit status 7"):
+            writer.close()
+        assert writer.closed
+        writer.close()
+
+
 def main():
     """Main."""
     try:
