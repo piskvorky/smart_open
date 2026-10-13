@@ -344,7 +344,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         else:
             new_pos = smart_open.utils.clamp(new_pos, maxval=self.content_length)
 
-        if self._current_pos == new_pos:
+        if self._current_pos == new_pos and (self.response is not None or new_pos == self.content_length):
             return self._current_pos
 
         # Check if we can satisfy the seek from buffer (forward seek within buffered data)
