@@ -237,6 +237,25 @@ def test_write_command_failure():
         writer.close()
 
 
+@pytest.mark.parametrize("read_all", [False, True])
+def test_reader_close_releases_process(read_all):
+    """Close the output pipe and reap a finished or interrupted cat command."""
+    script = "import sys; sys.stdout.buffer.write(b'payload'); sys.stdout.flush()"
+    if not read_all:
+        script += "; import time; time.sleep(60)"
+    with (
+        subprocess.Popen([sys.executable, "-c", script], stdout=subprocess.PIPE) as process,  # noqa: S603  # controlled CLI stand-in
+        mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
+    ):
+        reader = smart_open.open("hdfs:///file", "rb")
+        if read_all:
+            assert reader.read() == b"payload"
+        reader.close()
+        assert process.stdout.closed
+        assert process.returncode is not None
+        reader.close()
+
+
 def main():
     """Main."""
     try:

@@ -108,8 +108,13 @@ class CliRawInputBase(io.RawIOBase):
         logger.debug("close: called")
         sub = self._sub
         if sub is not None:
-            sub.terminate()
-            self._sub = None
+            try:
+                sub.terminate()
+                assert sub.stdout is not None  # noqa: S101  # stdout=PIPE set in __init__
+                sub.stdout.close()
+                sub.wait()
+            finally:
+                self._sub = None
 
     @property
     def closed(self) -> bool:
