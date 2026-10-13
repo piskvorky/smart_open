@@ -399,3 +399,25 @@ def test_seek_releases_failed_response():
         reader.seek(10)
         assert responses.calls[-1].response.raw.closed
         assert reader.read() == b""
+
+
+@pytest.mark.parametrize("read_first", [False, True])
+@responses.activate
+def test_failed_seek_discards_stale_response_and_can_retry(read_first):
+    """A failed range request must not expose data from the previous position."""
+    responses.add(responses.GET, URL, body=BYTES)
+    responses.add(responses.GET, URL, body=requests.ConnectionError("range failed"))
+    responses.add_callback(responses.GET, URL, callback=request_callback)
+    offset = 20
+    with smart_open.http.SeekableBufferedInputBase(URL, buffer_size=8) as reader:
+        old_response = reader.response
+        if read_first:
+            assert reader.read(1) == BYTES[:1]
+        old_position = reader.tell()
+        with pytest.raises(requests.ConnectionError, match="range failed"):
+            reader.seek(offset)
+        assert old_response.raw.closed
+        assert reader.tell() == old_position
+        assert reader.read(3) == b""
+        assert reader.seek(offset) == offset
+        assert reader.read() == BYTES[offset:]

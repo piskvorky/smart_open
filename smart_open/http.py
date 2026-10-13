@@ -305,7 +305,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         #
         self._seekable = self.response.headers.get("Accept-Ranges", "").lower() != "none"
 
-    def seek(self, offset: int, whence: int = 0) -> int:  # noqa: PLR0912  # legacy public API; refactor in a dedicated PR
+    def seek(self, offset: int, whence: int = 0) -> int:  # legacy public API; refactor in a dedicated PR
         """Seek to the specified position.
 
         Args:
@@ -356,20 +356,17 @@ class SeekableBufferedInputBase(BufferedInputBase):
         logger.debug("http seeking from current_pos: %d to new_pos: %d", self._current_pos, new_pos)
 
         self._close_response()
-        self._current_pos = new_pos
+        self.response = None
+        buf.empty()
 
-        if new_pos == self.content_length:
-            self.response = None
-            buf.empty()
-        else:
+        if new_pos != self.content_length:
             response = self._partial_request(new_pos)
             if response.ok:
                 self.response = response
-                buf.empty()
             else:
                 response.close()
-                self.response = None
 
+        self._current_pos = new_pos
         return self._current_pos
 
     def tell(self) -> int:
