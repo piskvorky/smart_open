@@ -2078,7 +2078,6 @@ def test_write_file_descriptor():
             assert fin.read() == "hello world"
 
 
-@mock_s3
 @pytest.mark.parametrize("extension", ["", ".gz", ".bz2", ".xz"])
 @mock_s3
 def test_abort_when_outer_exit_fails(extension):
@@ -2112,6 +2111,7 @@ def test_abort_when_outer_exit_fails(extension):
         assert client.list_multipart_uploads(Bucket="test-bucket").get("Uploads", []) == []
 
 
+@mock_s3
 def test_to_boto3():
     """To boto3."""
     resource = _resource("s3")
