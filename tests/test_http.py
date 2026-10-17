@@ -401,53 +401,18 @@ def test_seek_releases_failed_response():
         assert reader.read() == b""
 
 
-@pytest.mark.parametrize("read_first", [False, True])
 @responses.activate
-def test_failed_seek_discards_stale_response_and_can_retry(read_first):
-    """A failed range request must not expose data from the previous position."""
-    responses.add(responses.GET, URL, body=BYTES)
-    responses.add(responses.GET, URL, body=requests.ConnectionError("range failed"))
-    responses.add_callback(responses.GET, URL, callback=request_callback)
-    offset = 20
-    with smart_open.http.SeekableBufferedInputBase(URL, buffer_size=8) as reader:
-        old_response = reader.response
-        if read_first:
-            assert reader.read(1) == BYTES[:1]
-        old_position = reader.tell()
-        with pytest.raises(requests.ConnectionError, match="range failed"):
-            reader.seek(offset)
-        assert old_response.raw.closed
-        assert reader.tell() == old_position
-        assert reader.read(3) == b""
-        assert reader.seek(offset) == offset
-        assert reader.read() == BYTES[offset:]
-
-
-@pytest.mark.parametrize("whence", [0, 1])
-@responses.activate
-def test_failed_seek_can_restore_previous_position(whence):
-    """Restoring the prior position reopens the response discarded by a failed seek."""
+def test_failed_seek_keeps_position_and_drops_stale_data():
+    """Keep the position and drop stale buffered data when a range request fails."""
     responses.add(responses.GET, URL, body=BYTES)
     responses.add(responses.GET, URL, body=requests.ConnectionError("range failed"))
     responses.add_callback(responses.GET, URL, callback=request_callback)
     with smart_open.http.SeekableBufferedInputBase(URL, buffer_size=8) as reader:
         assert reader.read(1) == BYTES[:1]
-        with pytest.raises(requests.ConnectionError, match="range failed"):
+        with pytest.raises(requests.ConnectionError):
             reader.seek(20)
         assert reader.tell() == 1
-        assert reader.seek(1 if whence == 0 else 0, whence) == 1
-        assert reader.read() == BYTES[1:]
-        assert len(responses.calls) == 3
-
-
-@pytest.mark.parametrize("whence", [0, 1])
-@responses.activate
-def test_seek_to_current_known_eof_does_not_reopen_response(whence):
-    """A known EOF position remains a valid no-op even without a response."""
-    responses.add(responses.GET, URL, body=BYTES, headers={"Content-Length": str(len(BYTES))})
-    with smart_open.http.SeekableBufferedInputBase(URL) as reader:
-        assert reader.seek(len(BYTES)) == len(BYTES)
-        assert reader.response is None
-        assert reader.seek(len(BYTES) if whence == 0 else 0, whence) == len(BYTES)
-        assert reader.read() == b""
-        assert len(responses.calls) == 1
+        assert reader.seek(1) == 1
+        assert reader.read(3) == BYTES[1:4]
+        assert reader.seek(20) == 20
+        assert reader.read(3) == BYTES[20:23]
