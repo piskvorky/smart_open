@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 #
 # Global storage for SSH connections.
 #
-_SSH: dict[tuple[str, str], paramiko.SSHClient] = {}
+_SSH: dict[tuple[str, str, int | None], paramiko.SSHClient] = {}
 
 SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""
@@ -287,7 +287,7 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     assert user is not None  # noqa: S101  # _maybe_fetch_config defaults user via getpass.getuser()
     assert path is not None  # noqa: S101  # callers always provide a remote path to open
 
-    key = (host, user)
+    key = (host, user, port)
 
     sftp_client: paramiko.SFTPClient | None = None
     attempts = 2
