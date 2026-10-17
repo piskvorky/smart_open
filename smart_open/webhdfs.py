@@ -16,6 +16,7 @@ from __future__ import annotations
 import http.client as httplib
 import io
 import logging
+import posixpath
 import urllib.parse
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -87,7 +88,7 @@ def open(
         msg = f"webhdfs support for mode {mode!r} not implemented"
         raise NotImplementedError(msg)
 
-    fobj.name = urllib.parse.urlsplit(http_uri).path.rsplit("/", 1)[-1]
+    fobj.name = posixpath.basename(urllib.parse.urlsplit(http_uri).path)
     return fobj
 
 
@@ -101,11 +102,7 @@ def _convert_to_http_uri(webhdfs_url: str) -> str:
         The converted HTTP URL as a string.
     """
     split_uri = urllib.parse.urlsplit(webhdfs_url)
-    netloc = split_uri.hostname or ""
-    if ":" in netloc:
-        netloc = f"[{netloc}]"
-    if split_uri.port:
-        netloc += f":{split_uri.port}"
+    netloc = split_uri.netloc.rpartition("@")[2]
     query = split_uri.query
     if split_uri.username:
         query += (
