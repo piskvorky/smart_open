@@ -134,6 +134,19 @@ class SSHOpen(unittest.TestCase):
         )
 
     @mock_ssh
+    def test_open_with_wildcard_config(self, mock_connect, get_transp_mock):
+        """Wildcard Host patterns supply connection settings just like exact aliases."""
+        smart_open.open("ssh://files.example/data")
+        mock_connect.assert_called_once_with("storage.internal", 2222, username="storage-user", password=None)
+
+    @mock_ssh
+    def test_password_skips_config_identityfile(self, mock_connect, get_transp_mock):
+        """An explicit password is not dropped in favour of a configured IdentityFile."""
+        smart_open.open("ssh://user:pass@another-host/")
+        assert mock_connect.call_args.kwargs["password"] == "pass"
+        assert "key_filename" not in mock_connect.call_args.kwargs
+
+    @mock_ssh
     def test_open_with_openssh_config_override_port(self, mock_connect, get_transp_mock):
         """Open with openssh config override port."""
         smart_open.open("ssh://another-host:22/")
