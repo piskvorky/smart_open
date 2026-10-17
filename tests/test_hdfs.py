@@ -193,6 +193,48 @@ def test_write_zip(schema):
     assert actual == expected
 
 
+@pytest.mark.parametrize("method", ["read", "readline"])
+def test_read_command_failure(method):
+    """Report a failed cat command rather than returning truncated content."""
+    command = [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'partial'); sys.exit(7)"]
+    with (
+        subprocess.Popen(command, stdout=subprocess.PIPE) as process,  # noqa: S603  # controlled CLI stand-in
+        mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
+        smart_open.open("hdfs:///missing/file", "rb") as reader,
+        pytest.raises(OSError, match="exit status 7"),
+    ):
+        getattr(reader, method)(64)
+
+
+def test_write_command_failure():
+    """Report a put failure that occurs after consuming all input."""
+    command = [sys.executable, "-c", "import sys; sys.stdin.buffer.read(); sys.exit(7)"]
+    with (
+        subprocess.Popen(command, stdin=subprocess.PIPE) as process,  # noqa: S603  # controlled CLI stand-in
+        mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
+    ):
+        writer = smart_open.open("hdfs:///failed/file", "wb")
+        assert writer.write(b"payload") == len(b"payload")
+        with pytest.raises(OSError, match="exit status 7"):
+            writer.close()
+        assert writer.closed
+        writer.close()
+
+
+def test_reader_close_releases_process():
+    """Close the output pipe and reap an interrupted cat command."""
+    script = "import sys, time; sys.stdout.buffer.write(b'payload'); sys.stdout.flush(); time.sleep(60)"
+    with (
+        subprocess.Popen([sys.executable, "-c", script], stdout=subprocess.PIPE) as process,  # noqa: S603  # controlled CLI stand-in
+        mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
+    ):
+        reader = smart_open.open("hdfs:///file", "rb")
+        reader.close()
+        assert process.stdout.closed
+        assert process.returncode is not None
+        reader.close()
+
+
 def main():
     """Main."""
     try:

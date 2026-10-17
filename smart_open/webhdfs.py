@@ -16,6 +16,7 @@ from __future__ import annotations
 import http.client as httplib
 import io
 import logging
+import posixpath
 import urllib.parse
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -87,7 +88,7 @@ def open(
         msg = f"webhdfs support for mode {mode!r} not implemented"
         raise NotImplementedError(msg)
 
-    fobj.name = http_uri.split("/")[-1]
+    fobj.name = posixpath.basename(urllib.parse.urlsplit(http_uri).path)
     return fobj
 
 
@@ -101,12 +102,14 @@ def _convert_to_http_uri(webhdfs_url: str) -> str:
         The converted HTTP URL as a string.
     """
     split_uri = urllib.parse.urlsplit(webhdfs_url)
-    netloc = split_uri.hostname or ""
-    if split_uri.port:
-        netloc += f":{split_uri.port}"
+    netloc = split_uri.netloc.rpartition("@")[2]
     query = split_uri.query
     if split_uri.username:
-        query += ("&" if query else "") + "user.name=" + urllib.parse.quote(split_uri.username)
+        query += (
+            ("&" if query else "")
+            + "user.name="
+            + urllib.parse.quote(urllib.parse.unquote(split_uri.username))
+        )
 
     return urllib.parse.urlunsplit(("http", netloc, "/webhdfs/v1" + split_uri.path, query, ""))
 
@@ -243,12 +246,11 @@ class BufferedOutputBase(io.BufferedIOBase):
             raise WebHdfsException.from_response(response)
 
     def write(self, b: ReadableBuffer) -> int:
-        """Write the given bytes (binary string) into the WebHDFS file from constructor."""
+        """Write the given buffer into the WebHDFS file from constructor."""
         self._checkClosed()
 
         if not isinstance(b, bytes):
-            msg = "input must be a binary string"
-            raise TypeError(msg)
+            b = memoryview(b).tobytes()
 
         self.lines.append(b)
         self.chunk_bytes += len(b)
@@ -257,7 +259,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         if self.chunk_bytes >= self.min_part_size:
             buff = b"".join(self.lines)
             logger.info(
-                "uploading part #%i, %i bytes (total %.3fGB)",
+                "uploading part #%i, %i bytes (total %.3fGiB)",
                 self.parts,
                 len(buff),
                 self.total_size / 1024.0**3,
@@ -276,7 +278,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         buff = b"".join(self.lines)
         if buff:
             logger.info(
-                "uploading last part #%i, %i bytes (total %.3fGB)",
+                "uploading last part #%i, %i bytes (total %.3fGiB)",
                 self.parts,
                 len(buff),
                 self.total_size / 1024.0**3,

@@ -13,6 +13,7 @@ import logging
 import ssl
 import types
 import urllib.parse
+from contextlib import ExitStack
 from ftplib import FTP, FTP_TLS, error_reply
 from typing import IO, TYPE_CHECKING, Any, TypedDict, cast
 
@@ -113,18 +114,21 @@ def _connect(  # noqa: PLR0913  # legacy internal helper; refactor in a dedicate
         ftp = FTP_TLS(context=ssl_context, **kwargs)  # noqa: S321  # this module's purpose
     else:
         ftp = FTP(**kwargs)  # noqa: S321  # this module's purpose
-    try:
-        ftp.connect(hostname, port)
-    except Exception:
-        logger.exception("Unable to connect to FTP server: try checking the host and port!")
-        raise
-    try:
-        ftp.login(cast("str", username), cast("str", password))
-    except error_reply:
-        logger.exception("Unable to login to FTP server: try checking the username and password!")
-        raise
-    if isinstance(ftp, FTP_TLS):
-        ftp.prot_p()
+    with ExitStack() as cleanup:
+        cleanup.callback(ftp.close)
+        try:
+            ftp.connect(hostname, port)
+        except Exception:
+            logger.exception("Unable to connect to FTP server: try checking the host and port!")
+            raise
+        try:
+            ftp.login(cast("str", username), cast("str", password))
+        except error_reply:
+            logger.exception("Unable to login to FTP server: try checking the username and password!")
+            raise
+        if isinstance(ftp, FTP_TLS):
+            ftp.prot_p()
+        cleanup.pop_all()
     return ftp
 
 
@@ -165,7 +169,6 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         raise ValueError(msg)
     if not transport_params:
         transport_params = {}
-    conn = _connect(host, user, port, password, secure_connection, transport_params)
     mode_to_ftp_cmds = {
         "rb": ("RETR", "rb"),
         "wb": ("STOR", "wb"),
@@ -176,15 +179,28 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     except KeyError as err:
         msg = f"unsupported mode: {mode!r}"
         raise ValueError(msg) from err
-    ftp_mode, file_obj_mode = mode_to_ftp_cmds[mode]
-    conn.voidcmd("TYPE I")
-    socket = conn.transfercmd(f"{ftp_mode} {path}")
+    conn = _connect(host, user, port, password, secure_connection, transport_params)
+    with ExitStack() as cleanup:
+        cleanup.callback(conn.close)
+        conn.voidcmd("TYPE I")
+        socket = conn.transfercmd(f"{ftp_mode} {path}")
+        cleanup.pop_all()
     fobj: Any = socket.makefile(cast("Any", file_obj_mode))
 
     def full_close(self: Any) -> None:
-        self.orig_close()
-        self.socket.close()
-        self.conn.close()
+        if self.closed:
+            return
+        try:
+            self.orig_close()
+            # a reader closed before EOF gets a 426 reply, so only check uploads (like ftplib.storbinary)
+            if ftp_mode != "RETR":
+                if isinstance(self.socket, ssl.SSLSocket):
+                    self.socket.unwrap()
+                self.socket.close()
+                self.conn.voidresp()
+        finally:
+            self.socket.close()
+            self.conn.close()
 
     fobj.orig_close = fobj.close
     fobj.socket = socket

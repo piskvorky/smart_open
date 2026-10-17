@@ -21,6 +21,7 @@ from unittest import mock
 import boto3
 import pytest
 import responses
+from botocore.exceptions import ReadTimeoutError
 
 from smart_open.compression import INFER_FROM_EXTENSION, NO_COMPRESSION
 
@@ -119,6 +120,15 @@ def test_compression_extensions():
                 got = list(fin)
 
         assert got == [b"hello world\n", b"this is a test\n"], f"Error for {extension=}, mode='wb'"
+
+
+@pytest.mark.parametrize("uri", ["webhdfs://user@host/file.gz", "webhdfs://host/file.gz?token=value"])
+@responses.activate
+def test_webhdfs_uri_compression(uri):
+    """Infer compression from the URI path, ignoring user and query."""
+    responses.add(responses.GET, "http://host/webhdfs/v1/file.gz", body=gzip.compress(SAMPLE_BYTES))
+    with smart_open.open(uri, "rb") as stream:
+        assert stream.read() == SAMPLE_BYTES
 
 
 class ParseUriTest(unittest.TestCase):
@@ -264,6 +274,20 @@ class ParseUriTest(unittest.TestCase):
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path?a=1&user.name=user"
         assert actual == expected
+
+    def test_webhdfs_uri_to_http_with_ipv6(self):
+        """Webhdfs uri to http with IPv6 host."""
+        parsed_uri = smart_open_lib._parse_uri(
+            "webhdfs://[::1]:14000/path"
+        )  # test reaches into private state
+        assert webhdfs.convert_to_http_uri(parsed_uri) == "http://[::1]:14000/webhdfs/v1/path"
+
+    def test_webhdfs_uri_to_http_with_encoded_user(self):
+        """Webhdfs uri to http with percent-encoded user."""
+        parsed_uri = smart_open_lib._parse_uri(
+            "webhdfs://a%40b@host:14000/path"
+        )  # test reaches into private state
+        assert webhdfs.convert_to_http_uri(parsed_uri) == "http://host:14000/webhdfs/v1/path?user.name=a%40b"
 
     def test_uri_from_issue_223_works(self):
         """Uri from issue 223 works."""
@@ -529,6 +553,16 @@ class ParseUriTest(unittest.TestCase):
             assert len(lines) == 3  # test uses inline magic value
         finally:
             _patch_pathlib(obj.old_impl)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="requires native Windows filesystem paths")
+@pytest.mark.parametrize("extension", ["", ".gz"])
+def test_windows_file_uri(tmp_path, extension):
+    """Open native Windows file URIs through the shortcut and compression paths."""
+    path = tmp_path / f"data{extension}"
+    path.write_bytes(gzip.compress(SAMPLE_BYTES) if extension else SAMPLE_BYTES)
+    with smart_open.open(path.as_uri(), "rb") as stream:
+        assert stream.read() == SAMPLE_BYTES
 
 
 class SmartOpenHttpTest(unittest.TestCase):
@@ -1482,6 +1516,21 @@ class SmartOpenTest(unittest.TestCase):
         assert expected == actual
 
 
+@responses.activate
+def test_webhdfs_write_buffer():
+    """Accept bytes-like buffers, count bytes, and snapshot mutable ones."""
+    payload = bytearray(b"abcdefghijklmnop")
+    uri = "http://host:1/webhdfs/v1/file"
+    responses.add(responses.PUT, uri, status=307, headers={"location": "http://node/file"})
+    responses.add(responses.PUT, "http://node/file", status=201)
+    responses.add(responses.POST, uri, status=307, headers={"location": "http://node/file"})
+    responses.add(responses.POST, "http://node/file", status=200)
+    with smart_open.open("webhdfs://host:1/file", "wb") as fout:
+        assert fout.write(memoryview(payload).cast("I")) == 16
+        payload[:] = b"x" * 16
+    assert responses.calls[-1].request.body == b"abcdefghijklmnop"
+
+
 class WebHdfsWriteTest(unittest.TestCase):
     """Test writing into webhdfs files."""
 
@@ -1600,6 +1649,10 @@ class CompressionFormatTest(unittest.TestCase):
     def test_write_read_bz2(self):
         """Can write and read bz2?"""
         self.write_read_assertion(".bz2")
+
+    def test_write_read_gz_uppercase(self):
+        """Can write and read gzip with an uppercase extension?"""
+        self.write_read_assertion(".GZ")
 
     def test_gzip_text(self):
         """Gzip text."""
@@ -2075,6 +2128,39 @@ def test_write_file_descriptor():
 
         with smart_open.open(tmp.name, "rt") as fin:
             assert fin.read() == "hello world"
+
+
+@pytest.mark.parametrize("extension", ["", ".gz"])
+@mock_s3
+def test_abort_when_outer_exit_fails(extension):
+    """Abort rather than commit an upload after outer stream finalization fails."""
+    client = boto3.client("s3", region_name="us-east-1")
+    client.create_bucket(Bucket="test-bucket")
+    size = smart_open.s3.MIN_PART_SIZE if extension else 1024
+    payload = hashlib.shake_256(b"test payload").digest(size)
+    error = ReadTimeoutError(endpoint_url="https://example.test")
+    upload_part = client.upload_part
+
+    def upload(**kwargs):
+        if upload_mock.call_count == 1:
+            kwargs["Body"].read()
+            raise error
+        return upload_part(**kwargs)
+
+    with mock.patch.object(client, "upload_part", side_effect=upload) as upload_mock:
+        with (  # noqa: PT012  # the failure occurs during stream context exit, not write
+            pytest.raises(ReadTimeoutError) as caught,
+            smart_open.open(
+                f"s3://test-bucket/key{extension}",
+                "wb",
+                transport_params={"client": client, "min_part_size": smart_open.s3.MIN_PART_SIZE},
+            ) as fout,
+        ):
+            fout.write(payload)
+            assert upload_mock.call_count == 0
+        assert caught.value is error
+        assert client.list_objects_v2(Bucket="test-bucket").get("Contents", []) == []
+        assert client.list_multipart_uploads(Bucket="test-bucket").get("Uploads", []) == []
 
 
 @mock_s3

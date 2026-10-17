@@ -392,10 +392,32 @@ def test_buffered_seek_keeps_response_open():
 
 @responses.activate
 def test_seek_releases_failed_response():
-    """Release a range response that cannot be used for reading."""
+    """Raise on and release a range response that cannot be used for reading."""
     responses.add(responses.GET, URL, body=BYTES)
-    responses.add(responses.GET, URL, status=404, body=b"not found")
+    responses.add(responses.GET, URL, status=503, body=b"unavailable")
+    responses.add(responses.GET, URL, status=416, body=b"not satisfiable")
     with smart_open.http.SeekableBufferedInputBase(URL, buffer_size=1) as reader:
-        reader.seek(10)
+        with pytest.raises(requests.HTTPError, match="503"):
+            reader.seek(10)
+        assert responses.calls[-1].response.raw.closed
+        assert reader.tell() == 0
+        assert reader.seek(10) == 10  # 416 means past EOF of a stream of unknown length
         assert responses.calls[-1].response.raw.closed
         assert reader.read() == b""
+
+
+@responses.activate
+def test_failed_seek_keeps_position_and_drops_stale_data():
+    """Keep the position and drop stale buffered data when a range request fails."""
+    responses.add(responses.GET, URL, body=BYTES)
+    responses.add(responses.GET, URL, body=requests.ConnectionError("range failed"))
+    responses.add_callback(responses.GET, URL, callback=request_callback)
+    with smart_open.http.SeekableBufferedInputBase(URL, buffer_size=8) as reader:
+        assert reader.read(1) == BYTES[:1]
+        with pytest.raises(requests.ConnectionError):
+            reader.seek(20)
+        assert reader.tell() == 1
+        assert reader.seek(1) == 1
+        assert reader.read(3) == BYTES[1:4]
+        assert reader.seek(20) == 20
+        assert reader.read(3) == BYTES[20:23]

@@ -1,3 +1,19 @@
+# 8.0.4, 2026-10-17
+
+- Use binary unit labels (GiB, MiB) in upload size logs (PR [#978](https://github.com/piskvorky/smart_open/pull/978), [@ddelange](https://github.com/ddelange))
+- [ftp] Close FTP connections when connection or transfer setup fails (PR [#976](https://github.com/piskvorky/smart_open/pull/976), [@xiehuanyi](https://github.com/xiehuanyi))
+- [ssh] Include the port in cached SSH connection keys (PR [#967](https://github.com/piskvorky/smart_open/pull/967), [@xiehuanyi](https://github.com/xiehuanyi))
+- [ssh] Apply wildcard Host and Match stanzas from ~/.ssh/config (PR [#968](https://github.com/piskvorky/smart_open/pull/968), [@xiehuanyi](https://github.com/xiehuanyi))
+- [s3,azure] Abort uploads when closing a compressed stream fails (PR [#969](https://github.com/piskvorky/smart_open/pull/969), [@zhechen-cs](https://github.com/zhechen-cs))
+- [hdfs] Raise on failed hdfs dfs -cat/-put commands and reap reader processes on close (PR [#970](https://github.com/piskvorky/smart_open/pull/970), [@zhechen-cs](https://github.com/zhechen-cs))
+- [http] Keep position and drop stale buffered data when a seek request fails (PR [#975](https://github.com/piskvorky/smart_open/pull/975), [@xiehuanyi](https://github.com/xiehuanyi))
+- [webhdfs] Accept bytes-like inputs in writes (PR [#971](https://github.com/piskvorky/smart_open/pull/971), [@zhechen-cs](https://github.com/zhechen-cs))
+- [webhdfs] Infer compression from the URI path and keep IPv6 hosts and encoded usernames intact (PR [#973](https://github.com/piskvorky/smart_open/pull/973), [@zhechen-cs](https://github.com/zhechen-cs))
+- [local] Infer compression from uppercase file extensions (PR [#974](https://github.com/piskvorky/smart_open/pull/974), [@zhechen-cs](https://github.com/zhechen-cs))
+- [local] Handle Windows drive letters in file:// URIs (PR [#977](https://github.com/piskvorky/smart_open/pull/977), [@zhechen-cs](https://github.com/zhechen-cs))
+- [ftp] Raise upload failures reported by the server on close (PR [#972](https://github.com/piskvorky/smart_open/pull/972), [@zhechen-cs](https://github.com/zhechen-cs))
+- [http] Raise from seek() when the server rejects a range request (PR [#980](https://github.com/piskvorky/smart_open/pull/980), [@ddelange](https://github.com/ddelange))
+
 # 8.0.3, 2026-10-12
 
 - Avoid consuming source data during zero-size buffer fills (PR [#958](https://github.com/piskvorky/smart_open/pull/958), [@xiehuanyi](https://github.com/xiehuanyi))
