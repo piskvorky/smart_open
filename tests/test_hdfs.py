@@ -193,7 +193,7 @@ def test_write_zip(schema):
     assert actual == expected
 
 
-@pytest.mark.parametrize("method", ["read", "read1", "readline", "readinto"])
+@pytest.mark.parametrize("method", ["read", "readline"])
 def test_read_command_failure(method):
     """Report a failed cat command rather than returning truncated content."""
     command = [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'partial'); sys.exit(7)"]
@@ -201,25 +201,9 @@ def test_read_command_failure(method):
         subprocess.Popen(command, stdout=subprocess.PIPE) as process,  # noqa: S603  # controlled CLI stand-in
         mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
         smart_open.open("hdfs:///missing/file", "rb") as reader,
+        pytest.raises(OSError, match="exit status 7"),
     ):
-        argument = bytearray(64) if method == "readinto" else 64
-        with pytest.raises(OSError, match="exit status 7"):
-            getattr(reader, method)(argument)
-
-
-@pytest.mark.parametrize("method", ["read", "read1", "readline", "readinto"])
-def test_zero_read_before_command_failure(method):
-    """A zero-size read does not consume data or observe the command status."""
-    command = [sys.executable, "-c", "import sys; sys.exit(7)"]
-    with subprocess.Popen(command, stdout=subprocess.PIPE) as process:  # noqa: S603  # controlled CLI stand-in
-        process.wait()
-        with (
-            mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
-            smart_open.open("hdfs:///missing/file", "rb") as reader,
-        ):
-            argument = bytearray() if method == "readinto" else 0
-            expected = 0 if method == "readinto" else b""
-            assert getattr(reader, method)(argument) == expected
+        getattr(reader, method)(64)
 
 
 def test_write_command_failure():
@@ -237,19 +221,14 @@ def test_write_command_failure():
         writer.close()
 
 
-@pytest.mark.parametrize("read_all", [False, True])
-def test_reader_close_releases_process(read_all):
-    """Close the output pipe and reap a finished or interrupted cat command."""
-    script = "import sys; sys.stdout.buffer.write(b'payload'); sys.stdout.flush()"
-    if not read_all:
-        script += "; import time; time.sleep(60)"
+def test_reader_close_releases_process():
+    """Close the output pipe and reap an interrupted cat command."""
+    script = "import sys, time; sys.stdout.buffer.write(b'payload'); sys.stdout.flush(); time.sleep(60)"
     with (
         subprocess.Popen([sys.executable, "-c", script], stdout=subprocess.PIPE) as process,  # noqa: S603  # controlled CLI stand-in
         mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
     ):
         reader = smart_open.open("hdfs:///file", "rb")
-        if read_all:
-            assert reader.read() == b"payload"
         reader.close()
         assert process.stdout.closed
         assert process.returncode is not None

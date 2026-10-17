@@ -108,13 +108,10 @@ class CliRawInputBase(io.RawIOBase):
         logger.debug("close: called")
         sub = self._sub
         if sub is not None:
-            try:
-                sub.terminate()
-                assert sub.stdout is not None  # noqa: S101  # stdout=PIPE set in __init__
-                sub.stdout.close()
-                sub.wait()
-            finally:
-                self._sub = None
+            sub.terminate()
+            self._stdout().close()
+            sub.wait()
+            self._sub = None
 
     @property
     def closed(self) -> bool:
@@ -138,15 +135,17 @@ class CliRawInputBase(io.RawIOBase):
 
     def read(self, size: int | None = -1) -> bytes:
         """Read up to size bytes from the object and return them."""
-        data = self._stdout().read(-1 if size is None else size)
-        if size is None or size < 0 or (size > 0 and len(data) < size):
+        size = -1 if size is None else size
+        data = self._stdout().read(size)
+        if size < 0 or len(data) < size:  # EOF
             self._check_exit()
         return data
 
     def readline(self, size: int | None = -1) -> bytes:
         """Read and return one line from the subprocess's buffered stdout."""
-        data = self._stdout().readline(-1 if size is None else size)
-        if size != 0 and not data.endswith(b"\n") and (size is None or size < 0 or len(data) < size):
+        size = -1 if size is None else size
+        data = self._stdout().readline(size)
+        if not data.endswith(b"\n") and (size < 0 or len(data) < size):  # EOF
             self._check_exit()
         return data
 
