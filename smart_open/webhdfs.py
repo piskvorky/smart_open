@@ -243,7 +243,7 @@ class BufferedOutputBase(io.BufferedIOBase):
             raise WebHdfsException.from_response(response)
 
     def write(self, b: ReadableBuffer) -> int:
-        """Write the given bytes (binary string) into the WebHDFS file from constructor."""
+        """Write the given buffer into the WebHDFS file from constructor."""
         self._checkClosed()
 
         if not isinstance(b, bytes):
