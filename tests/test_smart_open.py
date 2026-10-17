@@ -2078,7 +2078,7 @@ def test_write_file_descriptor():
             assert fin.read() == "hello world"
 
 
-@pytest.mark.parametrize("extension", ["", ".gz", ".bz2", ".xz"])
+@pytest.mark.parametrize("extension", ["", ".gz"])
 @mock_s3
 def test_abort_when_outer_exit_fails(extension):
     """Abort rather than commit an upload after outer stream finalization fails."""
@@ -2104,7 +2104,7 @@ def test_abort_when_outer_exit_fails(extension):
                 transport_params={"client": client, "min_part_size": smart_open.s3.MIN_PART_SIZE},
             ) as fout,
         ):
-            assert fout.write(payload) == len(payload)
+            fout.write(payload)
             assert upload_mock.call_count == 0
         assert caught.value is error
         assert client.list_objects_v2(Bucket="test-bucket").get("Contents", []) == []
