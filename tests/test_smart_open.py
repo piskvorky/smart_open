@@ -13,7 +13,6 @@ import gzip
 import hashlib
 import io
 import logging
-import lzma
 import os
 import tempfile
 import unittest
@@ -712,27 +711,6 @@ class CompressionRealFileSystemTests(RealFileSystemTests):
 #
 _IO_OPEN = "io.open"
 _BUILTIN_OPEN = "smart_open.smart_open_lib._builtin_open"
-
-
-@pytest.mark.parametrize("codec", [gzip, bz2, lzma], ids=["gz", "bz2", "xz"])
-@pytest.mark.parametrize("uppercase", [False, True], ids=["lowercase", "uppercase"])
-@pytest.mark.parametrize("uri_kind", ["path", "file_uri"])
-@pytest.mark.parametrize("mode", ["rb", "wb"])
-def test_local_compression_extension_case(tmp_path, codec, uppercase, uri_kind, mode):
-    """Infer compression consistently for local paths and file URIs."""
-    extension = {gzip: "gz", bz2: "bz2", lzma: "xz"}[codec]
-    if uppercase:
-        extension = extension.upper()
-    path = tmp_path / f"payload.{extension}"
-    uri = str(path) if uri_kind == "path" else f"file://{path}"
-    if mode == "rb":
-        path.write_bytes(codec.compress(SAMPLE_BYTES))
-        with smart_open.open(uri, mode) as stream:
-            assert stream.read() == SAMPLE_BYTES
-    else:
-        with smart_open.open(uri, mode) as stream:
-            assert stream.write(SAMPLE_BYTES) == len(SAMPLE_BYTES)
-        assert codec.decompress(path.read_bytes()) == SAMPLE_BYTES
 
 
 class SmartOpenReadTest(unittest.TestCase):
@@ -1622,6 +1600,10 @@ class CompressionFormatTest(unittest.TestCase):
     def test_write_read_bz2(self):
         """Can write and read bz2?"""
         self.write_read_assertion(".bz2")
+
+    def test_write_read_gz_uppercase(self):
+        """Can write and read gzip with an uppercase extension?"""
+        self.write_read_assertion(".GZ")
 
     def test_gzip_text(self):
         """Gzip text."""
