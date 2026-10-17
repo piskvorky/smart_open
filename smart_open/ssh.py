@@ -197,7 +197,7 @@ def _maybe_fetch_config(  # noqa: C901  # legacy internal helper; refactor in a 
         with contextlib.suppress(KeyError, ValueError):
             port = int(cfg["port"])
 
-    if connect_params.get("key_filename") is None:
+    if password is None and connect_params.get("key_filename") is None:
         identityfile = cfg.get("identityfile", [])
         if len(identityfile):
             connect_params["key_filename"] = identityfile
