@@ -392,11 +392,16 @@ def test_buffered_seek_keeps_response_open():
 
 @responses.activate
 def test_seek_releases_failed_response():
-    """Release a range response that cannot be used for reading."""
+    """Raise on and release a range response that cannot be used for reading."""
     responses.add(responses.GET, URL, body=BYTES)
-    responses.add(responses.GET, URL, status=404, body=b"not found")
+    responses.add(responses.GET, URL, status=503, body=b"unavailable")
+    responses.add(responses.GET, URL, status=416, body=b"not satisfiable")
     with smart_open.http.SeekableBufferedInputBase(URL, buffer_size=1) as reader:
-        reader.seek(10)
+        with pytest.raises(requests.HTTPError, match="503"):
+            reader.seek(10)
+        assert responses.calls[-1].response.raw.closed
+        assert reader.tell() == 0
+        assert reader.seek(10) == 10  # 416 means past EOF of a stream of unknown length
         assert responses.calls[-1].response.raw.closed
         assert reader.read() == b""
 

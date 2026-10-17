@@ -359,11 +359,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         buf.empty()
 
         if new_pos != self.content_length:
-            response = self._partial_request(new_pos)
-            if response.ok:
-                self.response = response
-            else:
-                response.close()
+            self.response = self._range_response(new_pos)
 
         self._current_pos = new_pos
         return self._current_pos
@@ -380,6 +376,16 @@ class SeekableBufferedInputBase(BufferedInputBase):
     def truncate(self, size: int | None = None) -> int:
         """Unsupported."""
         raise io.UnsupportedOperation
+
+    def _range_response(self, start_pos: int) -> requests.Response | None:
+        response = self._partial_request(start_pos)
+        if response.ok:
+            return response
+        response.close()
+        # past EOF of a stream of unknown length, which reads as EOF like io
+        if response.status_code != requests.codes.range_not_satisfiable:
+            response.raise_for_status()
+        return None
 
     def _partial_request(self, start_pos: int | None = None) -> requests.Response:
         headers = self.headers.copy()
