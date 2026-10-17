@@ -575,7 +575,7 @@ class Writer(io.BufferedIOBase):
         )
 
         logger.info(
-            "uploading part #%i, %i bytes (total %.3fGB)",
+            "uploading part #%i, %i bytes (total %.3fGiB)",
             part_num,
             content_length,
             range_stop / 1024.0**3,
