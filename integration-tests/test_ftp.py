@@ -133,3 +133,12 @@ def test_line_endings_binary(server_info):
     with open(f"{server_type}://user:123@localhost:{port_num}/file4", "rb") as f:
         for line in f:
             assert B_CLRF in line
+
+
+def test_partial_read(server_info):
+    """Closing a reader before EOF does not raise the server's 426 abort reply."""
+    server_type, port_num = server_info
+    with open(f"{server_type}://user:123@localhost:{port_num}/file5", "wb") as f:
+        f.write(b"x" * 16_000_000)
+    with open(f"{server_type}://user:123@localhost:{port_num}/file5", "rb") as f:
+        assert f.read(1) == b"x"

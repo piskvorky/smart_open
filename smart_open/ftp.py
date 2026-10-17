@@ -188,9 +188,19 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     fobj: Any = socket.makefile(cast("Any", file_obj_mode))
 
     def full_close(self: Any) -> None:
-        self.orig_close()
-        self.socket.close()
-        self.conn.close()
+        if self.closed:
+            return
+        try:
+            self.orig_close()
+            # a reader closed before EOF gets a 426 reply, so only check uploads (like ftplib.storbinary)
+            if ftp_mode != "RETR":
+                if isinstance(self.socket, ssl.SSLSocket):
+                    self.socket.unwrap()
+                self.socket.close()
+                self.conn.voidresp()
+        finally:
+            self.socket.close()
+            self.conn.close()
 
     fobj.orig_close = fobj.close
     fobj.socket = socket
