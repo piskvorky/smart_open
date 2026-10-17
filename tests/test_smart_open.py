@@ -1640,6 +1640,10 @@ class CompressionFormatTest(unittest.TestCase):
         """Can write and read bz2?"""
         self.write_read_assertion(".bz2")
 
+    def test_write_read_gz_uppercase(self):
+        """Can write and read gzip with an uppercase extension?"""
+        self.write_read_assertion(".GZ")
+
     def test_gzip_text(self):
         """Gzip text."""
         with named_temporary_file(suffix=".gz") as f:
