@@ -122,6 +122,15 @@ def test_compression_extensions():
         assert got == [b"hello world\n", b"this is a test\n"], f"Error for {extension=}, mode='wb'"
 
 
+@pytest.mark.parametrize("uri", ["webhdfs://user@host/file.gz", "webhdfs://host/file.gz?token=value"])
+@responses.activate
+def test_webhdfs_uri_compression(uri):
+    """Infer compression from the URI path, ignoring user and query."""
+    responses.add(responses.GET, "http://host/webhdfs/v1/file.gz", body=gzip.compress(SAMPLE_BYTES))
+    with smart_open.open(uri, "rb") as stream:
+        assert stream.read() == SAMPLE_BYTES
+
+
 class ParseUriTest(unittest.TestCase):
     """Test ParseUri class."""
 
@@ -265,6 +274,20 @@ class ParseUriTest(unittest.TestCase):
         actual = webhdfs.convert_to_http_uri(parsed_uri)
         expected = "http://host:14000/webhdfs/v1/path?a=1&user.name=user"
         assert actual == expected
+
+    def test_webhdfs_uri_to_http_with_ipv6(self):
+        """Webhdfs uri to http with IPv6 host."""
+        parsed_uri = smart_open_lib._parse_uri(
+            "webhdfs://[::1]:14000/path"
+        )  # test reaches into private state
+        assert webhdfs.convert_to_http_uri(parsed_uri) == "http://[::1]:14000/webhdfs/v1/path"
+
+    def test_webhdfs_uri_to_http_with_encoded_user(self):
+        """Webhdfs uri to http with percent-encoded user."""
+        parsed_uri = smart_open_lib._parse_uri(
+            "webhdfs://a%40b@host:14000/path"
+        )  # test reaches into private state
+        assert webhdfs.convert_to_http_uri(parsed_uri) == "http://host:14000/webhdfs/v1/path?user.name=a%40b"
 
     def test_uri_from_issue_223_works(self):
         """Uri from issue 223 works."""
