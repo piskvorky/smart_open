@@ -58,7 +58,7 @@ def test_hdfs():
     """Read lines from the ``hdfs dfs -cat`` subprocess in chunks."""
     stdout = io.BufferedReader(io.BytesIO(DATA))  # Popen(stdout=PIPE) gives a BufferedReader
     with (
-        mock.patch("subprocess.Popen", return_value=mock.Mock(stdout=stdout)),
+        mock.patch("subprocess.Popen", return_value=mock.Mock(stdout=stdout, wait=mock.Mock(return_value=0))),
         smart_open.open("hdfs://host/file", "rb") as fin,
     ):
         check_lines(fin)

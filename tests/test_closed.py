@@ -97,7 +97,9 @@ def test_hdfs_reader():
 
 def test_hdfs_writer():
     """Closed HDFS writer."""
-    with mock.patch("subprocess.Popen", return_value=mock.Mock(stdin=io.BytesIO())):
+    with mock.patch(
+        "subprocess.Popen", return_value=mock.Mock(stdin=io.BytesIO(), wait=mock.Mock(return_value=0))
+    ):
         check_closed(smart_open.open("hdfs://host/file", "wb"), WRITE)
 
 
