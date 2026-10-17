@@ -257,7 +257,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         if self.chunk_bytes >= self.min_part_size:
             buff = b"".join(self.lines)
             logger.info(
-                "uploading part #%i, %i bytes (total %.3fGB)",
+                "uploading part #%i, %i bytes (total %.3fGiB)",
                 self.parts,
                 len(buff),
                 self.total_size / 1024.0**3,
@@ -276,7 +276,7 @@ class BufferedOutputBase(io.BufferedIOBase):
         buff = b"".join(self.lines)
         if buff:
             logger.info(
-                "uploading last part #%i, %i bytes (total %.3fGB)",
+                "uploading last part #%i, %i bytes (total %.3fGiB)",
                 self.parts,
                 len(buff),
                 self.total_size / 1024.0**3,

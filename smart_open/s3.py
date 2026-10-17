@@ -1199,7 +1199,7 @@ class MultipartWriter(io.BufferedIOBase):
         assert self._upload_id is not None  # noqa: S101  # only called during an active upload
         part_num = self._total_parts + 1
         logger.info(
-            "%s: uploading part_num: %i, %i bytes (total %.3fGB)",
+            "%s: uploading part_num: %i, %i bytes (total %.3fGiB)",
             self,
             part_num,
             self._buf.tell(),
@@ -1535,7 +1535,7 @@ def iter_bucket(  # noqa: PLR0913  # legacy public API; refactor in a dedicated 
 
             if key_no % 1000 == 0:
                 logger.info(
-                    "yielding key #%i: %s, size %i (total %.1f MB)",
+                    "yielding key #%i: %s, size %i (total %.1f MiB)",
                     key_no,
                     key,
                     len(content),
@@ -1545,7 +1545,7 @@ def iter_bucket(  # noqa: PLR0913  # legacy public API; refactor in a dedicated 
             yield key, content
             total_size += len(content)
     logger.info(
-        "processed %i keys, total size %.1f MB",
+        "processed %i keys, total size %.1f MiB",
         key_no,
         total_size / 1024.0**2,
     )

@@ -191,12 +191,12 @@ class BufferedInputBase(io.BufferedIOBase):
         logger.debug("close: called")
         if not self.closed:
             self._close_response()
-            self.response = None
             self._read_buffer = None
 
     def _close_response(self) -> None:
         if self.response is not None:
             self.response.close()
+            self.response = None
 
     @property
     def closed(self) -> bool:
@@ -305,7 +305,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         #
         self._seekable = self.response.headers.get("Accept-Ranges", "").lower() != "none"
 
-    def seek(self, offset: int, whence: int = 0) -> int:  # noqa: PLR0912  # legacy public API; refactor in a dedicated PR
+    def seek(self, offset: int, whence: int = 0) -> int:
         """Seek to the specified position.
 
         Args:
@@ -344,7 +344,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         else:
             new_pos = smart_open.utils.clamp(new_pos, maxval=self.content_length)
 
-        if self._current_pos == new_pos:
+        if self._current_pos == new_pos and self.response is not None:
             return self._current_pos
 
         # Check if we can satisfy the seek from buffer (forward seek within buffered data)
@@ -356,20 +356,16 @@ class SeekableBufferedInputBase(BufferedInputBase):
         logger.debug("http seeking from current_pos: %d to new_pos: %d", self._current_pos, new_pos)
 
         self._close_response()
-        self._current_pos = new_pos
+        buf.empty()
 
-        if new_pos == self.content_length:
-            self.response = None
-            buf.empty()
-        else:
+        if new_pos != self.content_length:
             response = self._partial_request(new_pos)
             if response.ok:
                 self.response = response
-                buf.empty()
             else:
                 response.close()
-                self.response = None
 
+        self._current_pos = new_pos
         return self._current_pos
 
     def tell(self) -> int:

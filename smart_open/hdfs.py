@@ -109,6 +109,8 @@ class CliRawInputBase(io.RawIOBase):
         sub = self._sub
         if sub is not None:
             sub.terminate()
+            self._stdout().close()
+            sub.wait()
             self._sub = None
 
     @property
@@ -133,11 +135,27 @@ class CliRawInputBase(io.RawIOBase):
 
     def read(self, size: int | None = -1) -> bytes:
         """Read up to size bytes from the object and return them."""
-        return self._stdout().read(-1 if size is None else size)
+        size = -1 if size is None else size
+        data = self._stdout().read(size)
+        if size < 0 or len(data) < size:  # EOF
+            self._check_exit()
+        return data
 
     def readline(self, size: int | None = -1) -> bytes:
         """Read and return one line from the subprocess's buffered stdout."""
-        return self._stdout().readline(-1 if size is None else size)
+        size = -1 if size is None else size
+        data = self._stdout().readline(size)
+        if not data.endswith(b"\n") and (size < 0 or len(data) < size):  # EOF
+            self._check_exit()
+        return data
+
+    def _check_exit(self) -> None:
+        sub = self._sub
+        assert sub is not None  # noqa: S101  # called only while the stream is open
+        returncode = sub.wait()
+        if returncode != 0:
+            msg = f"HDFS read command failed with exit status {returncode}"
+            raise OSError(msg)
 
     def _stdout(self) -> IO[bytes]:
         self._checkClosed()
@@ -181,8 +199,11 @@ class CliRawOutputBase(io.RawIOBase):
             assert sub.stdin is not None  # noqa: S101  # stdin=PIPE set in __init__
             self.flush()
             sub.stdin.close()
-            sub.wait()
+            returncode = sub.wait()
             self._sub = None
+            if returncode != 0:
+                msg = f"HDFS write command failed with exit status {returncode}"
+                raise OSError(msg)
 
     @property
     def closed(self) -> bool:

@@ -63,6 +63,18 @@ class SSHOpen(unittest.TestCase):
         mock_connect.assert_called_with("some-host", 22, username="user", password=None)
 
     @mock_ssh
+    def test_cache_separates_ports(self, mock_connect, get_transp_mock):
+        """Connections to different SSH ports must not share a cached client."""
+        smart_open.open("ssh://user@some-host:22/first")
+        smart_open.open("ssh://user@some-host:2222/second")
+        smart_open.open("ssh://user@some-host:22/third")
+
+        assert mock_connect.call_args_list == [
+            mock.call("some-host", 22, username="user", password=None),
+            mock.call("some-host", 2222, username="user", password=None),
+        ]
+
+    @mock_ssh
     def test_open_with_transport_params(self, mock_connect, get_transp_mock):
         """Open with transport params."""
         smart_open.open(
@@ -120,6 +132,19 @@ class SSHOpen(unittest.TestCase):
             gss_deleg_creds=False,
             gss_trust_dns=False,
         )
+
+    @mock_ssh
+    def test_open_with_wildcard_config(self, mock_connect, get_transp_mock):
+        """Wildcard Host patterns supply connection settings just like exact aliases."""
+        smart_open.open("ssh://files.example/data")
+        mock_connect.assert_called_once_with("storage.internal", 2222, username="storage-user", password=None)
+
+    @mock_ssh
+    def test_password_skips_config_identityfile(self, mock_connect, get_transp_mock):
+        """An explicit password is not dropped in favour of a configured IdentityFile."""
+        smart_open.open("ssh://user:pass@another-host/")
+        assert mock_connect.call_args.kwargs["password"] == "pass"
+        assert "key_filename" not in mock_connect.call_args.kwargs
 
     @mock_ssh
     def test_open_with_openssh_config_override_port(self, mock_connect, get_transp_mock):

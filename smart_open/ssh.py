@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 #
 # Global storage for SSH connections.
 #
-_SSH: dict[tuple[str, str], paramiko.SSHClient] = {}
+_SSH: dict[tuple[str, str, int | None], paramiko.SSHClient] = {}
 
 SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""
@@ -148,7 +148,7 @@ def _connect_ssh(
     return ssh
 
 
-def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refactor in a dedicated PR
+def _maybe_fetch_config(  # noqa: C901  # legacy internal helper; refactor in a dedicated PR
     host: str | None,
     username: str | None = None,
     password: str | None = None,
@@ -180,60 +180,37 @@ def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refac
     #
     connect_params = (connect_kwargs or {}).copy()
     config_files = [f for f in _SSH_CONFIG_FILES if Path(f).exists()]
-    #
-    # This is the actual name of the host.  The input host may actually be an
-    # alias.
-    #
-    actual_hostname = ""
-
+    config = paramiko.SSHConfig()
     for config_filename in config_files:
-        try:
-            cfg = paramiko.SSHConfig.from_path(config_filename)
-        except PermissionError:
-            continue
+        with contextlib.suppress(PermissionError), Path(config_filename).open() as config_file:
+            config.parse(config_file)
 
-        if host not in cfg.get_hostnames():
-            continue
+    # Resolve once, so Paramiko applies first-value precedence before adding
+    # its default HostName when no matching stanza explicitly supplies one.
+    cfg = config.lookup(host)
+    host = cfg["hostname"]
+    if username is None:
+        username = cfg.get("user", None)
 
-        cfg = cfg.lookup(host)
-        if username is None:
-            username = cfg.get("user", None)
+    if port is None:
+        # Nb. ignore missing/invalid port numbers
+        with contextlib.suppress(KeyError, ValueError):
+            port = int(cfg["port"])
 
-        if not actual_hostname:
-            actual_hostname = cfg["hostname"]
+    if password is None and connect_params.get("key_filename") is None:
+        identityfile = cfg.get("identityfile", [])
+        if len(identityfile):
+            connect_params["key_filename"] = identityfile
 
-        if port is None:
-            # Nb. ignore missing/invalid port numbers
-            with contextlib.suppress(KeyError, ValueError):
-                port = int(cfg["port"])
-
-        #
-        # Special case, as we can have multiple identity files, so we check
-        # that the identityfile list has len > 0. This should be redundant, but
-        # keeping it for safety.
-        #
-        if connect_params.get("key_filename") is None:
-            identityfile = cfg.get("identityfile", [])
-            if len(identityfile):
-                connect_params["key_filename"] = identityfile
-
-        for param_name, (sshcfg_name, from_str) in _PARAMIKO_CONFIG_MAP.items():
-            if connect_params.get(param_name) is None and sshcfg_name in cfg:
-                connect_params[param_name] = from_str(cfg[sshcfg_name])
-
-        #
-        # Continue working through other config files, if there are any,
-        # as they may contain more options for our host
-        #
+    for param_name, (sshcfg_name, from_str) in _PARAMIKO_CONFIG_MAP.items():
+        if connect_params.get(param_name) is None and sshcfg_name in cfg:
+            connect_params[param_name] = from_str(cfg[sshcfg_name])
 
     if port is None:
         port = DEFAULT_PORT
 
     if not username:
         username = getpass.getuser()
-
-    if actual_hostname:
-        host = actual_hostname
 
     return host, username, password, port, connect_params
 
@@ -287,7 +264,7 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     assert user is not None  # noqa: S101  # _maybe_fetch_config defaults user via getpass.getuser()
     assert path is not None  # noqa: S101  # callers always provide a remote path to open
 
-    key = (host, user)
+    key = (host, user, port)
 
     sftp_client: paramiko.SFTPClient | None = None
     attempts = 2
