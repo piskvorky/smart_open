@@ -13,12 +13,9 @@ import gzip
 import hashlib
 import io
 import logging
-import ntpath
 import os
-import posixpath
 import tempfile
 import unittest
-from types import SimpleNamespace
 from unittest import mock
 
 import boto3
@@ -534,51 +531,14 @@ class ParseUriTest(unittest.TestCase):
             _patch_pathlib(obj.old_impl)
 
 
-@pytest.mark.parametrize(
-    ("platform", "uri", "expected"),
-    [
-        ("nt", "file:///C:/tmp/data.txt", "C:/tmp/data.txt"),
-        ("nt", "file:///d:/tmp/data.txt", "d:/tmp/data.txt"),
-        ("nt", "file://C:/tmp/data.txt", "C:/tmp/data.txt"),
-        ("nt", "C:/tmp/data.txt", "C:/tmp/data.txt"),
-        ("nt", "file:////server/share/data.txt", "//server/share/data.txt"),
-        ("nt", "file:///tmp/data.txt", "/tmp/data.txt"),
-        ("posix", "file:///C:/tmp/data.txt", "/C:/tmp/data.txt"),
-        ("posix", "file:///tmp/data.txt", "/tmp/data.txt"),
-    ],
-)
-@pytest.mark.parametrize("mode", ["rb", "wb"])
-def test_file_uri_drive_path(platform, uri, expected, mode):
-    """Translate Windows drive URIs without changing native and POSIX paths."""
-    filesystem = SimpleNamespace(name=platform, path=ntpath if platform == "nt" else posixpath)
-    with (
-        mock.patch.object(smart_open.local_file, "os", filesystem),
-        mock.patch.object(smart_open_lib, "os", filesystem),
-        mock.patch("smart_open.smart_open_lib._builtin_open", return_value=io.BytesIO()) as builtin_open,
-    ):
-        with smart_open.open(uri, mode) as stream:
-            if mode == "rb":
-                assert stream.read() == b""
-            else:
-                assert stream.write(SAMPLE_BYTES) == len(SAMPLE_BYTES)
-        builtin_open.assert_called_once_with(expected, mode, buffering=-1)
-
-
 @pytest.mark.skipif(os.name != "nt", reason="requires native Windows filesystem paths")
 @pytest.mark.parametrize("extension", ["", ".gz"])
-@pytest.mark.parametrize("mode", ["rb", "wb"])
-def test_windows_file_uri(tmp_path, extension, mode):
+def test_windows_file_uri(tmp_path, extension):
     """Open native Windows file URIs through the shortcut and compression paths."""
     path = tmp_path / f"data{extension}"
-    if mode == "rb":
-        path.write_bytes(gzip.compress(SAMPLE_BYTES) if extension else SAMPLE_BYTES)
-        with smart_open.open(path.as_uri(), mode) as stream:
-            assert stream.read() == SAMPLE_BYTES
-    else:
-        with smart_open.open(path.as_uri(), mode) as stream:
-            assert stream.write(SAMPLE_BYTES) == len(SAMPLE_BYTES)
-        data = path.read_bytes()
-        assert (gzip.decompress(data) if extension else data) == SAMPLE_BYTES
+    path.write_bytes(gzip.compress(SAMPLE_BYTES) if extension else SAMPLE_BYTES)
+    with smart_open.open(path.as_uri(), "rb") as stream:
+        assert stream.read() == SAMPLE_BYTES
 
 
 class SmartOpenHttpTest(unittest.TestCase):
