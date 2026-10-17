@@ -21,6 +21,7 @@ from unittest import mock
 import boto3
 import pytest
 import responses
+from botocore.exceptions import ReadTimeoutError
 
 from smart_open.compression import INFER_FROM_EXTENSION, NO_COMPRESSION
 
@@ -2075,6 +2076,39 @@ def test_write_file_descriptor():
 
         with smart_open.open(tmp.name, "rt") as fin:
             assert fin.read() == "hello world"
+
+
+@pytest.mark.parametrize("extension", ["", ".gz"])
+@mock_s3
+def test_abort_when_outer_exit_fails(extension):
+    """Abort rather than commit an upload after outer stream finalization fails."""
+    client = boto3.client("s3", region_name="us-east-1")
+    client.create_bucket(Bucket="test-bucket")
+    size = smart_open.s3.MIN_PART_SIZE if extension else 1024
+    payload = hashlib.shake_256(b"test payload").digest(size)
+    error = ReadTimeoutError(endpoint_url="https://example.test")
+    upload_part = client.upload_part
+
+    def upload(**kwargs):
+        if upload_mock.call_count == 1:
+            kwargs["Body"].read()
+            raise error
+        return upload_part(**kwargs)
+
+    with mock.patch.object(client, "upload_part", side_effect=upload) as upload_mock:
+        with (  # noqa: PT012  # the failure occurs during stream context exit, not write
+            pytest.raises(ReadTimeoutError) as caught,
+            smart_open.open(
+                f"s3://test-bucket/key{extension}",
+                "wb",
+                transport_params={"client": client, "min_part_size": smart_open.s3.MIN_PART_SIZE},
+            ) as fout,
+        ):
+            fout.write(payload)
+            assert upload_mock.call_count == 0
+        assert caught.value is error
+        assert client.list_objects_v2(Bucket="test-bucket").get("Contents", []) == []
+        assert client.list_multipart_uploads(Bucket="test-bucket").get("Uploads", []) == []
 
 
 @mock_s3
