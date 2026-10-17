@@ -1483,6 +1483,21 @@ class SmartOpenTest(unittest.TestCase):
         assert expected == actual
 
 
+@responses.activate
+def test_webhdfs_write_buffer():
+    """Accept bytes-like buffers, count bytes, and snapshot mutable ones."""
+    payload = bytearray(b"abcdefghijklmnop")
+    uri = "http://host:1/webhdfs/v1/file"
+    responses.add(responses.PUT, uri, status=307, headers={"location": "http://node/file"})
+    responses.add(responses.PUT, "http://node/file", status=201)
+    responses.add(responses.POST, uri, status=307, headers={"location": "http://node/file"})
+    responses.add(responses.POST, "http://node/file", status=200)
+    with smart_open.open("webhdfs://host:1/file", "wb") as fout:
+        assert fout.write(memoryview(payload).cast("I")) == 16
+        payload[:] = b"x" * 16
+    assert responses.calls[-1].request.body == b"abcdefghijklmnop"
+
+
 class WebHdfsWriteTest(unittest.TestCase):
     """Test writing into webhdfs files."""
 
