@@ -184,9 +184,8 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         cleanup.callback(conn.close)
         conn.voidcmd("TYPE I")
         socket = conn.transfercmd(f"{ftp_mode} {path}")
-        cleanup.callback(socket.close)
-        fobj: Any = socket.makefile(cast("Any", file_obj_mode))
         cleanup.pop_all()
+    fobj: Any = socket.makefile(cast("Any", file_obj_mode))
 
     def full_close(self: Any) -> None:
         self.orig_close()
