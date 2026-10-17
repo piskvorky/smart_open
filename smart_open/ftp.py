@@ -185,14 +185,15 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         if self.closed:
             return
         try:
-            try:
-                self.orig_close()
+            self.orig_close()
+            # a reader closed before EOF gets a 426 reply, so only check uploads (like ftplib.storbinary)
+            if ftp_mode != "RETR":
                 if isinstance(self.socket, ssl.SSLSocket):
                     self.socket.unwrap()
-            finally:
                 self.socket.close()
-            self.conn.voidresp()
+                self.conn.voidresp()
         finally:
+            self.socket.close()
             self.conn.close()
 
     fobj.orig_close = fobj.close
