@@ -555,6 +555,16 @@ class ParseUriTest(unittest.TestCase):
             _patch_pathlib(obj.old_impl)
 
 
+@pytest.mark.skipif(os.name != "nt", reason="requires native Windows filesystem paths")
+@pytest.mark.parametrize("extension", ["", ".gz"])
+def test_windows_file_uri(tmp_path, extension):
+    """Open native Windows file URIs through the shortcut and compression paths."""
+    path = tmp_path / f"data{extension}"
+    path.write_bytes(gzip.compress(SAMPLE_BYTES) if extension else SAMPLE_BYTES)
+    with smart_open.open(path.as_uri(), "rb") as stream:
+        assert stream.read() == SAMPLE_BYTES
+
+
 class SmartOpenHttpTest(unittest.TestCase):
     """Test reading from HTTP connections in various ways."""
 
