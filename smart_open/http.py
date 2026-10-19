@@ -317,7 +317,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         Raises:
             ValueError: If ``whence`` is not one of ``WHENCE_CHOICES``.
-            OSError: If the stream is not seekable.
+            OSError: If the stream is not seekable or the server ignores a nonzero range request.
         """
         logger.debug("seeking to offset: %r whence: %r", offset, whence)
         self._checkClosed()
@@ -379,6 +379,10 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
     def _range_response(self, start_pos: int) -> requests.Response | None:
         response = self._partial_request(start_pos)
+        if start_pos and response.status_code == requests.codes.ok:
+            response.close()
+            msg = "server ignored the range request"
+            raise OSError(msg)
         if response.ok:
             return response
         response.close()
