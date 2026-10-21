@@ -8,6 +8,8 @@ import io
 import random
 import unittest
 
+import pytest
+
 import smart_open.bytebuffer
 
 CHUNK_SIZE = 1024
@@ -225,3 +227,48 @@ class ByteBufferTest(unittest.TestCase):
         expected = [b"one!", b"two.", b"three,"]
         actual = [buf.readline(b"!"), buf.readline(b"."), buf.readline(b",")]
         assert expected == actual
+
+
+@pytest.mark.parametrize("terminator", [b"\r\n", b"aba", b"aaa", b"abab", b"\0END\0"])
+@pytest.mark.parametrize("chunk_size", [1, 2, 3, 5, 64])
+def test_readline_multibyte_terminator(terminator, chunk_size):
+    """Find complete terminators across refills, including overlapping prefixes."""
+    data = terminator.join([b"", b"first", b"", b"second", b"tail"])
+    source = io.BytesIO(data)
+    buf = smart_open.bytebuffer.ByteBuffer(chunk_size)
+    expected = [part + terminator for part in data.split(terminator)[:-1]]
+    expected.append(data.split(terminator)[-1])
+    actual = []
+    while line := buf.readline(terminator, fill=lambda: buf.fill(source)):
+        actual.append(line)
+    assert actual == expected
+    assert b"".join(actual) == data
+    assert buf.readline(terminator, fill=lambda: buf.fill(source)) == b""
+
+
+@pytest.mark.parametrize("chunk_size", [1, 2, 3, 64])
+def test_readline_multibyte_terminator_limits_and_reuse(chunk_size):
+    """Limits may split a terminator, and subsequent reads keep the unused bytes."""
+    source = io.BytesIO(b"first\r\nsecond\r\n\r\nlast\r")
+    buf = smart_open.bytebuffer.ByteBuffer(chunk_size)
+
+    def line(limit=-1):
+        return buf.readline(b"\r\n", limit, lambda: buf.fill(source))
+
+    assert line(0) == b""
+    assert source.tell() == 0
+    assert line(6) == b"first\r"
+    assert line() == b"\nsecond\r\n"
+    assert line(1) == b"\r"
+    assert line(None) == b"\nlast\r"
+    assert line() == b""
+
+
+def test_readline_multibyte_terminator_without_refill():
+    """Return one complete buffered record, or all available bytes at the end."""
+    buf = smart_open.bytebuffer.ByteBuffer()
+    buf.fill(io.BytesIO(b"usedfirst\r\nsecond\r"))
+    assert buf.read(4) == b"used"
+    assert buf.readline(b"\r\n") == b"first\r\n"
+    assert buf.readline(b"\r\n") == b"second\r"
+    assert buf.readline(b"\r\n") == b""

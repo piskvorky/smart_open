@@ -15,6 +15,48 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
 
+class _TerminatorMatcher:
+    """Remember a partial terminator while the byte buffer is drained and refilled."""
+
+    def __init__(self, terminator: bytes) -> None:
+        self._terminator = terminator
+        self._matched = 0
+        self._prefix = [0] * len(terminator)
+        for index in range(1, len(terminator)):
+            matched = self._prefix[index - 1]
+            while matched and terminator[index] != terminator[matched]:
+                matched = self._prefix[matched - 1]
+            if terminator[index] == terminator[matched]:
+                matched += 1
+            self._prefix[index] = matched
+
+    def _advance(self, value: int) -> bool:
+        while self._matched and value != self._terminator[self._matched]:
+            self._matched = self._prefix[self._matched - 1]
+        if value == self._terminator[self._matched]:
+            self._matched += 1
+        if self._matched == len(self._terminator):
+            self._matched = self._prefix[-1]
+            return True
+        return False
+
+    def find(self, data: bytearray, start: int, end: int) -> int:
+        """Return the terminator's end offset, or remember its prefix for a refill."""
+        # Finish a possible match carried over from the previous buffer first.
+        while start < end and self._matched:
+            if self._advance(data[start]):
+                return start + 1
+            start += 1
+        index = data.find(self._terminator, start, end)
+        if index != -1:
+            return index + len(self._terminator)
+        # There is no complete match.  Only the suffix can start a terminator
+        # that continues into the next buffer; scan it with prefix fallbacks.
+        for value in data[max(start, end - len(self._terminator) + 1) : end]:
+            self._advance(value)
+        return -1
+
+
 class ByteBuffer:
     """Byte buffer that allows callers to read data with minimal copying, and has a fast ``__len__`` method.
 
@@ -158,12 +200,12 @@ class ByteBuffer:
 
         A line is a contiguous sequence of bytes that ends with either:
 
-        1. The ``terminator`` character
+        1. The complete ``terminator`` sequence
         2. ``limit`` bytes, if ``limit`` is not negative
         3. The end of the buffer itself, or with ``fill``, the end of the source
 
         Args:
-            terminator: The line terminator byte.
+            terminator: The line terminator byte sequence.
             limit: Maximum number of bytes to return. If negative or None, no limit.
             fill: Called when the buffer runs out mid line, to add more bytes.
                 A buffer still empty afterwards means the end of the source.
@@ -173,15 +215,23 @@ class ByteBuffer:
         """
         if limit is None:
             limit = -1
+        matcher = _TerminatorMatcher(terminator) if len(terminator) > 1 else None
         parts: list[bytes] = []
         while True:
-            index = self._bytes.find(terminator, self._pos)
-            size = len(self) if index == -1 else index - self._pos + 1
+            if matcher is None:
+                index = self._bytes.find(terminator, self._pos)
+                end = -1 if index == -1 else index + 1
+            else:
+                stop = len(self._bytes)
+                if limit >= 0:
+                    stop = min(stop, self._pos + limit)
+                end = matcher.find(self._bytes, self._pos, stop)
+            size = len(self) if end == -1 else end - self._pos
             if limit >= 0:
                 size = min(size, limit)
                 limit -= size
             parts.append(self.read(size))
-            if parts[-1].endswith(terminator) or limit == 0 or fill is None:
+            if end != -1 or limit == 0 or fill is None:
                 break
             fill()
             if not len(self):
