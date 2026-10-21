@@ -6,6 +6,7 @@ import io
 from unittest import mock
 
 import boto3
+import pytest
 import responses
 
 import smart_open
@@ -84,3 +85,45 @@ def test_azure():
     with smart_open.open("azure://container/blob", "rb", transport_params=params) as fin:
         check_lines(fin)
         assert fin.tell() == len(DATA)
+
+
+def check_custom_lines(fin, terminator):
+    """Keep custom record boundaries and positions across tiny transport refills."""
+    assert fin.read(1) == b"f"
+    assert fin.readline(0) == b""
+    assert fin.readline(3) == b"irs"
+    assert fin.readline() == b"t" + terminator
+    assert fin.readline() == terminator
+    assert fin.readline(2) == b"ne"
+    assert list(fin) == [b"xt" + terminator, b"tail"]
+    assert fin.tell() == len(b"first" + terminator * 2 + b"next" + terminator + b"tail")
+    assert fin.seek(0) == 0
+    assert fin.readline() == b"first" + terminator
+
+
+@pytest.mark.parametrize("terminator", [b"\r\n", b"ababa"])
+@pytest.mark.parametrize("buffer_size", [1, 2, 3, 7])
+@mock_s3
+def test_s3_custom_line_terminator(terminator, buffer_size):
+    """The public S3 reader supports a terminator longer than its read buffer."""
+    client = boto3.client("s3", region_name="us-east-1")
+    client.create_bucket(Bucket="bucket")
+    data = b"first" + terminator * 2 + b"next" + terminator + b"tail"
+    client.put_object(Bucket="bucket", Key="key", Body=data)
+    with smart_open.s3.Reader(
+        "bucket", "key", client=client, buffer_size=buffer_size, line_terminator=terminator
+    ) as fin:
+        check_custom_lines(fin, terminator)
+
+
+@pytest.mark.parametrize("terminator", [b"\r\n", b"ababa"])
+@pytest.mark.parametrize("buffer_size", [1, 2, 3, 7])
+def test_azure_custom_line_terminator(terminator, buffer_size):
+    """The public Azure reader supports custom terminators across blob chunks."""
+    client = FakeBlobServiceClient("https://account.blob.core.windows.net")
+    data = b"first" + terminator * 2 + b"next" + terminator + b"tail"
+    client.create_container("container").upload_blob("blob", data)
+    with smart_open.azure.Reader(
+        "container", "blob", client=client, buffer_size=buffer_size, line_terminator=terminator
+    ) as fin:
+        check_custom_lines(fin, terminator)
