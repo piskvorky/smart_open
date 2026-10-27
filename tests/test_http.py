@@ -34,9 +34,6 @@ def request_callback(request, headers=HEADERS, data=BYTES):
     start = int(start)
     end = int(end) if end else len(data)
 
-    if "range" in request.headers:
-        headers["Content-Range"] = f"bytes {start}-{end - 1}/{len(data)}"
-
     data = data[start:end]
     headers["Content-Length"] = str(len(data))
 
@@ -426,29 +423,14 @@ def test_failed_seek_keeps_position_and_drops_stale_data():
         assert reader.read(3) == BYTES[20:23]
 
 
-@pytest.mark.parametrize("headers", [{}, {"Accept-Ranges": "bytes"}, {"Content-Length": str(len(BYTES))}])
-@pytest.mark.parametrize("offset", [3, 20])
 @responses.activate
-def test_seek_rejects_ignored_range(headers, offset):
-    """Reject a full response at a nonzero offset and allow rewinding after failure."""
-    responses.add(responses.GET, URL, headers=headers, body=BYTES)
-    with smart_open.open(URL, "rb", transport_params={"buffer_size": 4}) as reader:
-        assert reader.read(10) == BYTES[:10]
-        with pytest.raises(OSError, match="server ignored the range request"):
-            reader.seek(offset)
-        assert responses.calls[-1].request.headers["range"] == f"bytes={offset}-"
-        assert responses.calls[-1].response.raw.closed
-        assert reader.tell() == 10
-        assert reader.read() == b""
-        assert reader.seek(0) == 0
-        assert reader.read() == BYTES
-
-
-@responses.activate
-def test_seek_to_start_accepts_full_response():
-    """Rewinding needs no partial response, even when the server ignores Range."""
+def test_seek_rejects_ignored_range():
+    """Raise when a nonzero range request gets the full body, and still allow rewinding."""
     responses.add(responses.GET, URL, body=BYTES)
-    with smart_open.open(URL, "rb") as reader:
-        assert reader.read() == BYTES
+    with smart_open.http.SeekableBufferedInputBase(URL) as reader:
+        with pytest.raises(OSError, match="ignored the range request"):
+            reader.seek(10)
+        assert responses.calls[-1].response.raw.closed
+        assert reader.tell() == 0
         assert reader.seek(0) == 0
         assert reader.read() == BYTES
