@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 #
 # Global storage for SSH connections.
 #
-_SSH: dict[tuple[str, str, int | None], paramiko.SSHClient] = {}
+_SSH: dict[tuple[str, str, int | None, str | None, str], paramiko.SSHClient] = {}
 
 SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""
@@ -264,7 +264,11 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     assert user is not None  # noqa: S101  # _maybe_fetch_config defaults user via getpass.getuser()
     assert path is not None  # noqa: S101  # callers always provide a remote path to open
 
-    key = (host, user, port)
+    # Credentials and connect options are part of the key, so a client authenticated
+    # by one call is never reused for a call that supplied different credentials.
+    # sock is left out: a fresh socket per call would otherwise never hit the cache.
+    options = {k: v for k, v in (connect_kwargs or {}).items() if k != "sock"}
+    key = (host, user, port, password, repr(sorted(options.items())))
 
     sftp_client: paramiko.SFTPClient | None = None
     attempts = 2

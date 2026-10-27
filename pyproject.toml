@@ -36,7 +36,7 @@ gcs = ["google-cloud-storage>=2.6.0"]
 http = ["requests"]
 lz4 = ["lz4"]
 s3 = ["boto3>=1.9.17"]
-ssh = ["paramiko"]
+ssh = ["paramiko>=3.2"]
 dev = [
   "smart_open[all]",
   "moto[server]",
