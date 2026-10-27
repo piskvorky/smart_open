@@ -478,17 +478,23 @@ def test_seek_rejects_other_range(first, last):
 
 
 @pytest.mark.parametrize(
-    ("read", "total", "calls"),
+    ("read", "total", "at_end", "calls"),
     [
-        (lambda reader: reader.read(), len(BYTES), 8),
-        (lambda reader: reader.read(len(BYTES)), len(BYTES), 8),
-        (lambda reader: b"".join(iter(reader.readline, b"")), len(BYTES), 8),
-        (lambda reader: reader.read(), "*", 9),  # the last request answers 416
+        (lambda reader: reader.read(), len(BYTES), None, 8),
+        (lambda reader: reader.read(len(BYTES)), len(BYTES), None, 8),
+        (lambda reader: b"".join(iter(reader.readline, b"")), len(BYTES), None, 8),
+        (lambda reader: reader.read(), "*", (416, {}, b""), 9),
+        (
+            lambda reader: reader.read(),
+            "*",
+            (200, {"Content-Length": str(len(BYTES))}, BYTES),
+            9,
+        ),  # Range ignored
     ],
-    ids=["read", "read_size", "readline", "unknown_total"],
+    ids=["read", "read_size", "readline", "unknown_total_416", "unknown_total_200"],
 )
 @responses.activate
-def test_read_continues_after_capped_range(read, total, calls):
+def test_read_continues_after_capped_range(read, total, at_end, calls):
     """Request the rest from where a server cut a partial response short."""
 
     def callback(request):
@@ -497,7 +503,7 @@ def test_read_continues_after_capped_range(read, total, calls):
             return 200, {"ETag": '"v1"'}, BYTES
         assert request.headers["If-Match"] == '"v1"'  # every range pins the first version
         if first >= len(BYTES):
-            return 416, {}, b""
+            return at_end
         last = min(first + 10, len(BYTES)) - 1  # the server caps every range at 10 bytes
         return 206, {"Content-Range": f"bytes {first}-{last}/{total}"}, BYTES[first : last + 1]
 

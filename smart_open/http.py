@@ -420,6 +420,8 @@ class SeekableBufferedInputBase(BufferedInputBase):
         response = self._partial_request(start_pos)
         if start_pos and response.status_code == requests.codes.ok:
             response.close()
+            if int(response.headers.get("Content-Length", start_pos + 1)) <= start_pos:
+                return None  # the whole body ends before the requested range, which reads as EOF like a 416
             msg = "server ignored the range request"
             raise io.UnsupportedOperation(msg)
         content_range = response.headers.get("Content-Range")
