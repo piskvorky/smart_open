@@ -197,10 +197,12 @@ class CliRawOutputBase(io.RawIOBase):
         sub = self._sub
         if sub is not None:
             assert sub.stdin is not None  # noqa: S101  # stdin=PIPE set in __init__
-            self.flush()
-            sub.stdin.close()
-            returncode = sub.wait()
-            self._sub = None
+            try:
+                # close() flushes the buffer and closes the pipe even if flushing fails.
+                sub.stdin.close()
+            finally:
+                returncode = sub.wait()
+                self._sub = None
             if returncode != 0:
                 msg = f"HDFS write command failed with exit status {returncode}"
                 raise OSError(msg)
