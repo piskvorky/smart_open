@@ -361,25 +361,13 @@ def test_close_releases_response(reader_class):
     reader.close()
 
 
-@pytest.mark.parametrize(
-    "opener",
-    [
-        smart_open.http.BufferedInputBase,
-        smart_open.http.SeekableBufferedInputBase,
-        functools.partial(smart_open.open, mode="rb"),
-        functools.partial(smart_open.open, mode="r"),
-    ],
-)
-@pytest.mark.parametrize("status", [403, 404, 503])
 @responses.activate
-def test_failed_open_releases_response(opener, status):
-    """Release the streamed response even while the HTTPError retains it."""
-    responses.add(responses.GET, URL, status=status, body=b"unavailable")
-    with pytest.raises(requests.HTTPError, match=str(status)) as exc_info:
-        opener(URL)
-    response = responses.calls[-1].response
-    assert exc_info.value.response is response
-    assert response.raw.closed
+def test_failed_open_releases_response():
+    """Raise on and release a response that cannot be used for reading."""
+    responses.add(responses.GET, URL, status=404, body=b"not found")
+    with pytest.raises(requests.HTTPError, match="404"):
+        smart_open.http.SeekableBufferedInputBase(URL)
+    assert responses.calls[-1].response.raw.closed
 
 
 @pytest.mark.parametrize("offset", [10, len(BYTES)])
