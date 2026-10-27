@@ -266,7 +266,9 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
 
     # Credentials and connect options are part of the key, so a client authenticated
     # by one call is never reused for a call that supplied different credentials.
-    key = (host, user, port, password, repr(sorted((connect_kwargs or {}).items())))
+    # sock is left out: a fresh socket per call would otherwise never hit the cache.
+    options = {k: v for k, v in (connect_kwargs or {}).items() if k != "sock"}
+    key = (host, user, port, password, repr(sorted(options.items())))
 
     sftp_client: paramiko.SFTPClient | None = None
     attempts = 2
