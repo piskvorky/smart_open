@@ -444,3 +444,60 @@ def test_seek_rejects_ignored_range():
         assert reader.tell() == 0
         assert reader.seek(0) == 0
         assert reader.read() == BYTES
+
+
+@responses.activate
+def test_seek_from_end_needs_length():
+    """Refuse to seek from the end of a response of unknown length."""
+    responses.add(responses.GET, URL, body=BYTES)
+    with (
+        smart_open.http.SeekableBufferedInputBase(URL) as reader,
+        pytest.raises(io.UnsupportedOperation, match="unknown length"),
+    ):
+        reader.seek(-3, smart_open.constants.WHENCE_END)
+
+
+@pytest.mark.parametrize(("first", "last"), [(8, len(BYTES) - 1), (10, 19)])  # wrong start, capped end
+@responses.activate
+def test_seek_rejects_other_range(first, last):
+    """Raise when a partial response does not span from the requested offset to the end."""
+    content_range = f"bytes {first}-{last}/{len(BYTES)}"
+    partial = (206, {"Content-Range": content_range}, BYTES[first : last + 1])
+    responses.add_callback(
+        responses.GET, URL, callback=lambda r: partial if "range" in r.headers else (200, {}, BYTES)
+    )
+    with (
+        smart_open.http.SeekableBufferedInputBase(URL) as reader,
+        pytest.raises(OSError, match=content_range),
+    ):
+        reader.seek(10)
+
+
+@pytest.mark.parametrize(
+    ("version", "precondition"),
+    [
+        ({"ETag": '"v1"'}, {"If-Match": '"v1"'}),
+        (
+            {"ETag": 'W/"v1"', "Last-Modified": "Tue, 27 Oct 2026 10:00:00 GMT"},
+            {"If-Unmodified-Since": "Tue, 27 Oct 2026 10:00:00 GMT"},
+        ),
+    ],
+)
+@responses.activate
+def test_seek_requires_same_version(version, precondition):
+    """Fail a seek with 412 when the resource changed since the first response."""
+
+    def callback(request):
+        if "range" not in request.headers:
+            return 200, version, BYTES
+        name, stale = next(iter(precondition.items()))
+        if request.headers.get(name) == stale:  # the resource was replaced in between
+            return 412, {}, b""
+        return request_callback(request)
+
+    responses.add_callback(responses.GET, URL, callback=callback)
+    with (
+        smart_open.http.SeekableBufferedInputBase(URL) as reader,
+        pytest.raises(requests.HTTPError, match=r"412.*If-Match: \*"),
+    ):
+        reader.seek(10)

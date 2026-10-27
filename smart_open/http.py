@@ -89,7 +89,9 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
             If a tuple, ``('cert', 'key')``.
         headers: Any headers to send in the request. If ``None``, the default headers
             are sent: ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
-            set this variable to an empty dict, ``{}``.
+            set this variable to an empty dict, ``{}``. Seeks send ``If-Match`` or
+            ``If-Unmodified-Since`` for the version first read, so they fail with 412 when it
+            changed; send ``{'If-Match': '*'}`` to seek regardless.
         timeout: Request timeout in seconds.
         session: The ``requests.Session`` object to use with HTTP GET requests.
             Can be used for OAuth2 clients.
@@ -305,6 +307,18 @@ class SeekableBufferedInputBase(BufferedInputBase):
         # does not appear to be seekable but really is.
         #
         self._seekable = self.response.headers.get("Accept-Ranges", "").lower() != "none"
+        #
+        # Range requests carry a precondition on the version of this first response,
+        # so a resource replaced in between fails with 412 instead of mixing versions.
+        #
+        etag = self.response.headers.get("ETag", "")
+        last_modified = self.response.headers.get("Last-Modified")
+        if etag and not etag.startswith("W/"):  # If-Match compares strongly, so a weak ETag never matches
+            self._precondition = {"If-Match": etag}
+        elif last_modified:
+            self._precondition = {"If-Unmodified-Since": last_modified}
+        else:
+            self._precondition = {}
 
     def seek(self, offset: int, whence: int = 0) -> int:
         """Seek to the specified position.
@@ -337,13 +351,15 @@ class SeekableBufferedInputBase(BufferedInputBase):
             new_pos = offset
         elif whence == constants.WHENCE_CURRENT:
             new_pos = self._current_pos + offset
+        elif self.content_length == -1:  # constants.WHENCE_END without a Content-Length
+            msg = "cannot seek from the end of a response of unknown length"
+            raise io.UnsupportedOperation(msg)
         else:  # constants.WHENCE_END
             new_pos = self.content_length + offset
 
-        if self.content_length == -1:
-            new_pos = smart_open.utils.clamp(new_pos, maxval=None)
-        else:
-            new_pos = smart_open.utils.clamp(new_pos, maxval=self.content_length)
+        new_pos = smart_open.utils.clamp(
+            new_pos, maxval=None if self.content_length == -1 else self.content_length
+        )
 
         if self._current_pos == new_pos and self.response is not None:
             return self._current_pos
@@ -384,16 +400,28 @@ class SeekableBufferedInputBase(BufferedInputBase):
             response.close()
             msg = "server ignored the range request"
             raise io.UnsupportedOperation(msg)
+        content_range = response.headers.get("Content-Range")
+        if response.status_code == requests.codes.partial_content and content_range:
+            span, _, length = content_range.removeprefix("bytes ").partition("/")
+            first, _, last = span.partition("-")
+            # a server that caps open ended ranges fails here too, until one needs a request from the cut
+            if int(first) != start_pos or (length != "*" and int(last) + 1 != int(length)):
+                response.close()
+                msg = f"server answered bytes={start_pos}- with Content-Range: {content_range}"
+                raise OSError(msg)
         if response.ok:
             return response
         response.close()
+        if response.status_code == requests.codes.precondition_failed:
+            msg = f"412 Precondition Failed: {self.url} changed since it was opened, send If-Match: * to seek regardless"
+            raise requests.HTTPError(msg, response=response)
         # past EOF of a stream of unknown length, which reads as EOF like io
         if response.status_code != requests.codes.range_not_satisfiable:
             response.raise_for_status()
         return None
 
     def _partial_request(self, start_pos: int | None = None) -> requests.Response:
-        headers = self.headers.copy()
+        headers = {**self._precondition, **self.headers}
         if start_pos is not None:
             headers["range"] = smart_open.utils.make_range_string(start_pos)
 
