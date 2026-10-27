@@ -195,9 +195,10 @@ FUNCTIONS
             headers:
                 Any headers to send in the request. If ``None``, the default headers
                 are sent: ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
-                set this variable to an empty dict, ``{}``. Seeks send ``If-Match`` or
-                ``If-Unmodified-Since`` for the version first read, so they fail with 412 when it
-                changed; send ``{'If-Match': '*'}`` to seek regardless.
+                set this variable to an empty dict, ``{}``. Range requests, from seeks and from reads
+                past a range the server cut short, send ``If-Match`` or ``If-Unmodified-Since`` for
+                the version first read, so they fail with 412 when it changed; send
+                ``{'If-Match': '*'}`` to read regardless.
             timeout:
                 Request timeout in seconds.
             session:

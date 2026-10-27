@@ -457,11 +457,16 @@ def test_seek_from_end_needs_length():
         reader.seek(-3, smart_open.constants.WHENCE_END)
 
 
+@pytest.mark.parametrize(
+    ("first", "last"),
+    [(8, len(BYTES) - 1), (10, 9), (10, len(BYTES))],
+    ids=["wrong_start", "end_before_start", "end_past_total"],
+)
 @responses.activate
-def test_seek_rejects_other_range():
-    """Raise when a partial response starts elsewhere than the requested offset."""
-    content_range = f"bytes 8-{len(BYTES) - 1}/{len(BYTES)}"
-    partial = (206, {"Content-Range": content_range}, BYTES[8:])
+def test_seek_rejects_other_range(first, last):
+    """Raise when a partial response starts elsewhere than the requested offset, or is invalid."""
+    content_range = f"bytes {first}-{last}/{len(BYTES)}"
+    partial = (206, {"Content-Range": content_range}, BYTES[first : last + 1])
     responses.add_callback(
         responses.GET, URL, callback=lambda r: partial if "range" in r.headers else (200, {}, BYTES)
     )
@@ -473,23 +478,24 @@ def test_seek_rejects_other_range():
 
 
 @pytest.mark.parametrize(
-    ("read", "total"),
+    ("read", "total", "calls"),
     [
-        (lambda reader: reader.read(), len(BYTES)),
-        (lambda reader: reader.read(len(BYTES)), len(BYTES)),
-        (lambda reader: b"".join(iter(reader.readline, b"")), len(BYTES)),
-        (lambda reader: reader.read(), "*"),
+        (lambda reader: reader.read(), len(BYTES), 8),
+        (lambda reader: reader.read(len(BYTES)), len(BYTES), 8),
+        (lambda reader: b"".join(iter(reader.readline, b"")), len(BYTES), 8),
+        (lambda reader: reader.read(), "*", 9),  # the last request answers 416
     ],
     ids=["read", "read_size", "readline", "unknown_total"],
 )
 @responses.activate
-def test_read_continues_after_capped_range(read, total):
+def test_read_continues_after_capped_range(read, total, calls):
     """Request the rest from where a server cut a partial response short."""
 
     def callback(request):
-        if "range" not in request.headers:
-            return 200, {}, BYTES
-        first = int(request.headers["range"].removeprefix("bytes=").partition("-")[0])
+        first = int(request.headers.get("range", "bytes=0-").removeprefix("bytes=").partition("-")[0])
+        if not first:  # also a rewind, answered without Content-Range
+            return 200, {"ETag": '"v1"'}, BYTES
+        assert request.headers["If-Match"] == '"v1"'  # every range pins the first version
         if first >= len(BYTES):
             return 416, {}, b""
         last = min(first + 10, len(BYTES)) - 1  # the server caps every range at 10 bytes
@@ -499,6 +505,9 @@ def test_read_continues_after_capped_range(read, total):
     with smart_open.http.SeekableBufferedInputBase(URL) as reader:
         reader.seek(5)
         assert read(reader) == BYTES[5:]
+        assert len(responses.calls) == calls  # no request past a known total
+        reader.seek(0)
+        assert reader.read() == BYTES
 
 
 @pytest.mark.parametrize(
@@ -531,19 +540,24 @@ def test_seek_requires_same_version(version, precondition):
         reader.seek(10)
 
 
+@pytest.mark.parametrize(
+    ("body", "match"),
+    [(BYTES[5:8], "has 3 bytes"), (BYTES[5:], "has 63 bytes"), (BYTES[5:15], "416")],
+    ids=["short", "long", "416_before_total"],
+)
 @responses.activate
-def test_read_rejects_short_partial_body():
-    """Raise instead of skipping bytes when a partial body is shorter than its Content-Range."""
+def test_read_rejects_inconsistent_partial_response(body, match):
+    """Raise instead of skipping, repeating or truncating bytes when a capped response does not add up."""
 
     def callback(request):
-        if (
-            request.headers.get("range") == "bytes=5-"
-        ):  # declares 10 bytes, sends 3, no Content-Length to catch it
-            return 206, {"Content-Range": f"bytes 5-14/{len(BYTES)}"}, BYTES[5:8]
-        return request_callback(request)
+        if "range" not in request.headers:
+            return request_callback(request)
+        if request.headers["range"] == "bytes=5-":  # declares 10 bytes, no Content-Length to catch it
+            return 206, {"Content-Range": f"bytes 5-14/{len(BYTES)}"}, body
+        return 416, {}, b""  # the rest is gone before the declared total
 
     responses.add_callback(responses.GET, URL, callback=callback)
     with smart_open.http.SeekableBufferedInputBase(URL) as reader:
         reader.seek(5)
-        with pytest.raises(OSError, match="shorter than its Content-Range"):
+        with pytest.raises(OSError, match=match):
             reader.read()
