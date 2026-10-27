@@ -457,10 +457,14 @@ def test_seek_from_end_needs_length():
         reader.seek(-3, smart_open.constants.WHENCE_END)
 
 
-@pytest.mark.parametrize(("first", "last"), [(8, len(BYTES) - 1), (10, 19)])  # wrong start, capped end
+@pytest.mark.parametrize(
+    ("first", "last"),
+    [(8, len(BYTES) - 1), (10, 9), (10, len(BYTES))],
+    ids=["wrong_start", "end_before_start", "end_past_total"],
+)
 @responses.activate
 def test_seek_rejects_other_range(first, last):
-    """Raise when a partial response does not span from the requested offset to the end."""
+    """Raise when a partial response starts elsewhere than the requested offset, or is invalid."""
     content_range = f"bytes {first}-{last}/{len(BYTES)}"
     partial = (206, {"Content-Range": content_range}, BYTES[first : last + 1])
     responses.add_callback(
@@ -471,6 +475,45 @@ def test_seek_rejects_other_range(first, last):
         pytest.raises(OSError, match=content_range),
     ):
         reader.seek(10)
+
+
+@pytest.mark.parametrize(
+    ("read", "total", "at_end", "calls"),
+    [
+        (lambda reader: reader.read(), len(BYTES), None, 8),
+        (lambda reader: reader.read(len(BYTES)), len(BYTES), None, 8),
+        (lambda reader: b"".join(iter(reader.readline, b"")), len(BYTES), None, 8),
+        (lambda reader: reader.read(), "*", (416, {}, b""), 9),
+        (
+            lambda reader: reader.read(),
+            "*",
+            (200, {"Content-Length": str(len(BYTES))}, BYTES),
+            9,
+        ),  # Range ignored
+    ],
+    ids=["read", "read_size", "readline", "unknown_total_416", "unknown_total_200"],
+)
+@responses.activate
+def test_read_continues_after_capped_range(read, total, at_end, calls):
+    """Request the rest from where a server cut a partial response short."""
+
+    def callback(request):
+        first = int(request.headers.get("range", "bytes=0-").removeprefix("bytes=").partition("-")[0])
+        if not first:  # also a rewind, answered without Content-Range
+            return 200, {"ETag": '"v1"'}, BYTES
+        assert request.headers["If-Match"] == '"v1"'  # every range pins the first version
+        if first >= len(BYTES):
+            return at_end
+        last = min(first + 10, len(BYTES)) - 1  # the server caps every range at 10 bytes
+        return 206, {"Content-Range": f"bytes {first}-{last}/{total}"}, BYTES[first : last + 1]
+
+    responses.add_callback(responses.GET, URL, callback=callback)
+    with smart_open.http.SeekableBufferedInputBase(URL) as reader:
+        reader.seek(5)
+        assert read(reader) == BYTES[5:]
+        assert len(responses.calls) == calls  # no request past a known total
+        reader.seek(0)
+        assert reader.read() == BYTES
 
 
 @pytest.mark.parametrize(
@@ -501,3 +544,26 @@ def test_seek_requires_same_version(version, precondition):
         pytest.raises(requests.HTTPError, match=r"412.*If-Match: \*"),
     ):
         reader.seek(10)
+
+
+@pytest.mark.parametrize(
+    ("body", "match"),
+    [(BYTES[5:8], "has 3 bytes"), (BYTES[5:], "has 63 bytes"), (BYTES[5:15], "416")],
+    ids=["short", "long", "416_before_total"],
+)
+@responses.activate
+def test_read_rejects_inconsistent_partial_response(body, match):
+    """Raise instead of skipping, repeating or truncating bytes when a capped response does not add up."""
+
+    def callback(request):
+        if "range" not in request.headers:
+            return request_callback(request)
+        if request.headers["range"] == "bytes=5-":  # declares 10 bytes, no Content-Length to catch it
+            return 206, {"Content-Range": f"bytes 5-14/{len(BYTES)}"}, body
+        return 416, {}, b""  # the rest is gone before the declared total
+
+    responses.add_callback(responses.GET, URL, callback=callback)
+    with smart_open.http.SeekableBufferedInputBase(URL) as reader:
+        reader.seek(5)
+        with pytest.raises(OSError, match=match):
+            reader.read()
