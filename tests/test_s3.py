@@ -842,6 +842,44 @@ class MultipartWriterTest(unittest.TestCase):
 
 
 @mock_s3
+@pytest.mark.parametrize("multipart_upload", [True, False])
+@pytest.mark.parametrize(
+    "data",
+    [
+        b"abcdefghijklmnop",
+        bytearray(b"abcdefghijklmnop"),
+        memoryview(b"abcdefghijklmnop"),
+        memoryview(b"abcdefghijklmnop").cast("I"),
+        memoryview(b"abcdefghijklmnop").cast("I", shape=[2, 2]),
+    ],
+    ids=["bytes", "bytearray", "byte-view", "integer-view", "multidimensional-view"],
+)
+def test_write_buffer_byte_count(multipart_upload, data):
+    """Count bytes written to S3 rather than buffer elements."""
+    _resource("s3").create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
+    expected = io.BytesIO()
+    with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "wb", multipart_upload=multipart_upload) as fout:
+        assert fout.write(data) == expected.write(data)
+        assert fout.tell() == expected.tell()
+        assert fout.write(data) == expected.write(data)
+        assert fout.tell() == expected.tell()
+
+    with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "rb") as fin:
+        assert fin.read() == expected.getvalue()
+
+
+@mock_s3
+def test_multipart_writer_part_size_counts_bytes():
+    """Upload a part once part_size bytes are buffered, whatever the item size."""
+    _resource("s3").create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
+    part_size = smart_open.s3.MIN_PART_SIZE
+    with smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME, part_size=part_size) as fout:
+        fout.write(memoryview(bytes(part_size + 4)).cast("I"))
+        assert fout._total_parts == 1  # test reaches into private state
+        assert fout._buf.tell() == 4  # test uses inline magic value; test reaches into private state
+
+
+@mock_s3
 class SinglepartWriterTest(unittest.TestCase):
     """Test writing into s3 files using single part upload."""
 

@@ -1139,7 +1139,7 @@ class MultipartWriter(io.BufferedIOBase):
         """
         self._checkClosed()
         offset = 0
-        mv = memoryview(b)
+        mv = memoryview(b).cast("B")
         self._total_bytes += len(mv)
 
         #
