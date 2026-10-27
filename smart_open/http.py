@@ -318,7 +318,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         Raises:
             ValueError: If ``whence`` is not one of ``WHENCE_CHOICES``.
-            OSError: If the stream is not seekable.
+            io.UnsupportedOperation: If the stream is not seekable or the server ignores a nonzero range request.
         """
         logger.debug("seeking to offset: %r whence: %r", offset, whence)
         self._checkClosed()
@@ -328,7 +328,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         if not self.seekable():
             msg = "stream is not seekable"
-            raise OSError(msg)
+            raise io.UnsupportedOperation(msg)
 
         buf = self._read_buffer
         assert buf is not None  # noqa: S101  # not closed implies buf is set
@@ -380,6 +380,10 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
     def _range_response(self, start_pos: int) -> requests.Response | None:
         response = self._partial_request(start_pos)
+        if start_pos and response.status_code == requests.codes.ok:
+            response.close()
+            msg = "server ignored the range request"
+            raise io.UnsupportedOperation(msg)
         if response.ok:
             return response
         response.close()

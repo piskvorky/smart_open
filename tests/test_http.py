@@ -6,6 +6,7 @@
 #
 import functools
 import gzip
+import io
 import unittest
 
 import pytest
@@ -37,7 +38,7 @@ def request_callback(request, headers=HEADERS, data=BYTES):
     data = data[start:end]
     headers["Content-Length"] = str(len(data))
 
-    return (200, headers, data)
+    return (206 if "range" in request.headers else 200, headers, data)
 
 
 class HttpTest(unittest.TestCase):
@@ -430,3 +431,16 @@ def test_failed_seek_keeps_position_and_drops_stale_data():
         assert reader.read(3) == BYTES[1:4]
         assert reader.seek(20) == 20
         assert reader.read(3) == BYTES[20:23]
+
+
+@responses.activate
+def test_seek_rejects_ignored_range():
+    """Raise when a nonzero range request gets the full body, and still allow rewinding."""
+    responses.add(responses.GET, URL, body=BYTES)
+    with smart_open.http.SeekableBufferedInputBase(URL) as reader:
+        with pytest.raises(io.UnsupportedOperation, match="ignored the range request"):
+            reader.seek(10)
+        assert responses.calls[-1].response.raw.closed
+        assert reader.tell() == 0
+        assert reader.seek(0) == 0
+        assert reader.read() == BYTES
