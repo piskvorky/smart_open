@@ -8,6 +8,7 @@ import gzip
 import io
 import os
 import os.path
+import signal
 import subprocess
 import sys
 from unittest import mock
@@ -219,6 +220,20 @@ def test_write_command_failure():
             writer.close()
         assert writer.closed
         writer.close()
+
+
+def test_write_context_failure_terminates_put():
+    """Kill the put command instead of sending it the end of input when the with block raises."""
+    command = [sys.executable, "-c", "import sys; sys.stdin.buffer.read()"]
+    with (
+        subprocess.Popen(command, stdin=subprocess.PIPE) as process,  # noqa: S603  # controlled CLI stand-in
+        mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
+    ):
+        with pytest.raises(ZeroDivisionError), smart_open.open("hdfs:///partial/file", "wb") as writer:  # noqa: PT012  # the failure must occur inside the stream context
+            writer.write(b"partial")
+            1 / 0  # noqa: B018  # fail inside the with block
+        assert writer.closed
+        assert process.returncode == -signal.SIGTERM
 
 
 def test_reader_close_releases_process():
