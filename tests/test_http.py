@@ -6,6 +6,7 @@
 #
 import functools
 import gzip
+import io
 import unittest
 
 import pytest
@@ -428,7 +429,7 @@ def test_seek_rejects_ignored_range():
     """Raise when a nonzero range request gets the full body, and still allow rewinding."""
     responses.add(responses.GET, URL, body=BYTES)
     with smart_open.http.SeekableBufferedInputBase(URL) as reader:
-        with pytest.raises(OSError, match="ignored the range request"):
+        with pytest.raises(io.UnsupportedOperation, match="ignored the range request"):
             reader.seek(10)
         assert responses.calls[-1].response.raw.closed
         assert reader.tell() == 0
