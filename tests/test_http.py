@@ -567,3 +567,44 @@ def test_read_rejects_inconsistent_partial_response(body, match):
         reader.seek(5)
         with pytest.raises(OSError, match=match):
             reader.read()
+
+
+@pytest.mark.parametrize("read", [lambda r: r.read(), lambda r: r.readline()], ids=["read", "readline"])
+@responses.activate
+def test_read_after_failed_seek_raises(read):
+    """Raise on reads after a failed range request instead of reading as EOF, until a seek succeeds."""
+    responses.add(responses.GET, URL, body=BYTES)
+    responses.add(responses.GET, URL, status=503, body=b"unavailable")
+    responses.add_callback(responses.GET, URL, callback=request_callback)
+    with smart_open.http.SeekableBufferedInputBase(URL) as reader:
+        with pytest.raises(requests.HTTPError, match="503"):
+            reader.seek(10)
+        with pytest.raises(OSError, match="seek to retry"):
+            read(reader)
+        assert reader.seek(reader.tell()) == 0
+        assert read(reader) == BYTES
+
+
+@responses.activate
+def test_read_after_failed_continuation_raises():
+    """Keep raising after a failed request for the rest of a capped range, until a seek succeeds."""
+    failures = [503]  # the first request for the rest fails, a retry succeeds
+
+    def callback(request):
+        first = int(request.headers.get("range", "bytes=0-").removeprefix("bytes=").partition("-")[0])
+        if not first:
+            return 200, {}, BYTES
+        if first == 15 and failures:
+            return failures.pop(), {}, b"unavailable"
+        last = min(first + 10, len(BYTES)) - 1  # the server caps every range at 10 bytes
+        return 206, {"Content-Range": f"bytes {first}-{last}/{len(BYTES)}"}, BYTES[first : last + 1]
+
+    responses.add_callback(responses.GET, URL, callback=callback)
+    with smart_open.http.SeekableBufferedInputBase(URL) as reader:
+        reader.seek(5)
+        with pytest.raises(requests.HTTPError, match="503"):
+            reader.read(len(BYTES))
+        with pytest.raises(OSError, match="seek to retry"):
+            reader.read(len(BYTES))
+        assert reader.seek(reader.tell()) == 5
+        assert reader.read() == BYTES[5:]
