@@ -186,6 +186,7 @@ class BufferedInputBase(io.BufferedIOBase):
 
         self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
         self._current_pos = 0
+        self._failed = False  # a range request failed, so reads raise instead of reading as EOF
 
     #
     # Override some methods from io.IOBase.
@@ -221,6 +222,11 @@ class BufferedInputBase(io.BufferedIOBase):
         """Continue a response that ended early with the next one, which only range readers need."""
         return False
 
+    def _check_failed(self) -> None:
+        if self._failed:
+            msg = f"an earlier range request for {self.url} failed, seek to retry"
+            raise OSError(msg)
+
     @property
     def closed(self) -> bool:
         """Return True if the stream is closed."""
@@ -253,6 +259,7 @@ class BufferedInputBase(io.BufferedIOBase):
         logger.debug("reading with size: %d", size)
         buf, response = self._read_buffer, self.response
         if buf is None or response is None or size == 0:
+            self._check_failed()
             return b""
 
         if size == -1:
@@ -279,6 +286,7 @@ class BufferedInputBase(io.BufferedIOBase):
         self._checkClosed()
         buf, response = self._read_buffer, self.response
         if buf is None or response is None:
+            self._check_failed()
             return b""
         line = buf.readline(b"\n", size, self._fill)
         self._current_pos += len(line)
@@ -397,7 +405,9 @@ class SeekableBufferedInputBase(BufferedInputBase):
         buf.empty()
 
         if new_pos != self.content_length:
+            self._failed = True  # until the range request succeeds
             self.response = self._range_response(new_pos)
+        self._failed = False
 
         self._current_pos = new_pos
         return self._current_pos
@@ -459,10 +469,12 @@ class SeekableBufferedInputBase(BufferedInputBase):
         if total is not None and end >= total:
             return False
         self._close_response()
+        self._failed = True  # until the rest arrives
         self.response = self._range_response(end)
         if self.response is None and total is not None:  # only an unknown total ends with a 416
             msg = f"server answered 416 to bytes={end}- before the end at {total}"
             raise OSError(msg)
+        self._failed = False
         return self.response is not None
 
     def _partial_request(self, start_pos: int | None = None) -> requests.Response:
