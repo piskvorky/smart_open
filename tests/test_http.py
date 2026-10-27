@@ -361,6 +361,15 @@ def test_close_releases_response(reader_class):
     reader.close()
 
 
+@responses.activate
+def test_failed_open_releases_response():
+    """Raise on and release a response that cannot be used for reading."""
+    responses.add(responses.GET, URL, status=404, body=b"not found")
+    with pytest.raises(requests.HTTPError, match="404"):
+        smart_open.http.SeekableBufferedInputBase(URL)
+    assert responses.calls[-1].response.raw.closed
+
+
 @pytest.mark.parametrize("offset", [10, len(BYTES)])
 @responses.activate
 def test_seek_releases_response(offset):

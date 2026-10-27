@@ -75,6 +75,32 @@ class SSHOpen(unittest.TestCase):
         ]
 
     @mock_ssh
+    def test_cache_separates_credentials(self, mock_connect, get_transp_mock):
+        """A cached client authenticated with one set of credentials must not serve another."""
+        smart_open.open("ssh://user:right@some-host/first")
+        smart_open.open("ssh://user:wrong@some-host/second")
+        smart_open.open(
+            "ssh://user@some-host/third", transport_params={"connect_kwargs": {"key_filename": "key"}}
+        )
+        smart_open.open("ssh://user:right@some-host/fourth")
+
+        assert mock_connect.call_args_list == [
+            mock.call("some-host", 22, username="user", password="right"),  # fixture password kwarg
+            mock.call("some-host", 22, username="user", password="wrong"),  # fixture password kwarg
+            mock.call("some-host", 22, username="user", key_filename="key"),
+        ]
+
+    @mock_ssh
+    def test_cache_ignores_sock(self, mock_connect, get_transp_mock):
+        """A fresh sock per call must reuse the cached client instead of caching a new one."""
+        for path in ("first", "second"):
+            smart_open.open(
+                f"ssh://user@some-host/{path}", transport_params={"connect_kwargs": {"sock": object()}}
+            )
+
+        assert mock_connect.call_count == 1
+
+    @mock_ssh
     def test_open_with_transport_params(self, mock_connect, get_transp_mock):
         """Open with transport params."""
         smart_open.open(

@@ -200,13 +200,14 @@ class CliRawOutputBase(io.RawIOBase):
         sub = self._sub
         if sub is not None:
             assert sub.stdin is not None  # noqa: S101  # stdin=PIPE set in __init__
-            self.flush()
-            sub.stdin.close()
-            returncode = sub.wait()
-            self._sub = None
-            if returncode != 0:
-                msg = f"HDFS write command failed with exit status {returncode}"
-                raise OSError(msg)
+            try:
+                sub.stdin.close()  # flushes, and closes the pipe even if flushing fails
+            finally:
+                returncode = sub.wait()
+                self._sub = None
+                if returncode != 0:  # explains a BrokenPipeError from a command that exited early
+                    msg = f"HDFS write command failed with exit status {returncode}"
+                    raise OSError(msg)
 
     def terminate(self) -> None:
         """Kill the ``hdfs dfs -put`` subprocess, so it does not commit a partial upload."""

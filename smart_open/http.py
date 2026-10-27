@@ -178,6 +178,7 @@ class BufferedInputBase(io.BufferedIOBase):
         )
 
         if not self.response.ok:
+            self.response.close()
             self.response.raise_for_status()
 
         self._read_buffer = bytebuffer.ByteBuffer(buffer_size)

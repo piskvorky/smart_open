@@ -222,6 +222,22 @@ def test_write_command_failure():
         writer.close()
 
 
+def test_write_command_failure_broken_pipe():
+    """Report and reap a put that exits before close() flushes the buffered input."""
+    command = [sys.executable, "-c", "import sys; sys.exit(7)"]
+    with (
+        subprocess.Popen(command, stdin=subprocess.PIPE) as process,  # noqa: S603  # controlled CLI stand-in
+        mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
+    ):
+        writer = smart_open.open("hdfs:///failed/file", "wb")
+        writer.write(b"payload")
+        process.wait()
+        with pytest.raises(OSError, match="exit status 7"):
+            writer.close()
+        assert writer.closed
+        writer.close()
+
+
 def test_write_context_failure_terminates_put():
     """Kill the put command instead of sending it the end of input when the with block raises."""
     command = [sys.executable, "-c", "import sys; sys.stdin.buffer.read()"]
