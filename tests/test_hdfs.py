@@ -221,6 +221,22 @@ def test_write_command_failure():
         writer.close()
 
 
+def test_write_command_failure_broken_pipe():
+    """Report and reap a put that exits before close() flushes the buffered input."""
+    command = [sys.executable, "-c", "import sys; sys.exit(7)"]
+    with (
+        subprocess.Popen(command, stdin=subprocess.PIPE) as process,  # noqa: S603  # controlled CLI stand-in
+        mock.patch("smart_open.hdfs.subprocess.Popen", return_value=process),
+    ):
+        writer = smart_open.open("hdfs:///failed/file", "wb")
+        writer.write(b"payload")
+        process.wait()
+        with pytest.raises(OSError, match="exit status 7"):
+            writer.close()
+        assert writer.closed
+        writer.close()
+
+
 def test_reader_close_releases_process():
     """Close the output pipe and reap an interrupted cat command."""
     script = "import sys, time; sys.stdout.buffer.write(b'payload'); sys.stdout.flush(); time.sleep(60)"
