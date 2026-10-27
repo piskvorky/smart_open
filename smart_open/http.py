@@ -201,6 +201,25 @@ class BufferedInputBase(io.BufferedIOBase):
             self.response.close()
             self.response = None
 
+    def _fill(self) -> int:
+        assert self._read_buffer is not None  # noqa: S101  # only called while reading
+        assert self.response is not None  # noqa: S101  # only called while reading
+        filled = self._read_buffer.fill(self.response.raw)
+        if not filled and self._next_response():
+            return self._fill()
+        return filled
+
+    def _read_rest(self) -> bytes:
+        assert self.response is not None  # noqa: S101  # only called while reading
+        parts = [self.response.raw.read()]
+        while self._next_response():
+            parts.append(self.response.raw.read())
+        return b"".join(parts)
+
+    def _next_response(self) -> bool:
+        """Continue a response that ended early with the next one, which only range readers need."""
+        return False
+
     @property
     def closed(self) -> bool:
         """Return True if the stream is closed."""
@@ -237,13 +256,13 @@ class BufferedInputBase(io.BufferedIOBase):
 
         if size == -1:
             if len(buf):  # noqa: SIM108  # avoid the unnecessary + when the buffer is empty
-                retval = buf.read() + response.raw.read()
+                retval = buf.read() + self._read_rest()
             else:
-                retval = response.raw.read()
+                retval = self._read_rest()
         else:
             # Fill _read_buffer until it contains enough bytes
             while len(buf) < size:
-                if buf.fill(response.raw) == 0:
+                if self._fill() == 0:
                     break  # EOF reached
             retval = buf.read(size)
 
@@ -260,7 +279,7 @@ class BufferedInputBase(io.BufferedIOBase):
         buf, response = self._read_buffer, self.response
         if buf is None or response is None:
             return b""
-        line = buf.readline(b"\n", size, lambda: buf.fill(response.raw))
+        line = buf.readline(b"\n", size, self._fill)
         self._current_pos += len(line)
         return line
 
@@ -319,6 +338,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             self._precondition = {"If-Unmodified-Since": last_modified}
         else:
             self._precondition = {}
+        self._partial: tuple[int, int, int | None] | None = None  # start, end, total from Content-Range
 
     def seek(self, offset: int, whence: int = 0) -> int:
         """Seek to the specified position.
@@ -373,6 +393,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
         logger.debug("http seeking from current_pos: %d to new_pos: %d", self._current_pos, new_pos)
 
         self._close_response()
+        self._partial = None
         buf.empty()
 
         if new_pos != self.content_length:
@@ -404,11 +425,11 @@ class SeekableBufferedInputBase(BufferedInputBase):
         if response.status_code == requests.codes.partial_content and content_range:
             span, _, length = content_range.removeprefix("bytes ").partition("/")
             first, _, last = span.partition("-")
-            # a server that caps open ended ranges fails here too, until one needs a request from the cut
-            if int(first) != start_pos or (length != "*" and int(last) + 1 != int(length)):
+            if int(first) != start_pos:
                 response.close()
                 msg = f"server answered bytes={start_pos}- with Content-Range: {content_range}"
                 raise OSError(msg)
+            self._partial = (start_pos, int(last) + 1, None if length == "*" else int(length))
         if response.ok:
             return response
         response.close()
@@ -419,6 +440,22 @@ class SeekableBufferedInputBase(BufferedInputBase):
         if response.status_code != requests.codes.range_not_satisfiable:
             response.raise_for_status()
         return None
+
+    def _next_response(self) -> bool:
+        """Check the end of a partial body, and request the rest when the server capped the range."""
+        if self._partial is None:
+            return False
+        assert self.response is not None  # noqa: S101  # only called while reading
+        start, end, total = self._partial
+        if start + self.response.raw.tell() < end:
+            msg = f"partial body for bytes {start}-{end - 1} is shorter than its Content-Range"
+            raise OSError(msg)
+        if total is not None and end >= total:
+            return False  # with an unknown total, the next request answers 416 at the end
+        self._partial = None
+        self._close_response()
+        self.response = self._range_response(end)
+        return self.response is not None
 
     def _partial_request(self, start_pos: int | None = None) -> requests.Response:
         headers = {**self._precondition, **self.headers}
