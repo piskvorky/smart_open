@@ -36,13 +36,13 @@ gcs = ["google-cloud-storage>=2.6.0"]
 http = ["requests"]
 lz4 = ["lz4"]
 s3 = ["boto3>=1.9.17"]
-ssh = ["paramiko"]
+ssh = ["paramiko>=3.2"]
 dev = [
   "smart_open[all]",
   "moto[server]",
   "responses",
   "pre-commit",
-  "pytest",
+  "pytest<9.2",  # https://github.com/ionelmc/pytest-benchmark/issues/321
   "pytest-rerunfailures",
   "pytest_benchmark",
   "pytest-timeout",

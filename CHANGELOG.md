@@ -1,3 +1,17 @@
+# 9.0.0, 2026-10-28
+
+- [ssh] Include credentials in cached SSH connection keys (PR [#982](https://github.com/piskvorky/smart_open/pull/982), [@kakkar87d](https://github.com/kakkar87d))
+- [http] Close streamed responses when opening fails (PR [#984](https://github.com/piskvorky/smart_open/pull/984), [@JackyHsu-X](https://github.com/JackyHsu-X))
+- [hdfs] Close and reap writers when flushing the pipe fails (PR [#985](https://github.com/piskvorky/smart_open/pull/985), [@chivector](https://github.com/chivector))
+- [http] Reject ignored range requests when seeking (PR [#981](https://github.com/piskvorky/smart_open/pull/981), [@BSAIPF](https://github.com/BSAIPF))
+- [s3, azure] Preserve multibyte line terminators across refills (PR [#983](https://github.com/piskvorky/smart_open/pull/983), [@mayankdhingra02](https://github.com/mayankdhingra02))
+- [hdfs] Terminate the put command when a write context fails (PR [#986](https://github.com/piskvorky/smart_open/pull/986), [@ddelange](https://github.com/ddelange))
+- [http] Validate partial responses and pin range requests to one version (PR [#987](https://github.com/piskvorky/smart_open/pull/987), [@ddelange](https://github.com/ddelange))
+- [http] Request the remaining bytes when a server caps a range response (PR [#988](https://github.com/piskvorky/smart_open/pull/988), [@ddelange](https://github.com/ddelange))
+- [http] Raise on reads after a failed range request instead of returning EOF (PR [#989](https://github.com/piskvorky/smart_open/pull/989), [@ddelange](https://github.com/ddelange))
+- [s3] Count S3 multipart writer memoryview inputs in bytes (PR [#990](https://github.com/piskvorky/smart_open/pull/990), [@youdie006](https://github.com/youdie006))
+- [http] Document v9.0.0 range request changes and keep identity encoding in the If-Match opt out (PR [#991](https://github.com/piskvorky/smart_open/pull/991), [@ddelange](https://github.com/ddelange))
+
 # 8.0.4, 2026-10-17
 
 - Use binary unit labels (GiB, MiB) in upload size logs (PR [#978](https://github.com/piskvorky/smart_open/pull/978), [@ddelange](https://github.com/ddelange))

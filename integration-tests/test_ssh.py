@@ -30,7 +30,8 @@ def test():
     #
     # Ensure the cache is being used
     #
-    assert ("localhost", "misha") in smart_open.ssh._SSH  # integration test reaches into private state
+    cached_hosts = [key[:2] for key in smart_open.ssh._SSH]  # integration test reaches into private state
+    assert ("localhost", "misha") in cached_hosts
 
     try:
         connect_ssh = smart_open.ssh._connect_ssh  # integration test reaches into private state

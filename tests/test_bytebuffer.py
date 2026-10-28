@@ -4,9 +4,12 @@
 # This code is distributed under the terms and conditions
 # from the MIT License (MIT).
 #
+import functools
 import io
 import random
 import unittest
+
+import pytest
 
 import smart_open.bytebuffer
 
@@ -225,3 +228,13 @@ class ByteBufferTest(unittest.TestCase):
         expected = [b"one!", b"two.", b"three,"]
         actual = [buf.readline(b"!"), buf.readline(b"."), buf.readline(b",")]
         assert expected == actual
+
+
+@pytest.mark.parametrize("terminator", [b"\r\n", b"aba", b"aaa"])
+@pytest.mark.parametrize("chunk_size", [1, 2, 64])
+def test_readline_multibyte_terminator(terminator, chunk_size):
+    """Does readline find a multibyte terminator, also when a refill splits it?"""
+    lines = [b"first" + terminator, terminator, b"second" + terminator, b"tail", b""]
+    source = io.BytesIO(b"".join(lines))
+    buf = smart_open.bytebuffer.ByteBuffer(chunk_size)
+    assert [buf.readline(terminator, fill=functools.partial(buf.fill, source)) for _ in lines] == lines

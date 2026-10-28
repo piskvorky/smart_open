@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import io
 import logging
 import subprocess
@@ -18,6 +19,8 @@ from typing import IO, TYPE_CHECKING, TypedDict
 import smart_open.utils
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     from _typeshed import ReadableBuffer, WriteableBuffer
 
     from smart_open._typing import TransportParams
@@ -197,13 +200,37 @@ class CliRawOutputBase(io.RawIOBase):
         sub = self._sub
         if sub is not None:
             assert sub.stdin is not None  # noqa: S101  # stdin=PIPE set in __init__
-            self.flush()
-            sub.stdin.close()
-            returncode = sub.wait()
+            try:
+                sub.stdin.close()  # flushes, and closes the pipe even if flushing fails
+            finally:
+                returncode = sub.wait()
+                self._sub = None
+                if returncode != 0:  # explains a BrokenPipeError from a command that exited early
+                    msg = f"HDFS write command failed with exit status {returncode}"
+                    raise OSError(msg)
+
+    def terminate(self) -> None:
+        """Kill the ``hdfs dfs -put`` subprocess, so it does not commit a partial upload."""
+        sub = self._sub
+        if sub is not None:
+            assert sub.stdin is not None  # noqa: S101  # stdin=PIPE set in __init__
+            sub.terminate()  # before closing stdin, which the command reads as the end of a complete upload
+            sub.wait()
+            with contextlib.suppress(OSError):  # the killed command no longer reads the buffered input
+                sub.stdin.close()
             self._sub = None
-            if returncode != 0:
-                msg = f"HDFS write command failed with exit status {returncode}"
-                raise OSError(msg)
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Close or terminate the writer on context exit."""
+        if exc_type is not None:
+            self.terminate()
+        else:
+            self.close()
 
     @property
     def closed(self) -> bool:

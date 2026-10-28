@@ -158,12 +158,12 @@ class ByteBuffer:
 
         A line is a contiguous sequence of bytes that ends with either:
 
-        1. The ``terminator`` character
+        1. The ``terminator`` bytes
         2. ``limit`` bytes, if ``limit`` is not negative
         3. The end of the buffer itself, or with ``fill``, the end of the source
 
         Args:
-            terminator: The line terminator byte.
+            terminator: The line terminator bytes.
             limit: Maximum number of bytes to return. If negative or None, no limit.
             fill: Called when the buffer runs out mid line, to add more bytes.
                 A buffer still empty afterwards means the end of the source.
@@ -174,15 +174,22 @@ class ByteBuffer:
         if limit is None:
             limit = -1
         parts: list[bytes] = []
+        tail = b""  # bytes already read that may start a terminator ending in this buffer
         while True:
-            index = self._bytes.find(terminator, self._pos)
-            size = len(self) if index == -1 else index - self._pos + 1
+            index = (tail + self.peek(len(terminator) - 1)).find(terminator) if tail else -1
+            if index != -1:
+                size = index + len(terminator) - len(tail)
+            else:
+                index = self._bytes.find(terminator, self._pos)
+                size = len(self) if index == -1 else index - self._pos + len(terminator)
             if limit >= 0:
                 size = min(size, limit)
                 limit -= size
             parts.append(self.read(size))
-            if parts[-1].endswith(terminator) or limit == 0 or fill is None:
+            if index != -1 or limit == 0 or fill is None:
                 break
+            if len(terminator) > 1:
+                tail = (tail + parts[-1][1 - len(terminator) :])[1 - len(terminator) :]
             fill()
             if not len(self):
                 break

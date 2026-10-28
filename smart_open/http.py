@@ -89,7 +89,10 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
             If a tuple, ``('cert', 'key')``.
         headers: Any headers to send in the request. If ``None``, the default headers
             are sent: ``{'Accept-Encoding': 'identity'}``. To use no headers at all,
-            set this variable to an empty dict, ``{}``.
+            set this variable to an empty dict, ``{}``. Range requests, from seeks and from reads
+            past a range the server cut short, send ``If-Match`` or ``If-Unmodified-Since`` for
+            the version first read, so they fail with 412 when it changed; send
+            ``{'Accept-Encoding': 'identity', 'If-Match': '*'}`` to read regardless.
         timeout: Request timeout in seconds.
         session: The ``requests.Session`` object to use with HTTP GET requests.
             Can be used for OAuth2 clients.
@@ -178,10 +181,12 @@ class BufferedInputBase(io.BufferedIOBase):
         )
 
         if not self.response.ok:
+            self.response.close()
             self.response.raise_for_status()
 
         self._read_buffer = bytebuffer.ByteBuffer(buffer_size)
         self._current_pos = 0
+        self._failed = False  # a range request failed, so reads raise instead of reading as EOF
 
     #
     # Override some methods from io.IOBase.
@@ -197,6 +202,30 @@ class BufferedInputBase(io.BufferedIOBase):
         if self.response is not None:
             self.response.close()
             self.response = None
+
+    def _fill(self) -> int:
+        assert self._read_buffer is not None  # noqa: S101  # only called while reading
+        assert self.response is not None  # noqa: S101  # only called while reading
+        filled = self._read_buffer.fill(self.response.raw)
+        if not filled and self._next_response():
+            return self._fill()
+        return filled
+
+    def _read_rest(self) -> bytes:
+        assert self.response is not None  # noqa: S101  # only called while reading
+        parts = [self.response.raw.read()]
+        while self._next_response():
+            parts.append(self.response.raw.read())
+        return b"".join(parts)
+
+    def _next_response(self) -> bool:
+        """Continue a response that ended early with the next one, which only range readers need."""
+        return False
+
+    def _check_failed(self) -> None:
+        if self._failed:
+            msg = f"an earlier range request for {self.url} failed, seek to retry"
+            raise OSError(msg)
 
     @property
     def closed(self) -> bool:
@@ -230,17 +259,18 @@ class BufferedInputBase(io.BufferedIOBase):
         logger.debug("reading with size: %d", size)
         buf, response = self._read_buffer, self.response
         if buf is None or response is None or size == 0:
+            self._check_failed()
             return b""
 
         if size == -1:
             if len(buf):  # noqa: SIM108  # avoid the unnecessary + when the buffer is empty
-                retval = buf.read() + response.raw.read()
+                retval = buf.read() + self._read_rest()
             else:
-                retval = response.raw.read()
+                retval = self._read_rest()
         else:
             # Fill _read_buffer until it contains enough bytes
             while len(buf) < size:
-                if buf.fill(response.raw) == 0:
+                if self._fill() == 0:
                     break  # EOF reached
             retval = buf.read(size)
 
@@ -256,8 +286,9 @@ class BufferedInputBase(io.BufferedIOBase):
         self._checkClosed()
         buf, response = self._read_buffer, self.response
         if buf is None or response is None:
+            self._check_failed()
             return b""
-        line = buf.readline(b"\n", size, lambda: buf.fill(response.raw))
+        line = buf.readline(b"\n", size, self._fill)
         self._current_pos += len(line)
         return line
 
@@ -304,6 +335,19 @@ class SeekableBufferedInputBase(BufferedInputBase):
         # does not appear to be seekable but really is.
         #
         self._seekable = self.response.headers.get("Accept-Ranges", "").lower() != "none"
+        #
+        # Range requests carry a precondition on the version of this first response,
+        # so a resource replaced in between fails with 412 instead of mixing versions.
+        #
+        etag = self.response.headers.get("ETag", "")
+        last_modified = self.response.headers.get("Last-Modified")
+        if etag and not etag.startswith("W/"):  # If-Match compares strongly, so a weak ETag never matches
+            self._precondition = {"If-Match": etag}
+        elif last_modified:
+            self._precondition = {"If-Unmodified-Since": last_modified}
+        else:
+            self._precondition = {}
+        self._partial: tuple[int, int, int | None] | None = None  # start, end, total from Content-Range
 
     def seek(self, offset: int, whence: int = 0) -> int:
         """Seek to the specified position.
@@ -317,7 +361,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         Raises:
             ValueError: If ``whence`` is not one of ``WHENCE_CHOICES``.
-            OSError: If the stream is not seekable.
+            io.UnsupportedOperation: If the stream is not seekable or the server ignores a nonzero range request.
         """
         logger.debug("seeking to offset: %r whence: %r", offset, whence)
         self._checkClosed()
@@ -327,7 +371,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
 
         if not self.seekable():
             msg = "stream is not seekable"
-            raise OSError(msg)
+            raise io.UnsupportedOperation(msg)
 
         buf = self._read_buffer
         assert buf is not None  # noqa: S101  # not closed implies buf is set
@@ -336,13 +380,15 @@ class SeekableBufferedInputBase(BufferedInputBase):
             new_pos = offset
         elif whence == constants.WHENCE_CURRENT:
             new_pos = self._current_pos + offset
+        elif self.content_length == -1:  # constants.WHENCE_END without a Content-Length
+            msg = "cannot seek from the end of a response of unknown length"
+            raise io.UnsupportedOperation(msg)
         else:  # constants.WHENCE_END
             new_pos = self.content_length + offset
 
-        if self.content_length == -1:
-            new_pos = smart_open.utils.clamp(new_pos, maxval=None)
-        else:
-            new_pos = smart_open.utils.clamp(new_pos, maxval=self.content_length)
+        new_pos = smart_open.utils.clamp(
+            new_pos, maxval=None if self.content_length == -1 else self.content_length
+        )
 
         if self._current_pos == new_pos and self.response is not None:
             return self._current_pos
@@ -359,7 +405,9 @@ class SeekableBufferedInputBase(BufferedInputBase):
         buf.empty()
 
         if new_pos != self.content_length:
+            self._failed = True  # until the range request succeeds
             self.response = self._range_response(new_pos)
+        self._failed = False
 
         self._current_pos = new_pos
         return self._current_pos
@@ -378,17 +426,59 @@ class SeekableBufferedInputBase(BufferedInputBase):
         raise io.UnsupportedOperation
 
     def _range_response(self, start_pos: int) -> requests.Response | None:
+        self._partial = None
         response = self._partial_request(start_pos)
+        if start_pos and response.status_code == requests.codes.ok:
+            response.close()
+            if int(response.headers.get("Content-Length", start_pos + 1)) <= start_pos:
+                return None  # the whole body ends before the requested range, which reads as EOF like a 416
+            msg = "server ignored the range request"
+            raise io.UnsupportedOperation(msg)
+        content_range = response.headers.get("Content-Range")
+        if response.status_code == requests.codes.partial_content and content_range:
+            span, _, length = content_range.removeprefix("bytes ").partition("/")
+            first, _, last = span.partition("-")
+            end, total = int(last) + 1, None if length == "*" else int(length)
+            # RFC 9110 14.4 forbids recombining an invalid range, and an end before the start never advances
+            if int(first) != start_pos or end <= start_pos or (total is not None and end > total):
+                response.close()
+                msg = f"server answered bytes={start_pos}- with Content-Range: {content_range}"
+                raise OSError(msg)
+            self._partial = (start_pos, end, total)
         if response.ok:
             return response
         response.close()
+        if response.status_code == requests.codes.precondition_failed:
+            msg = f"412 Precondition Failed: {self.url} changed since it was opened, send If-Match: * along with Accept-Encoding: identity to read regardless"
+            raise requests.HTTPError(msg, response=response)
         # past EOF of a stream of unknown length, which reads as EOF like io
         if response.status_code != requests.codes.range_not_satisfiable:
             response.raise_for_status()
         return None
 
+    def _next_response(self) -> bool:
+        """Check the end of a partial body, and request the rest when the server capped the range."""
+        if self._partial is None:
+            return False
+        assert self.response is not None  # noqa: S101  # only called while reading
+        start, end, total = self._partial
+        received = self.response.raw.tell()
+        if received != end - start:  # a longer body would repeat bytes in the next request
+            msg = f"partial body for bytes {start}-{end - 1} has {received} bytes"
+            raise OSError(msg)
+        if total is not None and end >= total:
+            return False
+        self._close_response()
+        self._failed = True  # until the rest arrives
+        self.response = self._range_response(end)
+        if self.response is None and total is not None:  # only an unknown total ends with a 416
+            msg = f"server answered 416 to bytes={end}- before the end at {total}"
+            raise OSError(msg)
+        self._failed = False
+        return self.response is not None
+
     def _partial_request(self, start_pos: int | None = None) -> requests.Response:
-        headers = self.headers.copy()
+        headers = {**self._precondition, **self.headers}
         if start_pos is not None:
             headers["range"] = smart_open.utils.make_range_string(start_pos)
 
