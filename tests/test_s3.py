@@ -880,6 +880,16 @@ def test_multipart_writer_part_size_counts_bytes():
 
 
 @mock_s3
+def test_multipart_writer_close_after_rejected_write():
+    """Reject a non-contiguous buffer without breaking close."""
+    _resource("s3").create_bucket(Bucket=BUCKET_NAME).wait_until_exists()
+    fout = smart_open.s3.MultipartWriter(BUCKET_NAME, WRITE_KEY_NAME)
+    with pytest.raises((BufferError, TypeError)):
+        fout.write(memoryview(b"abcdefgh")[::2])
+    fout.close()
+
+
+@mock_s3
 class SinglepartWriterTest(unittest.TestCase):
     """Test writing into s3 files using single part upload."""
 
