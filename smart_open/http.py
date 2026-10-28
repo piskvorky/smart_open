@@ -327,7 +327,11 @@ class SeekableBufferedInputBase(BufferedInputBase):
     ) -> None:
         super().__init__(url, mode, buffer_size, kerberos, user, password, cert, headers, session, timeout)
         assert self.response is not None  # noqa: S101  # set by super().__init__
-        self.content_length = int(self.response.headers.get("Content-Length", -1))
+        try:
+            self.content_length = int(self.response.headers.get("Content-Length", -1))
+        except ValueError:
+            self.close()
+            raise
         #
         # We assume the HTTP stream is seekable unless the server explicitly
         # tells us it isn't.  It's better to err on the side of "seekable"
@@ -436,11 +440,16 @@ class SeekableBufferedInputBase(BufferedInputBase):
             raise io.UnsupportedOperation(msg)
         content_range = response.headers.get("Content-Range")
         if response.status_code == requests.codes.partial_content and content_range:
-            span, _, length = content_range.removeprefix("bytes ").partition("/")
-            first, _, last = span.partition("-")
-            end, total = int(last) + 1, None if length == "*" else int(length)
+            try:
+                span, _, length = content_range.removeprefix("bytes ").partition("/")
+                first, _, last = span.partition("-")
+                end, total = int(last) + 1, None if length == "*" else int(length)
+                first_pos = int(first)
+            except ValueError:
+                response.close()
+                raise
             # RFC 9110 14.4 forbids recombining an invalid range, and an end before the start never advances
-            if int(first) != start_pos or end <= start_pos or (total is not None and end > total):
+            if first_pos != start_pos or end <= start_pos or (total is not None and end > total):
                 response.close()
                 msg = f"server answered bytes={start_pos}- with Content-Range: {content_range}"
                 raise OSError(msg)

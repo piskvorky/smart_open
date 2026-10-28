@@ -26,6 +26,54 @@ HEADERS = {
 }
 
 
+@responses.activate
+def test_invalid_content_length_releases_response():
+    """Release the streamed response before a header-parsing error propagates."""
+    responses.add(responses.GET, URL, body=BYTES, headers={"Content-Length": "invalid"})
+    try:
+        with pytest.raises(ValueError, match="invalid literal for int") as exc_info:
+            smart_open.open(URL, "rb")
+        assert exc_info.type is ValueError
+        assert responses.calls[-1].response.raw.closed
+    finally:
+        for call in responses.calls:
+            call.response.close()
+
+
+@pytest.mark.parametrize(
+    "content_range",
+    ["invalid", "bytes invalid-66/67", "bytes 10-invalid/67", "bytes 10-66/invalid"],
+)
+@responses.activate
+def test_invalid_content_range_releases_response(content_range):
+    """Release a failed range response and retain the explicit retry path."""
+    responses.add(responses.GET, URL, body=BYTES, headers={"Content-Length": str(len(BYTES))})
+    responses.add(responses.GET, URL, body=BYTES[10:], status=206, headers={"Content-Range": content_range})
+    reader = smart_open.http.SeekableBufferedInputBase(URL, buffer_size=1)
+    try:
+        assert reader.read(2) == BYTES[:2]
+        with pytest.raises(ValueError, match="invalid literal for int") as exc_info:
+            reader.seek(10)
+        assert exc_info.type is ValueError
+        assert responses.calls[-1].response.raw.closed
+        assert reader.tell() == 2
+        with pytest.raises(OSError, match="an earlier range request"):
+            reader.read(1)
+        responses.add(
+            responses.GET,
+            URL,
+            body=BYTES[10:],
+            status=206,
+            headers={"Content-Range": f"bytes 10-{len(BYTES) - 1}/{len(BYTES)}"},
+        )
+        assert reader.seek(10) == 10
+        assert reader.read() == BYTES[10:]
+    finally:
+        reader.close()
+        for call in responses.calls:
+            call.response.close()
+
+
 def request_callback(request, headers=HEADERS, data=BYTES):
     """Request callback."""
     headers = headers.copy()
