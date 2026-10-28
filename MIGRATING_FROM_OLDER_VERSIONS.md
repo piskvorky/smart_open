@@ -1,3 +1,38 @@
+# v9.0.0
+
+Version 9.0.0 pins HTTP range requests to the version first read, which fails seeks against servers whose validators change between requests.
+HTTP seeks and reads also raise now where they used to return wrong or truncated bytes.
+Code that never seeks, or that reads from servers which honour `Range` and keep stable validators, needs no change.
+
+## HTTP range requests are pinned to the first response
+
+Tracked in [#987](https://github.com/piskvorky/smart_open/pull/987) and [#988](https://github.com/piskvorky/smart_open/pull/988).
+Range requests, from `seek()` and from reads that continue a range the server cut short, now send `If-Match` with the strong ETag of the first response, or `If-Unmodified-Since` with its Last-Modified.
+A resource replaced in between now fails with `requests.HTTPError` (412) instead of mixing bytes of both versions.
+Servers that hand out different strong ETags for the same bytes, for example inode based ETags behind a load balancer, fail the same way.
+To read regardless, send `If-Match: *`.
+`headers` replaces the default headers, so keep `Accept-Encoding: identity` as well:
+
+```diff
+- fin = smart_open.open(url, 'rb')
++ fin = smart_open.open(url, 'rb', transport_params={'headers': {'Accept-Encoding': 'identity', 'If-Match': '*'}})
+```
+
+## HTTP seeks and reads raise instead of returning wrong bytes
+
+Tracked in [#981](https://github.com/piskvorky/smart_open/pull/981), [#987](https://github.com/piskvorky/smart_open/pull/987) and [#989](https://github.com/piskvorky/smart_open/pull/989).
+
+* A nonzero `seek()` on a server that ignores `Range` and answers 200 raises `io.UnsupportedOperation` instead of reading from the start. Rewinding to 0 still works.
+* `seek(-n, 2)` on a response without Content-Length raises `io.UnsupportedOperation` instead of reading the whole file.
+* A 206 whose Content-Range or body length does not match the request raises `OSError`.
+* After a failed range request, `read()` and `readline()` raise `OSError` instead of returning `b""` until a seek succeeds. `fin.seek(fin.tell())` retries from the last byte returned.
+
+## `smart_open[ssh]` requires paramiko 3.2
+
+Tracked in [#982](https://github.com/piskvorky/smart_open/pull/982).
+Cached SSH connections are now keyed by password and connect options too, so a call with other credentials opens its own connection.
+The `ssh` extra now requires `paramiko>=3.2`, whose fingerprint based `PKey.__repr__` lets a fresh `pkey` object for the same key reuse the cached connection.
+
 # v8.0.0
 
 Version 8.0.0 drops several long-deprecated APIs and backwards-compat shims that had been emitting warnings (or were no-ops) for years.
