@@ -42,7 +42,7 @@ dev = [
   "moto[server]",
   "responses",
   "pre-commit",
-  "pytest",
+  "pytest<9.2",  # https://github.com/ionelmc/pytest-benchmark/issues/321
   "pytest-rerunfailures",
   "pytest_benchmark",
   "pytest-timeout",

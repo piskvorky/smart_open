@@ -92,7 +92,7 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
             set this variable to an empty dict, ``{}``. Range requests, from seeks and from reads
             past a range the server cut short, send ``If-Match`` or ``If-Unmodified-Since`` for
             the version first read, so they fail with 412 when it changed; send
-            ``{'If-Match': '*'}`` to read regardless.
+            ``{'Accept-Encoding': 'identity', 'If-Match': '*'}`` to read regardless.
         timeout: Request timeout in seconds.
         session: The ``requests.Session`` object to use with HTTP GET requests.
             Can be used for OAuth2 clients.
@@ -449,7 +449,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
             return response
         response.close()
         if response.status_code == requests.codes.precondition_failed:
-            msg = f"412 Precondition Failed: {self.url} changed since it was opened, send If-Match: * to read regardless"
+            msg = f"412 Precondition Failed: {self.url} changed since it was opened, send If-Match: * along with Accept-Encoding: identity to read regardless"
             raise requests.HTTPError(msg, response=response)
         # past EOF of a stream of unknown length, which reads as EOF like io
         if response.status_code != requests.codes.range_not_satisfiable:

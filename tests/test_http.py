@@ -541,7 +541,7 @@ def test_seek_requires_same_version(version, precondition):
     responses.add_callback(responses.GET, URL, callback=callback)
     with (
         smart_open.http.SeekableBufferedInputBase(URL) as reader,
-        pytest.raises(requests.HTTPError, match=r"412.*If-Match: \*"),
+        pytest.raises(requests.HTTPError, match=r"412.*If-Match: \*.*Accept-Encoding: identity"),
     ):
         reader.seek(10)
 
