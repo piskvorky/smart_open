@@ -7,6 +7,7 @@
 import functools
 import gzip
 import io
+import re
 import unittest
 
 import pytest
@@ -458,23 +459,39 @@ def test_seek_from_end_needs_length():
 
 
 @pytest.mark.parametrize(
-    ("first", "last"),
-    [(8, len(BYTES) - 1), (10, 9), (10, len(BYTES))],
-    ids=["wrong_start", "end_before_start", "end_past_total"],
+    "content_range",
+    [
+        f"bytes 8-{len(BYTES) - 1}/{len(BYTES)}",
+        f"bytes 10-9/{len(BYTES)}",
+        f"bytes 10-{len(BYTES)}/{len(BYTES)}",
+        "invalid",
+        f"bytes */{len(BYTES)}",
+        f"bytes 10-{len(BYTES) - 1}/invalid",
+    ],
+    ids=["wrong_start", "end_before_start", "end_past_total", "malformed", "unsatisfied", "malformed_total"],
 )
 @responses.activate
-def test_seek_rejects_other_range(first, last):
-    """Raise when a partial response starts elsewhere than the requested offset, or is invalid."""
-    content_range = f"bytes {first}-{last}/{len(BYTES)}"
-    partial = (206, {"Content-Range": content_range}, BYTES[first : last + 1])
+def test_seek_rejects_other_range(content_range):
+    """Raise on and release a partial response that starts elsewhere than the requested offset, or is invalid."""
+    partial = (206, {"Content-Range": content_range}, BYTES[10:])
     responses.add_callback(
         responses.GET, URL, callback=lambda r: partial if "range" in r.headers else (200, {}, BYTES)
     )
     with (
         smart_open.http.SeekableBufferedInputBase(URL) as reader,
-        pytest.raises(OSError, match=content_range),
+        pytest.raises(OSError, match=re.escape(content_range)),
     ):
         reader.seek(10)
+    assert responses.calls[-1].response.raw.closed
+
+
+@responses.activate
+def test_malformed_content_length_reads_as_unknown():
+    """Read a response with a malformed Content-Length like one of unknown length."""
+    responses.add(responses.GET, URL, body=BYTES, headers={"Content-Length": "invalid"})
+    with smart_open.http.SeekableBufferedInputBase(URL) as reader:
+        assert reader.content_length == -1
+        assert reader.read() == BYTES
 
 
 @pytest.mark.parametrize(

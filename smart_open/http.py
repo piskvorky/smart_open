@@ -11,6 +11,7 @@ from __future__ import annotations
 import io
 import logging
 import posixpath
+import re
 import urllib.parse
 from typing import TYPE_CHECKING, TypedDict
 
@@ -45,6 +46,26 @@ For now, we ask the server to send us the files as they are.
 Sometimes, servers compress the file for more efficient transfer, in which case
 the client (us) has to decompress them with the appropriate algorithm.
 """
+
+_CONTENT_RANGE = re.compile(r"bytes (\d+)-(\d+)/(\d+|\*)")
+
+
+def _content_length(response: requests.Response) -> int:
+    """Return the Content-Length, or -1 when it is missing or malformed, which urllib3 also reads as unknown."""
+    value = response.headers.get("Content-Length", "")
+    return int(value) if value.isdecimal() else -1
+
+
+def _satisfied_range(content_range: str, start: int) -> tuple[int, int | None] | None:
+    """Return the end and total of a Content-Range answering ``bytes=start-``, or None if it does not."""
+    match = _CONTENT_RANGE.fullmatch(content_range)
+    if match is None:
+        return None
+    first, end, total = int(match[1]), int(match[2]) + 1, None if match[3] == "*" else int(match[3])
+    # RFC 9110 14.4 forbids recombining an invalid range, and an end before the start never advances
+    if first != start or end <= start or (total is not None and end > total):
+        return None
+    return end, total
 
 
 def parse_uri(uri_as_string: str) -> _HTTPUri:
@@ -327,7 +348,7 @@ class SeekableBufferedInputBase(BufferedInputBase):
     ) -> None:
         super().__init__(url, mode, buffer_size, kerberos, user, password, cert, headers, session, timeout)
         assert self.response is not None  # noqa: S101  # set by super().__init__
-        self.content_length = int(self.response.headers.get("Content-Length", -1))
+        self.content_length = _content_length(self.response)
         #
         # We assume the HTTP stream is seekable unless the server explicitly
         # tells us it isn't.  It's better to err on the side of "seekable"
@@ -430,21 +451,18 @@ class SeekableBufferedInputBase(BufferedInputBase):
         response = self._partial_request(start_pos)
         if start_pos and response.status_code == requests.codes.ok:
             response.close()
-            if int(response.headers.get("Content-Length", start_pos + 1)) <= start_pos:
+            if 0 <= _content_length(response) <= start_pos:
                 return None  # the whole body ends before the requested range, which reads as EOF like a 416
             msg = "server ignored the range request"
             raise io.UnsupportedOperation(msg)
         content_range = response.headers.get("Content-Range")
         if response.status_code == requests.codes.partial_content and content_range:
-            span, _, length = content_range.removeprefix("bytes ").partition("/")
-            first, _, last = span.partition("-")
-            end, total = int(last) + 1, None if length == "*" else int(length)
-            # RFC 9110 14.4 forbids recombining an invalid range, and an end before the start never advances
-            if int(first) != start_pos or end <= start_pos or (total is not None and end > total):
+            span = _satisfied_range(content_range, start_pos)
+            if span is None:
                 response.close()
                 msg = f"server answered bytes={start_pos}- with Content-Range: {content_range}"
                 raise OSError(msg)
-            self._partial = (start_pos, end, total)
+            self._partial = (start_pos, *span)
         if response.ok:
             return response
         response.close()
