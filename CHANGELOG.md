@@ -1,3 +1,7 @@
+# 9.0.1, 2026-10-29
+
+- [http] Release responses when numeric header parsing fails (PR [#992](https://github.com/piskvorky/smart_open/pull/992), [@edsonsims](https://github.com/edsonsims))
+
 # 9.0.0, 2026-10-28
 
 - [ssh] Include credentials in cached SSH connection keys (PR [#982](https://github.com/piskvorky/smart_open/pull/982), [@kakkar87d](https://github.com/kakkar87d))
