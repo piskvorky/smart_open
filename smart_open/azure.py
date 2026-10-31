@@ -358,8 +358,9 @@ class Reader(io.BufferedIOBase):
         if size == 0:
             return b""
         if size < 0:
+            out = self._read_from_buffer() + raw_reader.read()
             self._position = self._size
-            return self._read_from_buffer() + raw_reader.read()
+            return out
 
         #
         # Return unused data first

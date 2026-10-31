@@ -1201,3 +1201,29 @@ class AppendWriterTest(unittest.TestCase):
             )
         )
         assert output == [first_part + b"y"]
+
+
+@pytest.mark.parametrize("buffer_size", [4, 32])
+@pytest.mark.parametrize("prefix_size", [0, 1, 4])
+@pytest.mark.parametrize(("method", "size"), [("read", None), ("read", -1), ("read", -2), ("read1", -1)])
+def test_read_all_position(buffer_size, prefix_size, method, size):
+    """Keep read-all positions and subsequent relative seeks consistent with BytesIO."""
+    content = b"0123456789abcdef"
+    client = FakeBlobServiceClient("https://account.blob.core.windows.net")
+    client.create_container("container").upload_blob("blob", content)
+    expected = io.BytesIO(content)
+    with smart_open.open(
+        "azure://container/blob", "rb", transport_params={"client": client, "buffer_size": buffer_size}
+    ) as fin:
+        assert fin.read(prefix_size) == expected.read(prefix_size)
+        assert fin.read(0) == b""
+        assert fin.tell() == expected.tell()
+        assert getattr(fin, method)(size) == expected.read(size)
+        assert fin.tell() == expected.tell()
+
+        # A second read-all at EOF used to hide the incorrect position.
+        assert fin.seek(-3, io.SEEK_CUR) == expected.seek(-3, io.SEEK_CUR)
+        assert fin.read() == expected.read()
+        assert fin.tell() == expected.tell()
+        assert fin.read() == b""
+        assert fin.tell() == expected.tell()
