@@ -203,7 +203,15 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
         - `smart_open README.md
           <https://github.com/piskvorky/smart_open/blob/master/README.md>`__
     """
-    logger.debug("%r", locals())
+    # the uri userinfo and transport_params may hold credentials, so mask the one and log only the keys of the other
+    logger.debug(
+        "%r",
+        {
+            **locals(),
+            "uri": so_utils.redact_uri(uri) if isinstance(uri, str) else uri,
+            "transport_params": sorted(transport_params or {}),
+        },
+    )
 
     if not isinstance(mode, str):
         msg = "mode should be a string"

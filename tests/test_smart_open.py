@@ -586,6 +586,19 @@ class SmartOpenHttpTest(unittest.TestCase):
             port=1022,
         )
 
+    @mock.patch("smart_open.ssh.open", return_value=open(__file__))  # noqa: PTH123, SIM115  # test fixture path open
+    def test_read_ssh_does_not_log_passwords(self, mock_open):
+        """Do passwords from the URI and from transport_params stay out of the debug log?"""
+        with self.assertLogs("smart_open", level="DEBUG") as logs:
+            smart_open.open(
+                "ssh://ubuntu:uri_password@ip_address/some/path/lines.txt",
+                mode="rb",
+                transport_params={"password": "param_password"},
+            )
+        mock_open.assert_called_once()
+        for secret in ("uri_password", "param_password"):
+            assert not any(secret in line for line in logs.output), secret
+
     @responses.activate
     def test_http_read(self):
         """Does http read method work correctly."""
@@ -1287,6 +1300,21 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
             endpoint_url="http://aa.domain.com",
             config=mock_client.call_args.kwargs["config"],
         )
+
+    @mock.patch("boto3.client")
+    def test_credentials_not_logged(self, mock_client):
+        """Credentials from the URI and from client_kwargs stay out of the debug log."""
+        tp = {
+            "client_kwargs": {
+                "S3.Client": {"aws_session_token": "session_token"},
+            },
+            "defer_seek": True,
+        }
+        with self.assertLogs("smart_open", level="DEBUG") as logs:
+            smart_open.open("s3://access_id:access_secret@mybucket/mykey", transport_params=tp)
+        mock_client.assert_called_once()
+        for secret in ("access_secret", "session_token"):
+            assert not any(secret in line for line in logs.output), secret
 
     @mock.patch("boto3.client")
     def test_s3_upload(self, mock_client):

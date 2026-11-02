@@ -63,3 +63,20 @@ def test_safe_urlsplit(url, expected):
     """Safe urlsplit."""
     actual = smart_open.utils.safe_urlsplit(url)
     assert actual == urllib.parse.SplitResult(*expected)
+
+
+@pytest.mark.parametrize(
+    ("uri", "expected"),
+    [
+        ("s3://access_id:access_secret@bucket/key", "s3://access_id:***@bucket/key"),
+        ("s3://access_id:se:cr@et@bucket/key?x", "s3://access_id:***@bucket/key?x"),
+        ("sftp://user:password@host:22/path", "sftp://user:***@host:22/path"),
+        ("sftp://user@host:22/path", "sftp://user@host:22/path"),
+        ("https://host:8080/path?user=a:b@c", "https://host:8080/path?user=a:b@c"),
+        ("s3://bucket/key:with@at", "s3://bucket/key:with@at"),
+        ("/local/path@host:1", "/local/path@host:1"),
+    ],
+)
+def test_redact_uri(uri, expected):
+    """Redact uri."""
+    assert smart_open.utils.redact_uri(uri) == expected

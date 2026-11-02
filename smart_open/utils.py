@@ -12,6 +12,7 @@ from __future__ import annotations
 import inspect
 import io
 import logging
+import re
 import urllib.parse
 from typing import IO, TYPE_CHECKING, Any
 
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 WORKAROUND_SCHEMES = ["s3", "s3n", "s3a", "gcs", "gs"]
+_URI_PASSWORD_RE = re.compile(r"^(?P<user>[^:/?#]+://[^:/?#@]*:)[^/?#]*(?P<at>@)")
 QUESTION_MARK_PLACEHOLDER = "///smart_open.utils.QUESTION_MARK_PLACEHOLDER///"
 
 
@@ -155,6 +157,11 @@ def safe_urlsplit(url: str) -> urllib.parse.SplitResult:
 
     path = sr.path.replace(placeholder, "?")
     return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, "", "")
+
+
+def redact_uri(uri: str) -> str:
+    """Return `uri` with the password of its userinfo, if any, replaced by ``***``, for logging."""
+    return _URI_PASSWORD_RE.sub(r"\g<user>***\g<at>", uri, count=1)
 
 
 class TextIOWrapper(io.TextIOWrapper):
