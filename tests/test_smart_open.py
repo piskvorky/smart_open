@@ -1249,6 +1249,26 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         )
 
     @mock.patch("boto3.client")
+    def test_url_credentials_stay_out_of_transport_params(self, mock_client):
+        """URL credentials are not written back into transport_params, so a later open() does not reuse them."""
+        tp = {
+            "client_kwargs": {
+                "S3.Client": {"endpoint_url": "http://aa.domain.com"},
+            },
+            "defer_seek": True,
+        }
+        smart_open.open("s3://access_id:access_secret@mybucket/mykey", transport_params=tp)
+        assert "aws_access_key_id" not in tp["client_kwargs"]["S3.Client"]
+        assert "aws_secret_access_key" not in tp["client_kwargs"]["S3.Client"]
+
+        smart_open.open("s3://mybucket/otherkey", transport_params=tp)
+        mock_client.assert_called_with(
+            "s3",
+            endpoint_url="http://aa.domain.com",
+            config=mock_client.call_args.kwargs["config"],
+        )
+
+    @mock.patch("boto3.client")
     def test_s3_upload(self, mock_client):
         """S3 upload."""
         tp = {

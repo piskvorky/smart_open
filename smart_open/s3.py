@@ -258,17 +258,11 @@ def _consolidate_params(uri: _S3Uri, transport_params: TransportParams) -> tuple
     transport_params = dict(transport_params)
 
     def inject(**kwargs: Any) -> None:
-        try:
-            client_kwargs = transport_params["client_kwargs"]
-        except KeyError:
-            client_kwargs = transport_params["client_kwargs"] = {}
-
-        try:
-            init_kwargs = client_kwargs["S3.Client"]
-        except KeyError:
-            init_kwargs = client_kwargs["S3.Client"] = {}
-
-        init_kwargs.update(**kwargs)
+        # Copy the nested dicts: the caller's transport_params must not pick up the
+        # URL credentials, or a later open() with a plain URI would sign with them.
+        client_kwargs = dict(transport_params.get("client_kwargs", {}))
+        client_kwargs["S3.Client"] = {**client_kwargs.get("S3.Client", {}), **kwargs}
+        transport_params["client_kwargs"] = client_kwargs
 
     client = transport_params.get("client")
     if client is not None and (uri["access_id"] or uri["access_secret"]):
