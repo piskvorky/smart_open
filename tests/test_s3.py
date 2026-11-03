@@ -1095,6 +1095,26 @@ class IterBucketTest(unittest.TestCase):
         results = list(smart_open.s3.iter_bucket(BUCKET_NAME))
         assert len(results) == 10  # test uses inline magic value
 
+    def test_iter_bucket_sizes_each_pool_for_its_own_workers(self):
+        """A shared client_kwargs does not pin the connection pool size of the first call."""
+        populate_bucket()
+        client_kwargs = {}
+        real_client = boto3.session.Session.client
+        with mock.patch("boto3.session.Session.client", autospec=True, side_effect=real_client) as spy:
+            list(smart_open.s3.iter_bucket(BUCKET_NAME, workers=2, client_kwargs=client_kwargs))
+            list(smart_open.s3.iter_bucket(BUCKET_NAME, workers=32, client_kwargs=client_kwargs))
+        assert client_kwargs == {}
+        assert [call.kwargs["config"].max_pool_connections for call in spy.call_args_list] == [9, 129]
+
+    def test_iter_bucket_caller_config_replaces_default_config(self):
+        """A config passed through client_kwargs reaches the client instead of the default."""
+        populate_bucket()
+        config = botocore.client.Config(max_pool_connections=3)
+        real_client = boto3.session.Session.client
+        with mock.patch("boto3.session.Session.client", autospec=True, side_effect=real_client) as spy:
+            list(smart_open.s3.iter_bucket(BUCKET_NAME, workers=1, client_kwargs={"config": config}))
+        assert spy.call_args.kwargs["config"] is config
+
     def test_iter_bucket_404(self):
         """Iter bucket 404."""
         populate_bucket()
