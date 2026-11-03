@@ -1,3 +1,10 @@
+# 9.0.2, 2026-11-03
+
+- Bump pypa/gh-action-pypi-publish from 1.14.2 to 1.14.3 in the github-actions group (PR [#994](https://github.com/piskvorky/smart_open/pull/994), [@dependabot[bot]](https://github.com/apps/dependabot))
+- [azure] Fix read-all position after buffered reads (PR [#993](https://github.com/piskvorky/smart_open/pull/993), [@linjiaye929](https://github.com/linjiaye929))
+- [s3] Stop writing URL credentials and default config to the caller's transport_params (PR [#995](https://github.com/piskvorky/smart_open/pull/995), [@kakkar87d](https://github.com/kakkar87d))
+- [s3] Stop writing the default config to the caller's client_kwargs in iter_bucket (PR [#996](https://github.com/piskvorky/smart_open/pull/996), [@ddelange](https://github.com/ddelange))
+
 # 9.0.1, 2026-10-29
 
 - [http] Release responses when numeric header parsing fails (PR [#992](https://github.com/piskvorky/smart_open/pull/992), [@edsonsims](https://github.com/edsonsims))
