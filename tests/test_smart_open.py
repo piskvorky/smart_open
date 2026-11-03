@@ -1249,6 +1249,46 @@ class SmartOpenS3KwargsTest(unittest.TestCase):
         )
 
     @mock.patch("boto3.client")
+    def test_caller_config_replaces_default_config(self, mock_client):
+        """A config passed through client_kwargs reaches the client instead of the default."""
+        tp = {"client_kwargs": {"S3.Client": {"config": mock.sentinel.config}}, "defer_seek": True}
+        smart_open.open("s3://mybucket/mykey", transport_params=tp)
+        mock_client.assert_called_with("s3", config=mock.sentinel.config)
+
+    @mock.patch("boto3.client")
+    def test_url_credentials_with_client_kwargs_none(self, mock_client):
+        """URL credentials reach the client when client_kwargs is explicitly None."""
+        tp = {"client_kwargs": None, "defer_seek": True}
+        smart_open.open("s3://access_id:access_secret@mybucket/mykey", transport_params=tp)
+        mock_client.assert_called_with(
+            "s3",
+            aws_access_key_id="access_id",
+            aws_secret_access_key="access_secret",  # fixture password kwarg
+            config=mock_client.call_args.kwargs["config"],
+        )
+
+    @mock.patch("boto3.client")
+    def test_open_leaves_transport_params_untouched(self, mock_client):
+        """URL credentials and the default config stay out of transport_params, so a later open() does not reuse them."""
+        expected = {"S3.Client": {"endpoint_url": "http://aa.domain.com"}}
+        tp = {
+            "client_kwargs": {
+                "S3.Client": {"endpoint_url": "http://aa.domain.com"},
+            },
+            "defer_seek": True,
+        }
+        smart_open.open("s3://access_id:access_secret@mybucket/mykey", transport_params=tp)
+        assert tp["client_kwargs"] == expected
+
+        smart_open.open("s3://mybucket/otherkey", transport_params=tp)
+        assert tp["client_kwargs"] == expected
+        mock_client.assert_called_with(
+            "s3",
+            endpoint_url="http://aa.domain.com",
+            config=mock_client.call_args.kwargs["config"],
+        )
+
+    @mock.patch("boto3.client")
     def test_s3_upload(self, mock_client):
         """S3 upload."""
         tp = {
