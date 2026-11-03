@@ -388,8 +388,6 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         NotImplementedError: If the mode is not "rb" or "wb".
         ValueError: If version_id is specified for write mode.
     """
-    # client_kwargs may hold credentials, so log only its keys
-    logger.debug("%r", {**locals(), "client_kwargs": sorted(client_kwargs or {})})
     if mode not in constants.BINARY_MODES:
         msg = f"bad mode: {mode!r} expected one of {constants.BINARY_MODES!r}"
         raise NotImplementedError(msg)

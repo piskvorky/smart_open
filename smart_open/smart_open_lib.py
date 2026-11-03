@@ -140,8 +140,8 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
     encoding: str | None = None,
     errors: str | None = None,
     newline: str | None = None,
-    closefd: bool = True,  # noqa: FBT001, FBT002  # public API
-    opener: Callable[[str, int], int] | None = None,
+    closefd: bool = True,  # noqa: ARG001, FBT001, FBT002  # public API
+    opener: Callable[[str, int], int] | None = None,  # noqa: ARG001  # public API
     compression: str = so_compression.INFER_FROM_EXTENSION,
     compression_kwargs: CompressionKwargs | None = None,
     transport_params: TransportParams | None = None,
@@ -203,16 +203,6 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
         - `smart_open README.md
           <https://github.com/piskvorky/smart_open/blob/master/README.md>`__
     """
-    # the uri userinfo and transport_params may hold credentials, so mask the one and log only the keys of the other
-    logger.debug(
-        "%r",
-        {
-            **locals(),
-            "uri": so_utils.redact_uri(uri) if isinstance(uri, str) else uri,
-            "transport_params": sorted(transport_params or {}),
-        },
-    )
-
     if not isinstance(mode, str):
         msg = "mode should be a string"
         raise TypeError(msg)
@@ -498,8 +488,6 @@ def _encoding_wrapper(
     Returns:
         A file object.
     """
-    logger.debug("encoding_wrapper: %r", locals())
-
     #
     # If the mode is binary, but the user specified an encoding, assume they
     # want text.  If we don't make this assumption, ignore the encoding and
