@@ -257,13 +257,6 @@ def _consolidate_params(uri: _S3Uri, transport_params: TransportParams) -> tuple
     """
     transport_params = dict(transport_params)
 
-    def inject(**kwargs: Any) -> None:
-        # Copy the nested dicts: the caller's transport_params must not pick up the
-        # URL credentials, or a later open() with a plain URI would sign with them.
-        client_kwargs = dict(transport_params.get("client_kwargs", {}))
-        client_kwargs["S3.Client"] = {**client_kwargs.get("S3.Client", {}), **kwargs}
-        transport_params["client_kwargs"] = client_kwargs
-
     client = transport_params.get("client")
     if client is not None and (uri["access_id"] or uri["access_secret"]):
         logger.warning(
@@ -273,10 +266,16 @@ def _consolidate_params(uri: _S3Uri, transport_params: TransportParams) -> tuple
         )
         uri.update(access_id=None, access_secret=None)
     elif uri["access_id"] and uri["access_secret"]:
-        inject(
-            aws_access_key_id=uri["access_id"],
-            aws_secret_access_key=uri["access_secret"],
-        )
+        # New dicts: the caller's client_kwargs must not keep URL credentials for a later open() to sign with.
+        client_kwargs = transport_params.get("client_kwargs") or {}
+        transport_params["client_kwargs"] = {
+            **client_kwargs,
+            "S3.Client": {
+                **client_kwargs.get("S3.Client", {}),
+                "aws_access_key_id": uri["access_id"],
+                "aws_secret_access_key": uri["access_secret"],
+            },
+        }
         uri.update(access_id=None, access_secret=None)
 
     if uri["version_id"] is not None:
@@ -749,11 +748,12 @@ def _initialize_boto3(
         client_kwargs = {}
 
     if client is None:
-        init_kwargs = client_kwargs.get("S3.Client", {})
-        if "config" not in init_kwargs:
-            init_kwargs["config"] = botocore.client.Config(
+        init_kwargs: dict[str, Any] = {
+            "config": botocore.client.Config(
                 max_pool_connections=64, tcp_keepalive=True, retries={"max_attempts": 6, "mode": "adaptive"}
-            )
+            ),
+            **client_kwargs.get("S3.Client", {}),
+        }
         # boto3.client re-uses the default session which is not thread-safe when this is called
         # from within a thread. when using smart_open with multithreading, create a thread-safe
         # client with the config above and share it between threads using transport_params
