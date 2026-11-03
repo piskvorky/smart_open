@@ -1491,14 +1491,14 @@ def iter_bucket(  # noqa: PLR0913  # legacy public API; refactor in a dedicated 
     if session_kwargs is None:
         session_kwargs = {}
     session = boto3.session.Session(**session_kwargs)
-    if client_kwargs is None:
-        client_kwargs = {}
-    if "config" not in client_kwargs:
-        client_kwargs["config"] = botocore.client.Config(
+    client_kwargs = {
+        "config": botocore.client.Config(
             max_pool_connections=workers * max_threads_per_fileobj + 1,  # 1 thread for _list_bucket
             tcp_keepalive=True,
             retries={"max_attempts": retries * 2, "mode": "adaptive"},
-        )
+        ),
+        **(client_kwargs or {}),
+    }
     client = session.client("s3", **client_kwargs)
 
     transfer_config = boto3.s3.transfer.TransferConfig(max_concurrency=max_threads_per_fileobj)
