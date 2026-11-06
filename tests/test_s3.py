@@ -372,6 +372,16 @@ class ReaderTest(BaseTest):
             assert seek == 13  # test uses inline magic value
             assert fin.read(3) == b"how"
 
+    def test_range_requests_fail_after_overwrite(self):
+        """Do range requests fail instead of mixing bytes of an object replaced mid-read?"""
+        fin = smart_open.s3.Reader(BUCKET_NAME, KEY_NAME, buffer_size=4, range_chunk_size=4)
+        assert fin.read(4) == b"hell"
+        _resource("s3").Object(BUCKET_NAME, KEY_NAME).put(Body=b"x" * len(self.body))
+        with pytest.raises(OSError, match="PreconditionFailed"):
+            fin.read()
+        with pytest.raises(OSError, match="PreconditionFailed"):
+            fin.seek(0)
+
     def test_detect_eof(self):
         """Detect eof."""
         with self.assertApiCalls(GetObject=1):
