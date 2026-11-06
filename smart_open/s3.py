@@ -433,12 +433,13 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     return fileobj
 
 
-def _get(
+def _get(  # noqa: PLR0913  # legacy internal helper; refactor in a dedicated PR
     client: S3Client,
     bucket: str,
     key: str,
     version: str | None,
     range_string: str | None,
+    etag: str | None = None,
 ) -> dict[str, Any]:
     try:
         params: dict[str, Any] = {"Bucket": bucket, "Key": key}
@@ -446,6 +447,8 @@ def _get(
             params["VersionId"] = version
         if range_string:
             params["Range"] = range_string
+        if etag:
+            params["IfMatch"] = etag
 
         return cast("dict[str, Any]", client.get_object(**params))
     except botocore.client.ClientError as error:
@@ -487,6 +490,9 @@ class _SeekableRawReader:
         self._content_length: int | None = None
         self._position = 0
         self._body: StreamingBody | io.BytesIO | None = None
+        # ETag of the first response, so later range requests fail with 412 instead of
+        # mixing bytes of an object that was overwritten in between
+        self._etag: str | None = None
 
     @property
     def closed(self) -> bool:
@@ -593,6 +599,7 @@ class _SeekableRawReader:
                 self._key,
                 self._version_id,
                 range_string,
+                self._etag,
             )
         except OSError as ioe:
             # Handle requested content range exceeding content size.
@@ -628,6 +635,8 @@ class _SeekableRawReader:
         # range request may not always return partial content, see:
         # https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests#partial_request_responses
         #
+        if self._etag is None:
+            self._etag = response.get("ETag")
         status_code = response["ResponseMetadata"]["HTTPStatusCode"]
         if status_code == http.HTTPStatus.PARTIAL_CONTENT:
             # 206 guarantees that the response body only contains the requested byte range
