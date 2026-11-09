@@ -1,3 +1,9 @@
+# 9.0.3, 2026-11-09
+
+- Remove the locals() debug dumps that log credentials (PR [#997](https://github.com/piskvorky/smart_open/pull/997), [@kakkar87d](https://github.com/kakkar87d))
+- [s3] Raise FileNotFoundError and PermissionError instead of OSError (PR [#1001](https://github.com/piskvorky/smart_open/pull/1001), [@ddelange](https://github.com/ddelange))
+- Stop advertising x mode and name the S3 error on single part writes (PR [#1002](https://github.com/piskvorky/smart_open/pull/1002), [@ddelange](https://github.com/ddelange))
+
 # 9.0.2, 2026-11-03
 
 - Bump pypa/gh-action-pypi-publish from 1.14.2 to 1.14.3 in the github-actions group (PR [#994](https://github.com/piskvorky/smart_open/pull/994), [@dependabot[bot]](https://github.com/apps/dependabot))
