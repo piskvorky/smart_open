@@ -559,14 +559,22 @@ class ReaderTest(BaseTest):
         with pytest.raises(FileNotFoundError, match="The specified bucket does not exist"):
             smart_open.open(f"s3://missing_bucket/{KEY_NAME}")
 
-    def test_access_denied_is_not_file_not_found(self):
-        """Is an error other than a missing object still a plain OSError?"""
+    def test_access_denied_raises_permission_error(self):
+        """Does a denied read raise PermissionError like the builtin open?"""
         client = _resource("s3").meta.client
         with Stubber(client) as stubber:
             stubber.add_client_error("get_object", service_error_code="AccessDenied", http_status_code=403)
-            with pytest.raises(OSError, match="AccessDenied") as excinfo:
+            with pytest.raises(PermissionError, match="AccessDenied"):
                 smart_open.open(f"s3://{BUCKET_NAME}/{KEY_NAME}", transport_params={"client": client})
-        assert not isinstance(excinfo.value, FileNotFoundError)
+
+    def test_unmapped_client_error_stays_plain_os_error(self):
+        """Is an error without a builtin equivalent still a plain OSError?"""
+        client = _resource("s3").meta.client
+        with Stubber(client) as stubber:
+            stubber.add_client_error("get_object", service_error_code="SlowDown", http_status_code=503)
+            with pytest.raises(OSError, match="SlowDown") as excinfo:
+                smart_open.open(f"s3://{BUCKET_NAME}/{KEY_NAME}", transport_params={"client": client})
+        assert type(excinfo.value) is OSError
 
 
 @mock_s3
