@@ -87,7 +87,7 @@ _builtin_open = open
 @overload
 def open(
     uri: Uri,
-    mode: Literal["r", "w", "a", "x", "r+", "w+", "a+", "rt", "wt", "at", "xt"] = ...,
+    mode: Literal["r", "w", "a", "r+", "w+", "a+", "rt", "wt", "at"] = ...,
     buffering: int = ...,
     encoding: str | None = ...,
     errors: str | None = ...,
@@ -103,7 +103,7 @@ def open(
 @overload
 def open(
     uri: Uri,
-    mode: Literal["rb", "wb", "ab", "xb", "rb+", "wb+", "ab+", "br", "bw", "ba"],
+    mode: Literal["rb", "wb", "ab", "rb+", "wb+", "ab+", "br", "bw", "ba"],
     buffering: int = ...,
     *,
     encoding: None = ...,
@@ -314,7 +314,7 @@ def _get_binary_mode(mode_str: str) -> str:  # noqa: C901  # legacy internal hel
 
     counts = [mode.count(x) for x in "rwa"]
     if sum(counts) > 1:
-        msg = "must have exactly one of create/read/write/append mode"
+        msg = "must have exactly one of read/write/append mode"
         raise ValueError(msg)
 
     def transfer(char: str) -> None:
@@ -327,7 +327,7 @@ def _get_binary_mode(mode_str: str) -> str:  # noqa: C901  # legacy internal hel
     elif "r" in mode:
         transfer("r")
     else:
-        msg = "Must have exactly one of create/read/write/append mode and at most one plus"
+        msg = "Must have exactly one of read/write/append mode and at most one plus"
         raise ValueError(msg)
 
     if "b" in mode:

@@ -1322,7 +1322,7 @@ class SinglepartWriter(io.BufferedIOBase):
                 Body=buf,
             )
         except botocore.client.ClientError as e:
-            msg = f"the bucket {self._bucket!r} does not exist, or is forbidden for access"
+            msg = f"the bucket {self._bucket!r} does not exist, or is forbidden for access ({e!r})"
             raise ValueError(msg) from e
         else:
             logger.debug("%s: direct upload finished", self)
