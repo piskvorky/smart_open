@@ -998,6 +998,20 @@ class SinglepartWriterTest(unittest.TestCase):
         ):
             fout.write(expected)
 
+    def test_upload_error_names_the_s3_error(self):
+        """A failed upload says what S3 objected to, which may have nothing to do with the bucket."""
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "wb", multipart_upload=False) as fout:
+            fout.write(b"first")
+
+        client_kwargs = {"S3.Client.put_object": {"IfNoneMatch": "*"}}
+        with (
+            pytest.raises(ValueError, match="PreconditionFailed"),
+            smart_open.s3.open(
+                BUCKET_NAME, WRITE_KEY_NAME, "wb", multipart_upload=False, client_kwargs=client_kwargs
+            ) as fout,
+        ):
+            fout.write(b"second")
+
     def test_double_close(self):
         """Double close."""
         text = "там за туманами, вечными, пьяными".encode()
