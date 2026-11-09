@@ -24,6 +24,7 @@ import botocore.client
 import botocore.endpoint
 import botocore.exceptions
 import pytest
+from botocore.stub import Stubber
 
 # See https://github.com/piskvorky/smart_open/issues/800
 # This supports moto 4 & 5 until v4 is no longer used by distros.
@@ -547,6 +548,25 @@ class ReaderTest(BaseTest):
         ):
             seek = fin.seek(-10, whence=smart_open.constants.WHENCE_END)
             assert seek == 0  # Should be at position 0 for empty file
+
+    def test_missing_key_raises_file_not_found(self):
+        """Does opening a missing key raise FileNotFoundError like the builtin open?"""
+        with pytest.raises(FileNotFoundError, match="The specified key does not exist"):
+            smart_open.open(f"s3://{BUCKET_NAME}/missing_key")
+
+    def test_missing_bucket_raises_file_not_found(self):
+        """Does opening a key in a missing bucket raise FileNotFoundError?"""
+        with pytest.raises(FileNotFoundError, match="The specified bucket does not exist"):
+            smart_open.open(f"s3://missing_bucket/{KEY_NAME}")
+
+    def test_access_denied_is_not_file_not_found(self):
+        """Is an error other than a missing object still a plain OSError?"""
+        client = _resource("s3").meta.client
+        with Stubber(client) as stubber:
+            stubber.add_client_error("get_object", service_error_code="AccessDenied", http_status_code=403)
+            with pytest.raises(OSError, match="AccessDenied") as excinfo:
+                smart_open.open(f"s3://{BUCKET_NAME}/{KEY_NAME}", transport_params={"client": client})
+        assert not isinstance(excinfo.value, FileNotFoundError)
 
 
 @mock_s3

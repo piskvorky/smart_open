@@ -85,6 +85,7 @@ URI_EXAMPLES = (
 
 # Returned by AWS when we try to seek beyond EOF.
 _OUT_OF_RANGE = "InvalidRange"
+_NOT_FOUND = {"NoSuchBucket", "NoSuchKey", "NoSuchVersion"}
 
 # Matches the ``versionId`` query parameter in an S3 URI (issue #595).
 # The leading group preserves whether it was the first (``?``) or a later (``&``)
@@ -449,7 +450,9 @@ def _get(
 
         return cast("dict[str, Any]", client.get_object(**params))
     except botocore.client.ClientError as error:
-        wrapped_error = OSError(
+        error_code = error.response.get("Error", {}).get("Code")
+        error_class = FileNotFoundError if error_code in _NOT_FOUND else OSError
+        wrapped_error = error_class(
             f"unable to access bucket: {bucket!r} key: {key!r} version: {version!r} error: {error}"
         )
         wrapped_error.backend_error = error  # ty: ignore[unresolved-attribute]  # smuggle the botocore error through

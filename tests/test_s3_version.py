@@ -80,6 +80,12 @@ class TestVersionId(unittest.TestCase):
         with pytest.raises(OSError, match="unable to access bucket"):
             open(self.url, "rb", transport_params=params)
 
+    def test_missing_version_raises_file_not_found(self):
+        """Does a version_id that does not exist raise FileNotFoundError?"""
+        params = {"version_id": "bad-version-does-not-exist"}
+        with pytest.raises(FileNotFoundError, match="NoSuchVersion"):
+            open(self.url, "rb", transport_params=params)
+
     def test_bad_mode(self):
         """Do we correctly handle non-None version when writing?"""
         params = {"version_id": self.versions[0]}
