@@ -87,7 +87,7 @@ _builtin_open = open
 @overload
 def open(
     uri: Uri,
-    mode: Literal["r", "w", "a", "x", "r+", "w+", "a+", "rt", "wt", "at", "xt"] = ...,
+    mode: Literal["r", "w", "a", "r+", "w+", "a+", "rt", "wt", "at"] = ...,
     buffering: int = ...,
     encoding: str | None = ...,
     errors: str | None = ...,
@@ -103,7 +103,7 @@ def open(
 @overload
 def open(
     uri: Uri,
-    mode: Literal["rb", "wb", "ab", "xb", "rb+", "wb+", "ab+", "br", "bw", "ba"],
+    mode: Literal["rb", "wb", "ab", "rb+", "wb+", "ab+", "br", "bw", "ba"],
     buffering: int = ...,
     *,
     encoding: None = ...,
@@ -140,8 +140,8 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
     encoding: str | None = None,
     errors: str | None = None,
     newline: str | None = None,
-    closefd: bool = True,  # noqa: FBT001, FBT002  # public API
-    opener: Callable[[str, int], int] | None = None,
+    closefd: bool = True,  # noqa: ARG001, FBT001, FBT002  # public API
+    opener: Callable[[str, int], int] | None = None,  # noqa: ARG001  # public API
     compression: str = so_compression.INFER_FROM_EXTENSION,
     compression_kwargs: CompressionKwargs | None = None,
     transport_params: TransportParams | None = None,
@@ -203,8 +203,6 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
         - `smart_open README.md
           <https://github.com/piskvorky/smart_open/blob/master/README.md>`__
     """
-    logger.debug("%r", locals())
-
     if not isinstance(mode, str):
         msg = "mode should be a string"
         raise TypeError(msg)
@@ -316,7 +314,7 @@ def _get_binary_mode(mode_str: str) -> str:  # noqa: C901  # legacy internal hel
 
     counts = [mode.count(x) for x in "rwa"]
     if sum(counts) > 1:
-        msg = "must have exactly one of create/read/write/append mode"
+        msg = "must have exactly one of read/write/append mode"
         raise ValueError(msg)
 
     def transfer(char: str) -> None:
@@ -329,7 +327,7 @@ def _get_binary_mode(mode_str: str) -> str:  # noqa: C901  # legacy internal hel
     elif "r" in mode:
         transfer("r")
     else:
-        msg = "Must have exactly one of create/read/write/append mode and at most one plus"
+        msg = "Must have exactly one of read/write/append mode and at most one plus"
         raise ValueError(msg)
 
     if "b" in mode:
@@ -490,8 +488,6 @@ def _encoding_wrapper(
     Returns:
         A file object.
     """
-    logger.debug("encoding_wrapper: %r", locals())
-
     #
     # If the mode is binary, but the user specified an encoding, assume they
     # want text.  If we don't make this assumption, ignore the encoding and

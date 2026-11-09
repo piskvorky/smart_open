@@ -2220,6 +2220,41 @@ def test_to_boto3():
     assert obj.key == "key.txt"
 
 
+@pytest.mark.parametrize(
+    ("uri", "transport", "transport_params", "secrets"),
+    [
+        (
+            "s3://access_id:access_secret@mybucket/mykey",
+            "boto3.client",
+            {"client_kwargs": {"S3.Client": {"aws_session_token": "session_token"}}, "defer_seek": True},
+            ["access_secret", "session_token"],
+        ),
+        (
+            "s3://access_id:access/secret@mybucket/mykey",
+            "boto3.client",
+            {"defer_seek": True},
+            ["access/secret"],
+        ),
+        (
+            "ssh://ubuntu:uri_password@ip_address/some/path/lines.txt",
+            "smart_open.ssh.open",
+            {"password": "param_password"},
+            ["uri_password", "param_password"],
+        ),
+    ],
+)
+def test_credentials_stay_out_of_debug_log(uri, transport, transport_params, secrets, caplog):
+    """Credentials from the URI and from transport_params never reach the debug log."""
+    with (
+        mock.patch(transport, return_value=io.BytesIO(b"x")) as mock_transport,
+        caplog.at_level(logging.DEBUG, logger="smart_open"),
+    ):
+        smart_open.open(uri, transport_params=transport_params)
+    mock_transport.assert_called_once()
+    for secret in secrets:
+        assert secret not in caplog.text
+
+
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s : %(levelname)s : %(message)s", level=logging.DEBUG)
     unittest.main()

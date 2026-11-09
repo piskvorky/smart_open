@@ -24,6 +24,7 @@ import botocore.client
 import botocore.endpoint
 import botocore.exceptions
 import pytest
+from botocore.stub import Stubber
 
 # See https://github.com/piskvorky/smart_open/issues/800
 # This supports moto 4 & 5 until v4 is no longer used by distros.
@@ -548,6 +549,33 @@ class ReaderTest(BaseTest):
             seek = fin.seek(-10, whence=smart_open.constants.WHENCE_END)
             assert seek == 0  # Should be at position 0 for empty file
 
+    def test_missing_key_raises_file_not_found(self):
+        """Does opening a missing key raise FileNotFoundError like the builtin open?"""
+        with pytest.raises(FileNotFoundError, match="The specified key does not exist"):
+            smart_open.open(f"s3://{BUCKET_NAME}/missing_key")
+
+    def test_missing_bucket_raises_file_not_found(self):
+        """Does opening a key in a missing bucket raise FileNotFoundError?"""
+        with pytest.raises(FileNotFoundError, match="The specified bucket does not exist"):
+            smart_open.open(f"s3://missing_bucket/{KEY_NAME}")
+
+    def test_access_denied_raises_permission_error(self):
+        """Does a denied read raise PermissionError like the builtin open?"""
+        client = _resource("s3").meta.client
+        with Stubber(client) as stubber:
+            stubber.add_client_error("get_object", service_error_code="AccessDenied", http_status_code=403)
+            with pytest.raises(PermissionError, match="AccessDenied"):
+                smart_open.open(f"s3://{BUCKET_NAME}/{KEY_NAME}", transport_params={"client": client})
+
+    def test_unmapped_client_error_stays_plain_os_error(self):
+        """Is an error without a builtin equivalent still a plain OSError?"""
+        client = _resource("s3").meta.client
+        with Stubber(client) as stubber:
+            stubber.add_client_error("get_object", service_error_code="SlowDown", http_status_code=503)
+            with pytest.raises(OSError, match="SlowDown") as excinfo:
+                smart_open.open(f"s3://{BUCKET_NAME}/{KEY_NAME}", transport_params={"client": client})
+        assert type(excinfo.value) is OSError
+
 
 @mock_s3
 class MultipartWriterTest(unittest.TestCase):
@@ -969,6 +997,20 @@ class SinglepartWriterTest(unittest.TestCase):
             smart_open.s3.open("thisbucketdoesntexist", "mykey", "wb", multipart_upload=False) as fout,
         ):
             fout.write(expected)
+
+    def test_upload_error_names_the_s3_error(self):
+        """A failed upload says what S3 objected to, which may have nothing to do with the bucket."""
+        with smart_open.s3.open(BUCKET_NAME, WRITE_KEY_NAME, "wb", multipart_upload=False) as fout:
+            fout.write(b"first")
+
+        client_kwargs = {"S3.Client.put_object": {"IfNoneMatch": "*"}}
+        with (
+            pytest.raises(ValueError, match="PreconditionFailed"),
+            smart_open.s3.open(
+                BUCKET_NAME, WRITE_KEY_NAME, "wb", multipart_upload=False, client_kwargs=client_kwargs
+            ) as fout,
+        ):
+            fout.write(b"second")
 
     def test_double_close(self):
         """Double close."""
