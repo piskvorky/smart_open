@@ -1,3 +1,8 @@
+# 9.0.4, 2026-11-14
+
+- Remove MIT License classifier from pyproject.toml (PR [#1003](https://github.com/piskvorky/smart_open/pull/1003), [@APN-Pucky](https://github.com/APN-Pucky))
+- Fix README doctests for new commoncrawl robots.txt first line (PR [#1005](https://github.com/piskvorky/smart_open/pull/1005), [@ddelange](https://github.com/ddelange))
+
 # 9.0.3, 2026-11-09
 
 - Remove the locals() debug dumps that log credentials (PR [#997](https://github.com/piskvorky/smart_open/pull/997), [@kakkar87d](https://github.com/kakkar87d))
