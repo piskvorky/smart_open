@@ -85,7 +85,7 @@ If you'd like to access S3 without using an S3 account, then you need disable th
 >>> params = {'client': boto3.client('s3', config=config)}
 >>> with open('s3://commoncrawl/robots.txt', transport_params=params) as fin:
 ...    fin.readline()
-'User-Agent: *\n'
+'# this disallow is for crawlers. of course you are welcome to download our data via https.\n'
 
 ```
 ## How to Access S3 Object Properties
@@ -115,7 +115,7 @@ For example, let's get the content type of a publicly available file:
 ...    boto3_s3_object = fin.to_boto3(resource)
 ...    print(repr(boto3_s3_object))
 ...    print(boto3_s3_object.content_type)  # Using the boto3 API here
-User-Agent: *
+# this disallow is for crawlers. of course you are welcome to download our data via https.
 s3.Object(bucket_name='commoncrawl', key='robots.txt')
 text/plain
 
@@ -286,7 +286,7 @@ You can fine-tune it using several ways:
 >>> tp = {'client': client}
 >>> with open('s3://commoncrawl/robots.txt', transport_params=tp) as fin:
 ...     print(fin.readline())
-User-Agent: *
+# this disallow is for crawlers. of course you are welcome to download our data via https.
 <BLANKLINE>
 
 ```

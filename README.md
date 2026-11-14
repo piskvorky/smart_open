@@ -32,7 +32,7 @@ Working with large remote files, for example using Amazon's [boto3](https://boto
 >>> for line in open('s3://commoncrawl/robots.txt'):
 ...    print(repr(line))
 ...    break
-'User-Agent: *\n'
+'# this disallow is for crawlers. of course you are welcome to download our data via https.\n'
 
 >>> # stream from/to compressed files, with transparent (de)compression:
 >>> for line in open('tests/test_data/1984.txt.gz', encoding='utf-8'):
@@ -59,8 +59,8 @@ Working with large remote files, for example using Amazon's [boto3](https://boto
 ...         break
 ...     offset = fin.seek(0)  # seek to the beginning
 ...     print(fin.read(4))
-'User-Agent: *\n'
-b'User'
+'# this disallow is for crawlers. of course you are welcome to download our data via https.\n'
+b'# th'
 
 >>> # stream from HTTP
 >>> for line in open('http://example.com'):
