@@ -485,7 +485,7 @@ If you need more credential options, refer to the
 
 ### Azure Advanced Usage
 
-Additional keyword arguments can be propagated to the `commit_block_list` method (docs), which is used by `smart_open` under the hood for uploads, using the `blob_kwargs` transport parameter.
+Additional keyword arguments can be propagated to the `commit_block_list` method ([docs](https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.blobclient?view=azure-python#azure-storage-blob-blobclient-commit-block-list)), which is used by `smart_open` under the hood for uploads, using the `blob_kwargs` transport parameter.
 
 ```python
 kwargs = {"metadata": {"version": 2}}
