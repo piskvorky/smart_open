@@ -3,11 +3,24 @@
 
 set -euxo pipefail
 
-read -p "Enter new version for the CHANGELOG.md header: " new_version
+# Only allow the direct successors of the latest vX.Y.Z[.postN] tag: patch (default), minor, major, post release
+git fetch --tags
+read -ra allowed < <(git tag | python3 -c '
+import re, sys
+tags = [re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)(?:\.post(\d+))?", t.strip()) for t in sys.stdin]
+x, y, z, p = max(tuple(map(int, m.groups("0"))) for m in tags if m)
+print(f"v{x}.{y}.{z + 1} v{x}.{y + 1}.0 v{x + 1}.0.0 v{x}.{y}.{z}.post{p + 1}")
+')
+read -p "Enter new version for the CHANGELOG.md header, one of ${allowed[*]} [${allowed[0]}]: " new_version
+new_version="${new_version:-${allowed[0]}}"
 
 # Ensure version has 'v' prefix
 if [[ ! "${new_version}" == v* ]]; then
     new_version="v${new_version}"
+fi
+if [[ ! " ${allowed[*]} " == *" ${new_version} "* ]]; then
+    echo "Refusing to release ${new_version}: expected one of ${allowed[*]}" >&2
+    exit 1
 fi
 # Make sure you're on `develop` and you're up to date locally
 git checkout develop
