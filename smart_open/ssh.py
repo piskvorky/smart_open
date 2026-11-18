@@ -23,6 +23,7 @@ from __future__ import annotations
 import contextlib
 import getpass
 import logging
+import re
 import urllib.parse
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
@@ -62,6 +63,13 @@ URI_EXAMPLES = (
 # Global storage for SSH config files.
 #
 _SSH_CONFIG_FILES = [str(Path("~/.ssh/config").expanduser())]
+
+#
+# Paramiko substitutes %h and %n into "Match exec" commands unquoted and runs them
+# through a shell, so a hostname with shell syntax would run as part of that command.
+# These are the characters OpenSSH rejects in a hostname since 9.6 (CVE-2023-51385).
+#
+_UNSAFE_HOSTNAME = re.compile(r"""^-|[\x00-\x20\x7f\s'`"$\\;&<>|(){}]""")
 
 
 def _unquote(text: str | None) -> str | None:
@@ -161,6 +169,9 @@ def _maybe_fetch_config(  # noqa: C901  # legacy internal helper; refactor in a 
 
     if not host:
         msg = "you must specify the host to connect to"
+        raise ValueError(msg)
+    if _UNSAFE_HOSTNAME.search(host):
+        msg = f"invalid characters in SSH hostname: {host!r}"
         raise ValueError(msg)
 
     # Attempt to load an OpenSSH config.

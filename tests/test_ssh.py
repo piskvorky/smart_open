@@ -1,8 +1,11 @@
 import logging
 import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
+import pytest
 from paramiko import SSHException
 
 import smart_open.ssh
@@ -164,6 +167,27 @@ class SSHOpen(unittest.TestCase):
         """Wildcard Host patterns supply connection settings just like exact aliases."""
         smart_open.open("ssh://files.example/data")
         mock_connect.assert_called_once_with("storage.internal", 2222, username="storage-user", password=None)
+
+    @mock_ssh
+    def test_shell_metacharacters_in_host(self, mock_connect, get_transp_mock):
+        """A host from the URI must not reach Match exec, which runs %h through a shell unquoted."""
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "ssh.cfg"
+            config.write_text('Match exec "test %h = never-matches"\n  User nobody\n')
+            smart_open.ssh._SSH_CONFIG_FILES = [str(config)]
+
+            with mock.patch("paramiko.config.invoke.run") as run:
+                for uri in (
+                    "ssh://user@x;touch pwned;/path",
+                    "ssh://user@$(id)/path",
+                    "ssh://user@-oops/path",
+                ):
+                    with pytest.raises(ValueError, match="invalid characters"):
+                        smart_open.open(uri)
+                run.assert_not_called()
+
+                smart_open.open("ssh://user@some-host/path")
+                run.assert_called_with("test some-host = never-matches", hide="stdout", warn=True)
 
     @mock_ssh
     def test_password_skips_config_identityfile(self, mock_connect, get_transp_mock):
