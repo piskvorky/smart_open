@@ -1,3 +1,9 @@
+# 9.0.5, 2026-11-18
+
+- Fail CI for pull requests that target master (PR [#1006](https://github.com/piskvorky/smart_open/pull/1006), [@ddelange](https://github.com/ddelange))
+- Only allow the next patch, minor, major or post release in release.sh (PR [#1007](https://github.com/piskvorky/smart_open/pull/1007), [@ddelange](https://github.com/ddelange))
+- [ssh] Reject shell metacharacters in hostnames before the config lookup (PR [#1008](https://github.com/piskvorky/smart_open/pull/1008), [@kakkar87d](https://github.com/kakkar87d))
+
 # 9.0.4, 2026-11-14
 
 - Remove MIT License classifier from pyproject.toml (PR [#1003](https://github.com/piskvorky/smart_open/pull/1003), [@APN-Pucky](https://github.com/APN-Pucky))

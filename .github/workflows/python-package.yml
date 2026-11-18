@@ -10,6 +10,12 @@ concurrency:  # https://stackoverflow.com/questions/66335225#comment133398800_72
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  base-branch:
+    if: github.event_name == 'pull_request' && github.base_ref == 'master' && github.head_ref != 'develop'
+    runs-on: ubuntu-latest
+    steps:
+    - run: echo "::error::Target the develop branch, not master. Edit the PR to change its base branch, then push to rerun CI." && exit 1
+
   ci:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
