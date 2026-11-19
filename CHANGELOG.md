@@ -1,3 +1,9 @@
+# 9.0.6, 2026-11-19
+
+- [bytebuffer] Speed up readline when the line is already in the buffer (PR [#1010](https://github.com/piskvorky/smart_open/pull/1010), [@g4lb](https://github.com/g4lb))
+- [ssh] Only delegate GSSAPI credentials when ~/.ssh/config asks for it (PR [#1009](https://github.com/piskvorky/smart_open/pull/1009), [@kakkar87d](https://github.com/kakkar87d))
+- [ssh] Skip the GSSAPI options in ~/.ssh/config on paramiko 5 (PR [#1011](https://github.com/piskvorky/smart_open/pull/1011), [@ddelange](https://github.com/ddelange))
+
 # 9.0.5, 2026-11-18
 
 - Fail CI for pull requests that target master (PR [#1006](https://github.com/piskvorky/smart_open/pull/1006), [@ddelange](https://github.com/ddelange))
