@@ -37,11 +37,15 @@ class SSHOpen(unittest.TestCase):
         # hermetic by stubbing it out.
         self._getfqdn_patcher = mock.patch("socket.getfqdn", return_value="localhost")
         self._getfqdn_patcher.start()
+        # Model paramiko < 5, which has GSSAPI, whichever paramiko is installed.
+        self._gssapi_patcher = mock.patch("smart_open.ssh._PARAMIKO_GSSAPI", new=True)
+        self._gssapi_patcher.start()
 
     def tearDown(self):
         """TearDown."""
         smart_open.ssh._SSH_CONFIG_FILES = self._cfg_files  # test reaches into private state
         self._getfqdn_patcher.stop()
+        self._gssapi_patcher.stop()
 
     @mock_ssh
     def test_open(self, mock_connect, get_transp_mock):
@@ -163,6 +167,20 @@ class SSHOpen(unittest.TestCase):
         )
 
     @mock_ssh
+    @mock.patch("smart_open.ssh._PARAMIKO_GSSAPI", new=False)
+    def test_open_with_openssh_config_without_gssapi(self, mock_connect, get_transp_mock):
+        """Paramiko 5 removed GSSAPI, so the GSSAPI options in the config do not reach connect()."""
+        smart_open.open("ssh://another-host/")
+        mock_connect.assert_called_with(
+            "another-host-domain.com",
+            2345,
+            username="another-user",
+            key_filename=["/path/to/key/file"],
+            timeout=20.0,
+            compress=True,
+        )
+
+    @mock_ssh
     def test_open_with_wildcard_config(self, mock_connect, get_transp_mock):
         """Wildcard Host patterns supply connection settings just like exact aliases."""
         smart_open.open("ssh://files.example/data")
@@ -188,6 +206,26 @@ class SSHOpen(unittest.TestCase):
 
                 smart_open.open("ssh://user@some-host/path")
                 run.assert_called_with("test some-host = never-matches", hide="stdout", warn=True)
+
+    @mock_ssh
+    def test_gssapi_from_config_delegates_only_when_asked(self, mock_connect, get_transp_mock):
+        """GSSAPI enabled by the config does not delegate credentials unless the config asks, like OpenSSH."""
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "ssh.cfg"
+            config.write_text(
+                "Host delegate-host\n  GSSAPIDelegateCredentials yes\n\nHost *\n  GSSAPIAuthentication yes\n"
+            )
+            smart_open.ssh._SSH_CONFIG_FILES = [str(config)]
+
+            smart_open.open("ssh://user@some-host/path")
+            mock_connect.assert_called_with(
+                "some-host", 22, username="user", password=None, gss_auth=True, gss_deleg_creds=False
+            )
+
+            smart_open.open("ssh://user@delegate-host/path")
+            mock_connect.assert_called_with(
+                "delegate-host", 22, username="user", password=None, gss_auth=True, gss_deleg_creds=True
+            )
 
     @mock_ssh
     def test_password_skips_config_identityfile(self, mock_connect, get_transp_mock):

@@ -173,6 +173,14 @@ class ByteBuffer:
         """
         if limit is None:
             limit = -1
+        index = self._bytes.find(terminator, self._pos)
+        if index != -1:  # fast path: the line ends in this buffer
+            end = index + len(terminator)
+            if 0 <= limit < end - self._pos:
+                end = self._pos + limit
+            line = bytes(self._bytes[self._pos : end])
+            self._pos = end
+            return line
         parts: list[bytes] = []
         tail = b""  # bytes already read that may start a terminator ending in this buffer
         while True:
