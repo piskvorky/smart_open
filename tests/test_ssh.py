@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import paramiko
 import pytest
 from paramiko import SSHException
 
@@ -226,6 +227,21 @@ class SSHOpen(unittest.TestCase):
             mock_connect.assert_called_with(
                 "delegate-host", 22, username="user", password=None, gss_auth=True, gss_deleg_creds=True
             )
+
+    @mock_ssh
+    def test_strict_host_key_checking_from_config(self, mock_connect, get_transp_mock):
+        """StrictHostKeyChecking yes in the config rejects unknown host keys instead of adding them, like OpenSSH."""
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "ssh.cfg"
+            config.write_text("Host strict-host\n  StrictHostKeyChecking yes\n")
+            smart_open.ssh._SSH_CONFIG_FILES = [str(config)]
+
+            with mock.patch("paramiko.SSHClient.set_missing_host_key_policy") as set_policy:
+                smart_open.open("ssh://user:pass@strict-host/path")
+                assert isinstance(set_policy.call_args.args[0], paramiko.RejectPolicy)
+
+                smart_open.open("ssh://user:pass@some-host/path")
+                assert isinstance(set_policy.call_args.args[0], paramiko.AutoAddPolicy)
 
     @mock_ssh
     def test_password_skips_config_identityfile(self, mock_connect, get_transp_mock):
