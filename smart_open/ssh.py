@@ -30,6 +30,9 @@ from typing import TYPE_CHECKING, Any, TypedDict
 
 try:
     import paramiko
+
+    # paramiko 5 removed GSSAPI and the gss_* arguments of SSHClient.connect.
+    _PARAMIKO_GSSAPI = hasattr(paramiko, "GSS_AUTH_AVAILABLE")
 except ImportError:
     MISSING_DEPS = True
 
@@ -219,6 +222,8 @@ def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refac
         cfg.setdefault("gssapidelegatecredentials", "no")
 
     for param_name, (sshcfg_name, from_str) in _PARAMIKO_CONFIG_MAP.items():
+        if param_name.startswith("gss_") and not _PARAMIKO_GSSAPI:
+            continue  # skip like the other OpenSSH options that paramiko does not support
         if connect_params.get(param_name) is None and sshcfg_name in cfg:
             connect_params[param_name] = from_str(cfg[sshcfg_name])
 
