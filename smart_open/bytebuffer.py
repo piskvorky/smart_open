@@ -173,15 +173,20 @@ class ByteBuffer:
         """
         if limit is None:
             limit = -1
+        index = self._bytes.find(terminator, self._pos)
+        if index == -1:
+            size = len(self)
+        else:
+            end = index + len(terminator)
+            if limit < 0 or end - self._pos <= limit:
+                # fast path: the whole line is already in the buffer
+                line = bytes(self._bytes[self._pos : end])
+                self._pos = end
+                return line
+            size = end - self._pos
         parts: list[bytes] = []
         tail = b""  # bytes already read that may start a terminator ending in this buffer
         while True:
-            index = (tail + self.peek(len(terminator) - 1)).find(terminator) if tail else -1
-            if index != -1:
-                size = index + len(terminator) - len(tail)
-            else:
-                index = self._bytes.find(terminator, self._pos)
-                size = len(self) if index == -1 else index - self._pos + len(terminator)
             if limit >= 0:
                 size = min(size, limit)
                 limit -= size
@@ -193,4 +198,10 @@ class ByteBuffer:
             fill()
             if not len(self):
                 break
+            index = (tail + self.peek(len(terminator) - 1)).find(terminator) if tail else -1
+            if index != -1:
+                size = index + len(terminator) - len(tail)
+            else:
+                index = self._bytes.find(terminator, self._pos)
+                size = len(self) if index == -1 else index - self._pos + len(terminator)
         return b"".join(parts)
