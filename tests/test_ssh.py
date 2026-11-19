@@ -37,11 +37,15 @@ class SSHOpen(unittest.TestCase):
         # hermetic by stubbing it out.
         self._getfqdn_patcher = mock.patch("socket.getfqdn", return_value="localhost")
         self._getfqdn_patcher.start()
+        # Model paramiko < 5, which has GSSAPI, whichever paramiko is installed.
+        self._gssapi_patcher = mock.patch("smart_open.ssh._PARAMIKO_GSSAPI", new=True)
+        self._gssapi_patcher.start()
 
     def tearDown(self):
         """TearDown."""
         smart_open.ssh._SSH_CONFIG_FILES = self._cfg_files  # test reaches into private state
         self._getfqdn_patcher.stop()
+        self._gssapi_patcher.stop()
 
     @mock_ssh
     def test_open(self, mock_connect, get_transp_mock):
@@ -160,6 +164,20 @@ class SSHOpen(unittest.TestCase):
             gss_kex=False,
             gss_deleg_creds=False,
             gss_trust_dns=False,
+        )
+
+    @mock_ssh
+    @mock.patch("smart_open.ssh._PARAMIKO_GSSAPI", new=False)
+    def test_open_with_openssh_config_without_gssapi(self, mock_connect, get_transp_mock):
+        """Paramiko 5 removed GSSAPI, so the GSSAPI options in the config do not reach connect()."""
+        smart_open.open("ssh://another-host/")
+        mock_connect.assert_called_with(
+            "another-host-domain.com",
+            2345,
+            username="another-user",
+            key_filename=["/path/to/key/file"],
+            timeout=20.0,
+            compress=True,
         )
 
     @mock_ssh
