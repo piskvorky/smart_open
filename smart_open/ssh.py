@@ -156,7 +156,7 @@ def _connect_ssh(
     return ssh
 
 
-def _maybe_fetch_config(  # noqa: C901  # legacy internal helper; refactor in a dedicated PR
+def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refactor in a dedicated PR
     host: str | None,
     username: str | None = None,
     password: str | None = None,
@@ -212,6 +212,11 @@ def _maybe_fetch_config(  # noqa: C901  # legacy internal helper; refactor in a 
         identityfile = cfg.get("identityfile", [])
         if len(identityfile):
             connect_params["key_filename"] = identityfile
+
+    # OpenSSH only delegates GSSAPI credentials (the Kerberos TGT) with GSSAPIDelegateCredentials yes,
+    # while paramiko delegates by default, so apply the OpenSSH default when the config enables GSSAPI.
+    if "yes" in (cfg.get("gssapiauthentication"), cfg.get("gssapikeyexchange")):
+        cfg.setdefault("gssapidelegatecredentials", "no")
 
     for param_name, (sshcfg_name, from_str) in _PARAMIKO_CONFIG_MAP.items():
         if connect_params.get(param_name) is None and sshcfg_name in cfg:
