@@ -1,3 +1,9 @@
+# 10.0.0, 2026-11-20
+
+- [ssh] Reject unknown host keys by default and add a known_hosts transport param (PR [#1012](https://github.com/piskvorky/smart_open/pull/1012), [@kakkar87d](https://github.com/kakkar87d))
+- [ssh] Always apply ~/.ssh/config, also when all connection args are passed (PR [#1013](https://github.com/piskvorky/smart_open/pull/1013), [@ddelange](https://github.com/ddelange))
+- [ssh] Ignore the GSSAPI options in ~/.ssh/config (PR [#1014](https://github.com/piskvorky/smart_open/pull/1014), [@ddelange](https://github.com/ddelange))
+
 # 9.0.6, 2026-11-19
 
 - [bytebuffer] Speed up readline when the line is already in the buffer (PR [#1010](https://github.com/piskvorky/smart_open/pull/1010), [@g4lb](https://github.com/g4lb))
