@@ -280,6 +280,16 @@ class SSHOpen(unittest.TestCase):
             with pytest.raises(paramiko.AuthenticationException):
                 connect(first_key)
 
+    def test_rejected_host_key_closes_the_connection(self):
+        """A connection rejected at the host key check does not keep its socket and transport thread open."""
+        sock = self.serve_ssh(paramiko.ECDSAKey.generate())
+        connect_kwargs = {"sock": sock, "look_for_keys": False, "allow_agent": False}
+        with pytest.raises(SSHException, match="not found in known_hosts"):
+            smart_open.open(
+                "ssh://user:pass@unknown-host/path", transport_params={"connect_kwargs": connect_kwargs}
+            )
+        assert sock.fileno() == -1
+
     @mock_ssh
     def test_password_skips_config_identityfile(self, mock_connect, get_transp_mock):
         """An explicit password is not dropped in favour of a configured IdentityFile."""
