@@ -111,7 +111,7 @@ pip install 'smart_open[all]'
 Some transports have external dependencies that are not `smart_open` extras:
 
 - HTTP Kerberos auth (`kerberos=True`) needs the `requests-kerberos` package: `pip install requests-kerberos`
-- SSH GSSAPI/Kerberos auth (`gss_*` options) needs paramiko below 5 with its GSSAPI support (`pip install 'paramiko[gssapi]<5'`), because paramiko 5 removed GSSAPI and smart_open then skips the GSSAPI options in `~/.ssh/config`
+- SSH GSSAPI/Kerberos auth needs paramiko below 5 (`pip install 'paramiko[gssapi]<5'`), with the `gss_*` options passed in `connect_kwargs`, because paramiko 5 removed GSSAPI
 - The `hdfs://` and `viewfs://` transports shell out to the Hadoop `hdfs` command-line client, which must be installed separately and available on `$PATH`
 
 ### Built-in help

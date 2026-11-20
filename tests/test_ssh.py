@@ -38,15 +38,11 @@ class SSHOpen(unittest.TestCase):
         # hermetic by stubbing it out.
         self._getfqdn_patcher = mock.patch("socket.getfqdn", return_value="localhost")
         self._getfqdn_patcher.start()
-        # Model paramiko < 5, which has GSSAPI, whichever paramiko is installed.
-        self._gssapi_patcher = mock.patch("smart_open.ssh._PARAMIKO_GSSAPI", new=True)
-        self._gssapi_patcher.start()
 
     def tearDown(self):
         """TearDown."""
         smart_open.ssh._SSH_CONFIG_FILES = self._cfg_files  # test reaches into private state
         self._getfqdn_patcher.stop()
-        self._gssapi_patcher.stop()
 
     @mock_ssh
     def test_open(self, mock_connect, get_transp_mock):
@@ -163,33 +159,11 @@ class SSHOpen(unittest.TestCase):
             password="pass",  # fixture password kwarg
             timeout=5.0,
             compress=True,
-            gss_auth=False,
-            gss_kex=False,
-            gss_deleg_creds=False,
-            gss_trust_dns=False,
         )
 
     @mock_ssh
     def test_open_with_openssh_config(self, mock_connect, get_transp_mock):
         """Open with openssh config."""
-        smart_open.open("ssh://another-host/")
-        mock_connect.assert_called_with(
-            "another-host-domain.com",
-            2345,
-            username="another-user",
-            key_filename=["/path/to/key/file"],
-            timeout=20.0,
-            compress=True,
-            gss_auth=False,
-            gss_kex=False,
-            gss_deleg_creds=False,
-            gss_trust_dns=False,
-        )
-
-    @mock_ssh
-    @mock.patch("smart_open.ssh._PARAMIKO_GSSAPI", new=False)
-    def test_open_with_openssh_config_without_gssapi(self, mock_connect, get_transp_mock):
-        """Paramiko 5 removed GSSAPI, so the GSSAPI options in the config do not reach connect()."""
         smart_open.open("ssh://another-host/")
         mock_connect.assert_called_with(
             "another-host-domain.com",
@@ -228,24 +202,15 @@ class SSHOpen(unittest.TestCase):
                 run.assert_called_with("test some-host = never-matches", hide="stdout", warn=True)
 
     @mock_ssh
-    def test_gssapi_from_config_delegates_only_when_asked(self, mock_connect, get_transp_mock):
-        """GSSAPI enabled by the config does not delegate credentials unless the config asks, like OpenSSH."""
+    def test_gssapi_options_in_config_are_ignored(self, mock_connect, get_transp_mock):
+        """GSSAPI options in the config do not reach connect(); callers pass gss_* in connect_kwargs instead."""
         with tempfile.TemporaryDirectory() as tmp:
             config = Path(tmp) / "ssh.cfg"
-            config.write_text(
-                "Host delegate-host\n  GSSAPIDelegateCredentials yes\n\nHost *\n  GSSAPIAuthentication yes\n"
-            )
+            config.write_text("Host *\n  GSSAPIAuthentication yes\n  GSSAPIDelegateCredentials yes\n")
             smart_open.ssh._SSH_CONFIG_FILES = [str(config)]
 
             smart_open.open("ssh://user@some-host/path")
-            mock_connect.assert_called_with(
-                "some-host", 22, username="user", password=None, gss_auth=True, gss_deleg_creds=False
-            )
-
-            smart_open.open("ssh://user@delegate-host/path")
-            mock_connect.assert_called_with(
-                "delegate-host", 22, username="user", password=None, gss_auth=True, gss_deleg_creds=True
-            )
+            mock_connect.assert_called_with("some-host", 22, username="user", password=None)
 
     @mock_ssh
     def test_unknown_host_keys_rejected_unless_config_opts_out(self, mock_connect, get_transp_mock):
@@ -292,10 +257,6 @@ class SSHOpen(unittest.TestCase):
             key_filename=["/path/to/key/file"],
             timeout=20.0,
             compress=True,
-            gss_auth=False,
-            gss_kex=False,
-            gss_deleg_creds=False,
-            gss_trust_dns=False,
         )
 
     @mock_ssh
@@ -309,10 +270,6 @@ class SSHOpen(unittest.TestCase):
             key_filename=["/path/to/key/file"],
             timeout=20.0,
             compress=True,
-            gss_auth=False,
-            gss_kex=False,
-            gss_deleg_creds=False,
-            gss_trust_dns=False,
         )
 
     @mock_ssh
@@ -326,10 +283,6 @@ class SSHOpen(unittest.TestCase):
             key_filename=["/path/to/key/file"],
             timeout=20.0,
             compress=True,
-            gss_auth=False,
-            gss_kex=False,
-            gss_deleg_creds=False,
-            gss_trust_dns=False,
         )
 
     @mock_ssh
@@ -343,10 +296,6 @@ class SSHOpen(unittest.TestCase):
             key_filename=["/path/to/key/file"],
             timeout=20.0,
             compress=True,
-            gss_auth=False,
-            gss_kex=False,
-            gss_deleg_creds=False,
-            gss_trust_dns=False,
         )
 
     @mock_ssh

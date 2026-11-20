@@ -288,7 +288,7 @@ FUNCTIONS
 
             ssh/scp/sftp (smart_open/ssh.py)
             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            Implements I/O streams over SSH; GSSAPI auth (``gss_*`` options) needs ``paramiko[gssapi]``.
+            Implements I/O streams over SSH.
 
             path:
                 The path to the file to open on the remote machine.
