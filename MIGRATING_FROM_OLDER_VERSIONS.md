@@ -1,3 +1,31 @@
+# v10.0.0
+
+Version 10.0.0 checks SSH host keys.
+Servers already in `~/.ssh/known_hosts` need no change.
+
+## SSH refuses servers that are not in known_hosts
+
+Tracked in [#1012](https://github.com/piskvorky/smart_open/pull/1012).
+smart_open used to accept any server missing from `~/.ssh/known_hosts` and send it your password and data, so an attacker could pose as the server.
+Now it raises `paramiko.SSHException: Server 'sftp.example.com' not found in known_hosts`, like OpenSSH in a script.
+Fix it in one of these ways:
+
+1. Add the server to `~/.ssh/known_hosts` (`-p <port>` for other ports), and check its fingerprint with the server's admin:
+   ```sh
+   ssh-keyscan sftp.example.com >> ~/.ssh/known_hosts
+   ```
+2. If you cannot write to `~/.ssh`, or your `~/.ssh/config` sets `UserKnownHostsFile` (which smart_open ignores), pass a known_hosts file of your own.
+   smart_open reads it in addition to `~/.ssh/known_hosts`:
+   ```diff
+   - fin = smart_open.open('sftp://user@sftp.example.com/file.csv')
+   + fin = smart_open.open('sftp://user@sftp.example.com/file.csv', transport_params={'known_hosts': '/app/known_hosts'})
+   ```
+3. To accept unknown servers as before, only on a network you trust, set this in `~/.ssh/config` (`no` and `off` work too):
+   ```
+   Host sftp.example.com
+     StrictHostKeyChecking accept-new
+   ```
+
 # v9.0.0
 
 Version 9.0.0 pins HTTP range requests to the version first read, which fails seeks against servers whose validators change between requests.

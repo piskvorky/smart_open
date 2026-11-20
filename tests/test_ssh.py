@@ -229,19 +229,31 @@ class SSHOpen(unittest.TestCase):
             )
 
     @mock_ssh
-    def test_strict_host_key_checking_from_config(self, mock_connect, get_transp_mock):
-        """StrictHostKeyChecking yes in the config rejects unknown host keys instead of adding them, like OpenSSH."""
+    def test_unknown_host_keys_rejected_unless_config_opts_out(self, mock_connect, get_transp_mock):
+        """Like OpenSSH, unknown host keys are rejected unless StrictHostKeyChecking no in the config accepts them."""
         with tempfile.TemporaryDirectory() as tmp:
             config = Path(tmp) / "ssh.cfg"
-            config.write_text("Host strict-host\n  StrictHostKeyChecking yes\n")
+            config.write_text("Host lax-host\n  StrictHostKeyChecking no\n")
             smart_open.ssh._SSH_CONFIG_FILES = [str(config)]
 
-            with mock.patch("paramiko.SSHClient.set_missing_host_key_policy") as set_policy:
-                smart_open.open("ssh://user:pass@strict-host/path")
-                assert isinstance(set_policy.call_args.args[0], paramiko.RejectPolicy)
+            smart_open.open("ssh://user:pass@some-host/path")
+            smart_open.open("ssh://user:pass@lax-host/path")
+            policies = {key[0]: type(client._policy) for key, client in smart_open.ssh._SSH.items()}
+            assert policies == {"some-host": paramiko.RejectPolicy, "lax-host": paramiko.AutoAddPolicy}
 
-                smart_open.open("ssh://user:pass@some-host/path")
-                assert isinstance(set_policy.call_args.args[0], paramiko.AutoAddPolicy)
+    @mock_ssh
+    def test_known_hosts_param_trusts_its_host_keys(self, mock_connect, get_transp_mock):
+        """The known_hosts transport param trusts the host keys in that file on top of ~/.ssh/known_hosts."""
+        key = paramiko.ECDSAKey.generate()
+        with tempfile.TemporaryDirectory() as tmp:
+            known_hosts = Path(tmp) / "known_hosts"
+            known_hosts.write_text(f"some-host {key.get_name()} {key.get_base64()}\n")
+
+            smart_open.open(
+                "ssh://user:pass@some-host/path", transport_params={"known_hosts": str(known_hosts)}
+            )
+            (client,) = smart_open.ssh._SSH.values()
+            assert client._system_host_keys.check("some-host", key)
 
     @mock_ssh
     def test_password_skips_config_identityfile(self, mock_connect, get_transp_mock):
