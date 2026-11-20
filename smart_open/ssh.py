@@ -5,7 +5,7 @@
 # from the MIT License (MIT).
 #
 
-"""Implements I/O streams over SSH; GSSAPI auth (``gss_*`` options) needs ``paramiko[gssapi]``.
+"""Implements I/O streams over SSH.
 
 Example:
     >>> with open("/proc/version_signature", host="1.2.3.4") as conn:
@@ -30,9 +30,6 @@ from typing import TYPE_CHECKING, Any, TypedDict
 
 try:
     import paramiko
-
-    # paramiko 5 removed GSSAPI and the gss_* arguments of SSHClient.connect.
-    _PARAMIKO_GSSAPI = hasattr(paramiko, "GSS_AUTH_AVAILABLE")
 except ImportError:
     MISSING_DEPS = True
 
@@ -101,10 +98,6 @@ def _str2bool(string: str) -> bool:
 _PARAMIKO_CONFIG_MAP: dict[str, tuple[str, Callable]] = {
     "timeout": ("connecttimeout", float),
     "compress": ("compression", _str2bool),
-    "gss_auth": ("gssapiauthentication", _str2bool),
-    "gss_kex": ("gssapikeyexchange", _str2bool),
-    "gss_deleg_creds": ("gssapidelegatecredentials", _str2bool),
-    "gss_trust_dns": ("gssapitrustdns", _str2bool),
 }
 
 
@@ -141,7 +134,7 @@ def open_uri(uri: str, mode: str, transport_params: TransportParams) -> paramiko
     return open(uri_path, mode, **final_params)
 
 
-def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refactor in a dedicated PR
+def _maybe_fetch_config(  # noqa: C901  # legacy internal helper; refactor in a dedicated PR
     host: str | None,
     username: str | None = None,
     password: str | None = None,
@@ -168,7 +161,6 @@ def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refac
     # - identityfile inference
     # - connection timeout inference
     # - compression selection
-    # - GSS configuration
     # - StrictHostKeyChecking no, off and accept-new
     #
     connect_params = (connect_kwargs or {}).copy()
@@ -195,14 +187,7 @@ def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refac
         if len(identityfile):
             connect_params["key_filename"] = identityfile
 
-    # OpenSSH only delegates GSSAPI credentials (the Kerberos TGT) with GSSAPIDelegateCredentials yes,
-    # while paramiko delegates by default, so apply the OpenSSH default when the config enables GSSAPI.
-    if "yes" in (cfg.get("gssapiauthentication"), cfg.get("gssapikeyexchange")):
-        cfg.setdefault("gssapidelegatecredentials", "no")
-
     for param_name, (sshcfg_name, from_str) in _PARAMIKO_CONFIG_MAP.items():
-        if param_name.startswith("gss_") and not _PARAMIKO_GSSAPI:
-            continue  # skip like the other OpenSSH options that paramiko does not support
         if connect_params.get(param_name) is None and sshcfg_name in cfg:
             connect_params[param_name] = from_str(cfg[sshcfg_name])
 
