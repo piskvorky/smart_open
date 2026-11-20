@@ -293,7 +293,11 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         if "key_filename" not in kwargs:
             kwargs.setdefault("password", password)
         kwargs.setdefault("username", user)
-        ssh.connect(host, port, **kwargs)
+        # paramiko leaves the transport thread and socket running when connect fails, so close the client then
+        with contextlib.ExitStack() as on_failure:
+            on_failure.callback(ssh.close)
+            ssh.connect(host, port, **kwargs)
+            on_failure.pop_all()
         return ssh
 
     sftp_client: paramiko.SFTPClient | None = None
