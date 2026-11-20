@@ -288,7 +288,7 @@ FUNCTIONS
 
             ssh/scp/sftp (smart_open/ssh.py)
             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            Implements I/O streams over SSH; GSSAPI auth (``gss_*`` options) needs ``paramiko[gssapi]``.
+            Implements I/O streams over SSH.
 
             path:
                 The path to the file to open on the remote machine.
@@ -310,6 +310,9 @@ FUNCTIONS
                 The presence of this dict (even if empty) triggers prefetching.
             buffer_size:
                 Passed to the bufsize argument of paramiko.SFTPClient.open.
+            known_hosts:
+                Path to a known_hosts file whose host keys are trusted on top of ~/.ssh/known_hosts.
+                It is only read, so it may live on a read only filesystem.
 
             webhdfs (smart_open/webhdfs.py)
             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

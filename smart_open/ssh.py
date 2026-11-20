@@ -5,7 +5,7 @@
 # from the MIT License (MIT).
 #
 
-"""Implements I/O streams over SSH; GSSAPI auth (``gss_*`` options) needs ``paramiko[gssapi]``.
+"""Implements I/O streams over SSH.
 
 Example:
     >>> with open("/proc/version_signature", host="1.2.3.4") as conn:
@@ -30,9 +30,6 @@ from typing import TYPE_CHECKING, Any, TypedDict
 
 try:
     import paramiko
-
-    # paramiko 5 removed GSSAPI and the gss_* arguments of SSHClient.connect.
-    _PARAMIKO_GSSAPI = hasattr(paramiko, "GSS_AUTH_AVAILABLE")
 except ImportError:
     MISSING_DEPS = True
 
@@ -48,7 +45,7 @@ logger = logging.getLogger(__name__)
 #
 # Global storage for SSH connections.
 #
-_SSH: dict[tuple[str, str, int | None, str | None, str], paramiko.SSHClient] = {}
+_SSH: dict[tuple, paramiko.SSHClient] = {}
 
 SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""
@@ -101,10 +98,6 @@ def _str2bool(string: str) -> bool:
 _PARAMIKO_CONFIG_MAP: dict[str, tuple[str, Callable]] = {
     "timeout": ("connecttimeout", float),
     "compress": ("compression", _str2bool),
-    "gss_auth": ("gssapiauthentication", _str2bool),
-    "gss_kex": ("gssapikeyexchange", _str2bool),
-    "gss_deleg_creds": ("gssapidelegatecredentials", _str2bool),
-    "gss_trust_dns": ("gssapitrustdns", _str2bool),
 }
 
 
@@ -141,35 +134,13 @@ def open_uri(uri: str, mode: str, transport_params: TransportParams) -> paramiko
     return open(uri_path, mode, **final_params)
 
 
-def _connect_ssh(
-    hostname: str,
-    username: str | None,
-    port: int | None,
-    password: str | None,
-    connect_kwargs: dict[str, Any] | None,
-) -> paramiko.SSHClient:
-    ssh = paramiko.SSHClient()
-    ssh.load_system_host_keys()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # noqa: S507  # documented smart_open default
-    kwargs = (connect_kwargs or {}).copy()
-    if "key_filename" not in kwargs:
-        kwargs.setdefault("password", password)
-    kwargs.setdefault("username", username)
-    ssh.connect(hostname, port if port is not None else DEFAULT_PORT, **kwargs)
-    return ssh
-
-
-def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refactor in a dedicated PR
+def _maybe_fetch_config(  # noqa: C901  # legacy internal helper; refactor in a dedicated PR
     host: str | None,
     username: str | None = None,
     password: str | None = None,
     port: int | None = None,
     connect_kwargs: dict[str, Any] | None = None,
-) -> tuple[str | None, str | None, str | None, int | None, dict[str, Any] | None]:
-    # If all fields are set, return as-is.
-    if not any(arg is None for arg in (host, username, password, port, connect_kwargs)):
-        return host, username, password, port, connect_kwargs
-
+) -> tuple[str, str, str | None, int, dict[str, Any], bool]:
     if not host:
         msg = "you must specify the host to connect to"
         raise ValueError(msg)
@@ -190,7 +161,7 @@ def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refac
     # - identityfile inference
     # - connection timeout inference
     # - compression selection
-    # - GSS configuration
+    # - StrictHostKeyChecking no, off and accept-new
     #
     connect_params = (connect_kwargs or {}).copy()
     config_files = [f for f in _SSH_CONFIG_FILES if Path(f).exists()]
@@ -216,16 +187,13 @@ def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refac
         if len(identityfile):
             connect_params["key_filename"] = identityfile
 
-    # OpenSSH only delegates GSSAPI credentials (the Kerberos TGT) with GSSAPIDelegateCredentials yes,
-    # while paramiko delegates by default, so apply the OpenSSH default when the config enables GSSAPI.
-    if "yes" in (cfg.get("gssapiauthentication"), cfg.get("gssapikeyexchange")):
-        cfg.setdefault("gssapidelegatecredentials", "no")
-
     for param_name, (sshcfg_name, from_str) in _PARAMIKO_CONFIG_MAP.items():
-        if param_name.startswith("gss_") and not _PARAMIKO_GSSAPI:
-            continue  # skip like the other OpenSSH options that paramiko does not support
         if connect_params.get(param_name) is None and sshcfg_name in cfg:
             connect_params[param_name] = from_str(cfg[sshcfg_name])
+
+    # Paramiko, like OpenSSH without a terminal to ask on, rejects hosts missing from known_hosts.
+    # These values opt out by accepting their key for this process. Changed keys are still rejected.
+    auto_add_host_keys = cfg.get("stricthostkeychecking", "").lower() in ("no", "off", "false", "accept-new")
 
     if port is None:
         port = DEFAULT_PORT
@@ -233,7 +201,7 @@ def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refac
     if not username:
         username = getpass.getuser()
 
-    return host, username, password, port, connect_params
+    return host, username, password, port, connect_params, auto_add_host_keys
 
 
 def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
@@ -246,6 +214,7 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     connect_kwargs: dict[str, Any] | None = None,
     prefetch_kwargs: dict[str, Any] | None = None,
     buffer_size: int = -1,
+    known_hosts: str | None = None,
 ) -> paramiko.SFTPFile:
     """Open a file on a remote machine over SSH.
 
@@ -263,6 +232,8 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         prefetch_kwargs: Any additional settings to be passed to paramiko.SFTPFile.prefetch.
             The presence of this dict (even if empty) triggers prefetching.
         buffer_size: Passed to the bufsize argument of paramiko.SFTPClient.open.
+        known_hosts: Path to a known_hosts file whose host keys are trusted on top of ~/.ssh/known_hosts.
+            It is only read, so it may live on a read only filesystem.
 
     Returns:
         A file-like object.
@@ -272,24 +243,39 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
             cannot be re-established within the retry limit.
 
     Note:
-        If you specify a previously unseen host, then its host key will be added to
-        the local ~/.ssh/known_hosts *automatically*.
+        Like OpenSSH without a terminal, a host whose key is not in ~/.ssh/known_hosts
+        or ``known_hosts`` is rejected, unless ~/.ssh/config sets ``StrictHostKeyChecking no`` or ``accept-new``
+        for that host. Its key is then accepted for this process, but not saved.
 
         If ``username`` or ``password`` are specified in *both* the uri and
         ``transport_params``, ``transport_params`` will take precedence.
     """
-    host, user, password, port, connect_kwargs = _maybe_fetch_config(
+    host, user, password, port, connect_kwargs, auto_add_host_keys = _maybe_fetch_config(
         host, user, password, port, connect_kwargs
     )
-    assert host is not None  # noqa: S101  # _maybe_fetch_config raises if host is falsy
-    assert user is not None  # noqa: S101  # _maybe_fetch_config defaults user via getpass.getuser()
     assert path is not None  # noqa: S101  # callers always provide a remote path to open
 
     # Credentials and connect options are part of the key, so a client authenticated
     # by one call is never reused for a call that supplied different credentials.
     # sock is left out: a fresh socket per call would otherwise never hit the cache.
-    options = {k: v for k, v in (connect_kwargs or {}).items() if k != "sock"}
-    key = (host, user, port, password, repr(sorted(options.items())))
+    options = {k: v for k, v in connect_kwargs.items() if k != "sock"}
+    key = (host, user, port, password, repr(sorted(options.items())), auto_add_host_keys, known_hosts)
+
+    def connect() -> paramiko.SSHClient:
+        ssh = paramiko.SSHClient()
+        ssh.load_system_host_keys()
+        if known_hosts:
+            ssh.load_system_host_keys(known_hosts)  # adds to ~/.ssh/known_hosts, and is never written to
+        # auto add only when ~/.ssh/config opts out of StrictHostKeyChecking
+        ssh.set_missing_host_key_policy(
+            paramiko.AutoAddPolicy() if auto_add_host_keys else paramiko.RejectPolicy()
+        )
+        kwargs = connect_kwargs.copy()
+        if "key_filename" not in kwargs:
+            kwargs.setdefault("password", password)
+        kwargs.setdefault("username", user)
+        ssh.connect(host, port, **kwargs)
+        return ssh
 
     sftp_client: paramiko.SFTPClient | None = None
     attempts = 2
@@ -302,13 +288,13 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
             assert transport is not None  # noqa: S101  # a cached connection has a transport
             if not transport.active:
                 ssh.close()
-                ssh = _SSH[key] = _connect_ssh(host, user, port, password, connect_kwargs)
+                ssh = _SSH[key] = connect()
         except KeyError:
-            ssh = _SSH[key] = _connect_ssh(host, user, port, password, connect_kwargs)
+            ssh = _SSH[key] = connect()
 
         try:
             transport = ssh.get_transport()
-            assert transport is not None  # noqa: S101  # _connect_ssh established an active transport
+            assert transport is not None  # noqa: S101  # connect() established an active transport
             sftp_client = transport.open_sftp_client()
             break
         except paramiko.SSHException as ex:

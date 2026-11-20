@@ -1,3 +1,54 @@
+# v10.0.0
+
+Version 10.0.0 checks SSH host keys, always applies `~/.ssh/config`, and ignores its GSSAPI options.
+
+## SSH refuses servers that are not in known_hosts
+
+Tracked in [#1012](https://github.com/piskvorky/smart_open/pull/1012).
+Servers already in `~/.ssh/known_hosts` need no change.
+smart_open used to accept any server missing from `~/.ssh/known_hosts` and send it your password and data, so an attacker could pose as the server.
+Now it raises `paramiko.SSHException: Server 'sftp.example.com' not found in known_hosts`, like OpenSSH in a script.
+Fix it in one of these ways:
+
+1. Add the server to `~/.ssh/known_hosts` (`-p <port>` for other ports), and check its fingerprint with the server's admin:
+   ```sh
+   ssh-keyscan sftp.example.com >> ~/.ssh/known_hosts
+   ```
+2. If you cannot write to `~/.ssh`, or your `~/.ssh/config` sets `UserKnownHostsFile` (which smart_open ignores), pass a known_hosts file of your own.
+   smart_open reads it in addition to `~/.ssh/known_hosts`:
+   ```diff
+   - fin = smart_open.open('sftp://user@sftp.example.com/file.csv')
+   + fin = smart_open.open('sftp://user@sftp.example.com/file.csv', transport_params={'known_hosts': '/app/known_hosts'})
+   ```
+3. To accept unknown servers as before, only on a network you trust, set this in `~/.ssh/config` (`no` and `off` work too):
+   ```
+   Host sftp.example.com
+     StrictHostKeyChecking accept-new
+   ```
+
+## SSH always applies `~/.ssh/config`
+
+Tracked in [#1013](https://github.com/piskvorky/smart_open/pull/1013).
+smart_open used to skip `~/.ssh/config` when user, password, port and `connect_kwargs` were all passed, so `connect_kwargs={}` instead of `None` silently turned the config off.
+Now the config always applies, and the values you pass still win over it.
+If you passed all of them, check that your config still fits:
+
+* A host that is an alias in `~/.ssh/config` now connects to its `HostName`.
+* `ConnectTimeout`, `Compression` and the GSSAPI options in the config now apply, unless `connect_kwargs` sets them.
+* `StrictHostKeyChecking no` in the config now accepts unknown servers.
+
+## SSH ignores the GSSAPI options in `~/.ssh/config`
+
+Tracked in [#1014](https://github.com/piskvorky/smart_open/pull/1014).
+smart_open no longer reads `GSSAPIAuthentication`, `GSSAPIKeyExchange`, `GSSAPIDelegateCredentials` and `GSSAPITrustDns` from `~/.ssh/config`.
+paramiko 5 removed GSSAPI, so this only matters with paramiko below 5.
+There, pass the options in `connect_kwargs`, and keep `gss_deleg_creds=False` unless the server needs your Kerberos ticket, because paramiko forwards it by default:
+
+```diff
+- fin = smart_open.open('sftp://user@sftp.example.com/file.csv')
++ fin = smart_open.open('sftp://user@sftp.example.com/file.csv', transport_params={'connect_kwargs': {'gss_auth': True, 'gss_deleg_creds': False}})
+```
+
 # v9.0.0
 
 Version 9.0.0 pins HTTP range requests to the version first read, which fails seeks against servers whose validators change between requests.
