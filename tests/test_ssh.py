@@ -151,6 +151,25 @@ class SSHOpen(unittest.TestCase):
         mock_sftp.open.assert_called_once()
 
     @mock_ssh
+    def test_config_applies_when_all_args_are_passed(self, mock_connect, get_transp_mock):
+        """The config applies even when user, password, port and connect_kwargs are all passed, which still win."""
+        smart_open.open(
+            "ssh://user:pass@another-host:22/", transport_params={"connect_kwargs": {"timeout": 5.0}}
+        )
+        mock_connect.assert_called_with(
+            "another-host-domain.com",
+            22,
+            username="user",
+            password="pass",  # fixture password kwarg
+            timeout=5.0,
+            compress=True,
+            gss_auth=False,
+            gss_kex=False,
+            gss_deleg_creds=False,
+            gss_trust_dns=False,
+        )
+
+    @mock_ssh
     def test_open_with_openssh_config(self, mock_connect, get_transp_mock):
         """Open with openssh config."""
         smart_open.open("ssh://another-host/")

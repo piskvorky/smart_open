@@ -147,11 +147,7 @@ def _maybe_fetch_config(  # noqa: C901, PLR0912  # legacy internal helper; refac
     password: str | None = None,
     port: int | None = None,
     connect_kwargs: dict[str, Any] | None = None,
-) -> tuple[str | None, str | None, str | None, int | None, dict[str, Any] | None, bool]:
-    # If all fields are set, return as-is.
-    if not any(arg is None for arg in (host, username, password, port, connect_kwargs)):
-        return host, username, password, port, connect_kwargs, False
-
+) -> tuple[str, str, str | None, int, dict[str, Any], bool]:
     if not host:
         msg = "you must specify the host to connect to"
         raise ValueError(msg)
@@ -272,14 +268,12 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     host, user, password, port, connect_kwargs, auto_add_host_keys = _maybe_fetch_config(
         host, user, password, port, connect_kwargs
     )
-    assert host is not None  # noqa: S101  # _maybe_fetch_config raises if host is falsy
-    assert user is not None  # noqa: S101  # _maybe_fetch_config defaults user via getpass.getuser()
     assert path is not None  # noqa: S101  # callers always provide a remote path to open
 
     # Credentials and connect options are part of the key, so a client authenticated
     # by one call is never reused for a call that supplied different credentials.
     # sock is left out: a fresh socket per call would otherwise never hit the cache.
-    options = {k: v for k, v in (connect_kwargs or {}).items() if k != "sock"}
+    options = {k: v for k, v in connect_kwargs.items() if k != "sock"}
     key = (host, user, port, password, repr(sorted(options.items())), auto_add_host_keys, known_hosts)
 
     def connect() -> paramiko.SSHClient:
@@ -291,11 +285,11 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         ssh.set_missing_host_key_policy(
             paramiko.AutoAddPolicy() if auto_add_host_keys else paramiko.RejectPolicy()
         )
-        kwargs = (connect_kwargs or {}).copy()
+        kwargs = connect_kwargs.copy()
         if "key_filename" not in kwargs:
             kwargs.setdefault("password", password)
         kwargs.setdefault("username", user)
-        ssh.connect(host, port if port is not None else DEFAULT_PORT, **kwargs)
+        ssh.connect(host, port, **kwargs)
         return ssh
 
     sftp_client: paramiko.SFTPClient | None = None

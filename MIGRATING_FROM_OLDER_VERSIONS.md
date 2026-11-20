@@ -1,11 +1,11 @@
 # v10.0.0
 
-Version 10.0.0 checks SSH host keys.
-Servers already in `~/.ssh/known_hosts` need no change.
+Version 10.0.0 checks SSH host keys, and always applies `~/.ssh/config`.
 
 ## SSH refuses servers that are not in known_hosts
 
 Tracked in [#1012](https://github.com/piskvorky/smart_open/pull/1012).
+Servers already in `~/.ssh/known_hosts` need no change.
 smart_open used to accept any server missing from `~/.ssh/known_hosts` and send it your password and data, so an attacker could pose as the server.
 Now it raises `paramiko.SSHException: Server 'sftp.example.com' not found in known_hosts`, like OpenSSH in a script.
 Fix it in one of these ways:
@@ -25,6 +25,17 @@ Fix it in one of these ways:
    Host sftp.example.com
      StrictHostKeyChecking accept-new
    ```
+
+## SSH always applies `~/.ssh/config`
+
+Tracked in [#1013](https://github.com/piskvorky/smart_open/pull/1013).
+smart_open used to skip `~/.ssh/config` when user, password, port and `connect_kwargs` were all passed, so `connect_kwargs={}` instead of `None` silently turned the config off.
+Now the config always applies, and the values you pass still win over it.
+If you passed all of them, check that your config still fits:
+
+* A host that is an alias in `~/.ssh/config` now connects to its `HostName`.
+* `ConnectTimeout`, `Compression` and the GSSAPI options in the config now apply, unless `connect_kwargs` sets them.
+* `StrictHostKeyChecking no` in the config now accepts unknown servers.
 
 # v9.0.0
 
