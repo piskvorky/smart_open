@@ -2170,6 +2170,100 @@ def test_write_file_descriptor():
             assert fin.read() == "hello world"
 
 
+@pytest.mark.parametrize("multipart_upload", [True, False])
+@pytest.mark.parametrize(
+    ("extension", "options", "error"),
+    [
+        (".gz", {"compression_kwargs": {"compresslevel": 10}}, ValueError),
+        (".gz", {"encoding": "no-such-encoding"}, LookupError),
+        ("", {"encoding": "no-such-encoding"}, LookupError),
+    ],
+)
+@mock_s3
+def test_abort_when_open_fails(multipart_upload, extension, options, error):
+    """Abort an upload if compression or text wrapping fails during open."""
+    client = boto3.client("s3", region_name="us-east-1")
+    client.create_bucket(Bucket="test-bucket")
+    key = f"key{extension}"
+    client.put_object(Bucket="test-bucket", Key=key, Body=b"original contents")
+    streams = []
+    open_binary = smart_open_lib._open_binary_stream
+
+    def track_stream(*args, **kwargs):
+        stream = open_binary(*args, **kwargs)
+        streams.append(stream)
+        return stream
+
+    try:
+        with (
+            mock.patch.object(smart_open_lib, "_open_binary_stream", side_effect=track_stream),
+            pytest.raises(error),
+        ):
+            smart_open.open(
+                f"s3://test-bucket/{key}",
+                "w",
+                transport_params={"client": client, "multipart_upload": multipart_upload},
+                **options,
+            )
+        assert streams[0].closed
+        assert client.list_multipart_uploads(Bucket="test-bucket").get("Uploads", []) == []
+        assert client.get_object(Bucket="test-bucket", Key=key)["Body"].read() == b"original contents"
+    finally:
+        for stream in streams:
+            stream.terminate()
+
+
+@pytest.mark.parametrize("multipart_upload", [True, False])
+@pytest.mark.parametrize("raise_on_exit", [True, False])
+@mock_s3
+def test_open_failure_with_custom_compressor(multipart_upload, raise_on_exit):
+    """Do not suppress opening errors or commit uploads during compressor cleanup."""
+    client = boto3.client("s3", region_name="us-east-1")
+    client.create_bucket(Bucket="test-bucket")
+    client.put_object(Bucket="test-bucket", Key="key.cleanup", Body=b"original contents")
+    errors = []
+    streams = []
+    cleanup_error = RuntimeError("compressor cleanup failed")
+
+    class Compressor(io.BytesIO):
+        def __exit__(self, exc_type, exc_value, traceback):
+            errors.append(exc_value)
+            self.close()
+            if raise_on_exit:
+                raise cleanup_error
+            return True
+
+    def compress(stream, _mode):
+        streams.append(stream)
+        return Compressor()
+
+    try:
+        with mock.patch.dict(smart_open.compression._COMPRESSOR_REGISTRY):
+            smart_open.register_compressor(".cleanup", compress)
+            with pytest.raises(RuntimeError if raise_on_exit else LookupError) as caught:
+                smart_open.open(
+                    "s3://test-bucket/key.cleanup",
+                    "w",
+                    encoding="no-such-encoding",
+                    transport_params={"client": client, "multipart_upload": multipart_upload},
+                )
+
+        assert len(errors) == 1
+        assert isinstance(errors[0], LookupError)
+        if raise_on_exit:
+            assert caught.value is cleanup_error
+            assert cleanup_error.__context__ is errors[0]
+        else:
+            assert caught.value is errors[0]
+        assert client.list_multipart_uploads(Bucket="test-bucket").get("Uploads", []) == []
+        assert (
+            client.get_object(Bucket="test-bucket", Key="key.cleanup")["Body"].read() == b"original contents"
+        )
+    finally:
+        for stream in streams:
+            stream.terminate()
+
+
 @pytest.mark.parametrize("extension", ["", ".gz"])
 @mock_s3
 def test_abort_when_outer_exit_fails(extension):

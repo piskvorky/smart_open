@@ -262,40 +262,47 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
         raise NotImplementedError(ve.args[0]) from ve
 
     binary = _open_binary_stream(uri, binary_mode, transport_params)
-    name = getattr(binary, "name", None)
-    # prefer the stream's own name; if it's not string-like (e.g. ftp socket fileno), fall back to uri
-    filename = name if isinstance(name, str) else uri if isinstance(uri, str) else None
-    decompressed = so_compression.compression_wrapper(
-        binary,
-        binary_mode,
-        compression,
-        filename=filename,
-        compression_kwargs=compression_kwargs,
-    )
-
-    if "b" not in mode or explicit_encoding is not None:
-        decoded = _encoding_wrapper(
-            decompressed,
-            mode,
-            encoding=encoding,
-            errors=errors,
-            newline=newline,
+    decompressed = binary
+    try:
+        name = getattr(binary, "name", None)
+        # prefer the stream's own name; if it's not string-like (e.g. ftp socket fileno), fall back to uri
+        filename = name if isinstance(name, str) else uri if isinstance(uri, str) else None
+        decompressed = so_compression.compression_wrapper(
+            binary,
+            binary_mode,
+            compression,
+            filename=filename,
+            compression_kwargs=compression_kwargs,
         )
-    else:
-        decoded = decompressed
 
-    #
-    # There are some useful methods in the binary readers, e.g. to_boto3, that get
-    # hidden by the multiple layers of wrapping we just performed.  Promote
-    # them so they are visible to the user.
-    #
-    if decoded != binary:
-        promoted_attrs = ["to_boto3"]
-        for attr in promoted_attrs:
-            with contextlib.suppress(AttributeError):
-                setattr(decoded, attr, getattr(binary, attr))
+        if "b" not in mode or explicit_encoding is not None:
+            decoded = _encoding_wrapper(
+                decompressed,
+                mode,
+                encoding=encoding,
+                errors=errors,
+                newline=newline,
+            )
+        else:
+            decoded = decompressed
 
-    return cast("IO[Any]", so_utils.FileLikeProxy(decoded, binary))
+        #
+        # There are some useful methods in the binary readers, e.g. to_boto3, that get
+        # hidden by the multiple layers of wrapping we just performed.  Promote
+        # them so they are visible to the user.
+        #
+        if decoded != binary:
+            promoted_attrs = ["to_boto3"]
+            for attr in promoted_attrs:
+                with contextlib.suppress(AttributeError):
+                    setattr(decoded, attr, getattr(binary, attr))
+
+        return cast("IO[Any]", so_utils.FileLikeProxy(decoded, binary))
+    except BaseException as error:
+        cleanup = binary if decompressed is binary else so_utils.FileLikeProxy(decompressed, binary)
+        # A compressor's context exit must not suppress an error while opening.
+        cleanup.__exit__(type(error), error, error.__traceback__)
+        raise
 
 
 def _get_binary_mode(mode_str: str) -> str:  # noqa: C901  # legacy internal helper; refactor in a dedicated PR
