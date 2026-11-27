@@ -1,6 +1,8 @@
 import logging
 import os
+import socket
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -223,7 +225,10 @@ class SSHOpen(unittest.TestCase):
             smart_open.open("ssh://user:pass@some-host/path")
             smart_open.open("ssh://user:pass@lax-host/path")
             policies = {key[0]: type(client._policy) for key, client in smart_open.ssh._SSH.items()}
-            assert policies == {"some-host": paramiko.RejectPolicy, "lax-host": paramiko.AutoAddPolicy}
+            assert policies == {
+                "some-host": paramiko.RejectPolicy,
+                "lax-host": smart_open.ssh._AcceptFirstHostKey,
+            }
 
     @mock_ssh
     def test_known_hosts_param_trusts_its_host_keys(self, mock_connect, get_transp_mock):
@@ -238,6 +243,52 @@ class SSHOpen(unittest.TestCase):
             )
             (client,) = smart_open.ssh._SSH.values()
             assert client._system_host_keys.check("some-host", key)
+
+    def serve_ssh(self, host_key):
+        """Return a socket to an in-process SSH server that presents host_key and rejects every login."""
+        client_sock, server_sock = socket.socketpair()
+        self.addCleanup(client_sock.close)
+        server = paramiko.Transport(server_sock)
+        self.addCleanup(server.close)
+        server.add_server_key(host_key)
+        server.start_server(event=threading.Event(), server=paramiko.ServerInterface())
+        return client_sock
+
+    def test_accepted_host_key_is_pinned_for_the_process(self):
+        """A key accepted under StrictHostKeyChecking accept-new is the only key a later connection accepts."""
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "ssh.cfg"
+            config.write_text("Host tofu-host\n  StrictHostKeyChecking accept-new\n")
+            smart_open.ssh._SSH_CONFIG_FILES = [str(config)]
+            smart_open.ssh._ACCEPTED_HOST_KEYS.clear()  # test reaches into private state
+            first_key, other_key = paramiko.ECDSAKey.generate(), paramiko.ECDSAKey.generate()
+
+            def connect(host_key):
+                connect_kwargs = {
+                    "sock": self.serve_ssh(host_key),
+                    "look_for_keys": False,
+                    "allow_agent": False,
+                }
+                smart_open.open(
+                    "ssh://user:pass@tofu-host/path", transport_params={"connect_kwargs": connect_kwargs}
+                )
+
+            with pytest.raises(paramiko.AuthenticationException):  # past the host key check
+                connect(first_key)
+            with pytest.raises(paramiko.BadHostKeyException):
+                connect(other_key)
+            with pytest.raises(paramiko.AuthenticationException):
+                connect(first_key)
+
+    def test_rejected_host_key_closes_the_connection(self):
+        """A connection rejected at the host key check does not keep its socket and transport thread open."""
+        sock = self.serve_ssh(paramiko.ECDSAKey.generate())
+        connect_kwargs = {"sock": sock, "look_for_keys": False, "allow_agent": False}
+        with pytest.raises(SSHException, match="not found in known_hosts"):
+            smart_open.open(
+                "ssh://user:pass@unknown-host/path", transport_params={"connect_kwargs": connect_kwargs}
+            )
+        assert sock.fileno() == -1
 
     @mock_ssh
     def test_password_skips_config_identityfile(self, mock_connect, get_transp_mock):

@@ -47,6 +47,24 @@ logger = logging.getLogger(__name__)
 #
 _SSH: dict[tuple, paramiko.SSHClient] = {}
 
+#
+# Host keys accepted because ~/.ssh/config opts out of StrictHostKeyChecking,
+# so later connections in this process, like reconnects, reject any other key.
+#
+_ACCEPTED_HOST_KEYS: dict[str, paramiko.PKey] = {}
+
+
+class _AcceptFirstHostKey:
+    """Paramiko missing host key policy that trusts the first key of a host for the rest of the process."""
+
+    def missing_host_key(self, client: paramiko.SSHClient, hostname: str, key: paramiko.PKey) -> None:
+        """Accept the first key seen for hostname, and reject any other key for it."""
+        # setdefault is atomic, so concurrent first connections to a host agree on one key
+        accepted = _ACCEPTED_HOST_KEYS.setdefault(hostname, key)
+        if accepted != key:
+            raise paramiko.BadHostKeyException(hostname, key, accepted)
+
+
 SCHEMES = ("ssh", "scp", "sftp")
 """Supported URL schemes."""
 
@@ -245,7 +263,8 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
     Note:
         Like OpenSSH without a terminal, a host whose key is not in ~/.ssh/known_hosts
         or ``known_hosts`` is rejected, unless ~/.ssh/config sets ``StrictHostKeyChecking no`` or ``accept-new``
-        for that host. Its key is then accepted for this process, but not saved.
+        for that host. Its first key is then trusted for the rest of the process, but not saved,
+        so a later connection to that host that presents another key is rejected.
 
         If ``username`` or ``password`` are specified in *both* the uri and
         ``transport_params``, ``transport_params`` will take precedence.
@@ -266,15 +285,19 @@ def open(  # noqa: PLR0913  # legacy public API; refactor in a dedicated PR
         ssh.load_system_host_keys()
         if known_hosts:
             ssh.load_system_host_keys(known_hosts)  # adds to ~/.ssh/known_hosts, and is never written to
-        # auto add only when ~/.ssh/config opts out of StrictHostKeyChecking
+        # accept new hosts only when ~/.ssh/config opts out of StrictHostKeyChecking
         ssh.set_missing_host_key_policy(
-            paramiko.AutoAddPolicy() if auto_add_host_keys else paramiko.RejectPolicy()
+            _AcceptFirstHostKey() if auto_add_host_keys else paramiko.RejectPolicy()
         )
         kwargs = connect_kwargs.copy()
         if "key_filename" not in kwargs:
             kwargs.setdefault("password", password)
         kwargs.setdefault("username", user)
-        ssh.connect(host, port, **kwargs)
+        # paramiko leaves the transport thread and socket running when connect fails, so close the client then
+        with contextlib.ExitStack() as on_failure:
+            on_failure.callback(ssh.close)
+            ssh.connect(host, port, **kwargs)
+            on_failure.pop_all()
         return ssh
 
     sftp_client: paramiko.SFTPClient | None = None
