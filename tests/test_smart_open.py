@@ -2170,6 +2170,45 @@ def test_write_file_descriptor():
             assert fin.read() == "hello world"
 
 
+@pytest.mark.parametrize("multipart_upload", [True, False])
+@pytest.mark.parametrize(
+    ("extension", "options", "error"),
+    [
+        (".gz", {"compression_kwargs": {"compresslevel": 10}}, ValueError),
+        (".gz", {"encoding": "no-such-encoding"}, LookupError),
+        ("", {"encoding": "no-such-encoding"}, LookupError),
+    ],
+)
+@mock_s3
+def test_abort_when_open_fails(multipart_upload, extension, options, error):
+    """Abort an upload if compression or text wrapping fails during open."""
+    client = boto3.client("s3", region_name="us-east-1")
+    client.create_bucket(Bucket="test-bucket")
+    key = f"key{extension}"
+    client.put_object(Bucket="test-bucket", Key=key, Body=b"original contents")
+    streams = []
+    open_binary = smart_open_lib._open_binary_stream
+
+    def track_stream(*args, **kwargs):
+        stream = open_binary(*args, **kwargs)
+        streams.append(stream)
+        return stream
+
+    with (
+        mock.patch.object(smart_open_lib, "_open_binary_stream", side_effect=track_stream),
+        pytest.raises(error),
+    ):
+        smart_open.open(
+            f"s3://test-bucket/{key}",
+            "w",
+            transport_params={"client": client, "multipart_upload": multipart_upload},
+            **options,
+        )
+    assert streams[0].closed
+    assert client.list_multipart_uploads(Bucket="test-bucket").get("Uploads", []) == []
+    assert client.get_object(Bucket="test-bucket", Key=key)["Body"].read() == b"original contents"
+
+
 @pytest.mark.parametrize("extension", ["", ".gz"])
 @mock_s3
 def test_abort_when_outer_exit_fails(extension):

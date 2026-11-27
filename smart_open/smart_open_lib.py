@@ -265,24 +265,30 @@ def open(  # noqa: C901, PLR0913  # legacy public API; refactor in a dedicated P
     name = getattr(binary, "name", None)
     # prefer the stream's own name; if it's not string-like (e.g. ftp socket fileno), fall back to uri
     filename = name if isinstance(name, str) else uri if isinstance(uri, str) else None
-    decompressed = so_compression.compression_wrapper(
-        binary,
-        binary_mode,
-        compression,
-        filename=filename,
-        compression_kwargs=compression_kwargs,
-    )
-
-    if "b" not in mode or explicit_encoding is not None:
-        decoded = _encoding_wrapper(
-            decompressed,
-            mode,
-            encoding=encoding,
-            errors=errors,
-            newline=newline,
+    # the caller gets no stream to exit when wrapping fails, so exit the opened layers, aborting rather than committing a write
+    with contextlib.ExitStack() as on_failure:
+        on_failure.push(binary)
+        decompressed = so_compression.compression_wrapper(
+            binary,
+            binary_mode,
+            compression,
+            filename=filename,
+            compression_kwargs=compression_kwargs,
         )
-    else:
-        decoded = decompressed
+        if decompressed is not binary:
+            on_failure.push(decompressed)
+
+        if "b" not in mode or explicit_encoding is not None:
+            decoded = _encoding_wrapper(
+                decompressed,
+                mode,
+                encoding=encoding,
+                errors=errors,
+                newline=newline,
+            )
+        else:
+            decoded = decompressed
+        on_failure.pop_all()
 
     #
     # There are some useful methods in the binary readers, e.g. to_boto3, that get
