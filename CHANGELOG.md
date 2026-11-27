@@ -1,3 +1,10 @@
+# 10.0.1, 2026-11-27
+
+- [ssh] Pin the host key accepted under StrictHostKeyChecking no or accept-new for the rest of the process (PR [#1015](https://github.com/piskvorky/smart_open/pull/1015), [@ddelange](https://github.com/ddelange))
+- [ssh] Close the client when connecting fails, so a rejected host key leaves no socket and thread running (PR [#1016](https://github.com/piskvorky/smart_open/pull/1016), [@ddelange](https://github.com/ddelange))
+- Close transports when compression or encoding setup fails (PR [#1018](https://github.com/piskvorky/smart_open/pull/1018), [@ddelange](https://github.com/ddelange))
+- Pin Python 3.10 and all extras in update_helptext.py, so help.txt matches CI from any environment (PR [#1019](https://github.com/piskvorky/smart_open/pull/1019), [@ddelange](https://github.com/ddelange))
+
 # 10.0.0, 2026-11-20
 
 - [ssh] Reject unknown host keys by default and add a known_hosts transport param (PR [#1012](https://github.com/piskvorky/smart_open/pull/1012), [@kakkar87d](https://github.com/kakkar87d))
