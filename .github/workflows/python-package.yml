@@ -67,8 +67,8 @@ jobs:
     - name: Check whether help.txt update was forgotten
       if: matrix.python-version == '3.10' && startsWith(matrix.os, 'ubuntu') && github.event_name == 'pull_request'
       run: |
-        python update_helptext.py
-        test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "python update_helptext.py" was forgotten' && exit 1 )
+        ./update_helptext.py
+        test ! "$(git diff)" && echo "no changes" || ( git diff && echo 'looks like "./update_helptext.py" was forgotten' && exit 1 )
 
     - name: Run unit tests
       # configuration in pyproject.toml
