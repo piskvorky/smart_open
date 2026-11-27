@@ -5,7 +5,10 @@
 # [tool.uv.sources]
 # smart_open = { path = ".", editable = true }
 # ///
-"""Write out help.txt based on the current codebase."""
+"""Write out help.txt based on the current codebase.
+
+Run it as ./update_helptext.py, which needs uv: python update_helptext.py ignores the Python and extras pinned above.
+"""
 
 import pydoc
 from pathlib import Path
